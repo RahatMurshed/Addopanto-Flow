@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +34,8 @@ import { useAccountBalances, useCreateExpense } from "@/hooks/useExpenses";
 import { useCreateRevenue } from "@/hooks/useRevenues";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency as formatCurrencyUtil, formatCurrencyPrecise } from "@/utils/currencyUtils";
+import { usePagination } from "@/hooks/usePagination";
+import TablePagination from "@/components/TablePagination";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -83,8 +85,8 @@ export default function Dashboard() {
         supabase.from("allocations").select("amount").eq("user_id", user.id),
         supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active").eq("user_id", user.id),
         supabase.from("revenue_sources").select("id, name").eq("user_id", user.id),
-        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
-        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
       ]);
 
       if (revenuesRes.error) throw revenuesRes.error;
@@ -125,8 +127,7 @@ export default function Dashboard() {
           createdAt: e.created_at,
         })),
       ]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 10);
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       const totalRevenue = revenues.reduce((sum, r) => sum + Number(r.amount), 0);
       const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -295,6 +296,9 @@ export default function Dashboard() {
     expenseBreakdown: [],
     recentTransactions: [],
   };
+
+  // Pagination for recent transactions
+  const transactionsPagination = usePagination(data.recentTransactions);
 
   const metrics = [
     { label: "Total Revenue", value: formatCurrency(data.totalRevenue), icon: TrendingUp, color: "text-primary" },
@@ -616,53 +620,69 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           {data.recentTransactions.length > 0 ? (
-            <div className="space-y-3">
-              {data.recentTransactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "flex h-9 w-9 items-center justify-center rounded-full",
-                        tx.type === "revenue"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-destructive/10 text-destructive"
-                      )}
-                    >
-                      {tx.type === "revenue" ? (
-                        <ArrowUpRight className="h-4 w-4" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{tx.description}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{format(new Date(tx.date), "MMM d, yyyy")}</span>
-                        {tx.category && (
-                          <>
-                            <span>•</span>
-                            <Badge variant="secondary" className="text-xs">
-                              {tx.category}
-                            </Badge>
-                          </>
+            <>
+              <div className="space-y-3">
+                {transactionsPagination.paginatedItems.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-full",
+                          tx.type === "revenue"
+                            ? "bg-primary/10 text-primary"
+                            : "bg-destructive/10 text-destructive"
+                        )}
+                      >
+                        {tx.type === "revenue" ? (
+                          <ArrowUpRight className="h-4 w-4" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4" />
                         )}
                       </div>
+                      <div>
+                        <p className="font-medium">{tx.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{format(new Date(tx.date), "MMM d, yyyy")}</span>
+                          {tx.category && (
+                            <>
+                              <span>•</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {tx.category}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                    <p
+                      className={cn(
+                        "font-bold",
+                        tx.type === "revenue" ? "text-primary" : "text-destructive"
+                      )}
+                    >
+                      {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
+                    </p>
                   </div>
-                  <p
-                    className={cn(
-                      "font-bold",
-                      tx.type === "revenue" ? "text-primary" : "text-destructive"
-                    )}
-                  >
-                    {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              {data.recentTransactions.length > 10 && (
+                <TablePagination
+                  currentPage={transactionsPagination.currentPage}
+                  totalPages={transactionsPagination.totalPages}
+                  totalItems={transactionsPagination.totalItems}
+                  startIndex={transactionsPagination.startIndex}
+                  endIndex={transactionsPagination.endIndex}
+                  itemsPerPage={transactionsPagination.itemsPerPage}
+                  onPageChange={transactionsPagination.goToPage}
+                  onItemsPerPageChange={transactionsPagination.setItemsPerPage}
+                  canGoNext={transactionsPagination.canGoNext}
+                  canGoPrev={transactionsPagination.canGoPrev}
+                />
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Receipt className="mb-2 h-8 w-8 text-muted-foreground" />
