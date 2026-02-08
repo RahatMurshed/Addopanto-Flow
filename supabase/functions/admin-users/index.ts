@@ -121,10 +121,8 @@ Deno.serve(async (req) => {
         return json(403, { error: "Cannot delete cipher users" });
       }
 
-      // Delete user from auth.users
-      const { error: deleteError } = await adminClient.auth.admin.deleteUser(
-        userId,
-      );
+      // Delete user from auth.users (cascade will handle related data)
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
       if (deleteError) {
         console.error("Error deleting user:", deleteError);
@@ -139,8 +137,112 @@ Deno.serve(async (req) => {
       return json(200, { success: true });
     };
 
+    const handleApproveUser = async (
+      userId: string,
+      permissions: { can_add_revenue: boolean; can_add_expense: boolean; can_view_reports: boolean }
+    ) => {
+      // Update registration request status
+      const { error: updateError } = await adminClient
+        .from("registration_requests")
+        .update({
+          status: "approved",
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+          can_add_revenue: permissions.can_add_revenue,
+          can_add_expense: permissions.can_add_expense,
+          can_view_reports: permissions.can_view_reports,
+        })
+        .eq("user_id", userId)
+        .eq("status", "pending");
+
+      if (updateError) {
+        console.error("Error updating registration request:", updateError);
+        return json(500, { error: "Failed to update registration request" });
+      }
+
+      // Create user role as moderator
+      const { error: roleInsertError } = await adminClient
+        .from("user_roles")
+        .insert({
+          user_id: userId,
+          role: "moderator",
+          assigned_by: user.id,
+        });
+
+      if (roleInsertError) {
+        console.error("Error inserting user role:", roleInsertError);
+        return json(500, { error: "Failed to assign user role" });
+      }
+
+      // Create moderator permissions
+      const { error: permError } = await adminClient
+        .from("moderator_permissions")
+        .insert({
+          user_id: userId,
+          can_add_revenue: permissions.can_add_revenue,
+          can_add_expense: permissions.can_add_expense,
+          can_view_reports: permissions.can_view_reports,
+          controlled_by: user.id,
+        });
+
+      if (permError) {
+        console.error("Error inserting moderator permissions:", permError);
+        return json(500, { error: "Failed to set moderator permissions" });
+      }
+
+      return json(200, { success: true });
+    };
+
+    const handleRejectUser = async (userId: string, reason?: string) => {
+      // Update registration request status first
+      const { error: updateError } = await adminClient
+        .from("registration_requests")
+        .update({
+          status: "rejected",
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+          rejection_reason: reason || null,
+        })
+        .eq("user_id", userId)
+        .eq("status", "pending");
+
+      if (updateError) {
+        console.error("Error updating registration request:", updateError);
+        return json(500, { error: "Failed to update registration request" });
+      }
+
+      // Delete user from auth.users
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+
+      if (deleteError) {
+        console.error("Error deleting rejected user:", deleteError);
+        return json(500, { error: "Failed to delete user account" });
+      }
+
+      return json(200, { success: true });
+    };
+
     // Handle GET - List users with emails
     if (req.method === "GET") {
+      const url = new URL(req.url);
+      const pendingOnly = url.searchParams.get("pending") === "true";
+
+      if (pendingOnly) {
+        // Return pending registration requests
+        const { data: requests, error: reqError } = await adminClient
+          .from("registration_requests")
+          .select("*")
+          .eq("status", "pending")
+          .order("requested_at", { ascending: false });
+
+        if (reqError) {
+          console.error("Error fetching pending requests:", reqError);
+          return json(500, { error: "Failed to fetch pending requests" });
+        }
+
+        return json(200, { requests });
+      }
+
       // Get all users from auth.users using admin API
       const { data: authUsers, error: authError } =
         await adminClient.auth.admin.listUsers();
@@ -188,16 +290,36 @@ Deno.serve(async (req) => {
       return json(200, { users });
     }
 
-    // Handle POST - Delete a user (invoke() friendly)
+    // Handle POST - Delete, approve, or reject a user
     if (req.method === "POST") {
       const body = (await req.json().catch(() => null)) as
-        | { userId?: string }
+        | { 
+            action?: string;
+            userId?: string;
+            permissions?: { can_add_revenue: boolean; can_add_expense: boolean; can_view_reports: boolean };
+            reason?: string;
+          }
         | null;
 
       if (!body?.userId) {
         return json(400, { error: "Missing userId" });
       }
 
+      // Handle different actions
+      if (body.action === "approve") {
+        const permissions = body.permissions || {
+          can_add_revenue: true,
+          can_add_expense: true,
+          can_view_reports: true,
+        };
+        return await handleApproveUser(body.userId, permissions);
+      }
+
+      if (body.action === "reject") {
+        return await handleRejectUser(body.userId, body.reason);
+      }
+
+      // Default: delete user (backward compatibility)
       return await handleDeleteUser(body.userId);
     }
 

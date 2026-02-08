@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
+import { usePendingRequestsCount } from "@/hooks/usePendingRequestsCount";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserRoleBadge } from "@/components/UserRoleBadge";
 import {
@@ -17,6 +19,7 @@ import {
   X,
   Users,
   Shield,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +35,7 @@ const baseNavItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
   const { role, canManageUsers, isCipher, isAdmin } = useRole();
+  const pendingCount = usePendingRequestsCount();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -41,6 +45,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...baseNavItems,
     // User Management - visible to Admin and Cipher only
     ...(canManageUsers ? [{ label: "Users", href: "/users", icon: Users }] : []),
+    // Registration Requests - visible to Admin and Cipher only
+    ...((isAdmin || isCipher) ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
     // Moderator Control - visible to Admin and Cipher only
     ...((isAdmin || isCipher) ? [{ label: "Moderators", href: "/moderators", icon: Shield }] : []),
   ];
@@ -81,6 +87,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <item.icon className="h-4 w-4" />
               {item.label}
+              {"badge" in item && item.badge > 0 && (
+                <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
+                  {item.badge}
+                </Badge>
+              )}
             </Link>
           ))}
         </nav>
@@ -127,6 +138,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
+                  {"badge" in item && item.badge > 0 && (
+                    <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
+                      {item.badge}
+                    </Badge>
+                  )}
                 </Link>
               ))}
               <Button variant="ghost" className="mt-2 w-full justify-start gap-3 text-muted-foreground" onClick={handleLogout}>
