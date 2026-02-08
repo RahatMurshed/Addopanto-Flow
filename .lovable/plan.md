@@ -1,158 +1,191 @@
 
 
-# User Registration Approval System
+# Fix Registration Approval Flow - Updated Plan
 
-This plan implements a complete registration approval workflow where new users must request access and wait for Admin/Cipher approval before gaining access to the application.
+This plan fixes the registration approval system to ensure:
+1. New users CANNOT access the app until approved - they stay on pending screen
+2. Rejected users are IMMEDIATELY logged out
+3. Approved users become **Moderators only** with permissions set during approval
+4. Quick action buttons (Add Revenue/Expense/Transfer) only show if moderator has those specific permissions
 
-## Overview
+---
 
-When a new user registers:
-1. They create a "pending" registration request instead of getting immediate access
-2. They see a "Pending Approval" screen after registration
-3. Admins and Ciphers see pending requests in a new approval interface
-4. When approving, admins can set the user's permissions (for moderator access)
-5. Approved users become moderators by default with configured permissions
-6. Rejected requests are removed from the system entirely (auth + database)
+## Core Problem Analysis
 
-## Database Changes
+The current system has these issues:
 
-### 1. New Table: `registration_requests`
+1. **`useUserRole` defaults to "user" role** - When no role is found in `user_roles`, it returns `"user"` as default
+2. **RoleContext grants permissions to "user"** - The logic `canAddRevenue = ... || isUser` gives pending users full access
+3. **No force logout on rejection** - When admin rejects, the user's session remains active
+4. **Dashboard buttons always visible** - Quick actions aren't wrapped with permission guards
 
-```sql
-CREATE TABLE public.registration_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  requested_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  reviewed_at TIMESTAMP WITH TIME ZONE,
-  reviewed_by UUID,
-  rejection_reason TEXT,
-  -- Pre-configured permissions (set during approval)
-  can_add_revenue BOOLEAN NOT NULL DEFAULT true,
-  can_add_expense BOOLEAN NOT NULL DEFAULT true,
-  can_view_reports BOOLEAN NOT NULL DEFAULT true
-);
+---
 
-ALTER TABLE public.registration_requests ENABLE ROW LEVEL SECURITY;
+## Solution
+
+### Flow After Fix
+
+```text
+New User Registers
+       |
+       v
+Trigger creates: user_profiles + registration_requests (status=pending)
+NO user_roles entry created
+       |
+       v
+User logs in -> useUserRole finds NO role -> returns null, hasNoRole=true
+       |
+       v  
+useRegistrationStatus finds pending request -> status="pending"
+       |
+       v
+ProtectedRoute redirects to /pending (blocked from app)
+       |
+       v
+[Admin Approves]
+  - Creates user_roles with role="moderator"
+  - Creates moderator_permissions with configured permissions
+       |
+       v
+User's poll detects has_role -> redirects to Dashboard
+User sees buttons ONLY for permissions they were granted
 ```
 
-### 2. RLS Policies for `registration_requests`
+---
 
-- **Users can view their own request**: For showing pending status
-- **Admins/Ciphers can view all pending requests**: For the approval interface
-- **Admins/Ciphers can update requests**: For approve/reject actions
-- **Users can insert their own request**: Created during signup
+## File Changes
 
-### 3. Update `handle_new_user` Trigger
+### 1. Update `src/hooks/useUserRole.ts`
 
-Instead of automatically assigning the "user" role, the trigger will:
-1. Create the user_profiles entry (as before)
-2. Create a registration_request with status = 'pending'
-3. NOT create a user_roles entry (no role until approved)
+**What changes:**
+- Return `null` instead of `"user"` when no role found in database
+- Add `hasNoRole` boolean flag to indicate pending status
+- `isUser` only true when role is explicitly `"user"` from database
 
-## Edge Function Updates
+**Key logic change:**
+```typescript
+// Before: return (data?.role as AppRole) ?? "user";
+// After: return data?.role as AppRole | null ?? null;
 
-### Update `admin-users` Edge Function
-
-Add new endpoints:
-- **GET with `?pending=true`**: List all pending registration requests
-- **POST with `action: 'approve'`**: Approve a request, set role to moderator, create permissions
-- **POST with `action: 'reject'`**: Reject a request and delete user from auth
-
-## Frontend Changes
-
-### 1. New Component: `PendingApprovalPage.tsx`
-
-A waiting screen shown to users whose registration is pending:
-- Shows "Your registration is pending approval" message
-- Option to sign out
-- Polls periodically to check if approved
-
-### 2. Update Auth Flow in `App.tsx`
-
-After authentication, check if user has a role:
-- If no role exists, check for pending registration_request
-- If pending, show `PendingApprovalPage`
-- If approved, proceed normally
-- If rejected (shouldn't happen - user deleted), show error
-
-### 3. New Page: `RegistrationRequests.tsx`
-
-Admin interface showing:
-- Table of pending registration requests with email, requested date
-- For each request: Approve / Reject buttons
-- Approve opens a dialog to configure permissions before confirming
-- Reject shows confirmation dialog with optional reason
-
-### 4. Update Navigation
-
-Add "Requests" link in sidebar for Admin/Cipher users (with badge showing count)
-
-### 5. Update User Deletion
-
-Ensure that when deleting a user:
-- User is deleted from auth.users (already implemented)
-- Cascade deletes handle registration_requests automatically (via foreign key)
-
-## Detailed Component Breakdown
-
-### PendingApprovalPage Component
-```
-- Logo and app name
-- "Registration Pending" heading
-- Description: "Your account is awaiting approval from an administrator"
-- Sign Out button
-- Auto-refresh every 10 seconds to check status
+const role = userRole; // Can be null now
+const hasNoRole = role === null;
+const isUser = role === "user"; // Only true if DB says "user"
 ```
 
-### RegistrationRequests Page
-```
-- Header: "Registration Requests"
-- Tabs: Pending | Approved | Rejected (optional, could show history)
-- Table columns: Email | Requested | Actions
-- Approve button opens dialog with:
-  - Permission toggles (same as ModeratorPermissionsCard)
-  - Confirm Approve button
-- Reject button opens confirmation dialog
-```
+### 2. Update `src/contexts/RoleContext.tsx`
 
-### Approval Flow
-```
-1. Admin clicks Approve on a pending request
-2. Dialog appears with permission toggles (pre-checked by default)
-3. Admin adjusts permissions as needed
-4. Clicks "Approve & Grant Access"
-5. Backend:
-   a. Updates registration_request status to 'approved'
-   b. Creates user_roles entry with role = 'moderator'
-   c. Creates moderator_permissions entry with selected permissions
-6. User's next status check redirects them to dashboard
+**What changes:**
+- Import `hasNoRole` from useUserRole
+- Block ALL permissions when user has no role
+- Permissions only granted to confirmed role holders
+
+**Updated permission logic:**
+```typescript
+// Moderator-only permissions (no "isUser" fallback)
+const canAddRevenue = isCipher || isAdmin || (isModerator && modCanAddRevenue);
+const canAddExpense = isCipher || isAdmin || (isModerator && modCanAddExpense);
+const canViewReports = isCipher || isAdmin || (isModerator && modCanViewReports);
+
+// Edit/Delete: Only Cipher and Admin (moderators are add-only)
+const canEdit = isCipher || isAdmin;
+const canDelete = isCipher || isAdmin;
 ```
 
-## File Changes Summary
+### 3. Update `src/hooks/useRegistrationStatus.ts`
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/migrations/[new].sql` | Create | Add registration_requests table, RLS policies, update trigger |
-| `supabase/functions/admin-users/index.ts` | Modify | Add pending requests list, approve/reject handlers |
-| `src/pages/PendingApproval.tsx` | Create | Waiting screen for pending users |
-| `src/pages/RegistrationRequests.tsx` | Create | Admin approval interface |
-| `src/App.tsx` | Modify | Add route for /pending and /requests, update ProtectedRoute logic |
-| `src/components/AppLayout.tsx` | Modify | Add Requests nav link with pending count badge |
-| `src/hooks/useRegistrationStatus.ts` | Create | Hook to check if user is pending/approved |
-| `src/contexts/AuthContext.tsx` | Modify | Add registration status check |
+**What changes:**
+- Handle `"rejected"` status by triggering automatic logout
+- Import and use `signOut` from AuthContext
+- When status is "rejected", call signOut() immediately
 
-## Security Considerations
+**Key additions:**
+```typescript
+// When rejected status detected:
+if (requestData?.status === "rejected") {
+  setStatus("rejected");
+  // Force logout will happen in PendingApproval component
+}
+```
 
-1. **Pending users cannot access any protected routes** - they're blocked at the ProtectedRoute level
-2. **Only Admin/Cipher can approve/reject** - enforced via RLS and edge function checks
-3. **Rejected users are fully deleted** - no orphan accounts in auth.users
-4. **Cipher users remain invisible** - approval requests don't expose cipher status
+### 4. Update `src/pages/PendingApproval.tsx`
 
-## Technical Notes
+**What changes:**
+- Handle rejected status with auto-logout
+- Show rejection message briefly before logging out
+- Ensure pending users cannot navigate away
 
-- The `registration_requests` table uses a foreign key to `auth.users` with CASCADE delete, so if an auth user is deleted, their request is automatically cleaned up
-- Polling interval of 10 seconds balances user experience with server load
-- Approved users get the "moderator" role as specified, with permissions pre-configured during approval
+**Key additions:**
+```typescript
+useEffect(() => {
+  if (status === "rejected") {
+    toast({ title: "Access Denied", description: "Your registration was rejected." });
+    setTimeout(async () => {
+      await signOut();
+      navigate("/auth");
+    }, 2000);
+  }
+}, [status]);
+```
+
+### 5. Update `src/pages/Dashboard.tsx`
+
+**What changes:**
+- Import `PermissionGuard` from RoleGuard
+- Wrap quick action buttons with appropriate permission guards
+- Add Revenue button: requires `canAddRevenue`
+- Add Expense button: requires `canAddExpense`
+- Transfer button: requires both `canAddExpense` (transfer is an expense operation)
+
+**Example:**
+```typescript
+<PermissionGuard permission="canAddRevenue">
+  <Button onClick={() => setRevenueDialogOpen(true)}>
+    <Plus /> Add Revenue
+  </Button>
+</PermissionGuard>
+
+<PermissionGuard permission="canAddExpense">
+  <Button onClick={() => setExpenseDialogOpen(true)}>
+    <Plus /> Add Expense
+  </Button>
+</PermissionGuard>
+
+<PermissionGuard permission="canAddExpense">
+  <Button onClick={() => setTransferDialogOpen(true)}>
+    <ArrowLeftRight /> Transfer
+  </Button>
+</PermissionGuard>
+```
+
+---
+
+## Permission Hierarchy (Updated)
+
+| Role | canAddRevenue | canAddExpense | canViewReports | canEdit | canDelete |
+|------|---------------|---------------|----------------|---------|-----------|
+| cipher | Always Yes | Always Yes | Always Yes | Yes | Yes |
+| admin | Always Yes | Always Yes | Always Yes | Yes | Yes |
+| moderator | If granted | If granted | If granted | No | No |
+| pending (no role) | No | No | No | No | No |
+
+---
+
+## Summary of Changes
+
+| File | Change Type | Purpose |
+|------|-------------|---------|
+| `src/hooks/useUserRole.ts` | Modify | Return null when no role, add `hasNoRole` flag |
+| `src/contexts/RoleContext.tsx` | Modify | Remove "isUser" fallback from all permissions |
+| `src/hooks/useRegistrationStatus.ts` | Modify | Detect rejected status for force logout |
+| `src/pages/PendingApproval.tsx` | Modify | Handle rejection with auto-logout |
+| `src/pages/Dashboard.tsx` | Modify | Wrap quick actions with PermissionGuard |
+
+---
+
+## Security Benefits
+
+1. **Zero access for pending users** - No role = no permissions
+2. **Immediate rejection enforcement** - Session terminated on rejection
+3. **Granular moderator control** - Each permission explicitly granted
+4. **No privilege escalation** - Moderators cannot edit/delete, only add if permitted
 
