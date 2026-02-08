@@ -9,6 +9,7 @@ import {
   useExpenseSummary,
   type ExpenseWithAccount,
 } from "@/hooks/useExpenses";
+import { useCreateKhataTransfer } from "@/hooks/useKhataTransfers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,8 +42,10 @@ import {
   Loader2,
   AlertTriangle,
   TrendingDown,
+  ArrowLeftRight,
 } from "lucide-react";
 import ExpenseDialog from "@/components/ExpenseDialog";
+import TransferDialog from "@/components/TransferDialog";
 
 export default function Expenses() {
   const { data: expenses = [], isLoading } = useExpenses();
@@ -51,9 +54,11 @@ export default function Expenses() {
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
   const deleteMutation = useDeleteExpense();
+  const transferMutation = useCreateKhataTransfer();
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseWithAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -121,10 +126,20 @@ export default function Expenses() {
           <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
           <p className="text-muted-foreground">Record and track your spending by khata</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} disabled={accounts.length === 0}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Expense
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setTransferDialogOpen(true)}
+            disabled={accounts.length < 2}
+          >
+            <ArrowLeftRight className="mr-2 h-4 w-4" />
+            Transfer
+          </Button>
+          <Button onClick={() => setDialogOpen(true)} disabled={accounts.length === 0}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Expense
+          </Button>
+        </div>
       </div>
 
       {accounts.length === 0 && (
@@ -337,6 +352,23 @@ export default function Expenses() {
         expense={editingExpense}
         accounts={accounts}
         onSave={editingExpense ? handleUpdate : handleCreate}
+      />
+
+      {/* Transfer Dialog */}
+      <TransferDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
+        accounts={accounts}
+        onTransfer={async (data) => {
+          await transferMutation.mutateAsync(data);
+          const fromAcc = accounts.find((a) => a.id === data.from_account_id);
+          const toAcc = accounts.find((a) => a.id === data.to_account_id);
+          toast({
+            title: "Transfer complete",
+            description: `৳${data.amount.toLocaleString()} moved from ${fromAcc?.name} to ${toAcc?.name}`,
+          });
+        }}
+        isPending={transferMutation.isPending}
       />
 
       {/* Delete Confirmation */}
