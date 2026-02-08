@@ -109,3 +109,87 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Print styles for PDF export */
+@media print {
+  /* Hide navigation and non-essential UI elements */
+  nav,
+  aside,
+  header,
+  .no-print,
+  [data-sidebar],
+  [role="navigation"],
+  button:not(.print-include),
+  .export-buttons {
+    display: none !important;
+  }
+
+  /* Reset background colors for printing */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure content takes full width */
+  main,
+  .main-content {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Card styling for print */
+  .card,
+  [class*="Card"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Table styling for print */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border: 1px solid #e5e7eb !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Ensure charts and graphs print correctly */
+  svg {
+    max-width: 100% !important;
+  }
+
+  /* Color adjustments for better print visibility */
+  .text-primary {
+    color: #2563eb !important;
+  }
+
+  .text-destructive {
+    color: #dc2626 !important;
+  }
+
+  .text-success {
+    color: #16a34a !important;
+  }
+
+  /* Page break controls */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Ensure gradients show as solid colors */
+  [class*="gradient"] {
+    background: transparent !important;
+  }
+}

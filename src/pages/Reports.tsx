@@ -1,25 +1,31 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, getYear, getMonth } from "date-fns";
+import { format, endOfMonth, getYear, getMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useKhataTransfers } from "@/hooks/useKhataTransfers";
 import { useAccountBalances } from "@/hooks/useExpenses";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
+import AdvancedDateFilter from "@/components/AdvancedDateFilter";
+import ExportButtons from "@/components/ExportButtons";
+import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 
 export default function Reports() {
   const { user } = useAuth();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { data: transfers = [] } = useKhataTransfers();
   const { data: accounts = [] } = useAccountBalances();
+
+  const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
+    setDateRange(range);
+  }, []);
 
   const { data: reportData, isLoading } = useQuery({
     queryKey: ["reports", user?.id],
@@ -51,42 +57,12 @@ export default function Reports() {
     enabled: !!user,
   });
 
-  // Get available years from data
-  const availableYears = useMemo(() => {
-    if (!reportData) return [new Date().getFullYear().toString()];
-    const years = new Set<number>();
-    reportData.revenues.forEach((r) => years.add(getYear(new Date(r.date))));
-    reportData.expenses.forEach((e) => years.add(getYear(new Date(e.date))));
-    if (years.size === 0) years.add(new Date().getFullYear());
-    return Array.from(years).sort((a, b) => b - a).map(String);
-  }, [reportData]);
-
-  const months = [
-    { value: "all", label: "All Months" },
-    { value: "0", label: "January" },
-    { value: "1", label: "February" },
-    { value: "2", label: "March" },
-    { value: "3", label: "April" },
-    { value: "4", label: "May" },
-    { value: "5", label: "June" },
-    { value: "6", label: "July" },
-    { value: "7", label: "August" },
-    { value: "8", label: "September" },
-    { value: "9", label: "October" },
-    { value: "10", label: "November" },
-    { value: "11", label: "December" },
-  ];
-
-  // Filter data based on selection
+  // Filter data based on date range
   const filteredData = useMemo(() => {
-    if (!reportData) return { revenues: [], expenses: [], allocations: [] };
+    if (!reportData || !dateRange) return { revenues: [], expenses: [], allocations: [] };
 
-    const year = parseInt(selectedYear);
     const filterByDate = (date: string) => {
-      const d = new Date(date);
-      const matchesYear = getYear(d) === year;
-      const matchesMonth = selectedMonth === "all" || getMonth(d) === parseInt(selectedMonth);
-      return matchesYear && matchesMonth;
+      return date >= dateRange.start && date <= dateRange.end;
     };
 
     return {
@@ -94,7 +70,7 @@ export default function Reports() {
       expenses: reportData.expenses.filter((e) => filterByDate(e.date)),
       allocations: reportData.allocations,
     };
-  }, [reportData, selectedYear, selectedMonth]);
+  }, [reportData, dateRange]);
 
   // Calculate summaries
   const summary = useMemo(() => {
@@ -106,29 +82,25 @@ export default function Reports() {
     return { totalRevenue, totalExpenses, netProfit, transactionCount };
   }, [filteredData]);
 
-  // Monthly breakdown
+  // Monthly breakdown for the current year
   const monthlyBreakdown = useMemo(() => {
     if (!reportData) return [];
-    const year = parseInt(selectedYear);
+    const year = new Date().getFullYear();
     const breakdown: { month: string; revenue: number; expenses: number; profit: number }[] = [];
 
     for (let m = 0; m < 12; m++) {
       const monthStart = new Date(year, m, 1);
       const monthEnd = endOfMonth(monthStart);
       const monthLabel = format(monthStart, "MMMM");
+      const monthStartStr = format(monthStart, "yyyy-MM-dd");
+      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
 
       const monthRevenue = reportData.revenues
-        .filter((r) => {
-          const d = new Date(r.date);
-          return d >= monthStart && d <= monthEnd;
-        })
+        .filter((r) => r.date >= monthStartStr && r.date <= monthEndStr)
         .reduce((sum, r) => sum + Number(r.amount), 0);
 
       const monthExpenses = reportData.expenses
-        .filter((e) => {
-          const d = new Date(e.date);
-          return d >= monthStart && d <= monthEnd;
-        })
+        .filter((e) => e.date >= monthStartStr && e.date <= monthEndStr)
         .reduce((sum, e) => sum + Number(e.amount), 0);
 
       breakdown.push({
@@ -140,7 +112,7 @@ export default function Reports() {
     }
 
     return breakdown;
-  }, [reportData, selectedYear]);
+  }, [reportData]);
 
   // Account-wise breakdown
   const accountBreakdown = useMemo(() => {
@@ -191,7 +163,33 @@ export default function Reports() {
     return `৳${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // CSV Export functions
+  // Export handlers
+  const handleExportCSV = () => {
+    if (!reportData || !dateRange) return;
+    
+    const revenues = filteredData.revenues.map((r) => ({
+      date: r.date,
+      amount: Number(r.amount),
+      sourceName: reportData.sources.find((s) => s.id === r.source_id)?.name || "Uncategorized",
+      description: r.description,
+    }));
+
+    const expenses = filteredData.expenses.map((e) => ({
+      date: e.date,
+      amount: Number(e.amount),
+      accountName: reportData.accounts.find((a) => a.id === e.expense_account_id)?.name || "Uncategorized",
+      description: e.description,
+    }));
+
+    exportAllTransactionsCSV(revenues, expenses, dateRange.label);
+  };
+
+  const handleExportPDF = async () => {
+    if (!dateRange) return;
+    await exportToPDF("reports-content", "reports", "Financial Report", dateRange.label);
+  };
+
+  // CSV Export functions for individual tabs
   const downloadCSV = (data: any[], filename: string, headers: string[]) => {
     const csvContent = [
       headers.join(","),
@@ -201,7 +199,7 @@ export default function Reports() {
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${filename}_${selectedYear}${selectedMonth !== "all" ? `_${months.find(m => m.value === selectedMonth)?.label}` : ""}.csv`;
+    link.download = `${filename}_${dateRange?.label.replace(/[^a-zA-Z0-9]/g, "_") || "report"}.csv`;
     link.click();
   };
 
@@ -226,30 +224,6 @@ export default function Reports() {
     downloadCSV(data, "account_breakdown", ["Name", "Allocated", "Spent", "Balance", "Percentage"]);
   };
 
-  const exportTransactions = () => {
-    const revenueRows = filteredData.revenues.map((r) => ({
-      type: "Revenue",
-      date: r.date,
-      amount: r.amount,
-      description: r.description || "",
-      category: reportData?.sources.find((s) => s.id === r.source_id)?.name || "Uncategorized",
-    }));
-
-    const expenseRows = filteredData.expenses.map((e) => ({
-      type: "Expense",
-      date: e.date,
-      amount: e.amount,
-      description: e.description || "",
-      category: reportData?.accounts.find((a) => a.id === e.expense_account_id)?.name || "",
-    }));
-
-    const allTransactions = [...revenueRows, ...expenseRows].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    downloadCSV(allTransactions, "transactions", ["Type", "Date", "Amount", "Description", "Category"]);
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -259,38 +233,22 @@ export default function Reports() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" id="reports-content">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
           <p className="text-muted-foreground">Financial summaries and analytics</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map((year) => (
-                <SelectItem key={year} value={year}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((month) => (
-                <SelectItem key={month.value} value={month.value}>
-                  {month.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ExportButtons
+          onExportCSV={handleExportCSV}
+          onExportPDF={handleExportPDF}
+          disabled={!dateRange}
+        />
+      </div>
+
+      {/* Advanced Date Filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
       </div>
 
       {/* Summary Cards */}
@@ -351,7 +309,7 @@ export default function Reports() {
         <TabsContent value="monthly" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Monthly Breakdown - {selectedYear}</CardTitle>
+              <CardTitle>Monthly Breakdown - {new Date().getFullYear()}</CardTitle>
               <Button variant="outline" size="sm" onClick={exportMonthlySummary}>
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV
@@ -402,7 +360,7 @@ export default function Reports() {
         <TabsContent value="accounts" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Khata Breakdown</CardTitle>
+              <CardTitle>Khata Breakdown{dateRange ? ` - ${dateRange.label}` : ""}</CardTitle>
               <Button variant="outline" size="sm" onClick={exportAccountBreakdown}>
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV
@@ -432,35 +390,21 @@ export default function Reports() {
                         <TableRow key={account.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: account.color }} />
+                              <div
+                                className="h-3 w-3 rounded-full"
+                                style={{ backgroundColor: account.color }}
+                              />
                               <span className="font-medium">{account.name}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right">{account.percentage}%</TableCell>
-                          <TableCell className="text-right">{formatCurrency(account.allocated)}</TableCell>
+                          <TableCell className="text-right text-primary">{formatCurrency(account.allocated)}</TableCell>
                           <TableCell className="text-right text-destructive">{formatCurrency(account.spent)}</TableCell>
                           <TableCell className={cn("text-right font-medium", account.balance >= 0 ? "text-success" : "text-destructive")}>
                             {formatCurrency(account.balance)}
                           </TableCell>
                         </TableRow>
                       ))
-                    )}
-                    {accountBreakdown.length > 0 && (
-                      <TableRow className="bg-muted/50 font-bold">
-                        <TableCell>Total</TableCell>
-                        <TableCell className="text-right">
-                          {accountBreakdown.reduce((sum, a) => sum + a.percentage, 0)}%
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(accountBreakdown.reduce((sum, a) => sum + a.allocated, 0))}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {formatCurrency(accountBreakdown.reduce((sum, a) => sum + a.spent, 0))}
-                        </TableCell>
-                        <TableCell className={cn("text-right", accountBreakdown.reduce((sum, a) => sum + a.balance, 0) >= 0 ? "text-success" : "text-destructive")}>
-                          {formatCurrency(accountBreakdown.reduce((sum, a) => sum + a.balance, 0))}
-                        </TableCell>
-                      </TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -469,15 +413,11 @@ export default function Reports() {
           </Card>
         </TabsContent>
 
-        {/* Revenue Sources Tab */}
+        {/* Source Breakdown Tab */}
         <TabsContent value="sources" className="space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Revenue by Source</CardTitle>
-              <Button variant="outline" size="sm" onClick={exportTransactions}>
-                <Download className="mr-2 h-4 w-4" />
-                Export All Transactions
-              </Button>
+            <CardHeader>
+              <CardTitle>Revenue by Source{dateRange ? ` - ${dateRange.label}` : ""}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -485,8 +425,8 @@ export default function Reports() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Source</TableHead>
-                      <TableHead className="text-right">Transactions</TableHead>
-                      <TableHead className="text-right">Total Revenue</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -501,7 +441,9 @@ export default function Reports() {
                         <TableRow key={source.id}>
                           <TableCell className="font-medium">{source.name}</TableCell>
                           <TableCell className="text-right">{source.count}</TableCell>
-                          <TableCell className="text-right text-primary">{formatCurrency(source.amount)}</TableCell>
+                          <TableCell className="text-right text-primary font-medium">
+                            {formatCurrency(source.amount)}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -528,8 +470,8 @@ export default function Reports() {
           <TransferHistoryCard
             transfers={transfers}
             accounts={accounts}
-            showDelete={false}
-            showDateFilter={true}
+            onDelete={async () => {}}
+            isDeleting={false}
           />
         </TabsContent>
       </Tabs>

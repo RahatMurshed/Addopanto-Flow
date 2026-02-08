@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,8 +18,11 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from "date-fns";
-import MonthFilter, { getMonthDateRange } from "@/components/MonthFilter";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import AdvancedDateFilter from "@/components/AdvancedDateFilter";
+import ExportButtons from "@/components/ExportButtons";
+import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -28,8 +31,11 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState<string>(`${getYear(now)}-${getMonth(now)}`);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+
+  const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
+    setDateRange(range);
+  }, []);
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboard", user?.id],
@@ -136,6 +142,7 @@ export default function Dashboard() {
         actualProfit,
         totalBalance,
         accounts,
+        sources,
         revenues,
         expenses,
         revenueTrend,
@@ -146,46 +153,67 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  // Generate month options (last 12 months)
-  // Get month label for display
-  const { label: selectedMonthLabel } = getMonthDateRange(selectedMonth);
+  // Calculate filtered data based on date range
+  const filteredData = useMemo((): {
+    revenue: number;
+    expenses: number;
+    expenseBreakdown: { name: string; value: number; color: string }[];
+    filteredRevenues?: any[];
+    filteredExpenses?: any[];
+  } => {
+    if (!dashboardData || !dateRange) return { revenue: 0, expenses: 0, expenseBreakdown: [] };
+    
+    const filteredRevenues = (dashboardData.revenues || []).filter(
+      (r: any) => r.date >= dateRange.start && r.date <= dateRange.end
+    );
+    const filteredExpenses = (dashboardData.expenses || []).filter(
+      (e: any) => e.date >= dateRange.start && e.date <= dateRange.end
+    );
 
-  // Calculate selected month data
-  const selectedMonthData = useMemo(() => {
-    if (!dashboardData) return { revenue: 0, expenses: 0 };
-    
-    const { start: monthStart, end: monthEnd } = getMonthDateRange(selectedMonth);
-    
-    const revenue = (dashboardData.revenues || [])
-      .filter((r: any) => r.date >= monthStart && r.date <= monthEnd)
-      .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-    
-    const expenses = (dashboardData.expenses || [])
-      .filter((e: any) => e.date >= monthStart && e.date <= monthEnd)
-      .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-    
-    return { revenue, expenses };
-  }, [dashboardData, selectedMonth]);
+    const revenue = filteredRevenues.reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+    const expenses = filteredExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
 
-  // Get selected month expense breakdown
-  const selectedMonthExpenseBreakdown = useMemo(() => {
-    if (!dashboardData) return [];
-    
-    const { start: monthStart, end: monthEnd } = getMonthDateRange(selectedMonth);
-    
-    return (dashboardData.accounts || [])
+    const expenseBreakdown = (dashboardData.accounts || [])
       .map((account: any, index: number) => {
-        const accountExpenses = (dashboardData.expenses || [])
-          .filter((e: any) => e.expense_account_id === account.id && e.date >= monthStart && e.date <= monthEnd)
+        const accountExpenses = filteredExpenses
+          .filter((e: any) => e.expense_account_id === account.id)
           .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
         return {
-          name: account.name,
+          name: account.name as string,
           value: accountExpenses,
-          color: account.color || CHART_COLORS[index % CHART_COLORS.length],
+          color: (account.color || CHART_COLORS[index % CHART_COLORS.length]) as string,
         };
       })
-      .filter((item: any) => item.value > 0);
-  }, [dashboardData, selectedMonth]);
+      .filter((item) => item.value > 0);
+
+    return { revenue, expenses, expenseBreakdown, filteredRevenues, filteredExpenses };
+  }, [dashboardData, dateRange]);
+
+  // Export handlers
+  const handleExportCSV = () => {
+    if (!dashboardData || !dateRange) return;
+    
+    const revenues = (filteredData.filteredRevenues || []).map((r: any) => ({
+      date: r.date,
+      amount: Number(r.amount),
+      sourceName: dashboardData.sources?.find((s: any) => s.id === r.source_id)?.name || "Uncategorized",
+      description: r.description,
+    }));
+    
+    const expenses = (filteredData.filteredExpenses || []).map((e: any) => ({
+      date: e.date,
+      amount: Number(e.amount),
+      accountName: dashboardData.accounts?.find((a: any) => a.id === e.expense_account_id)?.name || "Uncategorized",
+      description: e.description,
+    }));
+    
+    exportAllTransactionsCSV(revenues, expenses, dateRange.label);
+  };
+
+  const handleExportPDF = async () => {
+    if (!dateRange) return;
+    await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label);
+  };
 
   if (isLoading) {
     return (
@@ -212,6 +240,7 @@ export default function Dashboard() {
     actualProfit: 0,
     totalBalance: 0,
     accounts: [],
+    sources: [],
     revenues: [],
     expenses: [],
     revenueTrend: [],
@@ -228,8 +257,8 @@ export default function Dashboard() {
   ];
 
   const hasRevenueTrendData = data.revenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
-  const hasSelectedMonthBreakdown = selectedMonthExpenseBreakdown.length > 0;
-  const totalSelectedMonthExpense = selectedMonthExpenseBreakdown.reduce((sum, item) => sum + item.value, 0);
+  const hasFilteredBreakdown = filteredData.expenseBreakdown.length > 0;
+  const totalFilteredExpense = filteredData.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
   const totalExpenseValue = data.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
   const hasExpenseBreakdownData = data.expenseBreakdown.length > 0;
 
@@ -281,10 +310,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Your financial overview at a glance</p>
+    <div className="space-y-6" id="dashboard-content">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Your financial overview at a glance</p>
+        </div>
+        <ExportButtons
+          onExportCSV={handleExportCSV}
+          onExportPDF={handleExportPDF}
+          disabled={!dateRange}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -302,44 +338,44 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Selected Month Summary with Filter */}
+      {/* Filtered Period Summary */}
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-2">
-          <CardTitle className="text-base font-semibold">Monthly Overview</CardTitle>
-          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+          <CardTitle className="text-base font-semibold">Period Overview</CardTitle>
+          <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-4">
               <p className="text-sm font-medium text-muted-foreground">Revenue</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(selectedMonthData.revenue)}</p>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(filteredData.revenue)}</p>
             </div>
             <div className="rounded-lg bg-gradient-to-br from-destructive/5 to-destructive/10 border border-destructive/20 p-4">
               <p className="text-sm font-medium text-muted-foreground">Expenses</p>
-              <p className="text-2xl font-bold text-destructive">{formatCurrency(selectedMonthData.expenses)}</p>
+              <p className="text-2xl font-bold text-destructive">{formatCurrency(filteredData.expenses)}</p>
             </div>
             <div className={cn(
               "rounded-lg border p-4",
-              selectedMonthData.revenue - selectedMonthData.expenses >= 0
+              filteredData.revenue - filteredData.expenses >= 0
                 ? "bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20"
                 : "bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20"
             )}>
               <p className="text-sm font-medium text-muted-foreground">Net Profit</p>
               <p className={cn(
                 "text-2xl font-bold",
-                selectedMonthData.revenue - selectedMonthData.expenses >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                filteredData.revenue - filteredData.expenses >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
               )}>
-                {formatCurrency(selectedMonthData.revenue - selectedMonthData.expenses)}
+                {formatCurrency(filteredData.revenue - filteredData.expenses)}
               </p>
             </div>
           </div>
           
-          {/* Selected Month Expense Breakdown */}
-          {hasSelectedMonthBreakdown && (
+          {/* Filtered Period Expense Breakdown */}
+          {hasFilteredBreakdown && dateRange && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm font-medium text-muted-foreground mb-3">Expense Breakdown for {selectedMonthLabel}</p>
+              <p className="text-sm font-medium text-muted-foreground mb-3">Expense Breakdown for {dateRange.label}</p>
               <div className="space-y-2">
-                {selectedMonthExpenseBreakdown.map((item, index) => (
+                {filteredData.expenseBreakdown.map((item, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
@@ -351,7 +387,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{formatCurrency(item.value)}</span>
                       <span className="text-xs text-muted-foreground">
-                        ({((item.value / totalSelectedMonthExpense) * 100).toFixed(0)}%)
+                        ({((item.value / totalFilteredExpense) * 100).toFixed(0)}%)
                       </span>
                     </div>
                   </div>
@@ -415,22 +451,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <TrendingUp className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  <p>Add revenue or expenses to see trends</p>
-                </div>
-              </div>
-            )}
-            {hasRevenueTrendData && (
-              <div className="mt-4 flex justify-center gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-[#3B82F6]" />
-                  <span className="text-sm text-muted-foreground">Revenue</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-[#EF4444]" />
-                  <span className="text-sm text-muted-foreground">Expenses</span>
-                </div>
+                No transaction data yet
               </div>
             )}
           </CardContent>
@@ -439,8 +460,8 @@ export default function Dashboard() {
         {/* Expense Breakdown Pie Chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Expense Breakdown</CardTitle>
-            <p className="text-sm text-muted-foreground">Spending by khata</p>
+            <CardTitle className="text-base font-semibold">Expense Distribution</CardTitle>
+            <p className="text-sm text-muted-foreground">All-time spending by category</p>
           </CardHeader>
           <CardContent className="pt-4">
             {hasExpenseBreakdownData ? (
@@ -451,11 +472,10 @@ export default function Dashboard() {
                       data={data.expenseBreakdown}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={3}
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
                       dataKey="value"
-                      strokeWidth={0}
                     >
                       {data.expenseBreakdown.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -464,27 +484,21 @@ export default function Dashboard() {
                     <Tooltip content={<CustomPieTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                  {data.expenseBreakdown.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
+                <div className="mt-4 grid w-full grid-cols-2 gap-2">
+                  {data.expenseBreakdown.slice(0, 6).map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
                       <div
-                        className="h-3 w-3 rounded-full"
+                        className="h-3 w-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-sm text-muted-foreground">{item.name}</span>
-                      <span className="text-sm font-medium">
-                        {((item.value / totalExpenseValue) * 100).toFixed(0)}%
-                      </span>
+                      <span className="truncate text-muted-foreground">{item.name}</span>
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
               <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <PiggyBank className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  <p>Add expenses to see breakdown</p>
-                </div>
+                No expense data yet
               </div>
             )}
           </CardContent>
@@ -495,37 +509,39 @@ export default function Dashboard() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">Recent Transactions</CardTitle>
-          <p className="text-sm text-muted-foreground">Last 10 revenue & expense entries</p>
+          <p className="text-sm text-muted-foreground">Latest income and expenses</p>
         </CardHeader>
-        <CardContent className="pt-4">
-          {(data.recentTransactions?.length ?? 0) > 0 ? (
+        <CardContent>
+          {data.recentTransactions.length > 0 ? (
             <div className="space-y-3">
-              {(data.recentTransactions ?? []).map((tx) => (
+              {data.recentTransactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+                  className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={cn(
                         "flex h-9 w-9 items-center justify-center rounded-full",
-                        tx.type === "revenue" ? "bg-primary/10" : "bg-destructive/10"
+                        tx.type === "revenue"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-destructive/10 text-destructive"
                       )}
                     >
                       {tx.type === "revenue" ? (
-                        <ArrowUpRight className="h-4 w-4 text-primary" />
+                        <ArrowUpRight className="h-4 w-4" />
                       ) : (
-                        <ArrowDownRight className="h-4 w-4 text-destructive" />
+                        <ArrowDownRight className="h-4 w-4" />
                       )}
                     </div>
                     <div>
-                      <p className="font-medium text-sm">{tx.description}</p>
+                      <p className="font-medium">{tx.description}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{format(new Date(tx.date), "MMM d, yyyy")}</span>
                         {tx.category && (
                           <>
                             <span>•</span>
-                            <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                            <Badge variant="secondary" className="text-xs">
                               {tx.category}
                             </Badge>
                           </>
@@ -535,21 +551,19 @@ export default function Dashboard() {
                   </div>
                   <p
                     className={cn(
-                      "font-semibold",
+                      "font-bold",
                       tx.type === "revenue" ? "text-primary" : "text-destructive"
                     )}
                   >
-                    {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
+                    {tx.type === "revenue" ? "+" : "-"}৳{tx.amount.toLocaleString()}
                   </p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex h-32 items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Receipt className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                <p>No transactions yet</p>
-              </div>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Receipt className="mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground">No transactions yet</p>
             </div>
           )}
         </CardContent>

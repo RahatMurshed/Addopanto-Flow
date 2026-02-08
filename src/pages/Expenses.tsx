@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { format, getMonth, getYear } from "date-fns";
+import { useState, useMemo, useCallback } from "react";
+import { format } from "date-fns";
 import {
   useExpenses,
   useCreateExpense,
@@ -44,11 +44,13 @@ import {
 import ExpenseDialog from "@/components/ExpenseDialog";
 import TransferDialog from "@/components/TransferDialog";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
-import MonthFilter, { getMonthDateRange } from "@/components/MonthFilter";
+import AdvancedDateFilter from "@/components/AdvancedDateFilter";
+import ExportButtons from "@/components/ExportButtons";
+import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import { exportExpensesToCSV, exportToPDF } from "@/utils/exportUtils";
 
 export default function Expenses() {
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(`${getYear(now)}-${getMonth(now)}`);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -65,14 +67,17 @@ export default function Expenses() {
   const [editingExpense, setEditingExpense] = useState<ExpenseWithAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Filter expenses by selected month
-  const { start: monthStart, end: monthEnd, label: monthLabel } = getMonthDateRange(selectedMonth);
-  
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter((e) => e.date >= monthStart && e.date <= monthEnd);
-  }, [expenses, monthStart, monthEnd]);
+  const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
+    setDateRange(range);
+  }, []);
 
-  const selectedMonthTotal = useMemo(() => {
+  // Filter expenses by selected date range
+  const filteredExpenses = useMemo(() => {
+    if (!dateRange) return [];
+    return expenses.filter((e) => e.date >= dateRange.start && e.date <= dateRange.end);
+  }, [expenses, dateRange]);
+
+  const filteredTotal = useMemo(() => {
     return filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   }, [filteredExpenses]);
 
@@ -80,8 +85,8 @@ export default function Expenses() {
     return expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   }, [expenses]);
 
-  // Expense breakdown by khata for selected month
-  const selectedMonthBreakdown = useMemo(() => {
+  // Expense breakdown by khata for selected period
+  const filteredBreakdown = useMemo(() => {
     return accounts
       .map((account) => {
         const accountExpenses = filteredExpenses
@@ -101,6 +106,23 @@ export default function Expenses() {
   const accountsNearLimit = accounts.filter(
     (a) => a.expected_monthly_expense && a.balance < a.expected_monthly_expense * 0.2 && a.balance >= 0
   );
+
+  // Export handlers
+  const handleExportCSV = () => {
+    if (!dateRange) return;
+    const data = filteredExpenses.map((e) => ({
+      date: e.date,
+      amount: Number(e.amount),
+      accountName: e.expense_accounts?.name || "Uncategorized",
+      description: e.description,
+    }));
+    exportExpensesToCSV(data, dateRange.label);
+  };
+
+  const handleExportPDF = async () => {
+    if (!dateRange) return;
+    await exportToPDF("expenses-content", "expenses", "Expenses Report", dateRange.label);
+  };
 
   const handleCreate = async (data: {
     amount: number;
@@ -155,14 +177,18 @@ export default function Expenses() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" id="expenses-content">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
           <p className="text-muted-foreground">Record and track your spending by khata</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={!dateRange}
+          />
           <Button
             variant="outline"
             onClick={() => setTransferDialogOpen(true)}
@@ -176,6 +202,11 @@ export default function Expenses() {
             Add Expense
           </Button>
         </div>
+      </div>
+
+      {/* Advanced Date Filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
       </div>
 
       {accounts.length === 0 && (
@@ -220,11 +251,13 @@ export default function Expenses() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{monthLabel}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {dateRange?.label || "Selected Period"}
+            </CardTitle>
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">৳{selectedMonthTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-destructive">৳{filteredTotal.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
           </CardContent>
         </Card>
@@ -240,15 +273,15 @@ export default function Expenses() {
         </Card>
       </div>
 
-      {/* Selected Month Breakdown */}
-      {selectedMonthBreakdown.length > 0 && (
+      {/* Selected Period Breakdown */}
+      {filteredBreakdown.length > 0 && dateRange && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Spending by Khata - {monthLabel}</CardTitle>
+            <CardTitle className="text-base">Spending by Khata - {dateRange.label}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {selectedMonthBreakdown.map((item) => (
+              {filteredBreakdown.map((item) => (
                 <div key={item.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div
@@ -262,7 +295,7 @@ export default function Expenses() {
                       ৳{item.amount.toLocaleString()}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      ({((item.amount / selectedMonthTotal) * 100).toFixed(0)}%)
+                      ({((item.amount / filteredTotal) * 100).toFixed(0)}%)
                     </span>
                   </div>
                 </div>
@@ -320,10 +353,10 @@ export default function Expenses() {
             <div className="mb-4 rounded-full bg-muted p-4">
               <Receipt className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">No expenses in {monthLabel}</h3>
+            <h3 className="mb-2 text-lg font-semibold">No expenses in {dateRange?.label || "selected period"}</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">
               {expenses.length > 0
-                ? "Try selecting a different month or add new expenses."
+                ? "Try selecting a different date range or add new expenses."
                 : "Start tracking your spending. Each expense will be deducted from the selected khata's balance."}
             </p>
             {accounts.length > 0 && (
@@ -334,7 +367,7 @@ export default function Expenses() {
       ) : (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Expense History - {monthLabel}</CardTitle>
+            <CardTitle className="text-base">Expense History - {dateRange?.label}</CardTitle>
             <span className="text-sm text-muted-foreground">{filteredExpenses.length} entries</span>
           </CardHeader>
           <CardContent>
