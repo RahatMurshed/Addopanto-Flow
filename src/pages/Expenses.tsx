@@ -46,11 +46,13 @@ import TransferDialog from "@/components/TransferDialog";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
-import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import PercentageChange from "@/components/PercentageChange";
+import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportExpensesToCSV, exportToPDF } from "@/utils/exportUtils";
 
 export default function Expenses() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -69,6 +71,7 @@ export default function Expenses() {
 
   const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
     setDateRange(range);
+    setPreviousRange(getPreviousPeriodRange(filterType, filterValue));
   }, []);
 
   // Filter expenses by selected date range
@@ -84,6 +87,14 @@ export default function Expenses() {
   const allTimeTotal = useMemo(() => {
     return expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   }, [expenses]);
+
+  // Previous period total for comparison
+  const previousTotal = useMemo(() => {
+    if (!previousRange) return 0;
+    return expenses
+      .filter((e) => e.date >= previousRange.start && e.date <= previousRange.end)
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+  }, [expenses, previousRange]);
 
   // Expense breakdown by khata for selected period
   const filteredBreakdown = useMemo(() => {
@@ -259,6 +270,15 @@ export default function Expenses() {
           <CardContent>
             <p className="text-2xl font-bold text-destructive">৳{filteredTotal.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
+            {previousRange && (
+              <PercentageChange
+                current={filteredTotal}
+                previous={previousTotal}
+                label={previousRange.label}
+                invertColors
+                className="mt-2"
+              />
+            )}
           </CardContent>
         </Card>
         <Card>

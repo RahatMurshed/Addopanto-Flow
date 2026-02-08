@@ -43,11 +43,13 @@ import {
 import RevenueDialog from "@/components/RevenueDialog";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
-import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import PercentageChange from "@/components/PercentageChange";
+import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportRevenuesToCSV, exportToPDF } from "@/utils/exportUtils";
 
 export default function Revenue() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -67,6 +69,7 @@ export default function Revenue() {
 
   const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
     setDateRange(range);
+    setPreviousRange(getPreviousPeriodRange(filterType, filterValue));
   }, []);
 
   // Filter revenues by selected date range
@@ -82,6 +85,14 @@ export default function Revenue() {
   const allTimeTotal = useMemo(() => {
     return revenues.reduce((sum, r) => sum + Number(r.amount), 0);
   }, [revenues]);
+
+  // Previous period total for comparison
+  const previousTotal = useMemo(() => {
+    if (!previousRange) return 0;
+    return revenues
+      .filter((r) => r.date >= previousRange.start && r.date <= previousRange.end)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
+  }, [revenues, previousRange]);
 
   // Revenue by source for selected period
   const filteredBySource = useMemo(() => {
@@ -214,6 +225,14 @@ export default function Revenue() {
           <CardContent>
             <p className="text-2xl font-bold text-primary">৳{filteredTotal.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
+            {previousRange && (
+              <PercentageChange
+                current={filteredTotal}
+                previous={previousTotal}
+                label={previousRange.label}
+                className="mt-2"
+              />
+            )}
           </CardContent>
         </Card>
         <Card>
