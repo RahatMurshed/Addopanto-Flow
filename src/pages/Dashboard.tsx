@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -15,9 +15,13 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+
+const CHART_COLORS = [
+  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+  "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+];
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -30,7 +34,6 @@ export default function Dashboard() {
       const now = new Date();
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
-      // Fetch all data in parallel
       const [revenuesRes, expensesRes, allocationsRes, accountsRes] = await Promise.all([
         supabase.from("revenues").select("amount, date").eq("user_id", user.id),
         supabase.from("expenses").select("amount, date, expense_account_id").eq("user_id", user.id),
@@ -48,7 +51,6 @@ export default function Dashboard() {
       const allocations = allocationsRes.data || [];
       const accounts = accountsRes.data || [];
 
-      // Calculate totals
       const totalRevenue = revenues.reduce((sum, r) => sum + Number(r.amount), 0);
       const thisMonthRevenue = revenues
         .filter((r) => r.date >= startOfCurrentMonth)
@@ -60,14 +62,8 @@ export default function Dashboard() {
         .reduce((sum, e) => sum + Number(e.amount), 0);
 
       const totalAllocations = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
-
-      // Allocated Profit = Total Revenue - Total Allocations
       const allocatedProfit = totalRevenue - totalAllocations;
-
-      // Actual Profit = Total Revenue - Total Expenses
       const actualProfit = totalRevenue - totalExpenses;
-
-      // Total Balance = Total Allocations - Total Expenses (what's left in khatas)
       const totalBalance = totalAllocations - totalExpenses;
 
       // Revenue trend data (last 6 months)
@@ -91,14 +87,14 @@ export default function Dashboard() {
 
       // Expense breakdown by account
       const expenseBreakdown = accounts
-        .map((account) => {
+        .map((account, index) => {
           const accountExpenses = expenses
             .filter((e) => e.expense_account_id === account.id)
             .reduce((sum, e) => sum + Number(e.amount), 0);
           return {
             name: account.name,
             value: accountExpenses,
-            color: account.color,
+            color: account.color || CHART_COLORS[index % CHART_COLORS.length],
           };
         })
         .filter((item) => item.value > 0);
@@ -132,9 +128,9 @@ export default function Dashboard() {
   };
 
   const formatCompact = (value: number) => {
-    if (value >= 1000000) return `৳${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `৳${(value / 1000).toFixed(0)}K`;
-    return `৳${value}`;
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+    return `${value}`;
   };
 
   const data = dashboardData || {
@@ -160,6 +156,54 @@ export default function Dashboard() {
 
   const hasRevenueTrendData = data.revenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
   const hasExpenseBreakdownData = data.expenseBreakdown.length > 0;
+  const totalExpenseValue = data.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
+
+  // Custom tooltip for area chart
+  const CustomAreaTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+          <p className="mb-2 font-medium text-foreground">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-muted-foreground">
+                {entry.dataKey === "revenue" ? "Revenue" : "Expenses"}:
+              </span>
+              <span className="font-medium text-foreground">{formatCurrency(entry.value)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Custom tooltip for pie chart
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const item = payload[0];
+      const percent = ((item.value / totalExpenseValue) * 100).toFixed(1);
+      return (
+        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <div
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: item.payload.color }}
+            />
+            <span className="font-medium text-foreground">{item.name}</span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatCurrency(item.value)} ({percent}%)
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -170,7 +214,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {metrics.map((m) => (
-          <Card key={m.label}>
+          <Card key={m.label} className="relative overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{m.label}</CardTitle>
               <m.icon className={cn("h-4 w-4", m.color)} />
@@ -178,13 +222,14 @@ export default function Dashboard() {
             <CardContent>
               <p className="text-2xl font-bold">{m.value}</p>
             </CardContent>
+            <div className={cn("absolute bottom-0 left-0 h-1 w-full", m.color.replace("text-", "bg-"))} />
           </Card>
         ))}
       </div>
 
       {/* This Month Summary */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">This Month Revenue</CardTitle>
           </CardHeader>
@@ -192,7 +237,7 @@ export default function Dashboard() {
             <p className="text-3xl font-bold text-primary">{formatCurrency(data.thisMonthRevenue)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">This Month Expenses</CardTitle>
           </CardHeader>
@@ -202,64 +247,75 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Revenue Trend Line Chart */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Revenue Trend Area Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Revenue vs Expenses Trend</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Revenue vs Expenses</CardTitle>
+            <p className="text-sm text-muted-foreground">Last 6 months comparison</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {hasRevenueTrendData ? (
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={data.revenueTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={data.revenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                   <XAxis
                     dataKey="month"
                     tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    axisLine={{ stroke: "hsl(var(--border))" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <YAxis
                     tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    axisLine={{ stroke: "hsl(var(--border))" }}
+                    axisLine={false}
+                    tickLine={false}
                     tickFormatter={formatCompact}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: number, name: string) => [
-                      formatCurrency(value),
-                      name === "revenue" ? "Revenue" : "Expenses",
-                    ]}
-                  />
-                  <Line
+                  <Tooltip content={<CustomAreaTooltip />} />
+                  <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="hsl(var(--primary))"
+                    stroke="#3B82F6"
                     strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))", strokeWidth: 2 }}
-                    activeDot={{ r: 6 }}
+                    fill="url(#revenueGradient)"
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="expenses"
-                    stroke="hsl(var(--destructive))"
+                    stroke="#EF4444"
                     strokeWidth={2}
-                    dot={{ fill: "hsl(var(--destructive))", strokeWidth: 2 }}
-                    activeDot={{ r: 6 }}
+                    fill="url(#expenseGradient)"
                   />
-                  <Legend
-                    formatter={(value) => (value === "revenue" ? "Revenue" : "Expenses")}
-                    wrapperStyle={{ fontSize: 12 }}
-                  />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-60 items-center justify-center text-muted-foreground">
-                Add revenue or expenses to see the trend chart
+              <div className="flex h-[280px] items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <TrendingUp className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  <p>Add revenue or expenses to see trends</p>
+                </div>
+              </div>
+            )}
+            {hasRevenueTrendData && (
+              <div className="mt-4 flex justify-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-[#3B82F6]" />
+                  <span className="text-sm text-muted-foreground">Revenue</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-[#EF4444]" />
+                  <span className="text-sm text-muted-foreground">Expenses</span>
+                </div>
               </div>
             )}
           </CardContent>
@@ -267,41 +323,53 @@ export default function Dashboard() {
 
         {/* Expense Breakdown Pie Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Expense Breakdown by Khata</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Expense Breakdown</CardTitle>
+            <p className="text-sm text-muted-foreground">Spending by khata</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {hasExpenseBreakdownData ? (
-              <ResponsiveContainer width="100%" height={240}>
-                <PieChart>
-                  <Pie
-                    data={data.expenseBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={{ stroke: "hsl(var(--muted-foreground))" }}
-                  >
-                    {data.expenseBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => [formatCurrency(value), "Spent"]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="flex flex-col items-center">
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={data.expenseBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {data.expenseBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomPieTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                  {data.expenseBreakdown.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm text-muted-foreground">{item.name}</span>
+                      <span className="text-sm font-medium">
+                        {((item.value / totalExpenseValue) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="flex h-60 items-center justify-center text-muted-foreground">
-                Add expenses to see the breakdown chart
+              <div className="flex h-[280px] items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <PiggyBank className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  <p>Add expenses to see breakdown</p>
+                </div>
               </div>
             )}
           </CardContent>
