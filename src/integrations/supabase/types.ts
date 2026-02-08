@@ -284,6 +284,7 @@ export type Database = {
           business_name: string | null
           created_at: string
           currency: string
+          email: string | null
           fiscal_year_start_month: number
           id: string
           updated_at: string
@@ -293,6 +294,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           currency?: string
+          email?: string | null
           fiscal_year_start_month?: number
           id?: string
           updated_at?: string
@@ -302,6 +304,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           currency?: string
+          email?: string | null
           fiscal_year_start_month?: number
           id?: string
           updated_at?: string
