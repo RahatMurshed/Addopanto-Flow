@@ -136,6 +136,51 @@ export type Database = {
           },
         ]
       }
+      khata_transfers: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          from_account_id: string
+          id: string
+          to_account_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          from_account_id: string
+          id?: string
+          to_account_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          from_account_id?: string
+          id?: string
+          to_account_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "khata_transfers_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "expense_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "khata_transfers_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "expense_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       revenue_sources: {
         Row: {
           created_at: string

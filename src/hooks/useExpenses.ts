@@ -134,6 +134,13 @@ export function useAccountBalances() {
         .eq("user_id", user.id);
       if (expensesError) throw expensesError;
 
+      // Get all khata transfers
+      const { data: transfers, error: transfersError } = await supabase
+        .from("khata_transfers")
+        .select("from_account_id, to_account_id, amount")
+        .eq("user_id", user.id);
+      if (transfersError) throw transfersError;
+
       // Calculate balances per account
       const balances: AccountBalance[] = accounts.map((account) => {
         const totalAllocated = allocations
@@ -144,6 +151,15 @@ export function useAccountBalances() {
           .filter((e) => e.expense_account_id === account.id)
           .reduce((sum, e) => sum + Number(e.amount), 0);
 
+        // Add incoming transfers to allocated, outgoing transfers to spent
+        const transfersIn = (transfers ?? [])
+          .filter((t) => t.to_account_id === account.id)
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+
+        const transfersOut = (transfers ?? [])
+          .filter((t) => t.from_account_id === account.id)
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+
         return {
           id: account.id,
           name: account.name,
@@ -151,9 +167,9 @@ export function useAccountBalances() {
           allocation_percentage: account.allocation_percentage,
           expected_monthly_expense: account.expected_monthly_expense,
           is_active: account.is_active,
-          total_allocated: totalAllocated,
-          total_spent: totalSpent,
-          balance: totalAllocated - totalSpent,
+          total_allocated: totalAllocated + transfersIn,
+          total_spent: totalSpent + transfersOut,
+          balance: totalAllocated + transfersIn - totalSpent - transfersOut,
         };
       });
 
