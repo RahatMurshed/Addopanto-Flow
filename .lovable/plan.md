@@ -1,172 +1,158 @@
 
-# Fix: User Management - Deletion, Role Simplification, and Email Visibility
 
-This plan addresses four issues on the Users page:
-1. Admin and Cipher cannot delete users
-2. Need to remove the "user" role option (only cipher, admin, moderator remain)
-3. Admin and Moderator should not see Cipher users (already working, but need to verify)
-4. User emails are not showing on the users page
+# User Registration Approval System
 
----
+This plan implements a complete registration approval workflow where new users must request access and wait for Admin/Cipher approval before gaining access to the application.
 
-## Current Analysis
+## Overview
 
-### Issue 1: User Deletion Not Available
-The current `UserManagement.tsx` has no delete user functionality. There is:
-- No delete button in the UI
-- No delete mutation
-- Deleting users from `auth.users` requires a backend function (cannot be done directly from the client)
+When a new user registers:
+1. They create a "pending" registration request instead of getting immediate access
+2. They see a "Pending Approval" screen after registration
+3. Admins and Ciphers see pending requests in a new approval interface
+4. When approving, admins can set the user's permissions (for moderator access)
+5. Approved users become moderators by default with configured permissions
+6. Rejected requests are removed from the system entirely (auth + database)
 
-### Issue 2: "User" Role Displayed
-The `availableRoles` array in `UserManagement.tsx` (lines 187-189) includes "user":
-```typescript
-const availableRoles: AppRole[] = isCipher
-  ? ["cipher", "admin", "moderator", "user"]
-  : ["admin", "moderator", "user"];
-```
+## Database Changes
 
-### Issue 3: Cipher Visibility (Already Working)
-The RLS policies and `can_view_user()` function already filter out cipher users from admin/moderator views. This is working correctly at the database level.
-
-### Issue 4: User Emails Not Showing
-The current implementation cannot get emails because:
-- Emails are stored in `auth.users` table which cannot be queried directly from client
-- The `user_profiles` table does not store email
-- Only the current logged-in user's email is available (lines 93-96)
-
----
-
-## Solution Overview
-
-### 1. Create Edge Function for Admin Operations
-Create a backend function with service role access to:
-- Fetch user emails from `auth.users`
-- Delete users from `auth.users` (with cascading deletion)
-
-### 2. Update Role Options
-Remove "user" from available roles in the dropdown, keeping only: cipher, admin, moderator
-
-### 3. Update User Profiles Table
-Add an `email` column to `user_profiles` to store user emails for easier access
-
-### 4. Update UserManagement Component
-- Add delete user functionality with confirmation dialog
-- Remove "user" from available roles
-- Fetch emails through the edge function
-
----
-
-## Implementation Details
-
-### Part 1: Database Migration
-
-Add `email` column to `user_profiles` and create a trigger to sync it from `auth.users`:
+### 1. New Table: `registration_requests`
 
 ```sql
--- Add email column to user_profiles
-ALTER TABLE public.user_profiles ADD COLUMN email TEXT;
-
--- Update existing profiles with emails (via edge function after migration)
-
--- Create function to sync email on user creation
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.user_profiles (user_id, email) 
-  VALUES (NEW.id, NEW.email);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
--- Allow admins to view user profiles for the users page
-CREATE POLICY "Admins can view all profiles"
-ON public.user_profiles
-FOR SELECT
-USING (
-  public.has_role(auth.uid(), 'admin') 
-  OR public.has_role(auth.uid(), 'cipher')
+CREATE TABLE public.registration_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  requested_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  reviewed_by UUID,
+  rejection_reason TEXT,
+  -- Pre-configured permissions (set during approval)
+  can_add_revenue BOOLEAN NOT NULL DEFAULT true,
+  can_add_expense BOOLEAN NOT NULL DEFAULT true,
+  can_view_reports BOOLEAN NOT NULL DEFAULT true
 );
+
+ALTER TABLE public.registration_requests ENABLE ROW LEVEL SECURITY;
 ```
 
-### Part 2: Edge Function for User Management
+### 2. RLS Policies for `registration_requests`
 
-Create `supabase/functions/admin-users/index.ts`:
+- **Users can view their own request**: For showing pending status
+- **Admins/Ciphers can view all pending requests**: For the approval interface
+- **Admins/Ciphers can update requests**: For approve/reject actions
+- **Users can insert their own request**: Created during signup
 
-```typescript
-// Handles:
-// GET - List users with emails (for admins/cipher only)
-// DELETE - Delete a user (with cascading cleanup)
+### 3. Update `handle_new_user` Trigger
 
-// Uses service role key to access auth.admin API
-// Validates caller has admin or cipher role before processing
+Instead of automatically assigning the "user" role, the trigger will:
+1. Create the user_profiles entry (as before)
+2. Create a registration_request with status = 'pending'
+3. NOT create a user_roles entry (no role until approved)
+
+## Edge Function Updates
+
+### Update `admin-users` Edge Function
+
+Add new endpoints:
+- **GET with `?pending=true`**: List all pending registration requests
+- **POST with `action: 'approve'`**: Approve a request, set role to moderator, create permissions
+- **POST with `action: 'reject'`**: Reject a request and delete user from auth
+
+## Frontend Changes
+
+### 1. New Component: `PendingApprovalPage.tsx`
+
+A waiting screen shown to users whose registration is pending:
+- Shows "Your registration is pending approval" message
+- Option to sign out
+- Polls periodically to check if approved
+
+### 2. Update Auth Flow in `App.tsx`
+
+After authentication, check if user has a role:
+- If no role exists, check for pending registration_request
+- If pending, show `PendingApprovalPage`
+- If approved, proceed normally
+- If rejected (shouldn't happen - user deleted), show error
+
+### 3. New Page: `RegistrationRequests.tsx`
+
+Admin interface showing:
+- Table of pending registration requests with email, requested date
+- For each request: Approve / Reject buttons
+- Approve opens a dialog to configure permissions before confirming
+- Reject shows confirmation dialog with optional reason
+
+### 4. Update Navigation
+
+Add "Requests" link in sidebar for Admin/Cipher users (with badge showing count)
+
+### 5. Update User Deletion
+
+Ensure that when deleting a user:
+- User is deleted from auth.users (already implemented)
+- Cascade deletes handle registration_requests automatically (via foreign key)
+
+## Detailed Component Breakdown
+
+### PendingApprovalPage Component
+```
+- Logo and app name
+- "Registration Pending" heading
+- Description: "Your account is awaiting approval from an administrator"
+- Sign Out button
+- Auto-refresh every 10 seconds to check status
 ```
 
-**Endpoints:**
-- `GET /admin-users` - Returns list of users with emails (filtered by role visibility)
-- `DELETE /admin-users?userId=xxx` - Deletes user from auth.users (cascades to all tables)
-
-### Part 3: Update UserManagement.tsx
-
-1. **Remove "user" from availableRoles:**
-```typescript
-const availableRoles: AppRole[] = isCipher
-  ? ["cipher", "admin", "moderator"]
-  : ["admin", "moderator"];
+### RegistrationRequests Page
+```
+- Header: "Registration Requests"
+- Tabs: Pending | Approved | Rejected (optional, could show history)
+- Table columns: Email | Requested | Actions
+- Approve button opens dialog with:
+  - Permission toggles (same as ModeratorPermissionsCard)
+  - Confirm Approve button
+- Reject button opens confirmation dialog
 ```
 
-2. **Add delete functionality:**
-- Add delete button to each row (except current user and protected roles)
-- Add confirmation dialog for deletion
-- Call edge function to delete user
-
-3. **Fetch emails from edge function or user_profiles:**
-- Update query to fetch emails from user_profiles table (after migration syncs them)
-
-### Part 4: Update AppRole Type
-
-Update `src/hooks/useUserRole.ts` to keep "user" type for backward compatibility but hide it from role selection:
-
-```typescript
-// AppRole type remains: "cipher" | "admin" | "moderator" | "user"
-// But UI only shows: cipher, admin, moderator for role assignment
+### Approval Flow
+```
+1. Admin clicks Approve on a pending request
+2. Dialog appears with permission toggles (pre-checked by default)
+3. Admin adjusts permissions as needed
+4. Clicks "Approve & Grant Access"
+5. Backend:
+   a. Updates registration_request status to 'approved'
+   b. Creates user_roles entry with role = 'moderator'
+   c. Creates moderator_permissions entry with selected permissions
+6. User's next status check redirects them to dashboard
 ```
 
----
+## File Changes Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/migrations/[new].sql` | Create | Add registration_requests table, RLS policies, update trigger |
+| `supabase/functions/admin-users/index.ts` | Modify | Add pending requests list, approve/reject handlers |
+| `src/pages/PendingApproval.tsx` | Create | Waiting screen for pending users |
+| `src/pages/RegistrationRequests.tsx` | Create | Admin approval interface |
+| `src/App.tsx` | Modify | Add route for /pending and /requests, update ProtectedRoute logic |
+| `src/components/AppLayout.tsx` | Modify | Add Requests nav link with pending count badge |
+| `src/hooks/useRegistrationStatus.ts` | Create | Hook to check if user is pending/approved |
+| `src/contexts/AuthContext.tsx` | Modify | Add registration status check |
 
 ## Security Considerations
 
-| Action | Who Can Do It |
-|--------|---------------|
-| **View user list** | Cipher, Admin |
-| **View user emails** | Cipher, Admin |
-| **Change roles** | Cipher (all), Admin (non-cipher) |
-| **Delete users** | Cipher (all), Admin (non-cipher) |
-| **See cipher users** | Cipher only |
+1. **Pending users cannot access any protected routes** - they're blocked at the ProtectedRoute level
+2. **Only Admin/Cipher can approve/reject** - enforced via RLS and edge function checks
+3. **Rejected users are fully deleted** - no orphan accounts in auth.users
+4. **Cipher users remain invisible** - approval requests don't expose cipher status
 
-The edge function will:
-1. Verify the caller has admin or cipher role
-2. Use `can_view_user()` logic to filter visible users
-3. Prevent admins from deleting cipher users
-4. Handle cascading deletion properly
+## Technical Notes
 
----
+- The `registration_requests` table uses a foreign key to `auth.users` with CASCADE delete, so if an auth user is deleted, their request is automatically cleaned up
+- Polling interval of 10 seconds balances user experience with server load
+- Approved users get the "moderator" role as specified, with permissions pre-configured during approval
 
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `supabase/functions/admin-users/index.ts` | Create - Edge function for user operations |
-| `src/pages/UserManagement.tsx` | Modify - Add delete functionality, fix emails |
-| `src/hooks/useUserRole.ts` | Keep as-is (type still includes "user") |
-| Database migration | Create - Add email to user_profiles, update trigger |
-
----
-
-## Summary
-
-After these changes:
-- Admins and Cipher can delete users (with proper role restrictions)
-- Role dropdown shows only: Cipher (for Cipher), Admin, Moderator
-- User emails display correctly on the users page
-- Existing "user" role users remain in system but new role assignments exclude "user"
-- Cipher users remain hidden from Admin and Moderator views
