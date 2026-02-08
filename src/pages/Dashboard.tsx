@@ -21,8 +21,9 @@ import {
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
-import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
+import PercentageChange from "@/components/PercentageChange";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -32,9 +33,15 @@ const CHART_COLORS = [
 export default function Dashboard() {
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [filterType, setFilterType] = useState<FilterType>("monthly");
+  const [filterValue, setFilterValue] = useState<FilterValue>({});
+  const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
 
-  const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
+  const handleFilterChange = useCallback((range: DateRange, type: FilterType, value: FilterValue) => {
     setDateRange(range);
+    setFilterType(type);
+    setFilterValue(value);
+    setPreviousRange(getPreviousPeriodRange(type, value));
   }, []);
 
   const { data: dashboardData, isLoading } = useQuery({
@@ -188,6 +195,23 @@ export default function Dashboard() {
 
     return { revenue, expenses, expenseBreakdown, filteredRevenues, filteredExpenses };
   }, [dashboardData, dateRange]);
+
+  // Calculate previous period data for comparison
+  const previousData = useMemo((): { revenue: number; expenses: number } => {
+    if (!dashboardData || !previousRange) return { revenue: 0, expenses: 0 };
+
+    const prevRevenues = (dashboardData.revenues || []).filter(
+      (r: any) => r.date >= previousRange.start && r.date <= previousRange.end
+    );
+    const prevExpenses = (dashboardData.expenses || []).filter(
+      (e: any) => e.date >= previousRange.start && e.date <= previousRange.end
+    );
+
+    return {
+      revenue: prevRevenues.reduce((sum: number, r: any) => sum + Number(r.amount), 0),
+      expenses: prevExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0),
+    };
+  }, [dashboardData, previousRange]);
 
   // Export handlers
   const handleExportCSV = () => {
@@ -349,10 +373,27 @@ export default function Dashboard() {
             <div className="rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-4">
               <p className="text-sm font-medium text-muted-foreground">Revenue</p>
               <p className="text-2xl font-bold text-primary">{formatCurrency(filteredData.revenue)}</p>
+              {previousRange && (
+                <PercentageChange
+                  current={filteredData.revenue}
+                  previous={previousData.revenue}
+                  label={previousRange.label}
+                  className="mt-1"
+                />
+              )}
             </div>
             <div className="rounded-lg bg-gradient-to-br from-destructive/5 to-destructive/10 border border-destructive/20 p-4">
               <p className="text-sm font-medium text-muted-foreground">Expenses</p>
               <p className="text-2xl font-bold text-destructive">{formatCurrency(filteredData.expenses)}</p>
+              {previousRange && (
+                <PercentageChange
+                  current={filteredData.expenses}
+                  previous={previousData.expenses}
+                  label={previousRange.label}
+                  invertColors
+                  className="mt-1"
+                />
+              )}
             </div>
             <div className={cn(
               "rounded-lg border p-4",
@@ -367,6 +408,14 @@ export default function Dashboard() {
               )}>
                 {formatCurrency(filteredData.revenue - filteredData.expenses)}
               </p>
+              {previousRange && (
+                <PercentageChange
+                  current={filteredData.revenue - filteredData.expenses}
+                  previous={previousData.revenue - previousData.expenses}
+                  label={previousRange.label}
+                  className="mt-1"
+                />
+              )}
             </div>
           </div>
           

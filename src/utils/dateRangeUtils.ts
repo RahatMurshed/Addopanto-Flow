@@ -124,3 +124,85 @@ export function getDefaultFilterValue(filterType: FilterType): FilterValue {
       return { month: getMonth(now), year: getYear(now) };
   }
 }
+
+// Get the previous period's date range for comparison
+export function getPreviousPeriodRange(filterType: FilterType, filterValue: FilterValue): DateRange {
+  const now = new Date();
+
+  switch (filterType) {
+    case "daily": {
+      const date = filterValue.date ?? now;
+      const prevDate = new Date(date);
+      prevDate.setDate(prevDate.getDate() - 1);
+      return {
+        start: format(startOfDay(prevDate), "yyyy-MM-dd"),
+        end: format(endOfDay(prevDate), "yyyy-MM-dd"),
+        label: format(prevDate, "MMMM d, yyyy"),
+      };
+    }
+
+    case "monthly": {
+      const month = filterValue.month ?? getMonth(now);
+      const year = filterValue.year ?? getYear(now);
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      const monthDate = new Date(prevYear, prevMonth, 1);
+      return {
+        start: format(startOfMonth(monthDate), "yyyy-MM-dd"),
+        end: format(endOfMonth(monthDate), "yyyy-MM-dd"),
+        label: format(monthDate, "MMMM yyyy"),
+      };
+    }
+
+    case "half-yearly": {
+      const half = filterValue.half ?? "H1";
+      const year = filterValue.year ?? getYear(now);
+      const prevHalf = half === "H1" ? "H2" : "H1";
+      const prevYear = half === "H1" ? year - 1 : year;
+      const startMonth = prevHalf === "H1" ? 0 : 6;
+      const endMonth = prevHalf === "H1" ? 5 : 11;
+      const startDate = new Date(prevYear, startMonth, 1);
+      const endDate = endOfMonth(new Date(prevYear, endMonth, 1));
+      return {
+        start: format(startDate, "yyyy-MM-dd"),
+        end: format(endDate, "yyyy-MM-dd"),
+        label: `${prevHalf} ${prevYear}`,
+      };
+    }
+
+    case "yearly": {
+      const year = filterValue.year ?? getYear(now);
+      const prevYear = year - 1;
+      const yearDate = new Date(prevYear, 0, 1);
+      return {
+        start: format(startOfYear(yearDate), "yyyy-MM-dd"),
+        end: format(endOfYear(yearDate), "yyyy-MM-dd"),
+        label: `Year ${prevYear}`,
+      };
+    }
+
+    case "custom": {
+      const startDate = filterValue.startDate ?? now;
+      const endDate = filterValue.endDate ?? now;
+      const duration = endDate.getTime() - startDate.getTime();
+      const prevEndDate = new Date(startDate.getTime() - 1);
+      const prevStartDate = new Date(prevEndDate.getTime() - duration);
+      return {
+        start: format(startOfDay(prevStartDate), "yyyy-MM-dd"),
+        end: format(endOfDay(prevEndDate), "yyyy-MM-dd"),
+        label: `${format(prevStartDate, "MMM d")} - ${format(prevEndDate, "MMM d, yyyy")}`,
+      };
+    }
+
+    default:
+      return getPreviousPeriodRange("monthly", { month: getMonth(now), year: getYear(now) });
+  }
+}
+
+// Calculate percentage change between two values
+export function calculatePercentChange(current: number, previous: number): number | null {
+  if (previous === 0) {
+    return current > 0 ? 100 : null;
+  }
+  return ((current - previous) / previous) * 100;
+}
