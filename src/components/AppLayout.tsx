@@ -29,7 +29,6 @@ const baseNavItems = [
   { label: "Revenue", href: "/revenue", icon: TrendingUp },
   { label: "Expenses", href: "/expenses", icon: Receipt },
   { label: "Reports", href: "/reports", icon: FileText },
-  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -43,6 +42,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Build nav items dynamically based on role
   const navItems = [
     ...baseNavItems,
+    // Settings - visible to Admin and Cipher only
+    ...((isAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
     // User Management - visible to Admin and Cipher only
     ...(canManageUsers ? [{ label: "Users", href: "/users", icon: Users }] : []),
     // Registration Requests - visible to Admin and Cipher only

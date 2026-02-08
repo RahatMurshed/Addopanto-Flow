@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
@@ -21,7 +22,8 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading, hasNoRole } = useRole();
+  const { isLoading: roleLoading, hasNoRole, isModerator, isCipher, isAdmin } = useRole();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
@@ -43,6 +45,13 @@ export default function SettingsPage() {
     fiscalMonth !== originalValues.fiscalMonth;
 
   const blocker = useUnsavedChanges(isDirty);
+
+  // Redirect moderators away from settings
+  useEffect(() => {
+    if (!roleLoading && isModerator) {
+      navigate("/", { replace: true });
+    }
+  }, [roleLoading, isModerator, navigate]);
 
   useEffect(() => {
     if (!user) return;
