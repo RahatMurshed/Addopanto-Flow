@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { format, getMonth, getYear } from "date-fns";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,8 +23,8 @@ import {
   getDateRange,
   getYearOptions,
   getMonthOptions,
-  getDefaultFilterValue,
 } from "@/utils/dateRangeUtils";
+import { useDateFilterParams } from "@/hooks/useDateFilterParams";
 
 interface AdvancedDateFilterProps {
   onFilterChange: (range: DateRange, filterType: FilterType, filterValue: FilterValue) => void;
@@ -37,30 +37,19 @@ export default function AdvancedDateFilter({
   defaultFilterType = "monthly",
   className,
 }: AdvancedDateFilterProps) {
-  const [filterType, setFilterType] = useState<FilterType>(defaultFilterType);
-  const [filterValue, setFilterValue] = useState<FilterValue>(
-    getDefaultFilterValue(defaultFilterType)
-  );
+  const {
+    filterType,
+    filterValue,
+    setFilterType: handleFilterTypeChange,
+    updateFilterValue,
+  } = useDateFilterParams(defaultFilterType);
+
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
   const [dailyDateOpen, setDailyDateOpen] = useState(false);
 
   const yearOptions = getYearOptions();
   const monthOptions = getMonthOptions();
-
-  useEffect(() => {
-    const range = getDateRange(filterType, filterValue);
-    onFilterChange(range, filterType, filterValue);
-  }, [filterType, filterValue, onFilterChange]);
-
-  const handleFilterTypeChange = (newType: FilterType) => {
-    setFilterType(newType);
-    setFilterValue(getDefaultFilterValue(newType));
-  };
-
-  const updateFilterValue = (updates: Partial<FilterValue>) => {
-    setFilterValue((prev) => ({ ...prev, ...updates }));
-  };
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
