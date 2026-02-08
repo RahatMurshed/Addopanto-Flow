@@ -1,183 +1,72 @@
 
+# Plan: Improve Recent Transactions Layout in Dashboard
 
-# Plan: Add Pagination to All Listed Items
+## Current Issues Identified
 
-## Overview
+### Issue 1: Khata Tags Displayed Inline
+Currently, the Khata/category badge is shown inline with the date in the description area:
+```
+[Icon] Description
+       Feb 8, 2026 • [Category Badge]    +৳5,000
+```
 
-This plan adds pagination controls to all tables and list views across the application, improving performance and user experience when dealing with large datasets.
-
----
-
-## Pages and Components Requiring Pagination
-
-| Location | List Type | Current State |
-|----------|-----------|---------------|
-| Dashboard | Recent Transactions | Shows 10 items (hardcoded limit) |
-| Expenses Page | Expense History Table | Shows all filtered expenses |
-| Revenue Page | Revenue History Table | Shows all filtered revenues |
-| Reports Page - Transfers Tab | Transfer History | Uses TransferHistoryCard component |
-| Expenses Page | Transfer History | Uses TransferHistoryCard component |
+### Issue 2: Pagination Only Shows When >10 Items
+The pagination controls are conditionally rendered only when `data.recentTransactions.length > 10`, making it invisible for users with fewer transactions.
 
 ---
 
-## Solution Approach
+## Solution
 
-### 1. Create a Reusable Pagination Hook
-A custom hook `usePagination` will handle:
-- Current page state
-- Items per page (configurable, default: 10)
-- Total pages calculation
-- Paginated data slicing
-- Page navigation functions
+### Change 1: Convert to Table Layout with Separate Khata Column
+Transform the Recent Transactions from a list/card layout to a proper table with columns:
+- **Date** - Transaction date
+- **Description** - Transaction description  
+- **Khata/Category** - Separate column for the Khata badge (only for expenses)
+- **Amount** - Transaction amount with +/- indicator
 
-### 2. Create a Reusable Pagination Component
-A `TablePagination` component that combines with the existing shadcn/ui pagination primitives to provide:
-- Page number display ("Page X of Y")
-- Previous/Next buttons
-- Items per page selector (10, 25, 50)
-- Total items count
+### Change 2: Always Show Pagination Controls
+Remove the condition that hides pagination when items ≤ 10. This provides consistent UI and allows users to change items per page even with fewer entries.
 
-### 3. Integrate Pagination into Each Page
+---
+
+## Visual Layout After Changes
+
+```text
++----------------------------------------------------------------+
+| Recent Transactions                                            |
+| Latest income and expenses                                     |
++----------------------------------------------------------------+
+| Date         | Description      | Khata        | Amount        |
+|--------------|------------------|--------------|---------------|
+| Feb 8, 2026  | Monthly Salary   | —            | +৳50,000      |
+| Feb 7, 2026  | Groceries        | [Food]       | -৳5,000       |
+| Feb 6, 2026  | Fuel             | [Transport]  | -৳2,500       |
+| Feb 5, 2026  | Freelance Work   | —            | +৳15,000      |
++----------------------------------------------------------------+
+| Showing 1-10 of 45 entries  [10 ▾]  [< Prev] Page 1 of 5 [Next>]|
++----------------------------------------------------------------+
+```
 
 ---
 
 ## Technical Implementation
 
-### New Files to Create
+### File to Modify: `src/pages/Dashboard.tsx`
 
-**1. `src/hooks/usePagination.ts`**
-```text
-Custom hook providing:
-- currentPage state
-- itemsPerPage state  
-- totalPages calculation
-- paginatedData (sliced array)
-- goToPage, nextPage, prevPage functions
-- setItemsPerPage function
-- resetPage function (for when filters change)
-```
+**Changes:**
 
-**2. `src/components/TablePagination.tsx`**
-```text
-Reusable component displaying:
-- "Showing X-Y of Z entries" text
-- Items per page dropdown (10, 25, 50)
-- Previous/Next navigation buttons
-- Current page indicator
-```
+1. **Import Table components** (add to imports around line 6):
+   - Import `Table`, `TableBody`, `TableCell`, `TableHead`, `TableHeader`, `TableRow` from `@/components/ui/table`
 
-### Files to Modify
+2. **Replace list layout with table** (lines 624-669):
+   - Convert the current `div` with `space-y-3` to a proper `Table` component
+   - Create table header with columns: Date, Description, Khata, Amount
+   - Move the icon inline with description
+   - Move Khata badge to its own column (show "—" for revenues which don't have Khata)
 
-**3. `src/pages/Dashboard.tsx`**
-- Add pagination to Recent Transactions section
-- Currently limited to 10 items; add "View More" or full pagination
-
-**4. `src/pages/Expenses.tsx`**
-- Import and use `usePagination` hook with `filteredExpenses`
-- Add `TablePagination` component below expense table
-- Reset page to 1 when date filter changes
-
-**5. `src/pages/Revenue.tsx`**
-- Import and use `usePagination` hook with `filteredRevenues`
-- Add `TablePagination` component below revenue table
-- Reset page to 1 when date filter changes
-
-**6. `src/components/TransferHistoryCard.tsx`**
-- Add internal pagination state
-- Paginate `displayTransfers` array
-- Add pagination controls at bottom of table
-
----
-
-## Visual Design
-
-```text
-+----------------------------------------------------------+
-|  Expense History - February 2026                         |
-+----------------------------------------------------------+
-| Date       | Amount    | Khata      | Description | Act. |
-|------------|-----------|------------|-------------|------|
-| Feb 7      | ৳5,000    | Food       | Groceries   | Edit |
-| Feb 6      | ৳2,500    | Transport  | Fuel        | Edit |
-| Feb 5      | ৳1,200    | Utilities  | Electric    | Edit |
-| ...        | ...       | ...        | ...         | ...  |
-+----------------------------------------------------------+
-| Showing 1-10 of 47 entries  [10 ▾]  [< Prev] [Next >]    |
-+----------------------------------------------------------+
-```
-
----
-
-## Implementation Details
-
-### usePagination Hook Interface
-```text
-Input:
-- items: T[] (the full array to paginate)
-- defaultItemsPerPage: number (default: 10)
-
-Output:
-- currentPage: number
-- itemsPerPage: number
-- totalPages: number
-- totalItems: number
-- paginatedItems: T[]
-- startIndex: number (for "Showing X-Y" display)
-- endIndex: number
-- goToPage: (page: number) => void
-- nextPage: () => void
-- prevPage: () => void
-- setItemsPerPage: (count: number) => void
-- resetPage: () => void
-```
-
-### TablePagination Component Props
-```text
-- currentPage: number
-- totalPages: number
-- totalItems: number
-- startIndex: number
-- endIndex: number
-- itemsPerPage: number
-- onPageChange: (page: number) => void
-- onItemsPerPageChange: (count: number) => void
-- itemsPerPageOptions?: number[] (default: [10, 25, 50])
-```
-
----
-
-## Page-Specific Changes
-
-### Dashboard - Recent Transactions
-- Keep the 10-item limit for the dashboard view
-- Add a "View All Transactions" link to navigate to a detailed view (optional enhancement)
-- Or add simple Previous/Next if more than 10 transactions exist
-
-### Expenses Page
-- Apply pagination to `filteredExpenses` array
-- Show pagination only when entries exceed page size
-- Reset to page 1 when date range changes
-
-### Revenue Page
-- Apply pagination to `filteredRevenues` array
-- Show pagination only when entries exceed page size
-- Reset to page 1 when date range changes
-
-### TransferHistoryCard Component
-- Add optional `enablePagination` prop (default: true)
-- Internal state for page management
-- Works independently for both Expenses and Reports pages
-
----
-
-## Reset Behavior
-
-When filters change (date range, year selector, etc.), pagination automatically resets to page 1 using a `useEffect`:
-```text
-useEffect(() => {
-  resetPage();
-}, [dateRange]);
-```
+3. **Always show pagination** (line 671):
+   - Remove the condition `data.recentTransactions.length > 10 &&`
+   - Pagination will always be visible when there are transactions
 
 ---
 
@@ -185,30 +74,15 @@ useEffect(() => {
 
 | Before | After |
 |--------|-------|
-| All items rendered at once | Items paginated (10/25/50 per page) |
-| Slow rendering with many entries | Fast, responsive tables |
-| No control over view size | User can choose items per page |
-| Scrolling to find entries | Navigate with pagination controls |
+| List/card layout | Proper table with columns |
+| Khata inline with date | Khata in separate column |
+| Pagination hidden when ≤10 items | Pagination always visible |
+| Harder to scan data | Easy column-based scanning |
 
 ---
 
-## Files Summary
+## Files Changed
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/hooks/usePagination.ts` | Create |
-| `src/components/TablePagination.tsx` | Create |
-| `src/pages/Dashboard.tsx` | Modify (add pagination to Recent Transactions) |
-| `src/pages/Expenses.tsx` | Modify (add pagination to Expense History) |
-| `src/pages/Revenue.tsx` | Modify (add pagination to Revenue History) |
-| `src/components/TransferHistoryCard.tsx` | Modify (add internal pagination) |
-
----
-
-## Accessibility Considerations
-
-- Pagination controls include proper ARIA labels
-- Keyboard navigation support (already in shadcn/ui components)
-- Clear visual indication of current page
-- Disabled states for Previous/Next at boundaries
-
+| `src/pages/Dashboard.tsx` | Replace list layout with table, add Khata column, always show pagination |
