@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const months = [
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [businessName, setBusinessName] = useState("");
@@ -87,6 +89,8 @@ export default function SettingsPage() {
         currency,
         fiscalMonth,
       });
+      // Invalidate the user profile cache so all pages get the updated settings
+      await queryClient.invalidateQueries({ queryKey: ["user-profile", user.id] });
       toast({ title: "Settings saved" });
     }
   };
