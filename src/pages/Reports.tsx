@@ -529,6 +529,7 @@ export default function Reports() {
             transfers={transfers}
             accounts={accounts}
             showDelete={false}
+            showDateFilter={true}
           />
         </TabsContent>
       </Tabs>
