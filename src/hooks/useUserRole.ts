@@ -17,8 +17,8 @@ export function useUserRole() {
 
   const { data: userRole, isLoading, error, refetch } = useQuery({
     queryKey: ["user-role", user?.id],
-    queryFn: async (): Promise<AppRole> => {
-      if (!user?.id) return "user";
+    queryFn: async (): Promise<AppRole | null> => {
+      if (!user?.id) return null;
 
       const { data, error } = await supabase
         .from("user_roles")
@@ -30,40 +30,45 @@ export function useUserRole() {
 
       if (error) {
         console.error("Error fetching user role:", error);
-        return "user";
+        return null;
       }
 
-      // Sort by role priority and return highest
-      return (data?.role as AppRole) ?? "user";
+      // Return the role if found, otherwise null (pending user)
+      return (data?.role as AppRole) ?? null;
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  const role = userRole ?? "user";
+  // Role can be null for pending users
+  const role = userRole ?? null;
+  const hasNoRole = role === null;
 
   return {
     role,
     isLoading,
     error,
     refetch,
-    // Helper functions
+    hasNoRole,
+    // Helper functions - only true when role explicitly matches
     isCipher: role === "cipher",
     isAdmin: role === "admin" || role === "cipher",
     isModerator: role === "moderator",
     isUser: role === "user",
     // Check if user has at least the given role level
     hasRoleLevel: (requiredRole: AppRole): boolean => {
+      if (hasNoRole) return false;
       const roleHierarchy: Record<AppRole, number> = {
         cipher: 4,
         admin: 3,
         moderator: 2,
         user: 1,
       };
-      return roleHierarchy[role] >= roleHierarchy[requiredRole];
+      return roleHierarchy[role!] >= roleHierarchy[requiredRole];
     },
     // Check if current user can manage target role
     canManageRole: (targetRole: AppRole): boolean => {
+      if (hasNoRole) return false;
       if (role === "cipher") return true;
       if (role === "admin" && targetRole !== "cipher") return true;
       return false;

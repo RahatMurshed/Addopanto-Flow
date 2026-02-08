@@ -37,6 +37,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency as formatCurrencyUtil, formatCurrencyPrecise } from "@/utils/currencyUtils";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
+import { PermissionGuard } from "@/components/RoleGuard";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -423,34 +424,40 @@ export default function Dashboard() {
           <p className="text-muted-foreground">Your financial overview at a glance</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Quick Action Buttons */}
-          <Button
-            size="sm"
-            onClick={() => setRevenueDialogOpen(true)}
-            className="gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            Add Revenue
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setExpenseDialogOpen(true)}
-            className="gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            Add Expense
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setTransferDialogOpen(true)}
-            disabled={(accountBalances?.length || 0) < 2}
-            className="gap-1"
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-            Transfer
-          </Button>
+          {/* Quick Action Buttons - Only visible with proper permissions */}
+          <PermissionGuard permission="canAddRevenue">
+            <Button
+              size="sm"
+              onClick={() => setRevenueDialogOpen(true)}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Add Revenue
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard permission="canAddExpense">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setExpenseDialogOpen(true)}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Add Expense
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard permission="canAddExpense">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setTransferDialogOpen(true)}
+              disabled={(accountBalances?.length || 0) < 2}
+              className="gap-1"
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              Transfer
+            </Button>
+          </PermissionGuard>
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
