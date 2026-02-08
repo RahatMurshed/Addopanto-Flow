@@ -10,6 +10,7 @@ import {
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useRole } from "@/contexts/RoleContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +58,9 @@ export default function Revenue() {
   
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
+  
+  // Role-based permissions
+  const { canAddRevenue, canEdit, canDelete, isModerator } = useRole();
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -207,10 +211,12 @@ export default function Revenue() {
             onExportPDF={handleExportPDF}
             disabled={!dateRange}
           />
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Revenue
-          </Button>
+          {canAddRevenue && (
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Revenue
+            </Button>
+          )}
         </div>
       </div>
 
@@ -325,7 +331,7 @@ export default function Revenue() {
                 ? "Try selecting a different date range or add new revenue."
                 : "Start tracking your income. Each entry will be automatically allocated to your active expense sources."}
             </p>
-            <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>
+            {canAddRevenue && <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>}
           </CardContent>
         </Card>
       ) : (
@@ -343,7 +349,7 @@ export default function Revenue() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -365,29 +371,35 @@ export default function Revenue() {
                       <TableCell className="hidden max-w-xs truncate md:table-cell">
                         {rev.description || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              setEditingRevenue(rev);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(rev.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {(canEdit || canDelete) && (
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setEditingRevenue(rev);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(rev.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
