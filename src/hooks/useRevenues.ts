@@ -45,11 +45,10 @@ export function useCreateRevenue() {
         .single();
       if (revenueError) throw revenueError;
 
-      // Get active expense accounts
+      // Get active expense accounts (global - all accounts)
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
         .select("id, allocation_percentage")
-        .eq("user_id", user.id)
         .eq("is_active", true);
       if (accountsError) throw accountsError;
 
@@ -116,11 +115,10 @@ export function useUpdateRevenue() {
           // Delete old allocations and recreate with new amounts
           await supabase.from("allocations").delete().eq("revenue_id", id);
 
-          // Get active accounts and recalculate
+          // Get active accounts and recalculate (global - all accounts)
           const { data: accounts } = await supabase
             .from("expense_accounts")
             .select("id, allocation_percentage")
-            .eq("user_id", user!.id)
             .eq("is_active", true);
 
           if (accounts && accounts.length > 0) {

@@ -38,7 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight } from "lucide-react";
 
 interface RegistrationRequest {
   id: string;
@@ -51,6 +51,8 @@ interface RegistrationRequest {
   rejection_reason: string | null;
   can_add_revenue: boolean;
   can_add_expense: boolean;
+  can_add_expense_source: boolean;
+  can_transfer: boolean;
   can_view_reports: boolean;
 }
 
@@ -58,6 +60,8 @@ interface ApproveDialogData {
   request: RegistrationRequest;
   canAddRevenue: boolean;
   canAddExpense: boolean;
+  canAddExpenseSource: boolean;
+  canTransfer: boolean;
   canViewReports: boolean;
 }
 
@@ -98,6 +102,8 @@ export default function RegistrationRequests() {
           permissions: {
             can_add_revenue: data.canAddRevenue,
             can_add_expense: data.canAddExpense,
+            can_add_expense_source: data.canAddExpenseSource,
+            can_transfer: data.canTransfer,
             can_view_reports: data.canViewReports,
           },
         },
@@ -155,6 +161,8 @@ export default function RegistrationRequests() {
       request,
       canAddRevenue: request.can_add_revenue,
       canAddExpense: request.can_add_expense,
+      canAddExpenseSource: request.can_add_expense_source,
+      canTransfer: request.can_transfer,
       canViewReports: request.can_view_reports,
     });
   };
@@ -305,6 +313,32 @@ export default function RegistrationRequests() {
                   checked={approveDialog?.canAddExpense ?? true}
                   onCheckedChange={(checked) =>
                     approveDialog && setApproveDialog({ ...approveDialog, canAddExpense: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="can-add-expense-source">Can Add Expense Sources</Label>
+                </div>
+                <Switch
+                  id="can-add-expense-source"
+                  checked={approveDialog?.canAddExpenseSource ?? false}
+                  onCheckedChange={(checked) =>
+                    approveDialog && setApproveDialog({ ...approveDialog, canAddExpenseSource: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="can-transfer">Can Transfer</Label>
+                </div>
+                <Switch
+                  id="can-transfer"
+                  checked={approveDialog?.canTransfer ?? false}
+                  onCheckedChange={(checked) =>
+                    approveDialog && setApproveDialog({ ...approveDialog, canTransfer: checked })
                   }
                 />
               </div>

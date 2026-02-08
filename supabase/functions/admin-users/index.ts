@@ -139,7 +139,13 @@ Deno.serve(async (req) => {
 
     const handleApproveUser = async (
       userId: string,
-      permissions: { can_add_revenue: boolean; can_add_expense: boolean; can_view_reports: boolean }
+      permissions: { 
+        can_add_revenue: boolean; 
+        can_add_expense: boolean; 
+        can_add_expense_source: boolean;
+        can_transfer: boolean;
+        can_view_reports: boolean;
+      }
     ) => {
       // Update registration request status
       const { error: updateError } = await adminClient
@@ -150,6 +156,8 @@ Deno.serve(async (req) => {
           reviewed_by: user.id,
           can_add_revenue: permissions.can_add_revenue,
           can_add_expense: permissions.can_add_expense,
+          can_add_expense_source: permissions.can_add_expense_source,
+          can_transfer: permissions.can_transfer,
           can_view_reports: permissions.can_view_reports,
         })
         .eq("user_id", userId)
@@ -181,6 +189,8 @@ Deno.serve(async (req) => {
           user_id: userId,
           can_add_revenue: permissions.can_add_revenue,
           can_add_expense: permissions.can_add_expense,
+          can_add_expense_source: permissions.can_add_expense_source,
+          can_transfer: permissions.can_transfer,
           can_view_reports: permissions.can_view_reports,
           controlled_by: user.id,
         });
@@ -296,7 +306,13 @@ Deno.serve(async (req) => {
         | { 
             action?: string;
             userId?: string;
-            permissions?: { can_add_revenue: boolean; can_add_expense: boolean; can_view_reports: boolean };
+            permissions?: { 
+              can_add_revenue: boolean; 
+              can_add_expense: boolean; 
+              can_add_expense_source: boolean;
+              can_transfer: boolean;
+              can_view_reports: boolean;
+            };
             reason?: string;
           }
         | null;
@@ -310,6 +326,8 @@ Deno.serve(async (req) => {
         const permissions = body.permissions || {
           can_add_revenue: true,
           can_add_expense: true,
+          can_add_expense_source: false,
+          can_transfer: false,
           can_view_reports: true,
         };
         return await handleApproveUser(body.userId, permissions);

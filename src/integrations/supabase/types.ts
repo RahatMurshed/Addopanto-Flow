@@ -395,6 +395,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_add_expense: { Args: { _user_id: string }; Returns: boolean }
+      can_add_expense_source: { Args: { _user_id: string }; Returns: boolean }
+      can_add_revenue: { Args: { _user_id: string }; Returns: boolean }
+      can_edit_delete: { Args: { _user_id: string }; Returns: boolean }
+      can_transfer: { Args: { _user_id: string }; Returns: boolean }
       can_view_user: { Args: { _target_user_id: string }; Returns: boolean }
       get_user_role: {
         Args: { _user_id: string }

@@ -63,7 +63,7 @@ export default function Expenses() {
   const currency = userProfile?.currency || "BDT";
   
   // Role-based permissions
-  const { canAddExpense, canEdit, canDelete, isModerator } = useRole();
+  const { canAddExpense, canEdit, canDelete, canTransfer } = useRole();
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -219,14 +219,16 @@ export default function Expenses() {
             onExportPDF={handleExportPDF}
             disabled={!dateRange}
           />
-          <Button
-            variant="outline"
-            onClick={() => setTransferDialogOpen(true)}
-            disabled={accounts.length < 2}
-          >
-            <ArrowLeftRight className="mr-2 h-4 w-4" />
-            Transfer
-          </Button>
+          {canTransfer && (
+            <Button
+              variant="outline"
+              onClick={() => setTransferDialogOpen(true)}
+              disabled={accounts.length < 2}
+            >
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Transfer
+            </Button>
+          )}
           {canAddExpense && (
             <Button onClick={() => setDialogOpen(true)} disabled={accounts.length === 0}>
               <Plus className="mr-2 h-4 w-4" />
