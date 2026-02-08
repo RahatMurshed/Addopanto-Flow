@@ -267,22 +267,7 @@ export default function Dashboard() {
     await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label, userProfile?.business_name || undefined);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const formatCurrency = (amount: number) => {
-    return formatCurrencyPrecise(amount, currency);
-  };
-
-  const formatCompact = (value: number) => {
-    return formatCurrencyUtil(value, currency, { compact: true });
-  };
-
+  // Define data object before any conditional returns (required for hooks)
   const data = dashboardData || {
     totalRevenue: 0,
     totalExpenses: 0,
@@ -298,8 +283,25 @@ export default function Dashboard() {
     recentTransactions: [],
   };
 
-  // Pagination for recent transactions
+  // Pagination for recent transactions (must be called before conditional returns)
   const transactionsPagination = usePagination(data.recentTransactions);
+
+  const formatCurrency = (amount: number) => {
+    return formatCurrencyPrecise(amount, currency);
+  };
+
+  const formatCompact = (value: number) => {
+    return formatCurrencyUtil(value, currency, { compact: true });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
 
   const metrics = [
     { label: "Total Revenue", value: formatCurrency(data.totalRevenue), icon: TrendingUp, color: "text-primary" },
