@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +17,16 @@ interface UnsavedChangesDialogProps {
 }
 
 export function UnsavedChangesDialog({ blocker }: UnsavedChangesDialogProps) {
+  const navigate = useNavigate();
+
+  const handleProceed = () => {
+    const pendingPath = blocker.pendingLocation;
+    blocker.proceed();
+    if (pendingPath) {
+      navigate(pendingPath);
+    }
+  };
+
   if (!blocker.isBlocked) {
     return null;
   }
@@ -32,7 +44,7 @@ export function UnsavedChangesDialog({ blocker }: UnsavedChangesDialogProps) {
           <AlertDialogCancel onClick={blocker.reset}>
             Stay on Page
           </AlertDialogCancel>
-          <AlertDialogAction onClick={blocker.proceed}>
+          <AlertDialogAction onClick={handleProceed}>
             Leave Page
           </AlertDialogAction>
         </AlertDialogFooter>
