@@ -15,11 +15,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { KhataTransfer } from "@/hooks/useKhataTransfers";
 import type { AccountBalance } from "@/hooks/useExpenses";
 import type { DateRange } from "react-day-picker";
+import { usePagination } from "@/hooks/usePagination";
+import TablePagination from "@/components/TablePagination";
 
 interface TransferHistoryCardProps {
   transfers: KhataTransfer[];
@@ -57,7 +59,17 @@ export default function TransferHistoryCard({
     });
   }, [transfers, dateRange]);
 
-  const displayTransfers = limit ? filteredTransfers.slice(0, limit) : filteredTransfers;
+  // Pagination for filtered transfers
+  const pagination = usePagination(filteredTransfers);
+
+  // Reset page when date range changes
+  useEffect(() => {
+    pagination.resetPage();
+  }, [dateRange]);
+
+  const displayTransfers = limit 
+    ? filteredTransfers.slice(0, limit) 
+    : pagination.paginatedItems;
 
   const handleDelete = async () => {
     if (!deleteId || !onDelete) return;
@@ -225,6 +237,22 @@ export default function TransferHistoryCard({
                   </TableBody>
                 </Table>
               </div>
+              
+              {/* Show pagination when no limit and has more than 10 items */}
+              {!limit && filteredTransfers.length > 10 && (
+                <TablePagination
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.totalItems}
+                  startIndex={pagination.startIndex}
+                  endIndex={pagination.endIndex}
+                  itemsPerPage={pagination.itemsPerPage}
+                  onPageChange={pagination.goToPage}
+                  onItemsPerPageChange={pagination.setItemsPerPage}
+                  canGoNext={pagination.canGoNext}
+                  canGoPrev={pagination.canGoPrev}
+                />
+              )}
               
               {showDateFilter && (
                 <div className="mt-4 flex items-center justify-between border-t pt-4 text-sm">

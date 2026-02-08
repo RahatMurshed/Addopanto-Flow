@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import {
   useRevenues,
@@ -48,6 +48,8 @@ import ExportButtons from "@/components/ExportButtons";
 import PercentageChange from "@/components/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportRevenuesToCSV, exportToPDF } from "@/utils/exportUtils";
+import { usePagination } from "@/hooks/usePagination";
+import TablePagination from "@/components/TablePagination";
 
 export default function Revenue() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
@@ -82,6 +84,14 @@ export default function Revenue() {
     if (!dateRange) return [];
     return revenues.filter((r) => r.date >= dateRange.start && r.date <= dateRange.end);
   }, [revenues, dateRange]);
+
+  // Pagination for filtered revenues
+  const pagination = usePagination(filteredRevenues);
+
+  // Reset page when date range changes
+  useEffect(() => {
+    pagination.resetPage();
+  }, [dateRange]);
 
   const filteredTotal = useMemo(() => {
     return filteredRevenues.reduce((sum, r) => sum + Number(r.amount), 0);
@@ -337,7 +347,7 @@ export default function Revenue() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRevenues.map((rev) => (
+                  {pagination.paginatedItems.map((rev) => (
                     <TableRow key={rev.id}>
                       <TableCell className="font-medium">
                         {format(new Date(rev.date), "MMM d, yyyy")}
@@ -383,6 +393,18 @@ export default function Revenue() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              itemsPerPage={pagination.itemsPerPage}
+              onPageChange={pagination.goToPage}
+              onItemsPerPageChange={pagination.setItemsPerPage}
+              canGoNext={pagination.canGoNext}
+              canGoPrev={pagination.canGoPrev}
+            />
           </CardContent>
         </Card>
       )}
