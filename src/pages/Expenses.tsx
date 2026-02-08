@@ -9,6 +9,8 @@ import {
   type ExpenseWithAccount,
 } from "@/hooks/useExpenses";
 import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -53,6 +55,9 @@ import { exportExpensesToCSV, exportToPDF } from "@/utils/exportUtils";
 export default function Expenses() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
+  
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -132,7 +137,7 @@ export default function Expenses() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("expenses-content", "expenses", "Expenses Report", dateRange.label);
+    await exportToPDF("expenses-content", "expenses", "Expenses Report", dateRange.label, userProfile?.business_name || undefined);
   };
 
   const handleCreate = async (data: {
@@ -144,7 +149,7 @@ export default function Expenses() {
     try {
       await createMutation.mutateAsync(data);
       const account = accounts.find((a) => a.id === data.expense_account_id);
-      toast({ title: "Expense recorded", description: `৳${data.amount.toLocaleString()} from ${account?.name}` });
+      toast({ title: "Expense recorded", description: `${formatCurrency(data.amount, currency)} from ${account?.name}` });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
@@ -237,7 +242,7 @@ export default function Expenses() {
             <strong>Deficit Alert:</strong>{" "}
             {accountsWithDeficit.map((a) => (
               <span key={a.id} className="mr-2">
-                {a.name} (৳{Math.abs(a.balance).toLocaleString()} over)
+                {a.name} ({formatCurrency(Math.abs(a.balance), currency)} over)
               </span>
             ))}
           </AlertDescription>
@@ -251,7 +256,7 @@ export default function Expenses() {
             <strong>Low Balance:</strong>{" "}
             {accountsNearLimit.map((a) => (
               <span key={a.id} className="mr-2">
-                {a.name} (৳{a.balance.toLocaleString()} left)
+                {a.name} ({formatCurrency(a.balance, currency)} left)
               </span>
             ))}
           </AlertDescription>
@@ -268,7 +273,7 @@ export default function Expenses() {
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">৳{filteredTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-destructive">{formatCurrency(filteredTotal, currency)}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
             {previousRange && (
               <PercentageChange
@@ -287,7 +292,7 @@ export default function Expenses() {
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">৳{allTimeTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-destructive">{formatCurrency(allTimeTotal, currency)}</p>
             <p className="text-xs text-muted-foreground mt-1">{expenses.length} total entries</p>
           </CardContent>
         </Card>
@@ -312,7 +317,7 @@ export default function Expenses() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-destructive">
-                      ৳{item.amount.toLocaleString()}
+                      {formatCurrency(item.amount, currency)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       ({((item.amount / filteredTotal) * 100).toFixed(0)}%)
@@ -353,10 +358,10 @@ export default function Expenses() {
                         account.balance < 0 ? "text-destructive" : "text-foreground"
                       }`}
                     >
-                      ৳{account.balance.toLocaleString()}
+                      {formatCurrency(account.balance, currency)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      ৳{account.total_spent.toLocaleString()} / ৳{account.total_allocated.toLocaleString()}
+                      {formatCurrency(account.total_spent, currency)} / {formatCurrency(account.total_allocated, currency)}
                     </p>
                   </div>
                 </div>
@@ -409,7 +414,7 @@ export default function Expenses() {
                         {format(new Date(exp.date), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell className="font-semibold text-destructive">
-                        ৳{Number(exp.amount).toLocaleString()}
+                        {formatCurrency(Number(exp.amount), currency)}
                       </TableCell>
                       <TableCell>
                         {exp.expense_accounts ? (

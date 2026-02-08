@@ -9,6 +9,8 @@ import {
 } from "@/hooks/useRevenues";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +52,9 @@ import { exportRevenuesToCSV, exportToPDF } from "@/utils/exportUtils";
 export default function Revenue() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
+  
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -125,13 +130,13 @@ export default function Revenue() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("revenue-content", "revenue", "Revenue Report", dateRange.label);
+    await exportToPDF("revenue-content", "revenue", "Revenue Report", dateRange.label, userProfile?.business_name || undefined);
   };
 
   const handleCreate = async (data: { amount: number; date: string; source_id: string | null; description: string | null }) => {
     try {
       await createMutation.mutateAsync(data);
-      toast({ title: "Revenue added", description: `৳${data.amount.toLocaleString()} allocated to ${activeAccounts.length} khatas` });
+      toast({ title: "Revenue added", description: `${formatCurrency(data.amount, currency)} allocated to ${activeAccounts.length} khatas` });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
@@ -223,7 +228,7 @@ export default function Revenue() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">৳{filteredTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(filteredTotal, currency)}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
             {previousRange && (
               <PercentageChange
@@ -241,7 +246,7 @@ export default function Revenue() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">৳{allTimeTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold">{formatCurrency(allTimeTotal, currency)}</p>
             <p className="text-xs text-muted-foreground mt-1">{revenues.length} total entries</p>
           </CardContent>
         </Card>
@@ -263,7 +268,7 @@ export default function Revenue() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary">
-                      ৳{item.amount.toLocaleString()}
+                      {formatCurrency(item.amount, currency)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       ({((item.amount / filteredTotal) * 100).toFixed(0)}%)
@@ -338,7 +343,7 @@ export default function Revenue() {
                         {format(new Date(rev.date), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell className="font-semibold text-primary">
-                        ৳{Number(rev.amount).toLocaleString()}
+                        {formatCurrency(Number(rev.amount), currency)}
                       </TableCell>
                       <TableCell>
                         {rev.revenue_sources?.name ? (

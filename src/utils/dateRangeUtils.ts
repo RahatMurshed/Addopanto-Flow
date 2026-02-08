@@ -8,6 +8,8 @@ import {
   format,
   getYear,
   getMonth,
+  addMonths,
+  subMonths,
 } from "date-fns";
 
 export type FilterType = "daily" | "monthly" | "half-yearly" | "yearly" | "custom";
@@ -27,7 +29,79 @@ export interface DateRange {
   label: string;
 }
 
-export function getDateRange(filterType: FilterType, filterValue: FilterValue): DateRange {
+/**
+ * Get the fiscal year range based on fiscal year start month
+ * @param fiscalStartMonth - 1-indexed month (1 = January, 7 = July)
+ * @param year - The calendar year to base the fiscal year on
+ */
+export function getFiscalYearRange(fiscalStartMonth: number, year: number): DateRange {
+  // If fiscal year starts in January, it's the same as calendar year
+  if (fiscalStartMonth === 1) {
+    const yearDate = new Date(year, 0, 1);
+    return {
+      start: format(startOfYear(yearDate), "yyyy-MM-dd"),
+      end: format(endOfYear(yearDate), "yyyy-MM-dd"),
+      label: `FY ${year}`,
+    };
+  }
+
+  // Fiscal year spans two calendar years (e.g., July 2024 - June 2025)
+  const fiscalYearStart = new Date(year, fiscalStartMonth - 1, 1);
+  const fiscalYearEnd = endOfMonth(new Date(year + 1, fiscalStartMonth - 2, 1));
+
+  return {
+    start: format(fiscalYearStart, "yyyy-MM-dd"),
+    end: format(fiscalYearEnd, "yyyy-MM-dd"),
+    label: `FY ${year}-${(year + 1).toString().slice(-2)}`,
+  };
+}
+
+/**
+ * Get the fiscal half-year range
+ * @param fiscalStartMonth - 1-indexed month (1 = January, 7 = July)
+ * @param half - H1 or H2
+ * @param year - The calendar year to base the fiscal year on
+ */
+export function getFiscalHalfRange(fiscalStartMonth: number, half: "H1" | "H2", year: number): DateRange {
+  const h1StartMonth = fiscalStartMonth - 1; // Convert to 0-indexed
+  const h2StartMonth = (h1StartMonth + 6) % 12;
+
+  if (half === "H1") {
+    const startDate = new Date(year, h1StartMonth, 1);
+    const endDate = endOfMonth(addMonths(startDate, 5));
+    
+    // Calculate the end year for label
+    const endYear = getYear(endDate);
+    const startMonthName = format(startDate, "MMM");
+    const endMonthName = format(endDate, "MMM");
+    
+    return {
+      start: format(startDate, "yyyy-MM-dd"),
+      end: format(endDate, "yyyy-MM-dd"),
+      label: fiscalStartMonth === 1 
+        ? `H1 ${year} (${startMonthName} - ${endMonthName})`
+        : `H1 FY ${year}-${(year + 1).toString().slice(-2)} (${startMonthName} - ${endMonthName})`,
+    };
+  } else {
+    // H2 starts 6 months after H1 start
+    const startYear = h2StartMonth < h1StartMonth ? year + 1 : year;
+    const startDate = new Date(startYear, h2StartMonth, 1);
+    const endDate = endOfMonth(addMonths(startDate, 5));
+    
+    const startMonthName = format(startDate, "MMM");
+    const endMonthName = format(endDate, "MMM");
+    
+    return {
+      start: format(startDate, "yyyy-MM-dd"),
+      end: format(endDate, "yyyy-MM-dd"),
+      label: fiscalStartMonth === 1 
+        ? `H2 ${year} (${startMonthName} - ${endMonthName})`
+        : `H2 FY ${year}-${(year + 1).toString().slice(-2)} (${startMonthName} - ${endMonthName})`,
+    };
+  }
+}
+
+export function getDateRange(filterType: FilterType, filterValue: FilterValue, fiscalStartMonth: number = 1): DateRange {
   const now = new Date();
   const year = filterValue.year ?? getYear(now);
 
@@ -53,24 +127,11 @@ export function getDateRange(filterType: FilterType, filterValue: FilterValue): 
 
     case "half-yearly": {
       const half = filterValue.half ?? "H1";
-      const startMonth = half === "H1" ? 0 : 6;
-      const endMonth = half === "H1" ? 5 : 11;
-      const startDate = new Date(year, startMonth, 1);
-      const endDate = endOfMonth(new Date(year, endMonth, 1));
-      return {
-        start: format(startDate, "yyyy-MM-dd"),
-        end: format(endDate, "yyyy-MM-dd"),
-        label: `${half} ${year} (${half === "H1" ? "Jan - Jun" : "Jul - Dec"})`,
-      };
+      return getFiscalHalfRange(fiscalStartMonth, half, year);
     }
 
     case "yearly": {
-      const yearDate = new Date(year, 0, 1);
-      return {
-        start: format(startOfYear(yearDate), "yyyy-MM-dd"),
-        end: format(endOfYear(yearDate), "yyyy-MM-dd"),
-        label: `Year ${year}`,
-      };
+      return getFiscalYearRange(fiscalStartMonth, year);
     }
 
     case "custom": {
@@ -126,7 +187,7 @@ export function getDefaultFilterValue(filterType: FilterType): FilterValue {
 }
 
 // Get the previous period's date range for comparison
-export function getPreviousPeriodRange(filterType: FilterType, filterValue: FilterValue): DateRange {
+export function getPreviousPeriodRange(filterType: FilterType, filterValue: FilterValue, fiscalStartMonth: number = 1): DateRange {
   const now = new Date();
 
   switch (filterType) {
@@ -159,26 +220,13 @@ export function getPreviousPeriodRange(filterType: FilterType, filterValue: Filt
       const year = filterValue.year ?? getYear(now);
       const prevHalf = half === "H1" ? "H2" : "H1";
       const prevYear = half === "H1" ? year - 1 : year;
-      const startMonth = prevHalf === "H1" ? 0 : 6;
-      const endMonth = prevHalf === "H1" ? 5 : 11;
-      const startDate = new Date(prevYear, startMonth, 1);
-      const endDate = endOfMonth(new Date(prevYear, endMonth, 1));
-      return {
-        start: format(startDate, "yyyy-MM-dd"),
-        end: format(endDate, "yyyy-MM-dd"),
-        label: `${prevHalf} ${prevYear}`,
-      };
+      return getFiscalHalfRange(fiscalStartMonth, prevHalf, prevYear);
     }
 
     case "yearly": {
       const year = filterValue.year ?? getYear(now);
       const prevYear = year - 1;
-      const yearDate = new Date(prevYear, 0, 1);
-      return {
-        start: format(startOfYear(yearDate), "yyyy-MM-dd"),
-        end: format(endOfYear(yearDate), "yyyy-MM-dd"),
-        label: `Year ${prevYear}`,
-      };
+      return getFiscalYearRange(fiscalStartMonth, prevYear);
     }
 
     case "custom": {
@@ -195,7 +243,7 @@ export function getPreviousPeriodRange(filterType: FilterType, filterValue: Filt
     }
 
     default:
-      return getPreviousPeriodRange("monthly", { month: getMonth(now), year: getYear(now) });
+      return getPreviousPeriodRange("monthly", { month: getMonth(now), year: getYear(now) }, fiscalStartMonth);
   }
 }
 

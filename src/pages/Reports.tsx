@@ -11,6 +11,8 @@ import { format, endOfMonth, getYear, getMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useKhataTransfers } from "@/hooks/useKhataTransfers";
 import { useAccountBalances } from "@/hooks/useExpenses";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { formatCurrencyPrecise } from "@/utils/currencyUtils";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
@@ -19,6 +21,9 @@ import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 
 export default function Reports() {
   const { user } = useAuth();
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
+  
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { data: transfers = [] } = useKhataTransfers();
   const { data: accounts = [] } = useAccountBalances();
@@ -160,7 +165,7 @@ export default function Reports() {
   }, [reportData, filteredData]);
 
   const formatCurrency = (amount: number) => {
-    return `৳${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return formatCurrencyPrecise(amount, currency);
   };
 
   // Export handlers
@@ -186,7 +191,7 @@ export default function Reports() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("reports-content", "reports", "Financial Report", dateRange.label);
+    await exportToPDF("reports-content", "reports", "Financial Report", dateRange.label, userProfile?.business_name || undefined);
   };
 
   // CSV Export functions for individual tabs

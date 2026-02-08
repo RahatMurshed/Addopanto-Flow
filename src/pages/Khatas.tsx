@@ -7,6 +7,8 @@ import {
   useCreateDefaultAccounts,
   type ExpenseAccount,
 } from "@/hooks/useExpenseAccounts";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +29,9 @@ import KhataDialog from "@/components/KhataDialog";
 
 export default function Khatas() {
   const { data: accounts = [], isLoading } = useExpenseAccounts();
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
+  
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();
   const deleteMutation = useDeleteExpenseAccount();
@@ -202,7 +207,7 @@ export default function Khatas() {
                     )}
                     {account.expected_monthly_expense && (
                       <p className="text-xs text-muted-foreground">
-                        Expected: ৳{Number(account.expected_monthly_expense).toLocaleString()}
+                        Expected: {formatCurrency(Number(account.expected_monthly_expense), currency)}
                       </p>
                     )}
                   </div>

@@ -137,7 +137,8 @@ export async function exportToPDF(
   elementId: string,
   filename: string,
   title: string,
-  dateRangeLabel: string
+  dateRangeLabel: string,
+  businessName?: string
 ): Promise<void> {
   const element = document.getElementById(elementId);
   if (!element) {
@@ -163,21 +164,35 @@ export async function exportToPDF(
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
+    let currentY = margin;
+
+    // Add business name if provided
+    if (businessName) {
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(businessName, margin, currentY + 5);
+      currentY += 10;
+    }
 
     // Add title
     pdf.setFontSize(16);
-    pdf.text(title, margin, margin + 5);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(title, margin, currentY + 5);
+    currentY += 7;
     
     // Add date range
     pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
     pdf.setTextColor(100);
-    pdf.text(`Period: ${dateRangeLabel}`, margin, margin + 12);
-    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, margin + 17);
+    pdf.text(`Period: ${dateRangeLabel}`, margin, currentY + 5);
+    currentY += 5;
+    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, currentY + 5);
+    currentY += 7;
 
     // Calculate image dimensions
     const imgWidth = pageWidth - margin * 2;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const startY = margin + 22;
+    const startY = currentY;
 
     // Check if image fits on one page
     if (imgHeight + startY > pageHeight - margin) {
