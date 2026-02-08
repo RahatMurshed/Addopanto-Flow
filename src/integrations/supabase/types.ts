@@ -214,6 +214,48 @@ export type Database = {
         }
         Relationships: []
       }
+      registration_requests: {
+        Row: {
+          can_add_expense: boolean
+          can_add_revenue: boolean
+          can_view_reports: boolean
+          email: string
+          id: string
+          rejection_reason: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          can_add_expense?: boolean
+          can_add_revenue?: boolean
+          can_view_reports?: boolean
+          email: string
+          id?: string
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          can_add_expense?: boolean
+          can_add_revenue?: boolean
+          can_view_reports?: boolean
+          email?: string
+          id?: string
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       revenue_sources: {
         Row: {
           created_at: string
