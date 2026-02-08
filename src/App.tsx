@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import AppLayout from "@/components/AppLayout";
 import Auth from "@/pages/Auth";
@@ -13,6 +14,8 @@ import Revenue from "@/pages/Revenue";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import SettingsPage from "@/pages/SettingsPage";
+import UserManagement from "@/pages/UserManagement";
+import ModeratorControl from "@/pages/ModeratorControl";
 import NotFound from "@/pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -28,7 +31,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth" replace />;
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <RoleProvider>
+      <AppLayout>{children}</AppLayout>
+    </RoleProvider>
+  );
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -60,6 +67,8 @@ const App = () => (
               <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+              <Route path="/moderators" element={<ProtectedRoute><ModeratorControl /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </NavigationBlockerProvider>

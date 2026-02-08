@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useExpenses";
 import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useRole } from "@/contexts/RoleContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,9 @@ export default function Expenses() {
   
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
+  
+  // Role-based permissions
+  const { canAddExpense, canEdit, canDelete, isModerator } = useRole();
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -223,10 +227,12 @@ export default function Expenses() {
             <ArrowLeftRight className="mr-2 h-4 w-4" />
             Transfer
           </Button>
-          <Button onClick={() => setDialogOpen(true)} disabled={accounts.length === 0}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Expense
-          </Button>
+          {canAddExpense && (
+            <Button onClick={() => setDialogOpen(true)} disabled={accounts.length === 0}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Expense
+            </Button>
+          )}
         </div>
       </div>
 
@@ -394,7 +400,7 @@ export default function Expenses() {
                 ? "Try selecting a different date range or add new expenses."
                 : "Start tracking your spending. Each expense will be deducted from the selected expense source's balance."}
             </p>
-            {accounts.length > 0 && (
+            {accounts.length > 0 && canAddExpense && (
               <Button onClick={() => setDialogOpen(true)}>Add Expense</Button>
             )}
           </CardContent>
@@ -414,7 +420,7 @@ export default function Expenses() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Expense Source</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -442,29 +448,35 @@ export default function Expenses() {
                       <TableCell className="hidden max-w-xs truncate md:table-cell">
                         {exp.description || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              setEditingExpense(exp);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(exp.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {(canEdit || canDelete) && (
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setEditingExpense(exp);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(exp.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

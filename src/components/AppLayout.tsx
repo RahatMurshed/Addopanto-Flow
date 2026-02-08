@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserRoleBadge } from "@/components/UserRoleBadge";
 import {
   LayoutDashboard,
   Wallet,
@@ -13,10 +15,12 @@ import {
   LogOut,
   Menu,
   X,
+  Users,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const baseNavItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Expense Sources", href: "/khatas", icon: Wallet },
   { label: "Revenue", href: "/revenue", icon: TrendingUp },
@@ -27,9 +31,19 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
+  const { role, canManageUsers, isCipher, isAdmin } = useRole();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Build nav items dynamically based on role
+  const navItems = [
+    ...baseNavItems,
+    // User Management - visible to Admin and Cipher only
+    ...(canManageUsers ? [{ label: "Users", href: "/users", icon: Users }] : []),
+    // Moderator Control - visible to Admin and Cipher only
+    ...((isAdmin || isCipher) ? [{ label: "Moderators", href: "/moderators", icon: Shield }] : []),
+  ];
 
   const handleLogout = async () => {
     await signOut();
@@ -48,6 +62,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="text-lg font-bold">KhataFlow</span>
           </div>
           <ThemeToggle />
+        </div>
+        {/* Role Badge */}
+        <div className="px-3 py-2 border-b border-border">
+          <UserRoleBadge role={role} size="sm" />
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {navItems.map((item) => (
