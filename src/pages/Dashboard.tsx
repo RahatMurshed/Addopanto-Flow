@@ -30,6 +30,8 @@ import PercentageChange from "@/components/PercentageChange";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useAccountBalances, useCreateExpense } from "@/hooks/useExpenses";
 import { useCreateRevenue } from "@/hooks/useRevenues";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { formatCurrency as formatCurrencyUtil, formatCurrencyPrecise } from "@/utils/currencyUtils";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -38,6 +40,9 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
+  
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("monthly");
   const [filterValue, setFilterValue] = useState<FilterValue>({});
@@ -253,7 +258,7 @@ export default function Dashboard() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label);
+    await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label, userProfile?.business_name || undefined);
   };
 
   if (isLoading) {
@@ -265,13 +270,11 @@ export default function Dashboard() {
   }
 
   const formatCurrency = (amount: number) => {
-    return `৳${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return formatCurrencyPrecise(amount, currency);
   };
 
   const formatCompact = (value: number) => {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-    return `${value}`;
+    return formatCurrencyUtil(value, currency, { compact: true });
   };
 
   const data = dashboardData || {

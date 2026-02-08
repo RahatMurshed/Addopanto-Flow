@@ -26,6 +26,21 @@ import {
   getDefaultFilterValue,
 } from "@/utils/dateRangeUtils";
 import { useDateFilterParams } from "@/hooks/useDateFilterParams";
+import { useUserProfile } from "@/hooks/useUserProfile";
+
+// Helper to get fiscal half labels based on fiscal start month
+function getFiscalHalfLabels(fiscalStartMonth: number): { h1: string; h2: string } {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const h1Start = fiscalStartMonth - 1; // Convert to 0-indexed
+  const h1End = (h1Start + 5) % 12;
+  const h2Start = (h1Start + 6) % 12;
+  const h2End = (h2Start + 5) % 12;
+
+  return {
+    h1: `H1 (${months[h1Start]} - ${months[h1End]})`,
+    h2: `H2 (${months[h2Start]} - ${months[h2End]})`,
+  };
+}
 
 interface AdvancedDateFilterProps {
   onFilterChange: (range: DateRange, filterType: FilterType, filterValue: FilterValue) => void;
@@ -38,6 +53,10 @@ export default function AdvancedDateFilter({
   defaultFilterType = "monthly",
   className,
 }: AdvancedDateFilterProps) {
+  const { data: userProfile } = useUserProfile();
+  const fiscalStartMonth = userProfile?.fiscal_year_start_month || 1;
+  const fiscalHalfLabels = getFiscalHalfLabels(fiscalStartMonth);
+
   const {
     filterType,
     filterValue,
@@ -55,9 +74,9 @@ export default function AdvancedDateFilter({
 
   // Call onFilterChange whenever filterType or filterValue changes
   useEffect(() => {
-    const range = getDateRange(filterType, filterValue);
+    const range = getDateRange(filterType, filterValue, fiscalStartMonth);
     onFilterChange(range, filterType, filterValue);
-  }, [filterType, filterValue, onFilterChange]);
+  }, [filterType, filterValue, fiscalStartMonth, onFilterChange]);
 
   const handleReset = () => {
     resetFilter();
@@ -159,12 +178,12 @@ export default function AdvancedDateFilter({
             value={filterValue.half}
             onValueChange={(v) => updateFilterValue({ half: v as "H1" | "H2" })}
           >
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Half" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="H1">H1 (Jan - Jun)</SelectItem>
-              <SelectItem value="H2">H2 (Jul - Dec)</SelectItem>
+              <SelectItem value="H1">{fiscalHalfLabels.h1}</SelectItem>
+              <SelectItem value="H2">{fiscalHalfLabels.h2}</SelectItem>
             </SelectContent>
           </Select>
           <Select
