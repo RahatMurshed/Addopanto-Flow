@@ -184,7 +184,9 @@ export type Database = {
       moderator_permissions: {
         Row: {
           can_add_expense: boolean
+          can_add_expense_source: boolean
           can_add_revenue: boolean
+          can_transfer: boolean
           can_view_reports: boolean
           controlled_by: string | null
           created_at: string
@@ -194,7 +196,9 @@ export type Database = {
         }
         Insert: {
           can_add_expense?: boolean
+          can_add_expense_source?: boolean
           can_add_revenue?: boolean
+          can_transfer?: boolean
           can_view_reports?: boolean
           controlled_by?: string | null
           created_at?: string
@@ -204,7 +208,9 @@ export type Database = {
         }
         Update: {
           can_add_expense?: boolean
+          can_add_expense_source?: boolean
           can_add_revenue?: boolean
+          can_transfer?: boolean
           can_view_reports?: boolean
           controlled_by?: string | null
           created_at?: string
@@ -217,7 +223,9 @@ export type Database = {
       registration_requests: {
         Row: {
           can_add_expense: boolean
+          can_add_expense_source: boolean
           can_add_revenue: boolean
+          can_transfer: boolean
           can_view_reports: boolean
           email: string
           id: string
@@ -230,7 +238,9 @@ export type Database = {
         }
         Insert: {
           can_add_expense?: boolean
+          can_add_expense_source?: boolean
           can_add_revenue?: boolean
+          can_transfer?: boolean
           can_view_reports?: boolean
           email: string
           id?: string
@@ -243,7 +253,9 @@ export type Database = {
         }
         Update: {
           can_add_expense?: boolean
+          can_add_expense_source?: boolean
           can_add_revenue?: boolean
+          can_transfer?: boolean
           can_view_reports?: boolean
           email?: string
           id?: string
