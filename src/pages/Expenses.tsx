@@ -9,7 +9,7 @@ import {
   useExpenseSummary,
   type ExpenseWithAccount,
 } from "@/hooks/useExpenses";
-import { useCreateKhataTransfer } from "@/hooks/useKhataTransfers";
+import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,15 +46,18 @@ import {
 } from "lucide-react";
 import ExpenseDialog from "@/components/ExpenseDialog";
 import TransferDialog from "@/components/TransferDialog";
+import TransferHistoryCard from "@/components/TransferHistoryCard";
 
 export default function Expenses() {
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
   const { data: summary } = useExpenseSummary();
+  const { data: transfers = [] } = useKhataTransfers();
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
   const deleteMutation = useDeleteExpense();
   const transferMutation = useCreateKhataTransfer();
+  const deleteTransferMutation = useDeleteKhataTransfer();
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -341,6 +344,18 @@ export default function Expenses() {
           </CardContent>
         </Card>
       )}
+
+      {/* Transfer History */}
+      <TransferHistoryCard
+        transfers={transfers}
+        accounts={accounts}
+        onDelete={async (id) => {
+          await deleteTransferMutation.mutateAsync(id);
+          toast({ title: "Transfer deleted" });
+        }}
+        isDeleting={deleteTransferMutation.isPending}
+        limit={5}
+      />
 
       {/* Create/Edit Dialog */}
       <ExpenseDialog

@@ -7,14 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText } from "lucide-react";
+import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, getYear, getMonth } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useKhataTransfers } from "@/hooks/useKhataTransfers";
+import { useAccountBalances } from "@/hooks/useExpenses";
+import TransferHistoryCard from "@/components/TransferHistoryCard";
 
 export default function Reports() {
   const { user } = useAuth();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const { data: transfers = [] } = useKhataTransfers();
+  const { data: accounts = [] } = useAccountBalances();
 
   const { data: reportData, isLoading } = useQuery({
     queryKey: ["reports", user?.id],
@@ -336,6 +341,10 @@ export default function Reports() {
           <TabsTrigger value="monthly">Monthly Summary</TabsTrigger>
           <TabsTrigger value="accounts">By Khata</TabsTrigger>
           <TabsTrigger value="sources">By Source</TabsTrigger>
+          <TabsTrigger value="transfers">
+            <ArrowLeftRight className="mr-1 h-4 w-4" />
+            Transfers
+          </TabsTrigger>
         </TabsList>
 
         {/* Monthly Summary Tab */}
@@ -512,6 +521,15 @@ export default function Reports() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Transfers Tab */}
+        <TabsContent value="transfers" className="space-y-4">
+          <TransferHistoryCard
+            transfers={transfers}
+            accounts={accounts}
+            showDelete={false}
+          />
         </TabsContent>
       </Tabs>
     </div>
