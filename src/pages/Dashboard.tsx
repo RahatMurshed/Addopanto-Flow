@@ -1,9 +1,11 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AreaChart,
@@ -17,7 +19,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from "date-fns";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -26,6 +28,8 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState<string>(`${now.getFullYear()}-${now.getMonth()}`);
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboard", user?.id],
@@ -33,7 +37,6 @@ export default function Dashboard() {
       if (!user) return null;
 
       const now = new Date();
-      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
       const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes, recentRevenuesRes, recentExpensesRes] = await Promise.all([
         supabase.from("revenues").select("amount, date").eq("user_id", user.id),
@@ -87,15 +90,7 @@ export default function Dashboard() {
         .slice(0, 10);
 
       const totalRevenue = revenues.reduce((sum, r) => sum + Number(r.amount), 0);
-      const thisMonthRevenue = revenues
-        .filter((r) => r.date >= startOfCurrentMonth)
-        .reduce((sum, r) => sum + Number(r.amount), 0);
-
       const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-      const thisMonthExpenses = expenses
-        .filter((e) => e.date >= startOfCurrentMonth)
-        .reduce((sum, e) => sum + Number(e.amount), 0);
-
       const totalAllocations = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
       const allocatedProfit = totalRevenue - totalAllocations;
       const actualProfit = totalRevenue - totalExpenses;
@@ -136,13 +131,13 @@ export default function Dashboard() {
 
       return {
         totalRevenue,
-        thisMonthRevenue,
         totalExpenses,
-        thisMonthExpenses,
         allocatedProfit,
         actualProfit,
         totalBalance,
         accounts,
+        revenues,
+        expenses,
         revenueTrend,
         expenseBreakdown,
         recentTransactions,
@@ -150,6 +145,60 @@ export default function Dashboard() {
     },
     enabled: !!user,
   });
+
+  // Generate month options (last 12 months)
+  const monthOptions = useMemo(() => {
+    const options = [];
+    for (let i = 0; i < 12; i++) {
+      const date = subMonths(now, i);
+      options.push({
+        value: `${getYear(date)}-${getMonth(date)}`,
+        label: format(date, "MMMM yyyy"),
+      });
+    }
+    return options;
+  }, []);
+
+  // Calculate selected month data
+  const selectedMonthData = useMemo(() => {
+    if (!dashboardData) return { revenue: 0, expenses: 0 };
+    
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const monthStart = format(startOfMonth(new Date(year, month)), "yyyy-MM-dd");
+    const monthEnd = format(endOfMonth(new Date(year, month)), "yyyy-MM-dd");
+    
+    const revenue = (dashboardData.revenues || [])
+      .filter((r: any) => r.date >= monthStart && r.date <= monthEnd)
+      .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+    
+    const expenses = (dashboardData.expenses || [])
+      .filter((e: any) => e.date >= monthStart && e.date <= monthEnd)
+      .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+    
+    return { revenue, expenses };
+  }, [dashboardData, selectedMonth]);
+
+  // Get selected month expense breakdown
+  const selectedMonthExpenseBreakdown = useMemo(() => {
+    if (!dashboardData) return [];
+    
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const monthStart = format(startOfMonth(new Date(year, month)), "yyyy-MM-dd");
+    const monthEnd = format(endOfMonth(new Date(year, month)), "yyyy-MM-dd");
+    
+    return (dashboardData.accounts || [])
+      .map((account: any, index: number) => {
+        const accountExpenses = (dashboardData.expenses || [])
+          .filter((e: any) => e.expense_account_id === account.id && e.date >= monthStart && e.date <= monthEnd)
+          .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+        return {
+          name: account.name,
+          value: accountExpenses,
+          color: account.color || CHART_COLORS[index % CHART_COLORS.length],
+        };
+      })
+      .filter((item: any) => item.value > 0);
+  }, [dashboardData, selectedMonth]);
 
   if (isLoading) {
     return (
@@ -171,13 +220,13 @@ export default function Dashboard() {
 
   const data = dashboardData || {
     totalRevenue: 0,
-    thisMonthRevenue: 0,
     totalExpenses: 0,
-    thisMonthExpenses: 0,
     allocatedProfit: 0,
     actualProfit: 0,
     totalBalance: 0,
     accounts: [],
+    revenues: [],
+    expenses: [],
     revenueTrend: [],
     expenseBreakdown: [],
     recentTransactions: [],
@@ -192,8 +241,13 @@ export default function Dashboard() {
   ];
 
   const hasRevenueTrendData = data.revenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
-  const hasExpenseBreakdownData = data.expenseBreakdown.length > 0;
+  const hasSelectedMonthBreakdown = selectedMonthExpenseBreakdown.length > 0;
+  const totalSelectedMonthExpense = selectedMonthExpenseBreakdown.reduce((sum, item) => sum + item.value, 0);
   const totalExpenseValue = data.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
+  const hasExpenseBreakdownData = data.expenseBreakdown.length > 0;
+
+  // Get selected month label
+  const selectedMonthLabel = monthOptions.find((m) => m.value === selectedMonth)?.label || "Selected Month";
 
   // Custom tooltip for area chart
   const CustomAreaTooltip = ({ active, payload, label }: any) => {
@@ -264,25 +318,79 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* This Month Summary */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This Month Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-primary">{formatCurrency(data.thisMonthRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This Month Expenses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-destructive">{formatCurrency(data.thisMonthExpenses)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Selected Month Summary with Filter */}
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-2">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-base font-semibold">Monthly Overview</CardTitle>
+          </div>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-4">
+              <p className="text-sm font-medium text-muted-foreground">Revenue</p>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(selectedMonthData.revenue)}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-destructive/5 to-destructive/10 border border-destructive/20 p-4">
+              <p className="text-sm font-medium text-muted-foreground">Expenses</p>
+              <p className="text-2xl font-bold text-destructive">{formatCurrency(selectedMonthData.expenses)}</p>
+            </div>
+            <div className={cn(
+              "rounded-lg border p-4",
+              selectedMonthData.revenue - selectedMonthData.expenses >= 0
+                ? "bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20"
+                : "bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20"
+            )}>
+              <p className="text-sm font-medium text-muted-foreground">Net Profit</p>
+              <p className={cn(
+                "text-2xl font-bold",
+                selectedMonthData.revenue - selectedMonthData.expenses >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+              )}>
+                {formatCurrency(selectedMonthData.revenue - selectedMonthData.expenses)}
+              </p>
+            </div>
+          </div>
+          
+          {/* Selected Month Expense Breakdown */}
+          {hasSelectedMonthBreakdown && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Expense Breakdown for {selectedMonthLabel}</p>
+              <div className="space-y-2">
+                {selectedMonthExpenseBreakdown.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{formatCurrency(item.value)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({((item.value / totalSelectedMonthExpense) * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Revenue Trend Area Chart */}
