@@ -146,7 +146,7 @@ export default function Revenue() {
   const handleCreate = async (data: { amount: number; date: string; source_id: string | null; description: string | null }) => {
     try {
       await createMutation.mutateAsync(data);
-      toast({ title: "Revenue added", description: `${formatCurrency(data.amount, currency)} allocated to ${activeAccounts.length} khatas` });
+      toast({ title: "Revenue added", description: `${formatCurrency(data.amount, currency)} allocated to ${activeAccounts.length} expense sources` });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
@@ -199,7 +199,7 @@ export default function Revenue() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
-          <p className="text-muted-foreground">Track income and automatically allocate to khatas</p>
+          <p className="text-muted-foreground">Track income and automatically allocate to expense sources</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
@@ -223,7 +223,7 @@ export default function Revenue() {
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            No active khatas! Revenue won't be allocated until you create expense accounts.
+            No active expense sources! Revenue won't be allocated until you create expense sources.
           </AlertDescription>
         </Alert>
       )}
@@ -323,7 +323,7 @@ export default function Revenue() {
             <p className="mb-4 max-w-sm text-muted-foreground">
               {revenues.length > 0 
                 ? "Try selecting a different date range or add new revenue."
-                : "Start tracking your income. Each entry will be automatically allocated to your active khatas."}
+                : "Start tracking your income. Each entry will be automatically allocated to your active expense sources."}
             </p>
             <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>
           </CardContent>
@@ -428,7 +428,7 @@ export default function Revenue() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this revenue?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the revenue entry and all its allocations to khatas.
+              This will permanently delete the revenue entry and all its allocations to expense sources.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

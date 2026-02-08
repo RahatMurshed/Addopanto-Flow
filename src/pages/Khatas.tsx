@@ -49,7 +49,7 @@ export default function Khatas() {
   const handleCreate = async (data: Omit<ExpenseAccount, "id" | "user_id" | "created_at" | "updated_at">) => {
     try {
       await createMutation.mutateAsync(data);
-      toast({ title: "Khata created" });
+      toast({ title: "Expense source created" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
@@ -60,7 +60,7 @@ export default function Khatas() {
     if (!editingKhata) return;
     try {
       await updateMutation.mutateAsync({ id: editingKhata.id, ...data });
-      toast({ title: "Khata updated" });
+      toast({ title: "Expense source updated" });
       setEditingKhata(null);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -72,7 +72,7 @@ export default function Khatas() {
     if (!deleteId) return;
     try {
       await deleteMutation.mutateAsync(deleteId);
-      toast({ title: "Khata deleted" });
+      toast({ title: "Expense source deleted" });
       setDeleteId(null);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -82,7 +82,7 @@ export default function Khatas() {
   const handleCreateDefaults = async () => {
     try {
       await createDefaultsMutation.mutateAsync();
-      toast({ title: "Default khatas created", description: "6 expense accounts added with suggested allocations" });
+      toast({ title: "Default expense sources created", description: "6 expense accounts added with suggested allocations" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -100,7 +100,7 @@ export default function Khatas() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expense Accounts (Khatas)</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Expense Sources</h1>
           <p className="text-muted-foreground">Manage your expense categories and allocation percentages</p>
         </div>
         <div className="flex gap-2">
@@ -120,7 +120,7 @@ export default function Khatas() {
           )}
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Khata
+            Add Expense Source
           </Button>
         </div>
       </div>
@@ -150,7 +150,7 @@ export default function Khatas() {
             </div>
             <h3 className="mb-2 text-lg font-semibold">No expense accounts yet</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">
-              Create khatas to automatically allocate your revenue. Start with our defaults or create custom ones.
+              Create expense sources to automatically allocate your revenue. Start with our defaults or create custom ones.
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleCreateDefaults} disabled={createDefaultsMutation.isPending}>
@@ -265,7 +265,7 @@ export default function Khatas() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this khata?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this expense source?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete the expense account. Existing expenses and allocations linked to this account may be affected.
             </AlertDialogDescription>

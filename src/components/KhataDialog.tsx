@@ -83,7 +83,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Khata" : "Create Khata"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Expense Source" : "Create Expense Source"}</DialogTitle>
           <DialogDescription>
             {isEdit ? "Update expense account details" : "Add a new expense account for allocation"}
           </DialogDescription>
@@ -181,7 +181,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEdit ? "Save Changes" : "Create Khata"}
+              {isEdit ? "Save Changes" : "Create Expense Source"}
             </Button>
           </DialogFooter>
         </form>

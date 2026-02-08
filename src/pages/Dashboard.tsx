@@ -627,7 +627,7 @@ export default function Dashboard() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Khata</TableHead>
+                    <TableHead>Expense Source</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>

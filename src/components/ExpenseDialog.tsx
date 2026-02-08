@@ -33,7 +33,7 @@ import type { AccountBalance } from "@/hooks/useExpenses";
 const expenseSchema = z.object({
   amount: z.number().positive("Amount must be positive"),
   date: z.string().min(1, "Date is required"),
-  expense_account_id: z.string().min(1, "Please select a khata"),
+  expense_account_id: z.string().min(1, "Please select an expense source"),
   description: z.string().max(500).nullable(),
 });
 
@@ -104,19 +104,19 @@ export default function ExpenseDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Expense" : "Add Expense"}</DialogTitle>
           <DialogDescription>
-            {isEdit ? "Update expense entry" : "Record a spending from one of your khatas"}
+            {isEdit ? "Update expense entry" : "Record a spending from one of your expense sources"}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>Khata (Expense Account)</Label>
+            <Label>Expense Source</Label>
             <Select
               value={form.watch("expense_account_id")}
               onValueChange={(value) => form.setValue("expense_account_id", value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a khata" />
+                <SelectValue placeholder="Select an expense source" />
               </SelectTrigger>
               <SelectContent className="bg-popover">
                 {accounts.map((account) => (
