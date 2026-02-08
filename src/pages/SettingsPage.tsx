@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { DataManagementSection } from "@/components/DataManagementSection";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 const months = [
   "January", "February", "March", "April", "May", "June",
@@ -24,6 +26,20 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState("BDT");
   const [fiscalMonth, setFiscalMonth] = useState("1");
 
+  // Track original values to detect changes
+  const [originalValues, setOriginalValues] = useState({
+    businessName: "",
+    currency: "BDT",
+    fiscalMonth: "1",
+  });
+
+  const isDirty =
+    businessName !== originalValues.businessName ||
+    currency !== originalValues.currency ||
+    fiscalMonth !== originalValues.fiscalMonth;
+
+  const blocker = useUnsavedChanges(isDirty);
+
   useEffect(() => {
     if (!user) return;
     supabase
@@ -33,9 +49,17 @@ export default function SettingsPage() {
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
-          setBusinessName(data.business_name || "");
-          setCurrency(data.currency);
-          setFiscalMonth(String(data.fiscal_year_start_month));
+          const bName = data.business_name || "";
+          const curr = data.currency;
+          const fiscal = String(data.fiscal_year_start_month);
+          setBusinessName(bName);
+          setCurrency(curr);
+          setFiscalMonth(fiscal);
+          setOriginalValues({
+            businessName: bName,
+            currency: curr,
+            fiscalMonth: fiscal,
+          });
         }
         setLoading(false);
       });
@@ -57,6 +81,12 @@ export default function SettingsPage() {
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
+      // Update original values after successful save
+      setOriginalValues({
+        businessName,
+        currency,
+        fiscalMonth,
+      });
       toast({ title: "Settings saved" });
     }
   };
@@ -66,61 +96,65 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Manage your business profile</p>
+    <>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">Manage your business profile</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Business Profile</CardTitle>
+            <CardDescription>Configure your business details and preferences</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" value={user?.email || ""} disabled className="bg-muted" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="business-name">Business Name</Label>
+                <Input id="business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BDT">BDT (৳)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Fiscal Year Starts</Label>
+                  <Select value={fiscalMonth} onValueChange={setFiscalMonth}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {months.map((m, i) => (
+                        <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <DataManagementSection />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Profile</CardTitle>
-          <CardDescription>Configure your business details and preferences</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" value={user?.email || ""} disabled className="bg-muted" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="business-name">Business Name</Label>
-              <Input id="business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Currency</Label>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BDT">BDT (৳)</SelectItem>
-                    <SelectItem value="USD">USD ($)</SelectItem>
-                    <SelectItem value="EUR">EUR (€)</SelectItem>
-                    <SelectItem value="GBP">GBP (£)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Fiscal Year Starts</Label>
-                <Select value={fiscalMonth} onValueChange={setFiscalMonth}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {months.map((m, i) => (
-                      <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button type="submit" disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <DataManagementSection />
-    </div>
+      <UnsavedChangesDialog blocker={blocker} />
+    </>
   );
 }
