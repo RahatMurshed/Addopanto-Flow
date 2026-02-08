@@ -133,6 +133,7 @@ export function exportAllTransactionsCSV(
 /**
  * Export page as PDF using html2canvas and jsPDF
  * - Forces light theme for consistent output
+ * - Hides action buttons for clean report output
  * - Properly handles multi-page content with correct slicing
  */
 export async function exportToPDF(
@@ -151,6 +152,26 @@ export async function exportToPDF(
   // Store current theme and force light mode for PDF
   const htmlElement = document.documentElement;
   const wasDarkMode = htmlElement.classList.contains("dark");
+  
+  // Hide action buttons for clean PDF output
+  const hiddenElements: HTMLElement[] = [];
+  const actionSelectors = [
+    'button',
+    '[role="button"]',
+    '.action-buttons',
+    '[data-pdf-hide]',
+    'a[href]',
+  ];
+  
+  actionSelectors.forEach((selector) => {
+    element.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+      if (el.offsetParent !== null) { // Only if visible
+        hiddenElements.push(el);
+        el.dataset.originalDisplay = el.style.display;
+        el.style.display = 'none';
+      }
+    });
+  });
   
   try {
     // Temporarily switch to light mode for clean PDF
@@ -262,6 +283,12 @@ export async function exportToPDF(
     console.error("Error generating PDF:", error);
     throw error;
   } finally {
+    // Restore hidden elements
+    hiddenElements.forEach((el) => {
+      el.style.display = el.dataset.originalDisplay || '';
+      delete el.dataset.originalDisplay;
+    });
+    
     // Restore dark mode if it was active
     if (wasDarkMode) {
       htmlElement.classList.add("dark");
