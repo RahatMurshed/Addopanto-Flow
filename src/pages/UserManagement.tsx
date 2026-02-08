@@ -35,7 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { RoleGuard } from "@/components/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
-import { Loader2, Users, Search, ShieldAlert } from "lucide-react";
+import { Loader2, Users, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 interface UserWithRole {
@@ -46,7 +46,7 @@ interface UserWithRole {
 }
 
 export default function UserManagement() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, session } = useAuth();
   const { isCipher, isAdmin, canManageUsers, canManageRole } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -57,45 +57,22 @@ export default function UserManagement() {
     newRole: AppRole;
     currentRole: AppRole;
   } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    userId: string;
+    email: string;
+    role: AppRole;
+  } | null>(null);
 
-  // Fetch all users with their roles (filtered by visibility)
+  // Fetch all users with their roles and emails via edge function
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async (): Promise<UserWithRole[]> => {
-      // Get user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role, created_at");
+      const { data, error } = await supabase.functions.invoke("admin-users", {
+        method: "GET",
+      });
 
-      if (rolesError) throw rolesError;
-
-      // Get user profiles for emails
-      const { data: profiles, error: profilesError } = await supabase
-        .from("user_profiles")
-        .select("user_id");
-
-      if (profilesError) throw profilesError;
-
-      // Combine data - we need to get emails from auth.users but we can't query it directly
-      // So we'll use the user_id from roles and profiles
-      const usersMap = new Map<string, UserWithRole>();
-
-      for (const role of roles || []) {
-        usersMap.set(role.user_id, {
-          user_id: role.user_id,
-          email: null, // Will be filled below if possible
-          role: role.role as AppRole,
-          created_at: role.created_at,
-        });
-      }
-
-      // For current user, we can get their email
-      if (currentUser && usersMap.has(currentUser.id)) {
-        const userEntry = usersMap.get(currentUser.id)!;
-        userEntry.email = currentUser.email || null;
-      }
-
-      return Array.from(usersMap.values());
+      if (error) throw error;
+      return data.users || [];
     },
     enabled: canManageUsers,
   });
@@ -159,6 +136,46 @@ export default function UserManagement() {
     },
   });
 
+  // Mutation to delete user
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke("admin-users", {
+        method: "DELETE",
+        body: null,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // The invoke method doesn't support query params directly, so we need to use fetch
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?userId=${userId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete user");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "User deleted successfully" });
+      setDeleteConfirm(null);
+    },
+    onError: (error) => {
+      toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleRoleChange = (userId: string, email: string | null, currentRole: AppRole, newRole: AppRole) => {
     // Prevent changing own role
     if (userId === currentUser?.id) {
@@ -183,10 +200,31 @@ export default function UserManagement() {
     });
   };
 
-  // Available roles based on current user's role
+  const handleDeleteUser = (userId: string, email: string | null, role: AppRole) => {
+    // Prevent deleting self
+    if (userId === currentUser?.id) {
+      toast({ title: "Cannot delete yourself", variant: "destructive" });
+      return;
+    }
+
+    // Check if user can manage this role
+    if (!canManageRole(role)) {
+      toast({ title: "You don't have permission to delete this user", variant: "destructive" });
+      return;
+    }
+
+    setDeleteConfirm({ userId, email: email || userId, role });
+  };
+
+  const confirmDeleteUser = () => {
+    if (!deleteConfirm) return;
+    deleteUserMutation.mutate(deleteConfirm.userId);
+  };
+
+  // Available roles based on current user's role (removed "user" option)
   const availableRoles: AppRole[] = isCipher
-    ? ["cipher", "admin", "moderator", "user"]
-    : ["admin", "moderator", "user"];
+    ? ["cipher", "admin", "moderator"]
+    : ["admin", "moderator"];
 
   // Redirect if not authorized (after all hooks)
   if (!canManageUsers) {
@@ -257,6 +295,7 @@ export default function UserManagement() {
                       <TableHead>Current Role</TableHead>
                       <TableHead>Change Role</TableHead>
                       <TableHead>Member Since</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -305,6 +344,17 @@ export default function UserManagement() {
                           <TableCell className="text-muted-foreground text-sm">
                             {new Date(u.created_at).toLocaleDateString()}
                           </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteUser(u.user_id, u.email, u.role)}
+                              disabled={!canModify || deleteUserMutation.isPending}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -337,6 +387,31 @@ export default function UserManagement() {
             <AlertDialogAction onClick={confirmRoleChange}>
               {changeRoleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?
+              <span className="block mt-2 text-destructive font-medium">
+                This action cannot be undone. All user data will be permanently removed.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
