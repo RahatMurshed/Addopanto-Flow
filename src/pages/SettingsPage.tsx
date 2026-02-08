@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { DataManagementSection } from "@/components/DataManagementSection";
 
 const months = [
   "January", "February", "March", "April", "May", "June",
@@ -118,6 +119,8 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <DataManagementSection />
     </div>
   );
 }
