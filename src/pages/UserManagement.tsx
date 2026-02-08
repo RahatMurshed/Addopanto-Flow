@@ -62,6 +62,7 @@ export default function UserManagement() {
     email: string;
     role: AppRole;
   } | null>(null);
+  const [deleteEmailInput, setDeleteEmailInput] = useState("");
 
   // Fetch all users with their roles and emails via edge function
   const { data: users = [], isLoading } = useQuery({
@@ -400,22 +401,56 @@ export default function UserManagement() {
       </AlertDialog>
 
       {/* Delete User Confirmation Dialog */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+      <AlertDialog
+        open={!!deleteConfirm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteConfirm(null);
+            setDeleteEmailInput("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?
-              <span className="block mt-2 text-destructive font-medium">
-                This action cannot be undone. All user data will be permanently removed.
-              </span>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?
+                </p>
+                <p className="text-destructive font-medium">
+                  This action cannot be undone. All user data will be permanently removed.
+                </p>
+
+                {/* Require email confirmation for high-privilege roles */}
+                {(deleteConfirm?.role === "admin" || deleteConfirm?.role === "cipher") && (
+                  <div className="pt-2">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to
+                      confirm deletion of this {deleteConfirm?.role} account:
+                    </p>
+                    <Input
+                      value={deleteEmailInput}
+                      onChange={(e) => setDeleteEmailInput(e.target.value)}
+                      placeholder="Enter email to confirm"
+                      className="mt-1"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeleteUser}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={
+                deleteUserMutation.isPending ||
+                ((deleteConfirm?.role === "admin" || deleteConfirm?.role === "cipher") &&
+                  deleteEmailInput !== deleteConfirm?.email)
+              }
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
             >
               {deleteUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
