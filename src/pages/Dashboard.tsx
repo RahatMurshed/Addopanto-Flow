@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AreaChart,
@@ -21,9 +22,14 @@ import {
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
+import RevenueDialog from "@/components/RevenueDialog";
+import ExpenseDialog from "@/components/ExpenseDialog";
 import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 import PercentageChange from "@/components/PercentageChange";
+import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
+import { useAccountBalances, useCreateExpense } from "@/hooks/useExpenses";
+import { useCreateRevenue } from "@/hooks/useRevenues";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -36,6 +42,17 @@ export default function Dashboard() {
   const [filterType, setFilterType] = useState<FilterType>("monthly");
   const [filterValue, setFilterValue] = useState<FilterValue>({});
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
+  
+  // Quick action dialog states
+  const [revenueDialogOpen, setRevenueDialogOpen] = useState(false);
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+
+  // Hooks for quick actions
+  const { data: revenueSources } = useRevenueSources();
+  const { data: accountBalances } = useAccountBalances();
+  const createRevenue = useCreateRevenue();
+  const createExpense = useCreateExpense();
+  const createRevenueSource = useCreateRevenueSource();
 
   const handleFilterChange = useCallback((range: DateRange, type: FilterType, value: FilterValue) => {
     setDateRange(range);
@@ -340,11 +357,31 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Your financial overview at a glance</p>
         </div>
-        <ExportButtons
-          onExportCSV={handleExportCSV}
-          onExportPDF={handleExportPDF}
-          disabled={!dateRange}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Action Buttons */}
+          <Button
+            size="sm"
+            onClick={() => setRevenueDialogOpen(true)}
+            className="gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Add Revenue
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setExpenseDialogOpen(true)}
+            className="gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Add Expense
+          </Button>
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={!dateRange}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -617,6 +654,38 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Quick Action Dialogs */}
+      <RevenueDialog
+        open={revenueDialogOpen}
+        onOpenChange={setRevenueDialogOpen}
+        sources={revenueSources || []}
+        onSave={async (data) => {
+          await createRevenue.mutateAsync({
+            amount: data.amount,
+            date: data.date,
+            source_id: data.source_id,
+            description: data.description,
+          });
+        }}
+        onCreateSource={async (name) => {
+          await createRevenueSource.mutateAsync(name);
+        }}
+      />
+
+      <ExpenseDialog
+        open={expenseDialogOpen}
+        onOpenChange={setExpenseDialogOpen}
+        accounts={accountBalances || []}
+        onSave={async (data) => {
+          await createExpense.mutateAsync({
+            amount: data.amount,
+            date: data.date,
+            expense_account_id: data.expense_account_id,
+            description: data.description,
+          });
+        }}
+      />
     </div>
   );
 }
