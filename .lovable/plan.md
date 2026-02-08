@@ -1,137 +1,232 @@
 
-# Plan: Make All Charts Filter-Responsive
+# Google Login & Role-Based Access Control Implementation Plan
 
-## Problem Summary
+This plan implements Google authentication and a sophisticated role hierarchy with an invisible "Cipher" super-admin, configurable Admin and Moderator roles.
 
-Currently, several charts across the app do **not** respond to the date filter selections:
+---
 
-| Page | Chart | Current Behavior | Issue |
-|------|-------|------------------|-------|
-| Dashboard | Revenue vs Expenses Area Chart | Always shows "Last 6 months" | Ignores date filter |
-| Dashboard | Expense Distribution Pie Chart | Always shows "All-time" data | Ignores date filter |
-| Reports | Monthly Overview Bar Chart | Uses separate year selector | Not synced with date filter |
-| Reports | Profit Trend Line Chart | Uses separate year selector | Not synced with date filter |
+## Overview
 
-## Solution
+We'll implement this in **4 phases** to ensure each feature works correctly before building on top of it:
 
-### Change 1: Dashboard - Make Area Chart Filter-Responsive
+1. **Phase 1**: Google Login Integration
+2. **Phase 2**: Role System Database Setup
+3. **Phase 3**: Role-Based Access Control (RBAC) Implementation
+4. **Phase 4**: Admin Dashboard & User Management UI
 
-**File:** `src/pages/Dashboard.tsx`
+---
 
-**Current:** The `revenueTrend` data is calculated once during query fetch and always shows the last 6 months:
-```tsx
-// Revenue trend data (last 6 months) - hardcoded
-for (let i = 5; i >= 0; i--) {
-  const monthDate = subMonths(now, i);
-  // ...
-}
+## Role Hierarchy
+
+```text
++------------------+
+|      CIPHER      |  <- Invisible super-admin (can see/control everything)
++------------------+
+         |
++------------------+
+|      ADMIN       |  <- Can manage users, edit data, control moderator permissions
++------------------+
+         |
++------------------+
+|    MODERATOR     |  <- Can add revenues/expenses (permissions controlled by admin)
++------------------+
+         |
++------------------+
+|       USER       |  <- Default role, access to own data only
++------------------+
 ```
 
-**Fix:** Create a `filteredRevenueTrend` memo that recalculates based on the selected date range. For monthly/half-yearly/yearly filters, aggregate by month. For daily/custom filters with smaller ranges, show daily data points.
+**Key Security Principle**: Cipher users are completely invisible in all queries, user lists, and admin panels to everyone except other Ciphers.
 
-- Update the chart title dynamically to reflect the selected period
-- Use `filteredData.filteredRevenues` and `filteredData.filteredExpenses` to compute trend data
+---
 
-### Change 2: Dashboard - Make Pie Chart Filter-Responsive
+## Phase 1: Google Login Integration
 
-**File:** `src/pages/Dashboard.tsx`
+### What We'll Add
+- Google sign-in button on the Auth page
+- Configure social auth using Lovable Cloud's managed Google OAuth
 
-**Current:** Uses `data.expenseBreakdown` which is all-time data
-```tsx
-<p className="text-sm text-muted-foreground">All-time spending by category</p>
-// ...
-{data.expenseBreakdown.map(...)}
+### Files to Modify
+- `src/pages/Auth.tsx` - Add Google login button
+- Configure social auth provider
+
+---
+
+## Phase 2: Role System Database Setup
+
+### New Database Tables
+
+**1. `user_roles` table** - Stores user role assignments
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| user_id | uuid | Reference to auth.users |
+| role | app_role (enum) | cipher, admin, moderator, user |
+| created_at | timestamp | When role was assigned |
+| assigned_by | uuid | Who assigned this role (nullable) |
+
+**2. `moderator_permissions` table** - Configurable moderator abilities
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| user_id | uuid | The moderator's user_id |
+| can_add_revenue | boolean | Permission to add revenue entries |
+| can_add_expense | boolean | Permission to add expense entries |
+| can_view_reports | boolean | Permission to view reports |
+| controlled_by | uuid | Admin who controls this moderator |
+| updated_at | timestamp | Last modification time |
+
+### Database Functions (Security Definer)
+
+```sql
+-- Check if user has a specific role (prevents RLS recursion)
+create function public.has_role(_user_id uuid, _role app_role)
+returns boolean
+language sql stable security definer
+set search_path = public;
+
+-- Check if user is cipher (for hiding cipher users)
+create function public.is_cipher(_user_id uuid)
+returns boolean
+language sql stable security definer
+set search_path = public;
+
+-- Get user's highest role
+create function public.get_user_role(_user_id uuid)
+returns app_role
+language sql stable security definer
+set search_path = public;
 ```
 
-**Fix:** 
-- Use `filteredData.expenseBreakdown` instead (already computed in the `filteredData` memo)
-- Update the chart subtitle to show the selected date range label
-- Update legend and tooltip to use filtered data
+### RLS Policies
 
-### Change 3: Reports - Sync Bar/Line Charts with Date Filter
-
-**File:** `src/pages/Reports.tsx`
-
-**Current:** Bar and Line charts use a separate `selectedYear` state with a year dropdown that's independent from the main date filter.
-
-**Fix Options:**
-1. **Option A - Remove year selector**: Make bar/line charts fully responsive to the date filter (aggregate based on filter type)
-2. **Option B - Keep year selector but improve**: Keep the year dropdown but move it into the chart card for clarity
-
-**Recommended: Option A** - Remove the separate year selector and make charts fully responsive to the date filter. When filter is:
-- **Daily**: Show daily bars for the selected day (or skip if single day)
-- **Monthly**: Show the selected month's daily breakdown
-- **Half-Yearly**: Show 6 months of data
-- **Yearly**: Show 12 months of the selected year
-- **Custom**: Aggregate appropriately based on date range span
+- **user_roles**: Users can view their own role; Admins can manage non-cipher roles; Cipher can manage all
+- **moderator_permissions**: Admins can manage permissions for their assigned moderators
+- **Critical**: All user-facing queries will exclude cipher users
 
 ---
 
-## Technical Implementation Details
+## Phase 3: Role-Based Access Control Implementation
 
-### Dashboard.tsx Changes
+### New Files to Create
 
-1. **Add a `filteredRevenueTrend` memo** (after `filteredData` memo, around line 226):
-   - Group filtered revenues/expenses by month within the selected date range
-   - Generate month labels and aggregated values
-   - Handle edge cases where date range spans multiple months
+**1. `src/hooks/useUserRole.ts`**
+- Fetches the current user's role
+- Caches role information
+- Provides helper functions: `isAdmin()`, `isModerator()`, `isCipher()`
 
-2. **Update Area Chart section** (around lines 511-567):
-   - Replace `data.revenueTrend` with `filteredRevenueTrend`
-   - Update title/subtitle: "Revenue vs Expenses - {dateRange.label}"
-   - Update `hasRevenueTrendData` check to use filtered data
+**2. `src/hooks/useModeratorPermissions.ts`**
+- Fetches moderator-specific permissions
+- Returns what actions the moderator can perform
 
-3. **Update Pie Chart section** (around lines 570-614):
-   - Replace `data.expenseBreakdown` with `filteredData.expenseBreakdown`
-   - Replace `totalExpenseValue` with `totalFilteredExpense`
-   - Update subtitle: "Spending by category - {dateRange.label}"
-   - Update tooltip to use `totalFilteredExpense`
+**3. `src/contexts/RoleContext.tsx`**
+- Provides role information throughout the app
+- Handles role-based routing and UI visibility
 
-### Reports.tsx Changes
+**4. `src/components/RoleGuard.tsx`**
+- Wrapper component to conditionally render based on role
+- Usage: `<RoleGuard roles={['admin', 'cipher']}>...</RoleGuard>`
 
-1. **Remove `selectedYear` state** (line 45) and year selector UI
+### Files to Modify
 
-2. **Update `monthlyBreakdown` memo** (lines 139-170):
-   - Change to calculate based on `dateRange` instead of `selectedYear`
-   - Smart aggregation: if range is < 31 days, show daily; if < 6 months, show by month; otherwise show by month for the range
+**`src/components/AppLayout.tsx`**
+- Add "User Management" nav item (visible to Admin/Cipher only)
+- Hide admin-only features from regular users
 
-3. **Update chart titles** (lines 578-580, 603-605):
-   - Show `{dateRange.label}` instead of `{selectedYear}`
-
-4. **Update `availableYears` memo** - Remove or repurpose for other uses
-
----
-
-## Visual Result After Changes
-
-### Dashboard - Before vs After
-
-| Before | After |
-|--------|-------|
-| Area Chart: "Last 6 months comparison" | Area Chart: "Revenue vs Expenses - March 2026" |
-| Pie Chart: "All-time spending by category" | Pie Chart: "Spending by category - March 2026" |
-
-### Reports - Before vs After
-
-| Before | After |
-|--------|-------|
-| Bar Chart: "Monthly Overview - 2026" (with year dropdown) | Bar Chart: "Monthly Overview - March 2026" |
-| Line Chart: "Profit Trend - 2026" (with year dropdown) | Line Chart: "Profit Trend - March 2026" |
+**`src/pages/Revenue.tsx` & `src/pages/Expenses.tsx`**
+- Check moderator permissions before showing add/edit/delete buttons
+- Moderators: Only show "Add" button if permission granted
+- Hide edit/delete buttons for moderators
 
 ---
 
-## Files to Modify
+## Phase 4: Admin Dashboard & User Management
 
-| File | Changes |
-|------|---------|
-| `src/pages/Dashboard.tsx` | Add `filteredRevenueTrend` memo, update Area chart to use filtered data, update Pie chart to use `filteredData.expenseBreakdown` |
-| `src/pages/Reports.tsx` | Remove `selectedYear` state and UI, update `monthlyBreakdown` to use `dateRange`, update chart titles |
+### New Pages
+
+**1. `src/pages/UserManagement.tsx`** (Admin/Cipher only)
+- List all users (excluding cipher users for admins)
+- Assign roles: Admin, Moderator, User
+- Quick actions: View user details, change role
+
+**2. `src/pages/ModeratorControl.tsx`** (Admin/Cipher only)
+- List assigned moderators
+- Toggle permissions per moderator:
+  - Can add revenue
+  - Can add expense
+  - Can view reports
+- Save permission changes
+
+### Components to Create
+
+**`src/components/UserRoleBadge.tsx`**
+- Visual badge showing user's role
+- Color-coded: Admin (purple), Moderator (blue), User (gray)
+
+**`src/components/UserList.tsx`**
+- Paginated list of users
+- Search/filter functionality
+- Role assignment dropdown
+
+**`src/components/ModeratorPermissionsCard.tsx`**
+- Card for each moderator showing toggles
+- Real-time permission updates
 
 ---
 
-## Edge Cases to Handle
+## Security Considerations
 
-1. **Single day filter**: Show a message or single data point for charts
-2. **No data in range**: Show "No data for selected period" message
-3. **Custom range spanning multiple years**: Aggregate by month across years
-4. **Very long custom ranges**: Limit data points to prevent chart overcrowding
+### Cipher Invisibility
+- All user queries will include: `WHERE NOT public.is_cipher(user_id)`
+- Cipher users won't appear in:
+  - User management lists (for admins)
+  - Any user-facing queries
+  - Activity logs visible to admins
+- Only other cipher users can see cipher users
+
+### RLS Policy Strategy
+- Use security definer functions to avoid recursion
+- Role checks happen server-side via database functions
+- Frontend role checks are for UX only (not security)
+
+### Permission Validation
+- All permission checks validated server-side
+- Moderator permissions checked on every add operation
+- Admin role verified before any user management action
+
+---
+
+## Implementation Order
+
+### Step 1: Google Login
+Configure Google OAuth and add sign-in button
+
+### Step 2: Create Role Tables
+Run migration to create `user_roles` and `moderator_permissions` tables with proper RLS
+
+### Step 3: Create Security Functions
+Implement `has_role`, `is_cipher`, and `get_user_role` database functions
+
+### Step 4: Build Role Hooks & Context
+Create React hooks and context for role management
+
+### Step 5: Update Existing Pages
+Modify Revenue/Expenses pages to respect role permissions
+
+### Step 6: Build Admin UI
+Create User Management and Moderator Control pages
+
+### Step 7: Test & Verify
+Test all role combinations and permission scenarios
+
+---
+
+## Summary
+
+This implementation creates a secure, hierarchical role system where:
+- **Cipher** is completely invisible and has full control
+- **Admin** can manage visible users and control moderator permissions
+- **Moderator** has configurable, limited add-only permissions
+- **User** has standard access to their own data
+
+The system prioritizes security by implementing all access control at the database level with RLS, while the frontend provides a smooth user experience.
