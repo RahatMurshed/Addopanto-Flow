@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AreaChart,
@@ -34,22 +35,56 @@ export default function Dashboard() {
       const now = new Date();
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
-      const [revenuesRes, expensesRes, allocationsRes, accountsRes] = await Promise.all([
+      const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes, recentRevenuesRes, recentExpensesRes] = await Promise.all([
         supabase.from("revenues").select("amount, date").eq("user_id", user.id),
         supabase.from("expenses").select("amount, date, expense_account_id").eq("user_id", user.id),
         supabase.from("allocations").select("amount").eq("user_id", user.id),
         supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active").eq("user_id", user.id),
+        supabase.from("revenue_sources").select("id, name").eq("user_id", user.id),
+        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
       ]);
 
       if (revenuesRes.error) throw revenuesRes.error;
       if (expensesRes.error) throw expensesRes.error;
       if (allocationsRes.error) throw allocationsRes.error;
       if (accountsRes.error) throw accountsRes.error;
+      if (sourcesRes.error) throw sourcesRes.error;
+      if (recentRevenuesRes.error) throw recentRevenuesRes.error;
+      if (recentExpensesRes.error) throw recentExpensesRes.error;
 
       const revenues = revenuesRes.data || [];
       const expenses = expensesRes.data || [];
       const allocations = allocationsRes.data || [];
       const accounts = accountsRes.data || [];
+      const sources = sourcesRes.data || [];
+      const recentRevenues = recentRevenuesRes.data || [];
+      const recentExpenses = recentExpensesRes.data || [];
+
+      // Build recent transactions list
+      const recentTransactions = [
+        ...recentRevenues.map((r) => ({
+          id: r.id,
+          type: "revenue" as const,
+          amount: Number(r.amount),
+          date: r.date,
+          description: r.description || sources.find((s) => s.id === r.source_id)?.name || "Revenue",
+          category: sources.find((s) => s.id === r.source_id)?.name || "Uncategorized",
+          createdAt: r.created_at,
+        })),
+        ...recentExpenses.map((e) => ({
+          id: e.id,
+          type: "expense" as const,
+          amount: Number(e.amount),
+          date: e.date,
+          description: e.description || accounts.find((a) => a.id === e.expense_account_id)?.name || "Expense",
+          category: accounts.find((a) => a.id === e.expense_account_id)?.name || "",
+          color: accounts.find((a) => a.id === e.expense_account_id)?.color || "#6B7280",
+          createdAt: e.created_at,
+        })),
+      ]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 10);
 
       const totalRevenue = revenues.reduce((sum, r) => sum + Number(r.amount), 0);
       const thisMonthRevenue = revenues
@@ -110,6 +145,7 @@ export default function Dashboard() {
         accounts,
         revenueTrend,
         expenseBreakdown,
+        recentTransactions,
       };
     },
     enabled: !!user,
@@ -144,6 +180,7 @@ export default function Dashboard() {
     accounts: [],
     revenueTrend: [],
     expenseBreakdown: [],
+    recentTransactions: [],
   };
 
   const metrics = [
@@ -375,6 +412,70 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Transactions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">Recent Transactions</CardTitle>
+          <p className="text-sm text-muted-foreground">Last 10 revenue & expense entries</p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {data.recentTransactions.length > 0 ? (
+            <div className="space-y-3">
+              {data.recentTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-full",
+                        tx.type === "revenue" ? "bg-primary/10" : "bg-destructive/10"
+                      )}
+                    >
+                      {tx.type === "revenue" ? (
+                        <ArrowUpRight className="h-4 w-4 text-primary" />
+                      ) : (
+                        <ArrowDownRight className="h-4 w-4 text-destructive" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{tx.description}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{format(new Date(tx.date), "MMM d, yyyy")}</span>
+                        {tx.category && (
+                          <>
+                            <span>•</span>
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                              {tx.category}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <p
+                    className={cn(
+                      "font-semibold",
+                      tx.type === "revenue" ? "text-primary" : "text-destructive"
+                    )}
+                  >
+                    {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-32 items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <Receipt className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p>No transactions yet</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
