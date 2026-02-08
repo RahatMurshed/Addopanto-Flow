@@ -20,6 +20,7 @@ interface UseDateFilterParamsReturn {
   filterValue: FilterValue;
   setFilterType: (type: FilterType) => void;
   updateFilterValue: (updates: Partial<FilterValue>) => void;
+  resetFilter: () => void;
 }
 
 export function useDateFilterParams(
@@ -171,10 +172,19 @@ export function useDateFilterParams(
     [filterType, syncToUrl]
   );
 
+  // Reset filter to default
+  const resetFilter = useCallback(() => {
+    const newValue = getDefaultFilterValue(defaultFilterType);
+    setFilterTypeState(defaultFilterType);
+    setFilterValue(newValue);
+    syncToUrl(defaultFilterType, newValue);
+  }, [defaultFilterType, syncToUrl]);
+
   return {
     filterType,
     filterValue,
     setFilterType,
     updateFilterValue,
+    resetFilter,
   };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -23,6 +23,7 @@ import {
   getDateRange,
   getYearOptions,
   getMonthOptions,
+  getDefaultFilterValue,
 } from "@/utils/dateRangeUtils";
 import { useDateFilterParams } from "@/hooks/useDateFilterParams";
 
@@ -42,6 +43,7 @@ export default function AdvancedDateFilter({
     filterValue,
     setFilterType: handleFilterTypeChange,
     updateFilterValue,
+    resetFilter,
   } = useDateFilterParams(defaultFilterType);
 
   const [startDateOpen, setStartDateOpen] = useState(false);
@@ -50,6 +52,21 @@ export default function AdvancedDateFilter({
 
   const yearOptions = getYearOptions();
   const monthOptions = getMonthOptions();
+
+  // Call onFilterChange whenever filterType or filterValue changes
+  useEffect(() => {
+    const range = getDateRange(filterType, filterValue);
+    onFilterChange(range, filterType, filterValue);
+  }, [filterType, filterValue, onFilterChange]);
+
+  const handleReset = () => {
+    resetFilter();
+  };
+
+  // Check if current filter differs from default
+  const defaultValue = getDefaultFilterValue(defaultFilterType);
+  const isDefault = filterType === defaultFilterType && 
+    JSON.stringify(filterValue) === JSON.stringify(defaultValue);
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -255,6 +272,19 @@ export default function AdvancedDateFilter({
             </PopoverContent>
           </Popover>
         </>
+      )}
+
+      {/* Reset Filter Button */}
+      {!isDefault && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleReset}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <RotateCcw className="mr-1 h-4 w-4" />
+          Reset
+        </Button>
       )}
     </div>
   );
