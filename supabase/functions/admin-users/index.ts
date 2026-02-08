@@ -3,13 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
 };
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -23,19 +24,19 @@ Deno.serve(async (req) => {
         hasServiceKey: !!supabaseServiceKey,
         hasAnonKey: !!supabaseAnonKey,
       });
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Server configuration error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get the authorization header from the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create client with user's token to verify identity
@@ -44,12 +45,16 @@ Deno.serve(async (req) => {
     });
 
     // Get current user
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
+
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create admin client with service role
@@ -65,10 +70,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (roleError || !roleData) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden - no role found" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden - no role found" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const callerRole = roleData.role;
@@ -78,82 +83,23 @@ Deno.serve(async (req) => {
     if (!isCipher && !isAdmin) {
       return new Response(
         JSON.stringify({ error: "Forbidden - insufficient permissions" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
-    // Handle GET - List users with emails
-    if (req.method === "GET") {
-      // Get all users from auth.users using admin API
-      const { data: authUsers, error: authError } = await adminClient.auth.admin.listUsers();
-      
-      if (authError) {
-        console.error("Error fetching auth users:", authError);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch users" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    const json = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
 
-      // Get all user roles
-      const { data: roles, error: rolesError } = await adminClient
-        .from("user_roles")
-        .select("user_id, role, created_at");
-
-      if (rolesError) {
-        console.error("Error fetching roles:", rolesError);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch roles" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Create a map of user_id to role
-      const roleMap = new Map(roles?.map(r => [r.user_id, { role: r.role, created_at: r.created_at }]) || []);
-
-      // Combine auth users with roles, filtering by visibility
-      const users = authUsers.users
-        .map(authUser => {
-          const roleInfo = roleMap.get(authUser.id);
-          return {
-            user_id: authUser.id,
-            email: authUser.email || null,
-            role: (roleInfo?.role || "user") as string,
-            created_at: roleInfo?.created_at || authUser.created_at,
-          };
-        })
-        .filter(u => {
-          // Non-cipher users cannot see cipher users
-          if (!isCipher && u.role === "cipher") {
-            return false;
-          }
-          return true;
-        });
-
-      return new Response(
-        JSON.stringify({ users }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Handle DELETE - Delete a user
-    if (req.method === "DELETE") {
-      const url = new URL(req.url);
-      const userId = url.searchParams.get("userId");
-
-      if (!userId) {
-        return new Response(
-          JSON.stringify({ error: "Missing userId parameter" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+    const handleDeleteUser = async (userId: string) => {
       // Prevent deleting self
       if (userId === user.id) {
-        return new Response(
-          JSON.stringify({ error: "Cannot delete yourself" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json(400, { error: "Cannot delete yourself" });
       }
 
       // Check target user's role
@@ -165,48 +111,121 @@ Deno.serve(async (req) => {
 
       if (targetRoleError && targetRoleError.code !== "PGRST116") {
         console.error("Error fetching target role:", targetRoleError);
-        return new Response(
-          JSON.stringify({ error: "Failed to verify target user role" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json(500, { error: "Failed to verify target user role" });
       }
 
       const targetUserRole = targetRole?.role || "user";
 
       // Admins cannot delete cipher users
       if (!isCipher && targetUserRole === "cipher") {
-        return new Response(
-          JSON.stringify({ error: "Cannot delete cipher users" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json(403, { error: "Cannot delete cipher users" });
       }
 
-      // Delete user from auth.users (cascades to all tables)
-      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+      // Delete user from auth.users
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(
+        userId,
+      );
 
       if (deleteError) {
         console.error("Error deleting user:", deleteError);
-        return new Response(
-          JSON.stringify({ error: "Failed to delete user" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json(500, {
+          error: "Failed to delete user",
+          details: deleteError.message,
+          code: (deleteError as unknown as { code?: string }).code,
+          status: (deleteError as unknown as { status?: number }).status,
+        });
       }
 
-      return new Response(
-        JSON.stringify({ success: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return json(200, { success: true });
+    };
+
+    // Handle GET - List users with emails
+    if (req.method === "GET") {
+      // Get all users from auth.users using admin API
+      const { data: authUsers, error: authError } =
+        await adminClient.auth.admin.listUsers();
+
+      if (authError) {
+        console.error("Error fetching auth users:", authError);
+        return json(500, { error: "Failed to fetch users" });
+      }
+
+      // Get all user roles
+      const { data: roles, error: rolesError } = await adminClient
+        .from("user_roles")
+        .select("user_id, role, created_at");
+
+      if (rolesError) {
+        console.error("Error fetching roles:", rolesError);
+        return json(500, { error: "Failed to fetch roles" });
+      }
+
+      // Create a map of user_id to role
+      const roleMap = new Map(
+        roles?.map((r) => [r.user_id, { role: r.role, created_at: r.created_at }]) ||
+          [],
       );
+
+      // Combine auth users with roles, filtering by visibility
+      const users = authUsers.users
+        .map((authUser) => {
+          const roleInfo = roleMap.get(authUser.id);
+          return {
+            user_id: authUser.id,
+            email: authUser.email || null,
+            role: (roleInfo?.role || "user") as string,
+            created_at: roleInfo?.created_at || authUser.created_at,
+          };
+        })
+        .filter((u) => {
+          // Non-cipher users cannot see cipher users
+          if (!isCipher && u.role === "cipher") {
+            return false;
+          }
+          return true;
+        });
+
+      return json(200, { users });
     }
 
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // Handle POST - Delete a user (invoke() friendly)
+    if (req.method === "POST") {
+      const body = (await req.json().catch(() => null)) as
+        | { userId?: string }
+        | null;
+
+      if (!body?.userId) {
+        return json(400, { error: "Missing userId" });
+      }
+
+      return await handleDeleteUser(body.userId);
+    }
+
+    // Handle DELETE - Delete a user (query param or JSON body)
+    if (req.method === "DELETE") {
+      const url = new URL(req.url);
+      let userId = url.searchParams.get("userId");
+
+      if (!userId) {
+        const body = (await req.json().catch(() => null)) as
+          | { userId?: string }
+          | null;
+        userId = body?.userId || null;
+      }
+
+      if (!userId) {
+        return json(400, { error: "Missing userId parameter" });
+      }
+
+      return await handleDeleteUser(userId);
+    }
+
+    return json(405, { error: "Method not allowed" });
   } catch (error) {
     console.error("Unexpected error:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
