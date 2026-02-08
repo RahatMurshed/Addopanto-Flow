@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth } from "date-fns";
+import { useState, useMemo, useCallback } from "react";
+import { format } from "date-fns";
 import {
   useRevenues,
   useCreateRevenue,
@@ -41,11 +41,13 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import RevenueDialog from "@/components/RevenueDialog";
-import MonthFilter, { getMonthDateRange } from "@/components/MonthFilter";
+import AdvancedDateFilter from "@/components/AdvancedDateFilter";
+import ExportButtons from "@/components/ExportButtons";
+import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
+import { exportRevenuesToCSV, exportToPDF } from "@/utils/exportUtils";
 
 export default function Revenue() {
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(`${getYear(now)}-${getMonth(now)}`);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -63,20 +65,57 @@ export default function Revenue() {
   const activeAccounts = accounts.filter((a) => a.is_active);
   const totalAllocationPercent = activeAccounts.reduce((sum, a) => sum + Number(a.allocation_percentage), 0);
 
-  // Filter revenues by selected month
-  const { start: monthStart, end: monthEnd, label: monthLabel } = getMonthDateRange(selectedMonth);
-  
-  const filteredRevenues = useMemo(() => {
-    return revenues.filter((r) => r.date >= monthStart && r.date <= monthEnd);
-  }, [revenues, monthStart, monthEnd]);
+  const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
+    setDateRange(range);
+  }, []);
 
-  const selectedMonthTotal = useMemo(() => {
+  // Filter revenues by selected date range
+  const filteredRevenues = useMemo(() => {
+    if (!dateRange) return [];
+    return revenues.filter((r) => r.date >= dateRange.start && r.date <= dateRange.end);
+  }, [revenues, dateRange]);
+
+  const filteredTotal = useMemo(() => {
     return filteredRevenues.reduce((sum, r) => sum + Number(r.amount), 0);
   }, [filteredRevenues]);
 
   const allTimeTotal = useMemo(() => {
     return revenues.reduce((sum, r) => sum + Number(r.amount), 0);
   }, [revenues]);
+
+  // Revenue by source for selected period
+  const filteredBySource = useMemo(() => {
+    return sources
+      .map((source) => {
+        const sourceRevenue = filteredRevenues
+          .filter((r) => r.source_id === source.id)
+          .reduce((sum, r) => sum + Number(r.amount), 0);
+        return {
+          id: source.id,
+          name: source.name,
+          amount: sourceRevenue,
+          count: filteredRevenues.filter((r) => r.source_id === source.id).length,
+        };
+      })
+      .filter((item) => item.amount > 0);
+  }, [sources, filteredRevenues]);
+
+  // Export handlers
+  const handleExportCSV = () => {
+    if (!dateRange) return;
+    const data = filteredRevenues.map((r) => ({
+      date: r.date,
+      amount: Number(r.amount),
+      sourceName: r.revenue_sources?.name || "Uncategorized",
+      description: r.description,
+    }));
+    exportRevenuesToCSV(data, dateRange.label);
+  };
+
+  const handleExportPDF = async () => {
+    if (!dateRange) return;
+    await exportToPDF("revenue-content", "revenue", "Revenue Report", dateRange.label);
+  };
 
   const handleCreate = async (data: { amount: number; date: string; source_id: string | null; description: string | null }) => {
     try {
@@ -130,19 +169,28 @@ export default function Revenue() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" id="revenue-content">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
           <p className="text-muted-foreground">Track income and automatically allocate to khatas</p>
         </div>
         <div className="flex items-center gap-2">
-          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+          <ExportButtons
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            disabled={!dateRange}
+          />
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Revenue
           </Button>
         </div>
+      </div>
+
+      {/* Advanced Date Filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
       </div>
 
       {activeAccounts.length === 0 && (
@@ -158,11 +206,13 @@ export default function Revenue() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{monthLabel}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {dateRange?.label || "Selected Period"}
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">৳{selectedMonthTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-primary">৳{filteredTotal.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
           </CardContent>
         </Card>
@@ -177,6 +227,35 @@ export default function Revenue() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Revenue by Source for Selected Period */}
+      {filteredBySource.length > 0 && dateRange && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Revenue by Source - {dateRange.label}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {filteredBySource.map((item) => (
+                <div key={item.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{item.name}</Badge>
+                    <span className="text-xs text-muted-foreground">({item.count} entries)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-primary">
+                      ৳{item.amount.toLocaleString()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({((item.amount / filteredTotal) * 100).toFixed(0)}%)
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Allocation Info */}
       {activeAccounts.length > 0 && (
@@ -206,10 +285,10 @@ export default function Revenue() {
             <div className="mb-4 rounded-full bg-muted p-4">
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">No revenue in {monthLabel}</h3>
+            <h3 className="mb-2 text-lg font-semibold">No revenue in {dateRange?.label || "selected period"}</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">
               {revenues.length > 0 
-                ? "Try selecting a different month or add new revenue."
+                ? "Try selecting a different date range or add new revenue."
                 : "Start tracking your income. Each entry will be automatically allocated to your active khatas."}
             </p>
             <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>
@@ -218,7 +297,7 @@ export default function Revenue() {
       ) : (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Revenue History - {monthLabel}</CardTitle>
+            <CardTitle className="text-base">Revenue History - {dateRange?.label}</CardTitle>
             <span className="text-sm text-muted-foreground">{filteredRevenues.length} entries</span>
           </CardHeader>
           <CardContent>
