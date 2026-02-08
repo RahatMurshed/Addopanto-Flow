@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AreaChart,
@@ -24,6 +24,8 @@ import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
 import RevenueDialog from "@/components/RevenueDialog";
 import ExpenseDialog from "@/components/ExpenseDialog";
+import TransferDialog from "@/components/TransferDialog";
+import { useCreateKhataTransfer } from "@/hooks/useKhataTransfers";
 import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 import PercentageChange from "@/components/PercentageChange";
@@ -51,6 +53,7 @@ export default function Dashboard() {
   // Quick action dialog states
   const [revenueDialogOpen, setRevenueDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
   // Hooks for quick actions
   const { data: revenueSources } = useRevenueSources();
@@ -58,6 +61,7 @@ export default function Dashboard() {
   const createRevenue = useCreateRevenue();
   const createExpense = useCreateExpense();
   const createRevenueSource = useCreateRevenueSource();
+  const createTransfer = useCreateKhataTransfer();
 
   const handleFilterChange = useCallback((range: DateRange, type: FilterType, value: FilterValue) => {
     setDateRange(range);
@@ -379,6 +383,16 @@ export default function Dashboard() {
             <Plus className="h-4 w-4" />
             Add Expense
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setTransferDialogOpen(true)}
+            disabled={(accountBalances?.length || 0) < 2}
+            className="gap-1"
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            Transfer
+          </Button>
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
@@ -688,6 +702,16 @@ export default function Dashboard() {
             description: data.description,
           });
         }}
+      />
+
+      <TransferDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
+        accounts={accountBalances || []}
+        onTransfer={async (data) => {
+          await createTransfer.mutateAsync(data);
+        }}
+        isPending={createTransfer.isPending}
       />
     </div>
   );
