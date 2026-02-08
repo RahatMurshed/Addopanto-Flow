@@ -1,27 +1,122 @@
 
-# Plan: Rename "Khata" to "Expense Source" Throughout the App
+# Plan: Make All Charts Filter-Responsive
 
-## Overview
+## Problem Summary
 
-This plan renames all user-facing instances of "Khata" to "Expense Source" across the entire application for consistent terminology. Note that the app name "KhataFlow" and internal code references (variable names, database table names, file names) will remain unchanged to avoid breaking functionality.
+Currently, several charts across the app do **not** respond to the date filter selections:
+
+| Page | Chart | Current Behavior | Issue |
+|------|-------|------------------|-------|
+| Dashboard | Revenue vs Expenses Area Chart | Always shows "Last 6 months" | Ignores date filter |
+| Dashboard | Expense Distribution Pie Chart | Always shows "All-time" data | Ignores date filter |
+| Reports | Monthly Overview Bar Chart | Uses separate year selector | Not synced with date filter |
+| Reports | Profit Trend Line Chart | Uses separate year selector | Not synced with date filter |
+
+## Solution
+
+### Change 1: Dashboard - Make Area Chart Filter-Responsive
+
+**File:** `src/pages/Dashboard.tsx`
+
+**Current:** The `revenueTrend` data is calculated once during query fetch and always shows the last 6 months:
+```tsx
+// Revenue trend data (last 6 months) - hardcoded
+for (let i = 5; i >= 0; i--) {
+  const monthDate = subMonths(now, i);
+  // ...
+}
+```
+
+**Fix:** Create a `filteredRevenueTrend` memo that recalculates based on the selected date range. For monthly/half-yearly/yearly filters, aggregate by month. For daily/custom filters with smaller ranges, show daily data points.
+
+- Update the chart title dynamically to reflect the selected period
+- Use `filteredData.filteredRevenues` and `filteredData.filteredExpenses` to compute trend data
+
+### Change 2: Dashboard - Make Pie Chart Filter-Responsive
+
+**File:** `src/pages/Dashboard.tsx`
+
+**Current:** Uses `data.expenseBreakdown` which is all-time data
+```tsx
+<p className="text-sm text-muted-foreground">All-time spending by category</p>
+// ...
+{data.expenseBreakdown.map(...)}
+```
+
+**Fix:** 
+- Use `filteredData.expenseBreakdown` instead (already computed in the `filteredData` memo)
+- Update the chart subtitle to show the selected date range label
+- Update legend and tooltip to use filtered data
+
+### Change 3: Reports - Sync Bar/Line Charts with Date Filter
+
+**File:** `src/pages/Reports.tsx`
+
+**Current:** Bar and Line charts use a separate `selectedYear` state with a year dropdown that's independent from the main date filter.
+
+**Fix Options:**
+1. **Option A - Remove year selector**: Make bar/line charts fully responsive to the date filter (aggregate based on filter type)
+2. **Option B - Keep year selector but improve**: Keep the year dropdown but move it into the chart card for clarity
+
+**Recommended: Option A** - Remove the separate year selector and make charts fully responsive to the date filter. When filter is:
+- **Daily**: Show daily bars for the selected day (or skip if single day)
+- **Monthly**: Show the selected month's daily breakdown
+- **Half-Yearly**: Show 6 months of data
+- **Yearly**: Show 12 months of the selected year
+- **Custom**: Aggregate appropriately based on date range span
 
 ---
 
-## Scope of Changes
+## Technical Implementation Details
 
-### What Will Be Changed
-- All **user-facing text** (labels, headings, descriptions, placeholders, toast messages, alerts)
-- Table column headers
-- Button labels
-- Dialog titles and descriptions
-- Navigation menu labels
+### Dashboard.tsx Changes
 
-### What Will NOT Be Changed
-- The app name "KhataFlow" (brand name)
-- File names (e.g., `KhataDialog.tsx`, `useKhataTransfers.ts`)
-- Variable names, function names, type names in code
-- Database table names (e.g., `khata_transfers`)
-- Query keys and internal identifiers
+1. **Add a `filteredRevenueTrend` memo** (after `filteredData` memo, around line 226):
+   - Group filtered revenues/expenses by month within the selected date range
+   - Generate month labels and aggregated values
+   - Handle edge cases where date range spans multiple months
+
+2. **Update Area Chart section** (around lines 511-567):
+   - Replace `data.revenueTrend` with `filteredRevenueTrend`
+   - Update title/subtitle: "Revenue vs Expenses - {dateRange.label}"
+   - Update `hasRevenueTrendData` check to use filtered data
+
+3. **Update Pie Chart section** (around lines 570-614):
+   - Replace `data.expenseBreakdown` with `filteredData.expenseBreakdown`
+   - Replace `totalExpenseValue` with `totalFilteredExpense`
+   - Update subtitle: "Spending by category - {dateRange.label}"
+   - Update tooltip to use `totalFilteredExpense`
+
+### Reports.tsx Changes
+
+1. **Remove `selectedYear` state** (line 45) and year selector UI
+
+2. **Update `monthlyBreakdown` memo** (lines 139-170):
+   - Change to calculate based on `dateRange` instead of `selectedYear`
+   - Smart aggregation: if range is < 31 days, show daily; if < 6 months, show by month; otherwise show by month for the range
+
+3. **Update chart titles** (lines 578-580, 603-605):
+   - Show `{dateRange.label}` instead of `{selectedYear}`
+
+4. **Update `availableYears` memo** - Remove or repurpose for other uses
+
+---
+
+## Visual Result After Changes
+
+### Dashboard - Before vs After
+
+| Before | After |
+|--------|-------|
+| Area Chart: "Last 6 months comparison" | Area Chart: "Revenue vs Expenses - March 2026" |
+| Pie Chart: "All-time spending by category" | Pie Chart: "Spending by category - March 2026" |
+
+### Reports - Before vs After
+
+| Before | After |
+|--------|-------|
+| Bar Chart: "Monthly Overview - 2026" (with year dropdown) | Bar Chart: "Monthly Overview - March 2026" |
+| Line Chart: "Profit Trend - 2026" (with year dropdown) | Line Chart: "Profit Trend - March 2026" |
 
 ---
 
@@ -29,93 +124,14 @@ This plan renames all user-facing instances of "Khata" to "Expense Source" acros
 
 | File | Changes |
 |------|---------|
-| `src/components/AppLayout.tsx` | Nav item label: "Khatas" → "Expense Sources" |
-| `src/pages/Khatas.tsx` | Page title, descriptions, button labels, toast messages, dialog references |
-| `src/components/KhataDialog.tsx` | Dialog titles: "Edit Khata" → "Edit Expense Source", button labels |
-| `src/pages/Expenses.tsx` | Table header, descriptions, card titles mentioning "Khata" |
-| `src/pages/Revenue.tsx` | Descriptions mentioning "khatas" |
-| `src/pages/Reports.tsx` | Chart labels, card titles mentioning "Khata" |
-| `src/pages/Dashboard.tsx` | Table column header: "Khata" → "Expense Source" |
-| `src/components/TransferDialog.tsx` | Labels: "From Khata" → "From Expense Source", descriptions |
-| `src/components/ExpenseDialog.tsx` | Labels and placeholders mentioning "khata" |
-| `src/components/ResetDataDialog.tsx` | List items mentioning "Khatas" and "khata transfers" |
+| `src/pages/Dashboard.tsx` | Add `filteredRevenueTrend` memo, update Area chart to use filtered data, update Pie chart to use `filteredData.expenseBreakdown` |
+| `src/pages/Reports.tsx` | Remove `selectedYear` state and UI, update `monthlyBreakdown` to use `dateRange`, update chart titles |
 
 ---
 
-## Detailed Changes by File
+## Edge Cases to Handle
 
-### 1. `src/components/AppLayout.tsx`
-```text
-Line 21: { label: "Khatas", href: "/khatas", icon: Wallet }
-       → { label: "Expense Sources", href: "/khatas", icon: Wallet }
-```
-
-### 2. `src/pages/Khatas.tsx`
-- Line 52: Toast: "Khata created" → "Expense source created"
-- Line 63: Toast: "Khata updated" → "Expense source updated"
-- Line 75: Toast: "Khata deleted" → "Expense source deleted"
-- Line 85: Toast: "Default khatas created" → "Default expense sources created"
-- Line 103: Page title: "Expense Accounts (Khatas)" → "Expense Sources"
-- Line 123: Button: "Add Khata" → "Add Expense Source"
-- Line 153: Text: "Create khatas to..." → "Create expense sources to..."
-- Line 268: Dialog title: "Delete this khata?" → "Delete this expense source?"
-
-### 3. `src/components/KhataDialog.tsx`
-- Line 86: Dialog title: "Edit Khata" / "Create Khata" → "Edit Expense Source" / "Create Expense Source"
-- Line 184: Button: "Create Khata" → "Create Expense Source"
-
-### 4. `src/pages/Expenses.tsx`
-- Line 210: Description: "...by khata" → "...by expense source"
-- Line 242: Alert: "...expense accounts (khatas)..." → "...expense sources..."
-- Line 315: Card title: "Spending by Khata" → "Spending by Expense Source"
-- Line 347: Card title: "Khata Balances" → "Expense Source Balances"
-- Line 395: Text: "...selected khata's balance" → "...selected expense source's balance"
-- Line 415: Table header: "Khata" → "Expense Source"
-
-### 5. `src/pages/Revenue.tsx`
-- Line 149: Toast: "...allocated to X khatas" → "...allocated to X expense sources"
-- Line 202: Description: "...allocate to khatas" → "...allocate to expense sources"
-- Line 226: Alert: "No active khatas!" → "No active expense sources!"
-- Line 326: Text: "...your active khatas" → "...your active expense sources"
-- Line 431: Alert: "...allocations to khatas" → "...allocations to expense sources"
-
-### 6. `src/pages/Reports.tsx`
-- Line 419: Variable for tooltip uses "expenseByKhata" (internal - keep)
-- Chart labels/titles containing "Khata" → "Expense Source"
-
-### 7. `src/pages/Dashboard.tsx`
-- Line 630: Table header: "Khata" → "Expense Source"
-
-### 8. `src/components/TransferDialog.tsx`
-- Line 109-110: Description: "Move funds between khatas..." → "Move funds between expense sources..."
-- Line 117: Label: "From Khata" → "From Expense Source"
-- Line 119: Placeholder: "Select source khata" → "Select source expense source" → Better: "Select source"
-- Line 143: Label: "To Khata" → "To Expense Source"
-- Line 146: Placeholder: "Select destination khata" → "Select destination"
-- Line 174: Alert: "...same khata" → "...same expense source"
-
-### 9. `src/components/ExpenseDialog.tsx`
-- Line 36: Validation message: "Please select a khata" → "Please select an expense source"
-- Line 107: Description: "...from one of your khatas" → "...from one of your expense sources"
-- Line 113: Label: "Khata (Expense Account)" → "Expense Source"
-- Line 119: Placeholder: "Select a khata" → "Select an expense source"
-
-### 10. `src/components/ResetDataDialog.tsx`
-- Line 110: "All expense accounts (Khatas)" → "All expense sources"
-- Line 111: "All khata transfers" → "All expense source transfers"
-
----
-
-## Summary
-
-| Category | Count |
-|----------|-------|
-| Files to modify | 10 |
-| Text changes | ~35 individual text updates |
-| Preserved items | App name "KhataFlow", all code internals, database tables, file names |
-
----
-
-## Expected Result
-
-After this change, users will see consistent "Expense Source" terminology throughout the app while the underlying code structure and database remain stable. The URL `/khatas` will still work, but the navigation will display "Expense Sources".
+1. **Single day filter**: Show a message or single data point for charts
+2. **No data in range**: Show "No data for selected period" message
+3. **Custom range spanning multiple years**: Aggregate by month across years
+4. **Very long custom ranges**: Limit data points to prevent chart overcrowding
