@@ -1,48 +1,90 @@
-# Plan: Make Settings Functional (Business Name, Currency, Fiscal Year)
 
-## Status: ✅ COMPLETED
+# Plan: Fix PDF Export Issues (Shrinking & Theme Adaptation)
 
-All three settings are now fully functional across the application.
+## Problems Identified
 
----
+### Issue 1: Shrunk & Unreadable PDF Content
+The current implementation captures the page with `html2canvas` at scale 2, but the multi-page handling logic has a bug where it adds the **entire** image to each page instead of properly slicing it, causing content to appear compressed and overlapping.
 
-## What Was Implemented
-
-### 1. Currency Symbol ✅
-**Before**: All amounts showed `৳` (BDT) regardless of currency setting  
-**After**: Amounts display the correct symbol based on user selection:
-- BDT → ৳
-- USD → $
-- EUR → €
-- GBP → £
-
-**Affected pages**: Dashboard, Revenue, Expenses, Khatas, Reports
-
-### 2. Business Name ✅
-**Before**: Not used anywhere  
-**After**: Business name appears in:
-- PDF exports (header/title) - prominently displayed at the top
-
-### 3. Fiscal Year Start Month ✅
-**Before**: Half-yearly filter used calendar year (H1 = Jan-Jun, H2 = Jul-Dec)  
-**After**: Half-yearly and Yearly filters respect fiscal year:
-- Example: If fiscal year starts in July, H1 = Jul-Dec, H2 = Jan-Jun
-- Yearly filter shows "FY 2025-26" format for non-calendar fiscal years
-- Labels dynamically update based on fiscal year setting
+### Issue 2: Dark Mode = Dark PDF
+The `html2canvas` configuration uses `backgroundColor: "#ffffff"` (white), but this only sets the canvas background - it doesn't override the dark mode CSS styles applied to text and elements. In dark mode, you get white background with dark-themed elements (light text, dark cards), making it unreadable.
 
 ---
 
-## Files Created
-1. `src/hooks/useUserProfile.ts` - Hook to fetch user settings
-2. `src/utils/currencyUtils.ts` - Currency formatting utilities
+## Solution
 
-## Files Modified
-1. `src/pages/Dashboard.tsx` - Dynamic currency formatting
-2. `src/pages/Revenue.tsx` - Dynamic currency formatting
-3. `src/pages/Expenses.tsx` - Dynamic currency formatting
-4. `src/pages/Khatas.tsx` - Dynamic currency formatting
-5. `src/pages/Reports.tsx` - Dynamic currency formatting
-6. `src/utils/dateRangeUtils.ts` - Fiscal year date range calculations
-7. `src/components/AdvancedDateFilter.tsx` - Fiscal year aware filter labels
-8. `src/utils/exportUtils.ts` - Business name in PDF header
+### Fix 1: Proper Multi-Page PDF Rendering
+Replace the current buggy page-splitting logic with proper A4-sized PDF generation:
+- Use fixed A4 dimensions (210mm x 297mm)
+- Calculate proper aspect ratio for content
+- Handle multi-page content by slicing the canvas image correctly
 
+### Fix 2: Force Light Theme for PDF Export
+Before capturing with `html2canvas`:
+1. Temporarily remove the `dark` class from `document.documentElement`
+2. Capture the content (now rendered in light mode)
+3. Restore the original theme after capture
+
+This ensures PDFs are always clean, readable, and professionally formatted regardless of the user's current theme.
+
+---
+
+## Technical Implementation
+
+### File to Modify: `src/utils/exportUtils.ts`
+
+**Changes:**
+
+1. **Detect current theme** before capture
+2. **Temporarily force light mode** by removing `dark` class
+3. **Increase scale to 3** for better quality (currently 2)
+4. **Fix multi-page logic** using proper A4 dimensions and image slicing
+5. **Restore original theme** after capture completes
+
+```text
+Before capture:
++---------------------------+
+| 1. Store current theme    |
+| 2. Remove 'dark' class    |
+| 3. Wait for reflow        |
++---------------------------+
+           |
+           v
++---------------------------+
+| html2canvas at scale: 3   |
+| backgroundColor: #ffffff  |
++---------------------------+
+           |
+           v
++---------------------------+
+| Generate PDF with:        |
+| - A4 page size            |
+| - Proper image slicing    |
+| - Multi-page handling     |
++---------------------------+
+           |
+           v
++---------------------------+
+| Restore original theme    |
++---------------------------+
+```
+
+---
+
+## Expected Results
+
+| Before | After |
+|--------|-------|
+| Shrunk, overlapping content | Full-size, readable content |
+| Dark mode = unreadable PDF | Always light, professional PDF |
+| Low resolution (scale 2) | Higher resolution (scale 3) |
+
+---
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/utils/exportUtils.ts` | Fix PDF generation with theme handling and proper pagination |
+
+No other files need modification - all pages (Dashboard, Revenue, Expenses, Reports) use the same `exportToPDF` function.
