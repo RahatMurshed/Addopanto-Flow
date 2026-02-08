@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -621,67 +622,83 @@ export default function Dashboard() {
         <CardContent>
           {data.recentTransactions.length > 0 ? (
             <>
-              <div className="space-y-3">
-                {transactionsPagination.paginatedItems.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "flex h-9 w-9 items-center justify-center rounded-full",
-                          tx.type === "revenue"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-destructive/10 text-destructive"
-                        )}
-                      >
-                        {tx.type === "revenue" ? (
-                          <ArrowUpRight className="h-4 w-4" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium">{tx.description}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{format(new Date(tx.date), "MMM d, yyyy")}</span>
-                          {tx.category && (
-                            <>
-                              <span>•</span>
-                              <Badge variant="secondary" className="text-xs">
-                                {tx.category}
-                              </Badge>
-                            </>
-                          )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Khata</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactionsPagination.paginatedItems.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">
+                        {format(new Date(tx.date), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={cn(
+                              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                              tx.type === "revenue"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-destructive/10 text-destructive"
+                            )}
+                          >
+                            {tx.type === "revenue" ? (
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                            ) : (
+                              <ArrowDownRight className="h-3.5 w-3.5" />
+                            )}
+                          </div>
+                          <span className="font-medium">{tx.description}</span>
                         </div>
-                      </div>
-                    </div>
-                    <p
-                      className={cn(
-                        "font-bold",
-                        tx.type === "revenue" ? "text-primary" : "text-destructive"
-                      )}
-                    >
-                      {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              {data.recentTransactions.length > 10 && (
-                <TablePagination
-                  currentPage={transactionsPagination.currentPage}
-                  totalPages={transactionsPagination.totalPages}
-                  totalItems={transactionsPagination.totalItems}
-                  startIndex={transactionsPagination.startIndex}
-                  endIndex={transactionsPagination.endIndex}
-                  itemsPerPage={transactionsPagination.itemsPerPage}
-                  onPageChange={transactionsPagination.goToPage}
-                  onItemsPerPageChange={transactionsPagination.setItemsPerPage}
-                  canGoNext={transactionsPagination.canGoNext}
-                  canGoPrev={transactionsPagination.canGoPrev}
-                />
-              )}
+                      </TableCell>
+                      <TableCell>
+                        {tx.type === "expense" && tx.category ? (
+                          <Badge 
+                            variant="secondary" 
+                            className="text-xs"
+                            style={{ 
+                              backgroundColor: tx.color ? `${tx.color}20` : undefined,
+                              color: tx.color || undefined,
+                              borderColor: tx.color ? `${tx.color}40` : undefined
+                            }}
+                          >
+                            {tx.category}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={cn(
+                            "font-bold",
+                            tx.type === "revenue" ? "text-primary" : "text-destructive"
+                          )}
+                        >
+                          {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={transactionsPagination.currentPage}
+                totalPages={transactionsPagination.totalPages}
+                totalItems={transactionsPagination.totalItems}
+                startIndex={transactionsPagination.startIndex}
+                endIndex={transactionsPagination.endIndex}
+                itemsPerPage={transactionsPagination.itemsPerPage}
+                onPageChange={transactionsPagination.goToPage}
+                onItemsPerPageChange={transactionsPagination.setItemsPerPage}
+                canGoNext={transactionsPagination.canGoNext}
+                canGoPrev={transactionsPagination.canGoPrev}
+              />
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
