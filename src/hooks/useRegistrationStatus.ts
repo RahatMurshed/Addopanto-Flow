@@ -56,9 +56,9 @@ export function useRegistrationStatus(): RegistrationStatusResult {
       if (requestData) {
         setStatus(requestData.status as RegistrationStatus);
       } else {
-        // No role and no request - this shouldn't happen for new users
-        // but could happen for existing users before this feature
-        setStatus("pending");
+        // No role and no request - this is a legacy user from before the approval feature
+        // Grant them access as if they have a role
+        setStatus("has_role");
       }
     } catch (err) {
       console.error("Unexpected error checking status:", err);
