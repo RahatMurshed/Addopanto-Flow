@@ -1,99 +1,182 @@
 
-# Plan: Fix Report Year Filter and Add Informative Data
 
-## Problems Identified
+# Plan: Add Pagination to All Listed Items
 
-### Issue 1: Monthly Summary Shows Only Current Year (2026)
-The Monthly Summary tab hardcodes the year using `new Date().getFullYear()` (line 93-94) and doesn't have a year selector. Users cannot view historical monthly data from previous years.
+## Overview
 
-### Issue 2: Report Lacks Informative Visualizations
-The current report is purely tabular data. It lacks:
-- Charts/graphs for visual analysis
-- Comparison metrics (profit margins, trends)
-- Key performance indicators
-- Year-over-year comparisons
+This plan adds pagination controls to all tables and list views across the application, improving performance and user experience when dealing with large datasets.
 
 ---
 
-## Solution
+## Pages and Components Requiring Pagination
 
-### Fix 1: Add Year Selector to Monthly Summary Tab
-- Add a state variable `selectedYear` for the monthly summary
-- Add a year dropdown selector in the Monthly Summary tab header
-- Update the `monthlyBreakdown` calculation to use `selectedYear` instead of hardcoded current year
+| Location | List Type | Current State |
+|----------|-----------|---------------|
+| Dashboard | Recent Transactions | Shows 10 items (hardcoded limit) |
+| Expenses Page | Expense History Table | Shows all filtered expenses |
+| Revenue Page | Revenue History Table | Shows all filtered revenues |
+| Reports Page - Transfers Tab | Transfer History | Uses TransferHistoryCard component |
+| Expenses Page | Transfer History | Uses TransferHistoryCard component |
 
-### Fix 2: Add Informative Report Sections
-- **Visual Charts**: Add a bar chart showing revenue vs expenses by month
-- **Summary Statistics Card**: Add calculated KPIs including:
-  - Profit Margin percentage
-  - Average Revenue per transaction
-  - Average Expense per transaction
-  - Highest/Lowest revenue months
-- **Year-over-Year Comparison**: Show current vs previous year totals with percentage change
-- **Pie Chart**: Expense distribution by Khata (account)
+---
+
+## Solution Approach
+
+### 1. Create a Reusable Pagination Hook
+A custom hook `usePagination` will handle:
+- Current page state
+- Items per page (configurable, default: 10)
+- Total pages calculation
+- Paginated data slicing
+- Page navigation functions
+
+### 2. Create a Reusable Pagination Component
+A `TablePagination` component that combines with the existing shadcn/ui pagination primitives to provide:
+- Page number display ("Page X of Y")
+- Previous/Next buttons
+- Items per page selector (10, 25, 50)
+- Total items count
+
+### 3. Integrate Pagination into Each Page
 
 ---
 
 ## Technical Implementation
 
-### File to Modify: `src/pages/Reports.tsx`
+### New Files to Create
 
-**Changes:**
+**1. `src/hooks/usePagination.ts`**
+```text
+Custom hook providing:
+- currentPage state
+- itemsPerPage state  
+- totalPages calculation
+- paginatedData (sliced array)
+- goToPage, nextPage, prevPage functions
+- setItemsPerPage function
+- resetPage function (for when filters change)
+```
 
-1. **Add state for selected year** (new state variable)
-   ```
-   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-   ```
+**2. `src/components/TablePagination.tsx`**
+```text
+Reusable component displaying:
+- "Showing X-Y of Z entries" text
+- Items per page dropdown (10, 25, 50)
+- Previous/Next navigation buttons
+- Current page indicator
+```
 
-2. **Update Monthly Breakdown calculation** to use `selectedYear` (lines 91-120)
-   - Replace hardcoded `const year = new Date().getFullYear();` with `selectedYear`
+### Files to Modify
 
-3. **Add year selector to Monthly Summary tab header** (around line 317)
-   - Add a Select dropdown next to the title
+**3. `src/pages/Dashboard.tsx`**
+- Add pagination to Recent Transactions section
+- Currently limited to 10 items; add "View More" or full pagination
 
-4. **Add new Summary Statistics section** (after summary cards)
-   - Profit Margin = (Net Profit / Revenue) * 100
-   - Average transaction values
-   - Best/worst performing months
+**4. `src/pages/Expenses.tsx`**
+- Import and use `usePagination` hook with `filteredExpenses`
+- Add `TablePagination` component below expense table
+- Reset page to 1 when date filter changes
 
-5. **Add Bar Chart component** for monthly revenue vs expenses visualization
-   - Use recharts BarChart (already in dependencies)
-   - Display revenue and expenses side by side for each month
+**5. `src/pages/Revenue.tsx`**
+- Import and use `usePagination` hook with `filteredRevenues`
+- Add `TablePagination` component below revenue table
+- Reset page to 1 when date filter changes
 
-6. **Add Year-over-Year comparison card**
-   - Calculate previous year totals
-   - Show percentage change using existing `PercentageChange` component
-
-7. **Add Pie Chart for expense breakdown by account**
-   - Reuse similar logic from Dashboard
+**6. `src/components/TransferHistoryCard.tsx`**
+- Add internal pagination state
+- Paginate `displayTransfers` array
+- Add pagination controls at bottom of table
 
 ---
 
-## Visual Layout After Changes
+## Visual Design
 
 ```text
-+--------------------------------------------------+
-|  REPORTS PAGE                                    |
-+--------------------------------------------------+
-|  [Date Filter: Monthly | February | 2026]        |
-+--------------------------------------------------+
-|  SUMMARY CARDS (existing)                        |
-|  [Revenue] [Expenses] [Net Profit] [Transactions]|
-+--------------------------------------------------+
-|  NEW: KEY PERFORMANCE INDICATORS                 |
-|  [Profit Margin %] [Avg Revenue] [Avg Expense]   |
-|  [Best Month] [Worst Month] [YoY Change %]       |
-+--------------------------------------------------+
-|  NEW: CHARTS SECTION                             |
-|  [Bar Chart: Monthly Revenue vs Expenses]        |
-|  [Pie Chart: Expense by Khata]                   |
-+--------------------------------------------------+
-|  TABS: [Monthly Summary] [By Khata] [By Source]  |
-+--------------------------------------------------+
-|  Monthly Summary Tab:                            |
-|  Title: Monthly Breakdown - [Year Selector ▾]    |
-|  [Table with monthly data for selected year]     |
-+--------------------------------------------------+
++----------------------------------------------------------+
+|  Expense History - February 2026                         |
++----------------------------------------------------------+
+| Date       | Amount    | Khata      | Description | Act. |
+|------------|-----------|------------|-------------|------|
+| Feb 7      | ৳5,000    | Food       | Groceries   | Edit |
+| Feb 6      | ৳2,500    | Transport  | Fuel        | Edit |
+| Feb 5      | ৳1,200    | Utilities  | Electric    | Edit |
+| ...        | ...       | ...        | ...         | ...  |
++----------------------------------------------------------+
+| Showing 1-10 of 47 entries  [10 ▾]  [< Prev] [Next >]    |
++----------------------------------------------------------+
+```
+
+---
+
+## Implementation Details
+
+### usePagination Hook Interface
+```text
+Input:
+- items: T[] (the full array to paginate)
+- defaultItemsPerPage: number (default: 10)
+
+Output:
+- currentPage: number
+- itemsPerPage: number
+- totalPages: number
+- totalItems: number
+- paginatedItems: T[]
+- startIndex: number (for "Showing X-Y" display)
+- endIndex: number
+- goToPage: (page: number) => void
+- nextPage: () => void
+- prevPage: () => void
+- setItemsPerPage: (count: number) => void
+- resetPage: () => void
+```
+
+### TablePagination Component Props
+```text
+- currentPage: number
+- totalPages: number
+- totalItems: number
+- startIndex: number
+- endIndex: number
+- itemsPerPage: number
+- onPageChange: (page: number) => void
+- onItemsPerPageChange: (count: number) => void
+- itemsPerPageOptions?: number[] (default: [10, 25, 50])
+```
+
+---
+
+## Page-Specific Changes
+
+### Dashboard - Recent Transactions
+- Keep the 10-item limit for the dashboard view
+- Add a "View All Transactions" link to navigate to a detailed view (optional enhancement)
+- Or add simple Previous/Next if more than 10 transactions exist
+
+### Expenses Page
+- Apply pagination to `filteredExpenses` array
+- Show pagination only when entries exceed page size
+- Reset to page 1 when date range changes
+
+### Revenue Page
+- Apply pagination to `filteredRevenues` array
+- Show pagination only when entries exceed page size
+- Reset to page 1 when date range changes
+
+### TransferHistoryCard Component
+- Add optional `enablePagination` prop (default: true)
+- Internal state for page management
+- Works independently for both Expenses and Reports pages
+
+---
+
+## Reset Behavior
+
+When filters change (date range, year selector, etc.), pagination automatically resets to page 1 using a `useEffect`:
+```text
+useEffect(() => {
+  resetPage();
+}, [dateRange]);
 ```
 
 ---
@@ -102,26 +185,30 @@ The current report is purely tabular data. It lacks:
 
 | Before | After |
 |--------|-------|
-| Monthly tab shows only 2026 | Year selector allows viewing any year (2021-2026) |
-| No visualizations | Bar chart + Pie chart for visual analysis |
-| Basic summary cards only | Additional KPIs: profit margin, averages, best/worst months |
-| No year comparisons | Year-over-Year comparison with percentage change |
+| All items rendered at once | Items paginated (10/25/50 per page) |
+| Slow rendering with many entries | Fast, responsive tables |
+| No control over view size | User can choose items per page |
+| Scrolling to find entries | Navigate with pagination controls |
 
 ---
 
-## Files Changed
+## Files Summary
 
-| File | Change |
+| File | Action |
 |------|--------|
-| `src/pages/Reports.tsx` | Add year selector, charts, KPI cards, YoY comparison |
+| `src/hooks/usePagination.ts` | Create |
+| `src/components/TablePagination.tsx` | Create |
+| `src/pages/Dashboard.tsx` | Modify (add pagination to Recent Transactions) |
+| `src/pages/Expenses.tsx` | Modify (add pagination to Expense History) |
+| `src/pages/Revenue.tsx` | Modify (add pagination to Revenue History) |
+| `src/components/TransferHistoryCard.tsx` | Modify (add internal pagination) |
 
 ---
 
-## New Imports Required
+## Accessibility Considerations
 
-```typescript
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import PercentageChange from "@/components/PercentageChange";
-```
+- Pagination controls include proper ARIA labels
+- Keyboard navigation support (already in shadcn/ui components)
+- Clear visual indication of current page
+- Disabled states for Previous/Next at boundaries
 
-These are already available in the project dependencies (recharts is installed, PercentageChange component exists).
