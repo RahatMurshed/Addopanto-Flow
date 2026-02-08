@@ -226,6 +226,38 @@ export default function Reports() {
     return khataExpenses;
   }, [reportData, filteredData]);
 
+  // Revenue breakdown by source for pie chart
+  const revenueBySource = useMemo(() => {
+    if (!reportData) return [];
+
+    const sourceRevenues = reportData.sources.map((source, index) => {
+      const total = filteredData.revenues
+        .filter((r) => r.source_id === source.id)
+        .reduce((sum, r) => sum + Number(r.amount), 0);
+
+      return {
+        name: source.name,
+        value: total,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      };
+    }).filter((s) => s.value > 0);
+
+    // Add uncategorized revenues
+    const uncategorizedRevenue = filteredData.revenues
+      .filter((r) => !r.source_id)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
+
+    if (uncategorizedRevenue > 0) {
+      sourceRevenues.push({
+        name: "Uncategorized",
+        value: uncategorizedRevenue,
+        color: "hsl(var(--muted-foreground))",
+      });
+    }
+
+    return sourceRevenues;
+  }, [reportData, filteredData]);
+
   // Account-wise breakdown
   const accountBreakdown = useMemo(() => {
     if (!reportData) return [];
@@ -353,24 +385,29 @@ export default function Reports() {
     return null;
   };
 
-  // Custom tooltip for pie chart
-  const CustomPieTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0];
-      const total = expenseByKhata.reduce((sum, k) => sum + k.value, 0);
-      const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
-      
-      return (
-        <div className="rounded-lg border bg-background p-3 shadow-lg">
-          <p className="font-medium">{data.name}</p>
-          <p className="text-sm text-muted-foreground">
-            {formatCurrency(data.value)} ({percentage}%)
-          </p>
-        </div>
-      );
-    }
-    return null;
+  // Custom tooltip for pie chart (works for any pie chart data)
+  const createPieTooltip = (chartData: { name: string; value: number }[]) => {
+    return ({ active, payload }: any) => {
+      if (active && payload && payload.length) {
+        const data = payload[0];
+        const total = chartData.reduce((sum, k) => sum + k.value, 0);
+        const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
+        
+        return (
+          <div className="rounded-lg border bg-background p-3 shadow-lg">
+            <p className="font-medium">{data.name}</p>
+            <p className="text-sm text-muted-foreground">
+              {formatCurrency(data.value)} ({percentage}%)
+            </p>
+          </div>
+        );
+      }
+      return null;
+    };
   };
+
+  const ExpensePieTooltip = createPieTooltip(expenseByKhata);
+  const RevenuePieTooltip = createPieTooltip(revenueBySource);
 
   if (isLoading) {
     return (
@@ -526,7 +563,7 @@ export default function Reports() {
       {/* Charts Section */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Bar Chart - Monthly Revenue vs Expenses */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
@@ -550,10 +587,57 @@ export default function Reports() {
           </CardContent>
         </Card>
 
+        {/* Pie Chart - Revenue by Source */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Revenue by Source
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              {revenueBySource.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={revenueBySource}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {revenueBySource.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<RevenuePieTooltip />} />
+                    <Legend 
+                      layout="vertical" 
+                      align="right" 
+                      verticalAlign="middle"
+                      formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  No revenue data for selected period
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Pie Chart - Expense by Khata */}
         <Card>
           <CardHeader>
-            <CardTitle>Expense Distribution by Khata</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-destructive" />
+              Expense Distribution by Khata
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -573,7 +657,7 @@ export default function Reports() {
                         <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomPieTooltip />} />
+                    <Tooltip content={<ExpensePieTooltip />} />
                     <Legend 
                       layout="vertical" 
                       align="right" 
