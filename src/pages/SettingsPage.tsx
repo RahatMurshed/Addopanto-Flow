@@ -21,7 +21,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading } = useRole();
+  const { isLoading: roleLoading, hasNoRole } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
@@ -97,8 +97,13 @@ export default function SettingsPage() {
     }
   };
 
+  // Show loading state while fetching data
   if (loading || roleLoading) {
-    return <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
