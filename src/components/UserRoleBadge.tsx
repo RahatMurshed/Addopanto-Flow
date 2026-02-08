@@ -1,15 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import type { AppRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
-import { Shield, ShieldCheck, User, Eye } from "lucide-react";
+import { Shield, ShieldCheck, User, Eye, Clock } from "lucide-react";
 
 interface UserRoleBadgeProps {
-  role: AppRole;
+  role: AppRole | null;
   size?: "sm" | "md";
   showIcon?: boolean;
 }
 
-const roleConfig: Record<AppRole, { label: string; className: string; icon: typeof Shield }> = {
+const roleConfig: Record<AppRole | "pending", { label: string; className: string; icon: typeof Shield }> = {
   cipher: {
     label: "Cipher",
     className: "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0",
@@ -30,10 +30,17 @@ const roleConfig: Record<AppRole, { label: string; className: string; icon: type
     className: "bg-secondary text-secondary-foreground",
     icon: User,
   },
+  pending: {
+    label: "Pending",
+    className: "bg-muted text-muted-foreground",
+    icon: Clock,
+  },
 };
 
 export function UserRoleBadge({ role, size = "md", showIcon = true }: UserRoleBadgeProps) {
-  const config = roleConfig[role];
+  // Handle null role (pending users)
+  const configKey = role ?? "pending";
+  const config = roleConfig[configKey];
   const Icon = config.icon;
 
   return (
