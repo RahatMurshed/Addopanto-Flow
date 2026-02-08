@@ -107,17 +107,17 @@ export default function TransferDialog({
         <DialogHeader>
           <DialogTitle>Transfer Balance</DialogTitle>
           <DialogDescription>
-            Move funds between khatas without affecting total allocation.
+            Move funds between expense sources without affecting total allocation.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* From Account */}
           <div className="space-y-2">
-            <Label htmlFor="from-account">From Khata</Label>
+            <Label htmlFor="from-account">From Expense Source</Label>
             <Select value={fromAccountId} onValueChange={setFromAccountId}>
               <SelectTrigger id="from-account">
-                <SelectValue placeholder="Select source khata" />
+                <SelectValue placeholder="Select source" />
               </SelectTrigger>
               <SelectContent>
                 {activeAccounts.map((account) => (
@@ -140,10 +140,10 @@ export default function TransferDialog({
 
           {/* To Account */}
           <div className="space-y-2">
-            <Label htmlFor="to-account">To Khata</Label>
+            <Label htmlFor="to-account">To Expense Source</Label>
             <Select value={toAccountId} onValueChange={setToAccountId}>
               <SelectTrigger id="to-account">
-                <SelectValue placeholder="Select destination khata" />
+                <SelectValue placeholder="Select destination" />
               </SelectTrigger>
               <SelectContent>
                 {activeAccounts.map((account) => (
@@ -171,7 +171,7 @@ export default function TransferDialog({
           {isSameAccount && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>Cannot transfer to the same khata.</AlertDescription>
+              <AlertDescription>Cannot transfer to the same expense source.</AlertDescription>
             </Alert>
           )}
 

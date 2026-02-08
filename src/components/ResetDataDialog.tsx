@@ -107,8 +107,8 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>• All revenues and allocations</li>
                 <li>• All expenses</li>
-                <li>• All expense accounts (Khatas)</li>
-                <li>• All khata transfers</li>
+                <li>• All expense sources</li>
+                <li>• All expense source transfers</li>
                 <li>• All revenue sources</li>
               </ul>
               <p className="mt-3 text-sm">

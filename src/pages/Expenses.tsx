@@ -207,7 +207,7 @@ export default function Expenses() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-muted-foreground">Record and track your spending by khata</p>
+          <p className="text-muted-foreground">Record and track your spending by expense source</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
@@ -239,7 +239,7 @@ export default function Expenses() {
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Create expense accounts (khatas) first before recording expenses.
+            Create expense sources first before recording expenses.
           </AlertDescription>
         </Alert>
       )}
@@ -312,7 +312,7 @@ export default function Expenses() {
       {filteredBreakdown.length > 0 && dateRange && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Spending by Khata - {dateRange.label}</CardTitle>
+            <CardTitle className="text-base">Spending by Expense Source - {dateRange.label}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -344,7 +344,7 @@ export default function Expenses() {
       {accounts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Khata Balances</CardTitle>
+            <CardTitle className="text-base">Expense Source Balances</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -392,7 +392,7 @@ export default function Expenses() {
             <p className="mb-4 max-w-sm text-muted-foreground">
               {expenses.length > 0
                 ? "Try selecting a different date range or add new expenses."
-                : "Start tracking your spending. Each expense will be deducted from the selected khata's balance."}
+                : "Start tracking your spending. Each expense will be deducted from the selected expense source's balance."}
             </p>
             {accounts.length > 0 && (
               <Button onClick={() => setDialogOpen(true)}>Add Expense</Button>
@@ -412,7 +412,7 @@ export default function Expenses() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Khata</TableHead>
+                    <TableHead>Expense Source</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
