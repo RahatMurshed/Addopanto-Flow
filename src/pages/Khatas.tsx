@@ -8,6 +8,7 @@ import {
   type ExpenseAccount,
 } from "@/hooks/useExpenseAccounts";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useRole } from "@/contexts/RoleContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,9 @@ export default function Khatas() {
   const { data: accounts = [], isLoading } = useExpenseAccounts();
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
+  
+  // Role-based permissions
+  const { canAddExpenseSource, canEdit, canDelete } = useRole();
   
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();
@@ -104,7 +108,7 @@ export default function Khatas() {
           <p className="text-muted-foreground">Manage your expense categories and allocation percentages</p>
         </div>
         <div className="flex gap-2">
-          {accounts.length === 0 && (
+          {accounts.length === 0 && canAddExpenseSource && (
             <Button
               variant="outline"
               onClick={handleCreateDefaults}
@@ -118,10 +122,12 @@ export default function Khatas() {
               Use Defaults
             </Button>
           )}
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Expense Source
-          </Button>
+          {canAddExpenseSource && (
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Expense Source
+            </Button>
+          )}
         </div>
       </div>
 
@@ -153,11 +159,15 @@ export default function Khatas() {
               Create expense sources to automatically allocate your revenue. Start with our defaults or create custom ones.
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCreateDefaults} disabled={createDefaultsMutation.isPending}>
-                {createDefaultsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Use Defaults
-              </Button>
-              <Button onClick={() => setDialogOpen(true)}>Create Custom</Button>
+              {canAddExpenseSource && (
+                <Button variant="outline" onClick={handleCreateDefaults} disabled={createDefaultsMutation.isPending}>
+                  {createDefaultsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Use Defaults
+                </Button>
+              )}
+              {canAddExpenseSource && (
+                <Button onClick={() => setDialogOpen(true)}>Create Custom</Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -173,27 +183,33 @@ export default function Khatas() {
                   />
                   <CardTitle className="text-base font-semibold">{account.name}</CardTitle>
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
-                      setEditingKhata(account);
-                      setDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => setDeleteId(account.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {(canEdit || canDelete) && (
+                  <div className="flex gap-1">
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditingKhata(account);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteId(account.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="flex items-end justify-between">

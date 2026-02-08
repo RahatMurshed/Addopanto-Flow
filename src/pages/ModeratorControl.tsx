@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { RoleGuard } from "@/components/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
-import { Loader2, Shield, Search, ShieldAlert, TrendingUp, Receipt, FileText } from "lucide-react";
+import { Loader2, Shield, Search, ShieldAlert, TrendingUp, Receipt, FileText, Wallet, ArrowLeftRight } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 interface ModeratorUser {
@@ -30,6 +30,8 @@ function ModeratorPermissionsCard({ userId, email }: { userId: string; email: st
     isUpdating,
     canAddRevenue,
     canAddExpense,
+    canAddExpenseSource,
+    canTransfer,
     canViewReports,
   } = useModeratorPermissions(userId);
 
@@ -79,6 +81,36 @@ function ModeratorPermissionsCard({ userId, email }: { userId: string; email: st
             id={`expense-${userId}`}
             checked={canAddExpense}
             onCheckedChange={(checked) => updatePermissions({ can_add_expense: checked })}
+            disabled={isUpdating}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-primary" />
+            <Label htmlFor={`expense-source-${userId}`} className="text-sm">
+              Can Add Expense Sources
+            </Label>
+          </div>
+          <Switch
+            id={`expense-source-${userId}`}
+            checked={canAddExpenseSource}
+            onCheckedChange={(checked) => updatePermissions({ can_add_expense_source: checked })}
+            disabled={isUpdating}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowLeftRight className="h-4 w-4 text-primary" />
+            <Label htmlFor={`transfer-${userId}`} className="text-sm">
+              Can Transfer
+            </Label>
+          </div>
+          <Switch
+            id={`transfer-${userId}`}
+            checked={canTransfer}
+            onCheckedChange={(checked) => updatePermissions({ can_transfer: checked })}
             disabled={isUpdating}
           />
         </div>

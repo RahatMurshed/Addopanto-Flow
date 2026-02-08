@@ -82,13 +82,13 @@ export default function Dashboard() {
       const now = new Date();
 
       const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes, recentRevenuesRes, recentExpensesRes] = await Promise.all([
-        supabase.from("revenues").select("amount, date").eq("user_id", user.id),
-        supabase.from("expenses").select("amount, date, expense_account_id").eq("user_id", user.id),
-        supabase.from("allocations").select("amount").eq("user_id", user.id),
-        supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active").eq("user_id", user.id),
-        supabase.from("revenue_sources").select("id, name").eq("user_id", user.id),
-        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
-        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+        supabase.from("revenues").select("amount, date"),
+        supabase.from("expenses").select("amount, date, expense_account_id"),
+        supabase.from("allocations").select("amount"),
+        supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active"),
+        supabase.from("revenue_sources").select("id, name"),
+        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").order("created_at", { ascending: false }).limit(50),
+        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").order("created_at", { ascending: false }).limit(50),
       ]);
 
       if (revenuesRes.error) throw revenuesRes.error;
@@ -446,7 +446,7 @@ export default function Dashboard() {
               Add Expense
             </Button>
           </PermissionGuard>
-          <PermissionGuard permission="canAddExpense">
+          <PermissionGuard permission="canTransfer">
             <Button
               size="sm"
               variant="outline"

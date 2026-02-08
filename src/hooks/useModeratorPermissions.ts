@@ -8,6 +8,8 @@ export interface ModeratorPermissions {
   user_id: string;
   can_add_revenue: boolean;
   can_add_expense: boolean;
+  can_add_expense_source: boolean;
+  can_transfer: boolean;
   can_view_reports: boolean;
   controlled_by: string | null;
   created_at: string;
@@ -43,7 +45,7 @@ export function useModeratorPermissions(targetUserId?: string) {
   });
 
   const updatePermissionsMutation = useMutation({
-    mutationFn: async (updates: Partial<Pick<ModeratorPermissions, "can_add_revenue" | "can_add_expense" | "can_view_reports">>) => {
+    mutationFn: async (updates: Partial<Pick<ModeratorPermissions, "can_add_revenue" | "can_add_expense" | "can_add_expense_source" | "can_transfer" | "can_view_reports">>) => {
       if (!userId) throw new Error("No user ID");
 
       // Check if permissions exist
@@ -93,6 +95,8 @@ export function useModeratorPermissions(targetUserId?: string) {
     // Helper functions for current user
     canAddRevenue: permissions?.can_add_revenue ?? false,
     canAddExpense: permissions?.can_add_expense ?? false,
+    canAddExpenseSource: permissions?.can_add_expense_source ?? false,
+    canTransfer: permissions?.can_transfer ?? false,
     canViewReports: permissions?.can_view_reports ?? false,
   };
 }

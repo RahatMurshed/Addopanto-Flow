@@ -16,6 +16,8 @@ interface RoleContextType {
   moderatorPermissions: ModeratorPermissions | null;
   canAddRevenue: boolean;
   canAddExpense: boolean;
+  canAddExpenseSource: boolean;
+  canTransfer: boolean;
   canViewReports: boolean;
   // Computed permissions based on role
   canEdit: boolean;
@@ -45,6 +47,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     isLoading: permissionsLoading,
     canAddRevenue: modCanAddRevenue,
     canAddExpense: modCanAddExpense,
+    canAddExpenseSource: modCanAddExpenseSource,
+    canTransfer: modCanTransfer,
     canViewReports: modCanViewReports,
   } = useModeratorPermissions();
 
@@ -56,6 +60,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   // Pending users (hasNoRole) have NO permissions
   const canAddRevenue = isCipher || isAdmin || (isModerator && modCanAddRevenue);
   const canAddExpense = isCipher || isAdmin || (isModerator && modCanAddExpense);
+  const canAddExpenseSource = isCipher || isAdmin || (isModerator && modCanAddExpenseSource);
+  const canTransfer = isCipher || isAdmin || (isModerator && modCanTransfer);
   const canViewReports = isCipher || isAdmin || (isModerator && modCanViewReports);
   
   // Edit/Delete: Only Cipher and Admin
@@ -81,6 +87,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         moderatorPermissions,
         canAddRevenue,
         canAddExpense,
+        canAddExpenseSource,
+        canTransfer,
         canViewReports,
         canEdit,
         canDelete,

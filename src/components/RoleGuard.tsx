@@ -61,7 +61,7 @@ export function RoleGuard({
  */
 interface PermissionGuardProps {
   children: ReactNode;
-  permission: "canAddRevenue" | "canAddExpense" | "canViewReports" | "canEdit" | "canDelete" | "canManageUsers";
+  permission: "canAddRevenue" | "canAddExpense" | "canAddExpenseSource" | "canTransfer" | "canViewReports" | "canEdit" | "canDelete" | "canManageUsers";
   fallback?: ReactNode;
 }
 
