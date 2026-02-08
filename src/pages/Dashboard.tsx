@@ -658,7 +658,7 @@ export default function Dashboard() {
                       tx.type === "revenue" ? "text-primary" : "text-destructive"
                     )}
                   >
-                    {tx.type === "revenue" ? "+" : "-"}৳{tx.amount.toLocaleString()}
+                    {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
                   </p>
                 </div>
               ))}
