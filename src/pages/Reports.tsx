@@ -20,7 +20,7 @@ import ExportButtons from "@/components/ExportButtons";
 import PercentageChange from "@/components/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, ReferenceLine } from "recharts";
 
 // Chart colors using HSL values that work with both themes
 const CHART_COLORS = [
@@ -563,7 +563,7 @@ export default function Reports() {
       {/* Charts Section */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Bar Chart - Monthly Revenue vs Expenses */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
@@ -582,6 +582,38 @@ export default function Reports() {
                   <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Line Chart - Profit Trend */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-success" />
+              Profit Trend - {selectedYear}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                  <Tooltip content={<CustomBarTooltip />} />
+                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                  <Line 
+                    type="monotone" 
+                    dataKey="profit" 
+                    name="Profit" 
+                    stroke="hsl(142, 76%, 36%)" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(142, 76%, 36%)', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: 'hsl(142, 76%, 36%)' }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
