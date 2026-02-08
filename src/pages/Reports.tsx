@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight } from "lucide-react";
-import { format, endOfMonth, getYear, getMonth } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight, Percent, Calculator, Calendar, BarChart3 } from "lucide-react";
+import { format, endOfMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useKhataTransfers } from "@/hooks/useKhataTransfers";
 import { useAccountBalances } from "@/hooks/useExpenses";
@@ -16,8 +17,22 @@ import { formatCurrencyPrecise } from "@/utils/currencyUtils";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
+import PercentageChange from "@/components/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+
+// Chart colors using HSL values that work with both themes
+const CHART_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--destructive))",
+  "hsl(142, 76%, 36%)", // green
+  "hsl(38, 92%, 50%)", // orange
+  "hsl(262, 83%, 58%)", // purple
+  "hsl(199, 89%, 48%)", // blue
+  "hsl(346, 77%, 49%)", // pink
+  "hsl(24, 94%, 50%)", // amber
+];
 
 export default function Reports() {
   const { user } = useAuth();
@@ -25,6 +40,7 @@ export default function Reports() {
   const currency = userProfile?.currency || "BDT";
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const { data: transfers = [] } = useKhataTransfers();
   const { data: accounts = [] } = useAccountBalances();
 
@@ -62,6 +78,20 @@ export default function Reports() {
     enabled: !!user,
   });
 
+  // Get available years from data
+  const availableYears = useMemo(() => {
+    if (!reportData) return [new Date().getFullYear()];
+    
+    const years = new Set<number>();
+    reportData.revenues.forEach((r) => years.add(getYear(new Date(r.date))));
+    reportData.expenses.forEach((e) => years.add(getYear(new Date(e.date))));
+    
+    // Always include current year
+    years.add(new Date().getFullYear());
+    
+    return Array.from(years).sort((a, b) => b - a); // Descending order
+  }, [reportData]);
+
   // Filter data based on date range
   const filteredData = useMemo(() => {
     if (!reportData || !dateRange) return { revenues: [], expenses: [], allocations: [] };
@@ -87,16 +117,33 @@ export default function Reports() {
     return { totalRevenue, totalExpenses, netProfit, transactionCount };
   }, [filteredData]);
 
-  // Monthly breakdown for the current year
+  // Calculate KPIs
+  const kpis = useMemo(() => {
+    const profitMargin = summary.totalRevenue > 0 
+      ? (summary.netProfit / summary.totalRevenue) * 100 
+      : 0;
+    
+    const avgRevenue = filteredData.revenues.length > 0 
+      ? summary.totalRevenue / filteredData.revenues.length 
+      : 0;
+    
+    const avgExpense = filteredData.expenses.length > 0 
+      ? summary.totalExpenses / filteredData.expenses.length 
+      : 0;
+
+    return { profitMargin, avgRevenue, avgExpense };
+  }, [summary, filteredData]);
+
+  // Monthly breakdown for the SELECTED year
   const monthlyBreakdown = useMemo(() => {
     if (!reportData) return [];
-    const year = new Date().getFullYear();
-    const breakdown: { month: string; revenue: number; expenses: number; profit: number }[] = [];
+    const breakdown: { month: string; monthShort: string; revenue: number; expenses: number; profit: number }[] = [];
 
     for (let m = 0; m < 12; m++) {
-      const monthStart = new Date(year, m, 1);
+      const monthStart = new Date(selectedYear, m, 1);
       const monthEnd = endOfMonth(monthStart);
       const monthLabel = format(monthStart, "MMMM");
+      const monthShort = format(monthStart, "MMM");
       const monthStartStr = format(monthStart, "yyyy-MM-dd");
       const monthEndStr = format(monthEnd, "yyyy-MM-dd");
 
@@ -110,6 +157,7 @@ export default function Reports() {
 
       breakdown.push({
         month: monthLabel,
+        monthShort,
         revenue: monthRevenue,
         expenses: monthExpenses,
         profit: monthRevenue - monthExpenses,
@@ -117,7 +165,66 @@ export default function Reports() {
     }
 
     return breakdown;
+  }, [reportData, selectedYear]);
+
+  // Year-over-Year comparison
+  const yoyComparison = useMemo(() => {
+    if (!reportData) return null;
+
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+
+    const currentYearStart = `${currentYear}-01-01`;
+    const currentYearEnd = `${currentYear}-12-31`;
+    const previousYearStart = `${previousYear}-01-01`;
+    const previousYearEnd = `${previousYear}-12-31`;
+
+    const currentRevenue = reportData.revenues
+      .filter((r) => r.date >= currentYearStart && r.date <= currentYearEnd)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
+
+    const previousRevenue = reportData.revenues
+      .filter((r) => r.date >= previousYearStart && r.date <= previousYearEnd)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
+
+    const currentExpenses = reportData.expenses
+      .filter((e) => e.date >= currentYearStart && e.date <= currentYearEnd)
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    const previousExpenses = reportData.expenses
+      .filter((e) => e.date >= previousYearStart && e.date <= previousYearEnd)
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    return {
+      currentYear,
+      previousYear,
+      currentRevenue,
+      previousRevenue,
+      currentExpenses,
+      previousExpenses,
+      currentProfit: currentRevenue - currentExpenses,
+      previousProfit: previousRevenue - previousExpenses,
+    };
   }, [reportData]);
+
+  // Expense breakdown by khata for pie chart
+  const expenseByKhata = useMemo(() => {
+    if (!reportData) return [];
+
+    const khataExpenses = reportData.accounts.map((account) => {
+      const total = filteredData.expenses
+        .filter((e) => e.expense_account_id === account.id)
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      return {
+        name: account.name,
+        value: total,
+        color: account.color,
+      };
+    }).filter((k) => k.value > 0);
+
+    return khataExpenses;
+  }, [reportData, filteredData]);
 
   // Account-wise breakdown
   const accountBreakdown = useMemo(() => {
@@ -229,6 +336,42 @@ export default function Reports() {
     downloadCSV(data, "account_breakdown", ["Name", "Allocated", "Spent", "Balance", "Percentage"]);
   };
 
+  // Custom tooltip for bar chart
+  const CustomBarTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border bg-background p-3 shadow-lg">
+          <p className="font-medium">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} style={{ color: entry.color }} className="text-sm">
+              {entry.name}: {formatCurrency(entry.value)}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Custom tooltip for pie chart
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      const total = expenseByKhata.reduce((sum, k) => sum + k.value, 0);
+      const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
+      
+      return (
+        <div className="rounded-lg border bg-background p-3 shadow-lg">
+          <p className="font-medium">{data.name}</p>
+          <p className="text-sm text-muted-foreground">
+            {formatCurrency(data.value)} ({percentage}%)
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -298,6 +441,157 @@ export default function Reports() {
         </Card>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Profit Margin</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className={cn("text-2xl font-bold", kpis.profitMargin >= 0 ? "text-success" : "text-destructive")}>
+              {kpis.profitMargin.toFixed(1)}%
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Net profit as % of revenue</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Revenue/Entry</CardTitle>
+            <Calculator className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(kpis.avgRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{filteredData.revenues.length} revenue entries</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Expense/Entry</CardTitle>
+            <Calculator className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-destructive">{formatCurrency(kpis.avgExpense)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{filteredData.expenses.length} expense entries</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Year-over-Year Comparison */}
+      {yoyComparison && (yoyComparison.previousRevenue > 0 || yoyComparison.previousExpenses > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Year-over-Year Comparison ({yoyComparison.previousYear} vs {yoyComparison.currentYear})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Revenue</p>
+                <p className="text-lg font-semibold text-primary">{formatCurrency(yoyComparison.currentRevenue)}</p>
+                <PercentageChange 
+                  current={yoyComparison.currentRevenue} 
+                  previous={yoyComparison.previousRevenue}
+                  label={String(yoyComparison.previousYear)}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Expenses</p>
+                <p className="text-lg font-semibold text-destructive">{formatCurrency(yoyComparison.currentExpenses)}</p>
+                <PercentageChange 
+                  current={yoyComparison.currentExpenses} 
+                  previous={yoyComparison.previousExpenses}
+                  label={String(yoyComparison.previousYear)}
+                  invertColors
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Net Profit</p>
+                <p className={cn("text-lg font-semibold", yoyComparison.currentProfit >= 0 ? "text-success" : "text-destructive")}>
+                  {formatCurrency(yoyComparison.currentProfit)}
+                </p>
+                <PercentageChange 
+                  current={yoyComparison.currentProfit} 
+                  previous={yoyComparison.previousProfit}
+                  label={String(yoyComparison.previousYear)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Charts Section */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Bar Chart - Monthly Revenue vs Expenses */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Monthly Overview - {selectedYear}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                  <Tooltip content={<CustomBarTooltip />} />
+                  <Legend />
+                  <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pie Chart - Expense by Khata */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Expense Distribution by Khata</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              {expenseByKhata.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={expenseByKhata}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {expenseByKhata.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomPieTooltip />} />
+                    <Legend 
+                      layout="vertical" 
+                      align="right" 
+                      verticalAlign="middle"
+                      formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  No expense data for selected period
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Tabs for different views */}
       <Tabs defaultValue="monthly" className="space-y-4">
         <TabsList>
@@ -314,7 +608,21 @@ export default function Reports() {
         <TabsContent value="monthly" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Monthly Breakdown - {new Date().getFullYear()}</CardTitle>
+              <div className="flex items-center gap-3">
+                <CardTitle>Monthly Breakdown</CardTitle>
+                <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button variant="outline" size="sm" onClick={exportMonthlySummary}>
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV
