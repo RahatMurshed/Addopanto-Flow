@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,8 @@ import PercentageChange from "@/components/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, ReferenceLine } from "recharts";
+import { usePagination } from "@/hooks/usePagination";
+import TablePagination from "@/components/TablePagination";
 
 // Chart colors using HSL values that work with both themes
 const CHART_COLORS = [
@@ -166,6 +168,14 @@ export default function Reports() {
 
     return breakdown;
   }, [reportData, selectedYear]);
+
+  // Pagination for monthly breakdown
+  const monthlyPagination = usePagination(monthlyBreakdown, { defaultItemsPerPage: 6 });
+
+  // Reset page when year changes
+  useEffect(() => {
+    monthlyPagination.resetPage();
+  }, [selectedYear]);
 
   // Year-over-Year comparison
   const yoyComparison = useMemo(() => {
@@ -756,7 +766,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {monthlyBreakdown.map((row) => (
+                    {monthlyPagination.paginatedItems.map((row) => (
                       <TableRow key={row.month}>
                         <TableCell className="font-medium">{row.month}</TableCell>
                         <TableCell className="text-right text-primary">{formatCurrency(row.revenue)}</TableCell>
@@ -767,7 +777,7 @@ export default function Reports() {
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-bold">
-                      <TableCell>Total</TableCell>
+                      <TableCell>Total ({selectedYear})</TableCell>
                       <TableCell className="text-right text-primary">
                         {formatCurrency(monthlyBreakdown.reduce((sum, m) => sum + m.revenue, 0))}
                       </TableCell>
@@ -781,6 +791,19 @@ export default function Reports() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={monthlyPagination.currentPage}
+                totalPages={monthlyPagination.totalPages}
+                totalItems={monthlyPagination.totalItems}
+                startIndex={monthlyPagination.startIndex}
+                endIndex={monthlyPagination.endIndex}
+                itemsPerPage={monthlyPagination.itemsPerPage}
+                onPageChange={monthlyPagination.goToPage}
+                onItemsPerPageChange={monthlyPagination.setItemsPerPage}
+                canGoNext={monthlyPagination.canGoNext}
+                canGoPrev={monthlyPagination.canGoPrev}
+                itemsPerPageOptions={[6, 12]}
+              />
             </CardContent>
           </Card>
         </TabsContent>
