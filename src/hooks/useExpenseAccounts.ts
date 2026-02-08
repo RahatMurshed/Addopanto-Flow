@@ -11,13 +11,12 @@ export function useExpenseAccounts() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["expense_accounts", user?.id],
+    queryKey: ["expense_accounts"],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("expense_accounts")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as ExpenseAccount[];
@@ -42,7 +41,7 @@ export function useCreateExpenseAccount() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expense_accounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
     },
   });
 }
@@ -63,7 +62,7 @@ export function useUpdateExpenseAccount() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expense_accounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
     },
   });
 }
@@ -78,7 +77,7 @@ export function useDeleteExpenseAccount() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expense_accounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
     },
   });
 }
@@ -105,7 +104,7 @@ export function useCreateDefaultAccounts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expense_accounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
     },
   });
 }

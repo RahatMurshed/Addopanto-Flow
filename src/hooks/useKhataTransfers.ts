@@ -23,13 +23,12 @@ export function useKhataTransfers() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["khata_transfers", user?.id],
+    queryKey: ["khata_transfers"],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("khata_transfers")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as KhataTransfer[];
@@ -54,9 +53,9 @@ export function useCreateKhataTransfer() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["khata_transfers", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["account_balances", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["khata_transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -71,9 +70,9 @@ export function useDeleteKhataTransfer() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["khata_transfers", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["account_balances", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["khata_transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

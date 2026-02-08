@@ -15,13 +15,12 @@ export function useRevenues() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["revenues", user?.id],
+    queryKey: ["revenues"],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("revenues")
         .select("*, revenue_sources(name)")
-        .eq("user_id", user.id)
         .order("date", { ascending: false });
       if (error) throw error;
       return data as RevenueWithSource[];
@@ -74,8 +73,8 @@ export function useCreateRevenue() {
       return revenueData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["revenues", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["allocations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["revenues"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
     },
   });
 }
@@ -144,8 +143,8 @@ export function useUpdateRevenue() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["revenues", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["allocations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["revenues"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
     },
   });
 }
@@ -161,8 +160,8 @@ export function useDeleteRevenue() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["revenues", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["allocations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["revenues"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
     },
   });
 }
@@ -171,7 +170,7 @@ export function useRevenueSummary() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["revenue_summary", user?.id],
+    queryKey: ["revenue_summary"],
     queryFn: async () => {
       if (!user) return { thisMonth: 0, thisYear: 0, total: 0 };
 
@@ -181,8 +180,7 @@ export function useRevenueSummary() {
 
       const { data, error } = await supabase
         .from("revenues")
-        .select("amount, date")
-        .eq("user_id", user.id);
+        .select("amount, date");
       if (error) throw error;
 
       const thisMonth = data

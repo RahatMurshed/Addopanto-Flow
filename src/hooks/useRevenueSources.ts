@@ -9,13 +9,12 @@ export function useRevenueSources() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["revenue_sources", user?.id],
+    queryKey: ["revenue_sources"],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("revenue_sources")
         .select("*")
-        .eq("user_id", user.id)
         .order("name");
       if (error) throw error;
       return data as RevenueSource[];
@@ -40,7 +39,7 @@ export function useCreateRevenueSource() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["revenue_sources", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_sources"] });
     },
   });
 }

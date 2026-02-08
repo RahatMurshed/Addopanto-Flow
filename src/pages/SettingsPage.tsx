@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { isLoading: roleLoading } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
