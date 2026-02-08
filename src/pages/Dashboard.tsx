@@ -628,6 +628,7 @@ export default function Dashboard() {
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Khata</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -667,6 +668,15 @@ export default function Dashboard() {
                               borderColor: tx.color ? `${tx.color}40` : undefined
                             }}
                           >
+                            {tx.category}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {tx.type === "revenue" && tx.category ? (
+                          <Badge variant="outline" className="text-xs text-primary border-primary/30">
                             {tx.category}
                           </Badge>
                         ) : (
