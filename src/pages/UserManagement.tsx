@@ -140,31 +140,38 @@ export default function UserManagement() {
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const { data, error } = await supabase.functions.invoke("admin-users", {
-        method: "DELETE",
-        body: null,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        method: "POST",
+        body: { userId },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
 
-      // The invoke method doesn't support query params directly, so we need to use fetch
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?userId=${userId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      if (error) {
+        const errAny = error as any;
+        const ctx = errAny?.context as Response | undefined;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete user");
+        // If we have a Response context, try to extract the JSON error body.
+        if (ctx) {
+          const contentType = ctx.headers.get("content-type") || "";
+
+          if (contentType.includes("application/json")) {
+            const payload = await ctx.json().catch(() => null);
+            const message =
+              payload?.details
+                ? `${payload.error}: ${payload.details}`
+                : payload?.error || errAny?.message || "Failed to delete user";
+            throw new Error(message);
+          }
+
+          const text = await ctx.text().catch(() => "");
+          throw new Error(text || errAny?.message || "Failed to delete user");
+        }
+
+        throw new Error(errAny?.message || "Failed to delete user");
       }
 
-      return response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
