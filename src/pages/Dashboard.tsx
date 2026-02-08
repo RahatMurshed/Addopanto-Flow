@@ -20,7 +20,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, eachMonthOfInterval, differenceInDays, parseISO, isWithinInterval } from "date-fns";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
 import ExportButtons from "@/components/ExportButtons";
 import RevenueDialog from "@/components/RevenueDialog";
@@ -224,6 +224,58 @@ export default function Dashboard() {
     return { revenue, expenses, expenseBreakdown, filteredRevenues, filteredExpenses };
   }, [dashboardData, dateRange]);
 
+  // Calculate filtered revenue trend based on date range
+  const filteredRevenueTrend = useMemo(() => {
+    if (!dateRange || !filteredData.filteredRevenues || !filteredData.filteredExpenses) {
+      return [];
+    }
+
+    const start = parseISO(dateRange.start);
+    const end = parseISO(dateRange.end);
+    const daysDiff = differenceInDays(end, start);
+
+    // For ranges <= 31 days, show daily data points
+    if (daysDiff <= 31) {
+      const days = eachDayOfInterval({ start, end });
+      return days.map((day) => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const dayRevenue = (filteredData.filteredRevenues || [])
+          .filter((r: any) => r.date === dayStr)
+          .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+        const dayExpenses = (filteredData.filteredExpenses || [])
+          .filter((e: any) => e.date === dayStr)
+          .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+        return {
+          month: format(day, "MMM d"),
+          revenue: dayRevenue,
+          expenses: dayExpenses,
+        };
+      });
+    }
+
+    // For longer ranges, aggregate by month
+    const months = eachMonthOfInterval({ start, end });
+    return months.map((monthDate) => {
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const monthStartStr = format(monthStart, "yyyy-MM-dd");
+      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
+
+      const monthRevenue = (filteredData.filteredRevenues || [])
+        .filter((r: any) => r.date >= monthStartStr && r.date <= monthEndStr)
+        .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+      const monthExpenses = (filteredData.filteredExpenses || [])
+        .filter((e: any) => e.date >= monthStartStr && e.date <= monthEndStr)
+        .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+
+      return {
+        month: format(monthDate, "MMM yyyy"),
+        revenue: monthRevenue,
+        expenses: monthExpenses,
+      };
+    });
+  }, [dateRange, filteredData.filteredRevenues, filteredData.filteredExpenses]);
+
   // Calculate previous period data for comparison
   const previousData = useMemo((): { revenue: number; expenses: number } => {
     if (!dashboardData || !previousRange) return { revenue: 0, expenses: 0 };
@@ -311,11 +363,10 @@ export default function Dashboard() {
     { label: "Total Balance", value: formatCurrency(data.totalBalance), icon: Wallet, color: data.totalBalance >= 0 ? "text-primary" : "text-destructive" },
   ];
 
-  const hasRevenueTrendData = data.revenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
+  const hasRevenueTrendData = filteredRevenueTrend.length > 0 && filteredRevenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
   const hasFilteredBreakdown = filteredData.expenseBreakdown.length > 0;
   const totalFilteredExpense = filteredData.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
-  const totalExpenseValue = data.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
-  const hasExpenseBreakdownData = data.expenseBreakdown.length > 0;
+  const hasExpenseBreakdownData = filteredData.expenseBreakdown.length > 0;
 
   // Custom tooltip for area chart
   const CustomAreaTooltip = ({ active, payload, label }: any) => {
@@ -345,7 +396,7 @@ export default function Dashboard() {
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const item = payload[0];
-      const percent = ((item.value / totalExpenseValue) * 100).toFixed(1);
+      const percent = totalFilteredExpense > 0 ? ((item.value / totalFilteredExpense) * 100).toFixed(1) : "0";
       return (
         <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
           <div className="flex items-center gap-2">
@@ -513,12 +564,12 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Revenue vs Expenses</CardTitle>
-            <p className="text-sm text-muted-foreground">Last 6 months comparison</p>
+            <p className="text-sm text-muted-foreground">{dateRange?.label || "Select a date range"}</p>
           </CardHeader>
           <CardContent className="pt-4">
             {hasRevenueTrendData ? (
               <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={data.revenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <AreaChart data={filteredRevenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
@@ -561,7 +612,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                No transaction data yet
+                No transaction data for selected period
               </div>
             )}
           </CardContent>
@@ -571,7 +622,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Expense Distribution</CardTitle>
-            <p className="text-sm text-muted-foreground">All-time spending by category</p>
+            <p className="text-sm text-muted-foreground">Spending by category - {dateRange?.label || "Select a date range"}</p>
           </CardHeader>
           <CardContent className="pt-4">
             {hasExpenseBreakdownData ? (
@@ -579,7 +630,7 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
-                      data={data.expenseBreakdown}
+                      data={filteredData.expenseBreakdown}
                       cx="50%"
                       cy="50%"
                       innerRadius={50}
@@ -587,7 +638,7 @@ export default function Dashboard() {
                       paddingAngle={2}
                       dataKey="value"
                     >
-                      {data.expenseBreakdown.map((entry, index) => (
+                      {filteredData.expenseBreakdown.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -595,7 +646,7 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="mt-4 grid w-full grid-cols-2 gap-2">
-                  {data.expenseBreakdown.slice(0, 6).map((item, index) => (
+                  {filteredData.expenseBreakdown.slice(0, 6).map((item, index) => (
                     <div key={index} className="flex items-center gap-2 text-sm">
                       <div
                         className="h-3 w-3 rounded-full flex-shrink-0"
@@ -608,7 +659,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                No expense data yet
+                No expense data for selected period
               </div>
             )}
           </CardContent>

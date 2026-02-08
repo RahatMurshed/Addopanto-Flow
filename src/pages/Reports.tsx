@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight, Percent, Calculator, Calendar, BarChart3 } from "lucide-react";
-import { format, endOfMonth, getYear } from "date-fns";
+import { format, endOfMonth, getYear, parseISO, startOfMonth, differenceInDays, eachDayOfInterval, eachMonthOfInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useKhataTransfers } from "@/hooks/useKhataTransfers";
 import { useAccountBalances } from "@/hooks/useExpenses";
@@ -42,7 +42,6 @@ export default function Reports() {
   const currency = userProfile?.currency || "BDT";
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const { data: transfers = [] } = useKhataTransfers();
   const { data: accounts = [] } = useAccountBalances();
 
@@ -136,46 +135,67 @@ export default function Reports() {
     return { profitMargin, avgRevenue, avgExpense };
   }, [summary, filteredData]);
 
-  // Monthly breakdown for the SELECTED year
-  const monthlyBreakdown = useMemo(() => {
-    if (!reportData) return [];
-    const breakdown: { month: string; monthShort: string; revenue: number; expenses: number; profit: number }[] = [];
+  // Dynamic breakdown based on date range
+  const chartBreakdown = useMemo(() => {
+    if (!reportData || !dateRange) return [];
+    
+    const start = parseISO(dateRange.start);
+    const end = parseISO(dateRange.end);
+    const daysDiff = differenceInDays(end, start);
 
-    for (let m = 0; m < 12; m++) {
-      const monthStart = new Date(selectedYear, m, 1);
-      const monthEnd = endOfMonth(monthStart);
-      const monthLabel = format(monthStart, "MMMM");
-      const monthShort = format(monthStart, "MMM");
-      const monthStartStr = format(monthStart, "yyyy-MM-dd");
-      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
-
-      const monthRevenue = reportData.revenues
-        .filter((r) => r.date >= monthStartStr && r.date <= monthEndStr)
-        .reduce((sum, r) => sum + Number(r.amount), 0);
-
-      const monthExpenses = reportData.expenses
-        .filter((e) => e.date >= monthStartStr && e.date <= monthEndStr)
-        .reduce((sum, e) => sum + Number(e.amount), 0);
-
-      breakdown.push({
-        month: monthLabel,
-        monthShort,
-        revenue: monthRevenue,
-        expenses: monthExpenses,
-        profit: monthRevenue - monthExpenses,
+    // For ranges <= 31 days, show daily data points
+    if (daysDiff <= 31) {
+      const days = eachDayOfInterval({ start, end });
+      return days.map((day) => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const dayRevenue = filteredData.revenues
+          .filter((r) => r.date === dayStr)
+          .reduce((sum, r) => sum + Number(r.amount), 0);
+        const dayExpenses = filteredData.expenses
+          .filter((e) => e.date === dayStr)
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        return {
+          month: format(day, "MMM d"),
+          monthShort: format(day, "d"),
+          revenue: dayRevenue,
+          expenses: dayExpenses,
+          profit: dayRevenue - dayExpenses,
+        };
       });
     }
 
-    return breakdown;
-  }, [reportData, selectedYear]);
+    // For longer ranges, aggregate by month
+    const months = eachMonthOfInterval({ start, end });
+    return months.map((monthDate) => {
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const monthStartStr = format(monthStart, "yyyy-MM-dd");
+      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
 
-  // Pagination for monthly breakdown
-  const monthlyPagination = usePagination(monthlyBreakdown, { defaultItemsPerPage: 6 });
+      const monthRevenue = filteredData.revenues
+        .filter((r) => r.date >= monthStartStr && r.date <= monthEndStr)
+        .reduce((sum, r) => sum + Number(r.amount), 0);
+      const monthExpenses = filteredData.expenses
+        .filter((e) => e.date >= monthStartStr && e.date <= monthEndStr)
+        .reduce((sum, e) => sum + Number(e.amount), 0);
 
-  // Reset page when year changes
+      return {
+        month: format(monthDate, "MMMM"),
+        monthShort: format(monthDate, "MMM"),
+        revenue: monthRevenue,
+        expenses: monthExpenses,
+        profit: monthRevenue - monthExpenses,
+      };
+    });
+  }, [reportData, dateRange, filteredData]);
+
+  // Pagination for chart breakdown
+  const monthlyPagination = usePagination(chartBreakdown, { defaultItemsPerPage: 6 });
+
+  // Reset page when date range changes
   useEffect(() => {
     monthlyPagination.resetPage();
-  }, [selectedYear]);
+  }, [dateRange]);
 
   // Year-over-Year comparison
   const yoyComparison = useMemo(() => {
@@ -358,13 +378,13 @@ export default function Reports() {
   };
 
   const exportMonthlySummary = () => {
-    const data = monthlyBreakdown.map((m) => ({
+    const data = chartBreakdown.map((m) => ({
       month: m.month,
       revenue: m.revenue,
       expenses: m.expenses,
       profit: m.profit,
     }));
-    downloadCSV(data, "monthly_summary", ["Month", "Revenue", "Expenses", "Profit"]);
+    downloadCSV(data, "period_summary", ["Month", "Revenue", "Expenses", "Profit"]);
   };
 
   const exportAccountBreakdown = () => {
@@ -572,27 +592,33 @@ export default function Reports() {
 
       {/* Charts Section */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Bar Chart - Monthly Revenue vs Expenses */}
+        {/* Bar Chart - Revenue vs Expenses */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Monthly Overview - {selectedYear}
+              Overview - {dateRange?.label || "Select a period"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomBarTooltip />} />
-                  <Legend />
-                  <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CustomBarTooltip />} />
+                    <Legend />
+                    <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  No data for selected period
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -602,29 +628,35 @@ export default function Reports() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-success" />
-              Profit Trend - {selectedYear}
+              Profit Trend - {dateRange?.label || "Select a period"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomBarTooltip />} />
-                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
-                  <Line 
-                    type="monotone" 
-                    dataKey="profit" 
-                    name="Profit" 
-                    stroke="hsl(142, 76%, 36%)" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(142, 76%, 36%)', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: 'hsl(142, 76%, 36%)' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {chartBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CustomBarTooltip />} />
+                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                    <Line 
+                      type="monotone" 
+                      dataKey="profit" 
+                      name="Profit" 
+                      stroke="hsl(142, 76%, 36%)" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(142, 76%, 36%)', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6, fill: 'hsl(142, 76%, 36%)' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  No data for selected period
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -673,12 +705,12 @@ export default function Reports() {
           </CardContent>
         </Card>
 
-        {/* Pie Chart - Expense by Khata */}
+        {/* Pie Chart - Expense by Expense Source */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingDown className="h-5 w-5 text-destructive" />
-              Expense Distribution by Khata
+              Expense Distribution
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -730,24 +762,12 @@ export default function Reports() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Monthly Summary Tab */}
+        {/* Period Summary Tab */}
         <TabsContent value="monthly" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="flex items-center gap-3">
-                <CardTitle>Monthly Breakdown</CardTitle>
-                <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableYears.map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CardTitle>Period Breakdown - {dateRange?.label || "Select a period"}</CardTitle>
               </div>
               <Button variant="outline" size="sm" onClick={exportMonthlySummary}>
                 <Download className="mr-2 h-4 w-4" />
@@ -759,7 +779,7 @@ export default function Reports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Month</TableHead>
+                      <TableHead>Period</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
                       <TableHead className="text-right">Expenses</TableHead>
                       <TableHead className="text-right">Profit</TableHead>
@@ -777,15 +797,15 @@ export default function Reports() {
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-bold">
-                      <TableCell>Total ({selectedYear})</TableCell>
+                      <TableCell>Total</TableCell>
                       <TableCell className="text-right text-primary">
-                        {formatCurrency(monthlyBreakdown.reduce((sum, m) => sum + m.revenue, 0))}
+                        {formatCurrency(chartBreakdown.reduce((sum, m) => sum + m.revenue, 0))}
                       </TableCell>
                       <TableCell className="text-right text-destructive">
-                        {formatCurrency(monthlyBreakdown.reduce((sum, m) => sum + m.expenses, 0))}
+                        {formatCurrency(chartBreakdown.reduce((sum, m) => sum + m.expenses, 0))}
                       </TableCell>
-                      <TableCell className={cn("text-right", monthlyBreakdown.reduce((sum, m) => sum + m.profit, 0) >= 0 ? "text-success" : "text-destructive")}>
-                        {formatCurrency(monthlyBreakdown.reduce((sum, m) => sum + m.profit, 0))}
+                      <TableCell className={cn("text-right", chartBreakdown.reduce((sum, m) => sum + m.profit, 0) >= 0 ? "text-success" : "text-destructive")}>
+                        {formatCurrency(chartBreakdown.reduce((sum, m) => sum + m.profit, 0))}
                       </TableCell>
                     </TableRow>
                   </TableBody>
