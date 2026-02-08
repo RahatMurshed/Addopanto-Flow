@@ -420,9 +420,9 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground">Last 10 revenue & expense entries</p>
         </CardHeader>
         <CardContent className="pt-4">
-          {data.recentTransactions.length > 0 ? (
+          {(data.recentTransactions?.length ?? 0) > 0 ? (
             <div className="space-y-3">
-              {data.recentTransactions.map((tx) => (
+              {(data.recentTransactions ?? []).map((tx) => (
                 <div
                   key={tx.id}
                   className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
