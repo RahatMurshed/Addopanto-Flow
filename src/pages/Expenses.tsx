@@ -1,18 +1,16 @@
-import { useState } from "react";
-import { format } from "date-fns";
+import { useState, useMemo } from "react";
+import { format, getMonth, getYear } from "date-fns";
 import {
   useExpenses,
   useCreateExpense,
   useUpdateExpense,
   useDeleteExpense,
   useAccountBalances,
-  useExpenseSummary,
   type ExpenseWithAccount,
 } from "@/hooks/useExpenses";
 import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -38,7 +36,6 @@ import {
   Pencil,
   Trash2,
   Receipt,
-  Calendar,
   Loader2,
   AlertTriangle,
   TrendingDown,
@@ -47,11 +44,14 @@ import {
 import ExpenseDialog from "@/components/ExpenseDialog";
 import TransferDialog from "@/components/TransferDialog";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
+import MonthFilter, { getMonthDateRange } from "@/components/MonthFilter";
 
 export default function Expenses() {
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(`${getYear(now)}-${getMonth(now)}`);
+  
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
-  const { data: summary } = useExpenseSummary();
   const { data: transfers = [] } = useKhataTransfers();
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
@@ -64,6 +64,38 @@ export default function Expenses() {
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseWithAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Filter expenses by selected month
+  const { start: monthStart, end: monthEnd, label: monthLabel } = getMonthDateRange(selectedMonth);
+  
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((e) => e.date >= monthStart && e.date <= monthEnd);
+  }, [expenses, monthStart, monthEnd]);
+
+  const selectedMonthTotal = useMemo(() => {
+    return filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  }, [filteredExpenses]);
+
+  const allTimeTotal = useMemo(() => {
+    return expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  }, [expenses]);
+
+  // Expense breakdown by khata for selected month
+  const selectedMonthBreakdown = useMemo(() => {
+    return accounts
+      .map((account) => {
+        const accountExpenses = filteredExpenses
+          .filter((e) => e.expense_account_id === account.id)
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        return {
+          id: account.id,
+          name: account.name,
+          color: account.color,
+          amount: accountExpenses,
+        };
+      })
+      .filter((item) => item.amount > 0);
+  }, [accounts, filteredExpenses]);
 
   const accountsWithDeficit = accounts.filter((a) => a.balance < 0);
   const accountsNearLimit = accounts.filter(
@@ -129,7 +161,8 @@ export default function Expenses() {
           <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
           <p className="text-muted-foreground">Record and track your spending by khata</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
           <Button
             variant="outline"
             onClick={() => setTransferDialogOpen(true)}
@@ -184,23 +217,15 @@ export default function Expenses() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">{monthLabel}</CardTitle>
+            <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">৳{(summary?.thisMonth || 0).toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This Year</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">৳{(summary?.thisYear || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-destructive">৳{selectedMonthTotal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
           </CardContent>
         </Card>
         <Card>
@@ -209,10 +234,43 @@ export default function Expenses() {
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">৳{(summary?.total || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-destructive">৳{allTimeTotal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{expenses.length} total entries</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Selected Month Breakdown */}
+      {selectedMonthBreakdown.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Spending by Khata - {monthLabel}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {selectedMonthBreakdown.map((item) => (
+                <div key={item.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-sm font-medium">{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-destructive">
+                      ৳{item.amount.toLocaleString()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({((item.amount / selectedMonthTotal) * 100).toFixed(0)}%)
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Account Balances */}
       {accounts.length > 0 && (
@@ -256,25 +314,28 @@ export default function Expenses() {
       )}
 
       {/* Expense Table */}
-      {expenses.length === 0 ? (
+      {filteredExpenses.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 rounded-full bg-muted p-4">
               <Receipt className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">No expenses recorded</h3>
+            <h3 className="mb-2 text-lg font-semibold">No expenses in {monthLabel}</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">
-              Start tracking your spending. Each expense will be deducted from the selected khata's balance.
+              {expenses.length > 0
+                ? "Try selecting a different month or add new expenses."
+                : "Start tracking your spending. Each expense will be deducted from the selected khata's balance."}
             </p>
             {accounts.length > 0 && (
-              <Button onClick={() => setDialogOpen(true)}>Add First Expense</Button>
+              <Button onClick={() => setDialogOpen(true)}>Add Expense</Button>
             )}
           </CardContent>
         </Card>
       ) : (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Expense History</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Expense History - {monthLabel}</CardTitle>
+            <span className="text-sm text-muted-foreground">{filteredExpenses.length} entries</span>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -289,7 +350,7 @@ export default function Expenses() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expenses.map((exp) => (
+                  {filteredExpenses.map((exp) => (
                     <TableRow key={exp.id}>
                       <TableCell className="font-medium">
                         {format(new Date(exp.date), "MMM d, yyyy")}

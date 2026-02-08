@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { format } from "date-fns";
+import { useState, useMemo } from "react";
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth } from "date-fns";
 import {
   useRevenues,
   useCreateRevenue,
   useUpdateRevenue,
   useDeleteRevenue,
-  useRevenueSummary,
   type RevenueWithSource,
 } from "@/hooks/useRevenues";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
@@ -38,17 +37,19 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
-  Calendar,
   Loader2,
   AlertTriangle,
 } from "lucide-react";
 import RevenueDialog from "@/components/RevenueDialog";
+import MonthFilter, { getMonthDateRange } from "@/components/MonthFilter";
 
 export default function Revenue() {
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(`${getYear(now)}-${getMonth(now)}`);
+  
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
   const { data: accounts = [] } = useExpenseAccounts();
-  const { data: summary } = useRevenueSummary();
   const createMutation = useCreateRevenue();
   const updateMutation = useUpdateRevenue();
   const deleteMutation = useDeleteRevenue();
@@ -61,6 +62,21 @@ export default function Revenue() {
 
   const activeAccounts = accounts.filter((a) => a.is_active);
   const totalAllocationPercent = activeAccounts.reduce((sum, a) => sum + Number(a.allocation_percentage), 0);
+
+  // Filter revenues by selected month
+  const { start: monthStart, end: monthEnd, label: monthLabel } = getMonthDateRange(selectedMonth);
+  
+  const filteredRevenues = useMemo(() => {
+    return revenues.filter((r) => r.date >= monthStart && r.date <= monthEnd);
+  }, [revenues, monthStart, monthEnd]);
+
+  const selectedMonthTotal = useMemo(() => {
+    return filteredRevenues.reduce((sum, r) => sum + Number(r.amount), 0);
+  }, [filteredRevenues]);
+
+  const allTimeTotal = useMemo(() => {
+    return revenues.reduce((sum, r) => sum + Number(r.amount), 0);
+  }, [revenues]);
 
   const handleCreate = async (data: { amount: number; date: string; source_id: string | null; description: string | null }) => {
     try {
@@ -120,10 +136,13 @@ export default function Revenue() {
           <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
           <p className="text-muted-foreground">Track income and automatically allocate to khatas</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Revenue
-        </Button>
+        <div className="flex items-center gap-2">
+          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Revenue
+          </Button>
+        </div>
       </div>
 
       {activeAccounts.length === 0 && (
@@ -136,23 +155,15 @@ export default function Revenue() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">{monthLabel}</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">৳{(summary?.thisMonth || 0).toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">This Year</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">৳{(summary?.thisYear || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-primary">৳{selectedMonthTotal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
           </CardContent>
         </Card>
         <Card>
@@ -161,7 +172,8 @@ export default function Revenue() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">৳{(summary?.total || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold">৳{allTimeTotal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{revenues.length} total entries</p>
           </CardContent>
         </Card>
       </div>
@@ -178,7 +190,7 @@ export default function Revenue() {
                 </span>
               ))}
               {totalAllocationPercent < 100 && (
-                <span className="text-success font-medium">
+                <span className="text-green-600 dark:text-green-400 font-medium">
                   + Profit ({(100 - totalAllocationPercent).toFixed(1)}%)
                 </span>
               )}
@@ -188,23 +200,26 @@ export default function Revenue() {
       )}
 
       {/* Revenue Table */}
-      {revenues.length === 0 ? (
+      {filteredRevenues.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 rounded-full bg-muted p-4">
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">No revenue recorded</h3>
+            <h3 className="mb-2 text-lg font-semibold">No revenue in {monthLabel}</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">
-              Start tracking your income. Each entry will be automatically allocated to your active khatas.
+              {revenues.length > 0 
+                ? "Try selecting a different month or add new revenue."
+                : "Start tracking your income. Each entry will be automatically allocated to your active khatas."}
             </p>
-            <Button onClick={() => setDialogOpen(true)}>Add First Revenue</Button>
+            <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>
           </CardContent>
         </Card>
       ) : (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Revenue History</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Revenue History - {monthLabel}</CardTitle>
+            <span className="text-sm text-muted-foreground">{filteredRevenues.length} entries</span>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -219,12 +234,12 @@ export default function Revenue() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {revenues.map((rev) => (
+                  {filteredRevenues.map((rev) => (
                     <TableRow key={rev.id}>
                       <TableCell className="font-medium">
                         {format(new Date(rev.date), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell className="font-semibold text-success">
+                      <TableCell className="font-semibold text-primary">
                         ৳{Number(rev.amount).toLocaleString()}
                       </TableCell>
                       <TableCell>
