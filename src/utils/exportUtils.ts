@@ -132,6 +132,8 @@ export function exportAllTransactionsCSV(
 
 /**
  * Export page as PDF using html2canvas and jsPDF
+ * - Forces light theme for consistent output
+ * - Properly handles multi-page content with correct slicing
  */
 export async function exportToPDF(
   elementId: string,
@@ -146,95 +148,124 @@ export async function exportToPDF(
     return;
   }
 
+  // Store current theme and force light mode for PDF
+  const htmlElement = document.documentElement;
+  const wasDarkMode = htmlElement.classList.contains("dark");
+  
   try {
-    // Create a clone for better rendering
+    // Temporarily switch to light mode for clean PDF
+    if (wasDarkMode) {
+      htmlElement.classList.remove("dark");
+      // Wait for styles to reflow
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    // Capture with higher scale for better quality
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: 3,
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
     });
 
-    const imgData = canvas.toDataURL("image/png");
+    // A4 dimensions in mm
+    const A4_WIDTH = 210;
+    const A4_HEIGHT = 297;
+    const margin = 10;
+    const contentWidth = A4_WIDTH - margin * 2;
+
     const pdf = new jsPDF({
-      orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+      orientation: "portrait",
       unit: "mm",
+      format: "a4",
     });
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    let currentY = margin;
+    let headerY = margin;
 
     // Add business name if provided
     if (businessName) {
       pdf.setFontSize(18);
       pdf.setFont("helvetica", "bold");
-      pdf.text(businessName, margin, currentY + 5);
-      currentY += 10;
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(businessName, margin, headerY + 5);
+      headerY += 10;
     }
 
     // Add title
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text(title, margin, currentY + 5);
-    currentY += 7;
-    
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(title, margin, headerY + 5);
+    headerY += 7;
+
     // Add date range
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(100);
-    pdf.text(`Period: ${dateRangeLabel}`, margin, currentY + 5);
-    currentY += 5;
-    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, currentY + 5);
-    currentY += 7;
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`Period: ${dateRangeLabel}`, margin, headerY + 5);
+    headerY += 5;
+    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, headerY + 5);
+    headerY += 10;
 
-    // Calculate image dimensions
-    const imgWidth = pageWidth - margin * 2;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const startY = currentY;
+    // Calculate scaled image dimensions to fit A4 width
+    const scaledImgHeight = (canvas.height * contentWidth) / canvas.width;
+    const availableHeightFirstPage = A4_HEIGHT - headerY - margin;
+    const availableHeightOtherPages = A4_HEIGHT - margin * 2;
 
-    // Check if image fits on one page
-    if (imgHeight + startY > pageHeight - margin) {
-      // Need to split across pages
-      let remainingHeight = imgHeight;
-      let currentY = startY;
+    // Convert canvas to image data
+    const imgData = canvas.toDataURL("image/png");
+
+    if (scaledImgHeight <= availableHeightFirstPage) {
+      // Content fits on one page
+      pdf.addImage(imgData, "PNG", margin, headerY, contentWidth, scaledImgHeight);
+    } else {
+      // Multi-page: slice the canvas properly
+      const pixelsPerMm = canvas.width / contentWidth;
       let sourceY = 0;
+      let isFirstPage = true;
 
-      while (remainingHeight > 0) {
-        const availableHeight = pageHeight - currentY - margin;
-        const sliceHeight = Math.min(remainingHeight, availableHeight);
+      while (sourceY < canvas.height) {
+        const availableHeight = isFirstPage ? availableHeightFirstPage : availableHeightOtherPages;
+        const sliceHeightPx = Math.min(availableHeight * pixelsPerMm, canvas.height - sourceY);
+        const sliceHeightMm = sliceHeightPx / pixelsPerMm;
+
+        // Create a temporary canvas to slice the image
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        const ctx = sliceCanvas.getContext("2d");
         
-        // Calculate source coordinates
-        const sourceHeight = (sliceHeight / imgHeight) * canvas.height;
+        if (ctx) {
+          ctx.drawImage(
+            canvas,
+            0, sourceY, canvas.width, sliceHeightPx,
+            0, 0, canvas.width, sliceHeightPx
+          );
+          
+          const sliceImgData = sliceCanvas.toDataURL("image/png");
+          const yPosition = isFirstPage ? headerY : margin;
+          
+          pdf.addImage(sliceImgData, "PNG", margin, yPosition, contentWidth, sliceHeightMm);
+        }
+
+        sourceY += sliceHeightPx;
         
-        pdf.addImage(
-          imgData,
-          "PNG",
-          margin,
-          currentY,
-          imgWidth,
-          sliceHeight,
-          undefined,
-          "FAST"
-        );
-
-        remainingHeight -= sliceHeight;
-        sourceY += sourceHeight;
-
-        if (remainingHeight > 0) {
+        if (sourceY < canvas.height) {
           pdf.addPage();
-          currentY = margin;
+          isFirstPage = false;
         }
       }
-    } else {
-      pdf.addImage(imgData, "PNG", margin, startY, imgWidth, imgHeight);
     }
 
     pdf.save(`${filename}_${dateRangeLabel.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
   } catch (error) {
     console.error("Error generating PDF:", error);
     throw error;
+  } finally {
+    // Restore dark mode if it was active
+    if (wasDarkMode) {
+      htmlElement.classList.add("dark");
+    }
   }
 }
 
