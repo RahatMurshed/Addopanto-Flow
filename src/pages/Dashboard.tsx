@@ -4,8 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt, CalendarDays } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, Loader2, ArrowUpRight, ArrowDownRight, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AreaChart,
@@ -20,6 +19,7 @@ import {
   Cell,
 } from "recharts";
 import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from "date-fns";
+import MonthFilter, { getMonthDateRange } from "@/components/MonthFilter";
 
 const CHART_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -29,7 +29,7 @@ const CHART_COLORS = [
 export default function Dashboard() {
   const { user } = useAuth();
   const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState<string>(`${now.getFullYear()}-${now.getMonth()}`);
+  const [selectedMonth, setSelectedMonth] = useState<string>(`${getYear(now)}-${getMonth(now)}`);
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboard", user?.id],
@@ -147,25 +147,14 @@ export default function Dashboard() {
   });
 
   // Generate month options (last 12 months)
-  const monthOptions = useMemo(() => {
-    const options = [];
-    for (let i = 0; i < 12; i++) {
-      const date = subMonths(now, i);
-      options.push({
-        value: `${getYear(date)}-${getMonth(date)}`,
-        label: format(date, "MMMM yyyy"),
-      });
-    }
-    return options;
-  }, []);
+  // Get month label for display
+  const { label: selectedMonthLabel } = getMonthDateRange(selectedMonth);
 
   // Calculate selected month data
   const selectedMonthData = useMemo(() => {
     if (!dashboardData) return { revenue: 0, expenses: 0 };
     
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const monthStart = format(startOfMonth(new Date(year, month)), "yyyy-MM-dd");
-    const monthEnd = format(endOfMonth(new Date(year, month)), "yyyy-MM-dd");
+    const { start: monthStart, end: monthEnd } = getMonthDateRange(selectedMonth);
     
     const revenue = (dashboardData.revenues || [])
       .filter((r: any) => r.date >= monthStart && r.date <= monthEnd)
@@ -182,9 +171,7 @@ export default function Dashboard() {
   const selectedMonthExpenseBreakdown = useMemo(() => {
     if (!dashboardData) return [];
     
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const monthStart = format(startOfMonth(new Date(year, month)), "yyyy-MM-dd");
-    const monthEnd = format(endOfMonth(new Date(year, month)), "yyyy-MM-dd");
+    const { start: monthStart, end: monthEnd } = getMonthDateRange(selectedMonth);
     
     return (dashboardData.accounts || [])
       .map((account: any, index: number) => {
@@ -245,9 +232,6 @@ export default function Dashboard() {
   const totalSelectedMonthExpense = selectedMonthExpenseBreakdown.reduce((sum, item) => sum + item.value, 0);
   const totalExpenseValue = data.expenseBreakdown.reduce((sum, item) => sum + item.value, 0);
   const hasExpenseBreakdownData = data.expenseBreakdown.length > 0;
-
-  // Get selected month label
-  const selectedMonthLabel = monthOptions.find((m) => m.value === selectedMonth)?.label || "Selected Month";
 
   // Custom tooltip for area chart
   const CustomAreaTooltip = ({ active, payload, label }: any) => {
@@ -321,22 +305,8 @@ export default function Dashboard() {
       {/* Selected Month Summary with Filter */}
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-2">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-base font-semibold">Monthly Overview</CardTitle>
-          </div>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CardTitle className="text-base font-semibold">Monthly Overview</CardTitle>
+          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
