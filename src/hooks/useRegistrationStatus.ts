@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -7,14 +7,16 @@ type RegistrationStatus = "pending" | "approved" | "rejected" | "has_role" | "lo
 interface RegistrationStatusResult {
   status: RegistrationStatus;
   isLoading: boolean;
+  rejectionReason: string | null;
   refetch: () => Promise<void>;
 }
 
 export function useRegistrationStatus(): RegistrationStatusResult {
   const { user } = useAuth();
   const [status, setStatus] = useState<RegistrationStatus>("loading");
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
     if (!user) {
       setStatus("loading");
       return;
@@ -43,7 +45,7 @@ export function useRegistrationStatus(): RegistrationStatusResult {
       // No role - check registration request status
       const { data: requestData, error: requestError } = await supabase
         .from("registration_requests")
-        .select("status")
+        .select("status, rejection_reason")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -54,7 +56,12 @@ export function useRegistrationStatus(): RegistrationStatusResult {
       }
 
       if (requestData) {
-        setStatus(requestData.status as RegistrationStatus);
+        if (requestData.status === "rejected") {
+          setRejectionReason(requestData.rejection_reason);
+          setStatus("rejected");
+        } else {
+          setStatus(requestData.status as RegistrationStatus);
+        }
       } else {
         // No role and no request - this is a legacy user from before the approval feature
         // Grant them access as if they have a role
@@ -64,16 +71,16 @@ export function useRegistrationStatus(): RegistrationStatusResult {
       console.error("Unexpected error checking status:", err);
       setStatus("error");
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     checkStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [checkStatus]);
 
   return {
     status,
     isLoading: status === "loading",
+    rejectionReason,
     refetch: checkStatus,
   };
 }

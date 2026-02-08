@@ -28,7 +28,7 @@ export function RoleGuard({
   fallback = null,
   showLoading = false,
 }: RoleGuardProps) {
-  const { role, isLoading, hasRoleLevel } = useRole();
+  const { role, isLoading, hasRoleLevel, hasNoRole } = useRole();
 
   if (isLoading && showLoading) {
     return <div className="animate-pulse h-8 bg-muted rounded" />;
@@ -38,8 +38,13 @@ export function RoleGuard({
     return null;
   }
 
+  // Block all access if user has no role (pending)
+  if (hasNoRole) {
+    return <>{fallback}</>;
+  }
+
   // Check if role is in allowed list
-  if (roles && !roles.includes(role)) {
+  if (roles && role && !roles.includes(role)) {
     return <>{fallback}</>;
   }
 

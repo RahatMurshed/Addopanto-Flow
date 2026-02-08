@@ -3,12 +3,13 @@ import { useUserRole, type AppRole } from "@/hooks/useUserRole";
 import { useModeratorPermissions, type ModeratorPermissions } from "@/hooks/useModeratorPermissions";
 
 interface RoleContextType {
-  role: AppRole;
+  role: AppRole | null;
   isLoading: boolean;
   isCipher: boolean;
   isAdmin: boolean;
   isModerator: boolean;
   isUser: boolean;
+  hasNoRole: boolean;
   hasRoleLevel: (requiredRole: AppRole) => boolean;
   canManageRole: (targetRole: AppRole) => boolean;
   // Moderator permissions
@@ -33,6 +34,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     isAdmin,
     isModerator,
     isUser,
+    hasNoRole,
     hasRoleLevel,
     canManageRole,
     refetch: refetchRole,
@@ -50,16 +52,16 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   // Compute permissions based on role
   // Cipher and Admin can do everything
-  // Moderator has limited add-only permissions
-  // User can only manage their own data (handled by RLS)
-  const canAddRevenue = isCipher || isAdmin || (isModerator && modCanAddRevenue) || isUser;
-  const canAddExpense = isCipher || isAdmin || (isModerator && modCanAddExpense) || isUser;
-  const canViewReports = isCipher || isAdmin || (isModerator && modCanViewReports) || isUser;
+  // Moderator has limited add-only permissions (only if granted)
+  // Pending users (hasNoRole) have NO permissions
+  const canAddRevenue = isCipher || isAdmin || (isModerator && modCanAddRevenue);
+  const canAddExpense = isCipher || isAdmin || (isModerator && modCanAddExpense);
+  const canViewReports = isCipher || isAdmin || (isModerator && modCanViewReports);
   
-  // Edit/Delete: Only Cipher, Admin, and regular Users (for their own data)
+  // Edit/Delete: Only Cipher and Admin
   // Moderators cannot edit or delete
-  const canEdit = isCipher || isAdmin || isUser;
-  const canDelete = isCipher || isAdmin || isUser;
+  const canEdit = isCipher || isAdmin;
+  const canDelete = isCipher || isAdmin;
   
   // User management: Only Cipher and Admin
   const canManageUsers = isCipher || isAdmin;
@@ -73,6 +75,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isModerator,
         isUser,
+        hasNoRole,
         hasRoleLevel,
         canManageRole,
         moderatorPermissions,
