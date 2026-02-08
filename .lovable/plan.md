@@ -1,293 +1,113 @@
 
 
-# Data Reset and Backup/Restore System
+# Plan: Make Settings Functional (Business Name, Currency, Fiscal Year)
 
 ## Overview
-Implement a secure data management system in the Settings page that allows users to:
-1. **Backup Data** - Export all user data to a JSON file for safekeeping
-2. **Restore Data** - Import previously backed up data to recover information
-3. **Reset Data** - Permanently delete all user data with strong security measures
+Currently, when you change business name, currency, or fiscal year start month in Settings, the values are saved to the database but **nothing changes in the app**. This plan will make all three settings actually affect how your data is displayed.
 
 ---
 
-## Security Measures
+## What Will Change
 
-The reset feature is destructive and irreversible. Multiple security layers will be implemented:
+### 1. Currency Symbol
+**Current**: All amounts show `৳` (BDT) regardless of your currency setting  
+**After**: Amounts will display the correct symbol based on your selection:
+- BDT → ৳
+- USD → $
+- EUR → €
+- GBP → £
 
-1. **Visual Warning** - Red danger zone section with clear warnings
-2. **Confirmation Dialog** - Multi-step confirmation process
-3. **Type-to-Confirm** - User must type "DELETE ALL DATA" exactly to enable the reset button
-4. **Password Re-authentication** - User must enter their password before final deletion
-5. **Cooldown Period** - 5-second countdown before reset can be executed
+**Affected pages**: Dashboard, Revenue, Expenses, Khatas, Reports
+
+### 2. Business Name
+**Current**: Not used anywhere  
+**After**: Your business name will appear in:
+- PDF exports (header/title)
+- Page headers (when set)
+- App navigation/sidebar (optional branding)
+
+### 3. Fiscal Year Start Month
+**Current**: Half-yearly filter uses calendar year (H1 = Jan-Jun, H2 = Jul-Dec)  
+**After**: Half-yearly filter will respect your fiscal year:
+- Example: If fiscal year starts in July, H1 = Jul-Dec, H2 = Jan-Jun
+- Yearly filter will also use your fiscal year boundaries
 
 ---
 
-## Components to Create
+## Technical Implementation
 
-### 1. Data Management Section Component (`src/components/DataManagementSection.tsx`)
+### Step 1: Create User Profile Hook
+Create a new hook `useUserProfile` to fetch and cache user settings (business name, currency, fiscal year start month) using React Query.
 
-A new card section for the Settings page containing:
+**New file**: `src/hooks/useUserProfile.ts`
 
-- **Backup Data Button** - Downloads all user data as JSON
-- **Restore Data Button** - Opens file picker to import backup
-- **Danger Zone** - Visually distinct red-bordered section with Reset button
+### Step 2: Create Currency Formatter Utility
+Create a utility function that formats amounts with the correct currency symbol based on user settings.
 
-### 2. Reset Confirmation Dialog (`src/components/ResetDataDialog.tsx`)
-
-Multi-step confirmation dialog:
-
+**New file**: `src/utils/currencyUtils.ts`
 ```text
-Step 1: Warning Screen
-+----------------------------------------+
-|  Warning: This action cannot be undone |
-|                                        |
-|  You are about to permanently delete:  |
-|  - All revenues and allocations        |
-|  - All expenses                        |
-|  - All expense accounts (Khatas)       |
-|  - All khata transfers                 |
-|  - All revenue sources                 |
-|                                        |
-|  [Cancel]           [I Understand]     |
-+----------------------------------------+
-
-Step 2: Type Confirmation
-+----------------------------------------+
-|  Type "DELETE ALL DATA" to confirm     |
-|                                        |
-|  [__________________________]          |
-|                                        |
-|  [Cancel]           [Continue]         |
-+----------------------------------------+
-
-Step 3: Password Verification
-+----------------------------------------+
-|  Enter your password to proceed        |
-|                                        |
-|  [__________________________]          |
-|                                        |
-|  [Cancel]    [Reset All Data (5...)]   |
-+----------------------------------------+
++---------------------------+
+| getCurrencySymbol(code)   |
+| formatCurrency(amount)    |
++---------------------------+
 ```
 
-### 3. Restore Confirmation Dialog (`src/components/RestoreDataDialog.tsx`)
+### Step 3: Update All Pages to Use Dynamic Currency
 
-Confirmation dialog for data restoration:
+**Files to modify**:
+- `src/pages/Dashboard.tsx` - Replace hardcoded `৳` with dynamic formatter
+- `src/pages/Revenue.tsx` - Replace hardcoded `৳` with dynamic formatter  
+- `src/pages/Expenses.tsx` - Replace hardcoded `৳` with dynamic formatter
+- `src/pages/Khatas.tsx` - Replace hardcoded `৳` with dynamic formatter
+- `src/pages/Reports.tsx` - Replace hardcoded `৳` with dynamic formatter
 
-```text
-+----------------------------------------+
-|  Restore from Backup                   |
-|                                        |
-|  This will ADD data from your backup.  |
-|  Existing data will NOT be deleted.    |
-|                                        |
-|  Backup contains:                      |
-|  - 5 expense accounts                  |
-|  - 12 revenues                         |
-|  - 45 expenses                         |
-|  - 3 khata transfers                   |
-|                                        |
-|  [Cancel]           [Restore Data]     |
-+----------------------------------------+
-```
+### Step 4: Update Date Range Utils for Fiscal Year
 
----
+**File to modify**: `src/utils/dateRangeUtils.ts`
 
-## Data Backup Format
+Add functions that calculate fiscal year boundaries:
+- `getFiscalYearRange(fiscalStartMonth, year)` 
+- `getFiscalHalfRange(fiscalStartMonth, half, year)`
 
-The backup file will be a JSON file with the following structure:
+### Step 5: Update Advanced Date Filter Component
 
-```text
-{
-  "version": "1.0",
-  "exportedAt": "2026-02-08T12:00:00Z",
-  "userEmail": "user@example.com",
-  "data": {
-    "expense_accounts": [...],
-    "revenue_sources": [...],
-    "revenues": [...],
-    "allocations": [...],
-    "expenses": [...],
-    "khata_transfers": [...]
-  }
-}
-```
+**File to modify**: `src/components/AdvancedDateFilter.tsx`
 
-The filename format: `khata-backup-{date}.json`
+- Fetch user's fiscal year start month
+- Apply fiscal year logic to "Yearly" and "Half-Yearly" filter options
+- Update labels to reflect fiscal periods (e.g., "FY 2025-26" instead of "Year 2025")
+
+### Step 6: Update PDF Exports with Business Name
+
+**File to modify**: `src/utils/exportUtils.ts`
+
+- Accept business name parameter in `exportToPDF`
+- Display business name prominently in PDF header
 
 ---
 
-## Utility Functions to Create
+## Summary of Changes
 
-### `src/utils/dataBackupUtils.ts`
-
-Functions for backup and restore operations:
-
-```text
-+------------------------------------------+
-| exportUserData(userId)                   |
-|   -> Fetches all user data from database |
-|   -> Returns structured JSON object      |
-+------------------------------------------+
-| downloadBackup(data, userEmail)          |
-|   -> Converts data to JSON string        |
-|   -> Triggers browser download           |
-+------------------------------------------+
-| parseBackupFile(file)                    |
-|   -> Reads and validates JSON file       |
-|   -> Returns parsed data or error        |
-+------------------------------------------+
-| validateBackupData(data)                 |
-|   -> Checks version compatibility        |
-|   -> Validates data structure            |
-|   -> Returns validation result           |
-+------------------------------------------+
-```
-
----
-
-## Database Operations
-
-### Reset Operation (order matters for foreign keys)
-
-Data must be deleted in the correct order due to foreign key constraints:
-
-1. Delete `allocations` (references revenues and expense_accounts)
-2. Delete `khata_transfers` (references expense_accounts)
-3. Delete `expenses` (references expense_accounts)
-4. Delete `revenues` (references revenue_sources)
-5. Delete `expense_accounts`
-6. Delete `revenue_sources`
-
-User profile is **NOT** deleted (preserves settings).
-
-### Restore Operation
-
-Data is inserted in reverse order:
-
-1. Insert `expense_accounts`
-2. Insert `revenue_sources`
-3. Insert `revenues`
-4. Insert `allocations`
-5. Insert `expenses`
-6. Insert `khata_transfers`
-
-IDs are regenerated to avoid conflicts with existing data.
-
----
-
-## Hook to Create
-
-### `src/hooks/useDataManagement.ts`
-
-Custom hook for data management operations:
-
-```text
-useDataManagement()
-  |
-  +-- exportData()
-  |     Fetches and downloads all user data
-  |
-  +-- importData(file)
-  |     Parses file and returns preview
-  |
-  +-- restoreData(parsedData)
-  |     Inserts backup data into database
-  |
-  +-- resetAllData(password)
-  |     Verifies password and deletes all data
-  |
-  +-- isExporting: boolean
-  +-- isRestoring: boolean
-  +-- isResetting: boolean
-```
+| Setting | Where It Will Be Used |
+|---------|----------------------|
+| Currency | All amount displays across Dashboard, Revenue, Expenses, Khatas, Reports, Dialogs |
+| Business Name | PDF exports header, optionally in page headers |
+| Fiscal Year Start | Yearly filter, Half-yearly filter (H1/H2 based on fiscal calendar) |
 
 ---
 
 ## Files to Create
-
-1. `src/components/DataManagementSection.tsx` - Main UI section for Settings
-2. `src/components/ResetDataDialog.tsx` - Multi-step reset confirmation
-3. `src/components/RestoreDataDialog.tsx` - Restore confirmation with preview
-4. `src/utils/dataBackupUtils.ts` - Backup/restore utility functions
-5. `src/hooks/useDataManagement.ts` - Data management operations hook
+1. `src/hooks/useUserProfile.ts`
+2. `src/utils/currencyUtils.ts`
 
 ## Files to Modify
-
-1. `src/pages/SettingsPage.tsx` - Add DataManagementSection component
-
----
-
-## Implementation Details
-
-### Password Re-authentication
-
-Uses the Supabase auth method to verify password:
-
-```text
-supabase.auth.signInWithPassword({
-  email: user.email,
-  password: enteredPassword
-})
-```
-
-If successful, proceed with deletion. This ensures only the account owner can reset data.
-
-### Visual Design
-
-**Danger Zone Styling:**
-- Red border around the section
-- Red destructive button
-- Warning icon
-- Clear explanatory text
-
-**Backup Section Styling:**
-- Standard card styling
-- Download and Upload icons
-- Success/error toast notifications
-
----
-
-## User Flow
-
-### Backup Flow
-1. User clicks "Backup Data" button
-2. System fetches all user data
-3. JSON file downloads automatically
-4. Success toast notification
-
-### Restore Flow
-1. User clicks "Restore Data" button
-2. File picker opens
-3. User selects backup JSON file
-4. System validates and shows preview dialog
-5. User confirms restoration
-6. Data is inserted
-7. All queries are invalidated to refresh UI
-8. Success toast notification
-
-### Reset Flow
-1. User clicks "Reset All Data" button
-2. Warning dialog appears (Step 1)
-3. User clicks "I Understand"
-4. Type confirmation screen appears (Step 2)
-5. User types "DELETE ALL DATA"
-6. Password screen appears (Step 3)
-7. User enters password
-8. 5-second countdown begins
-9. Data is deleted in correct order
-10. All queries are invalidated
-11. User redirected to Dashboard with empty state
-
----
-
-## Implementation Order
-
-1. Create utility functions (`dataBackupUtils.ts`)
-2. Create data management hook (`useDataManagement.ts`)
-3. Create restore dialog component
-4. Create reset dialog component with multi-step flow
-5. Create main data management section
-6. Integrate into Settings page
-7. Test all flows
+1. `src/pages/Dashboard.tsx`
+2. `src/pages/Revenue.tsx`
+3. `src/pages/Expenses.tsx`
+4. `src/pages/Khatas.tsx`
+5. `src/pages/Reports.tsx`
+6. `src/utils/dateRangeUtils.ts`
+7. `src/components/AdvancedDateFilter.tsx`
+8. `src/utils/exportUtils.ts`
+9. Dialog components (RevenueDialog, ExpenseDialog, etc.)
 
