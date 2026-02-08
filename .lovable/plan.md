@@ -1,88 +1,121 @@
 
-# Plan: Improve Recent Transactions Layout in Dashboard
+# Plan: Rename "Khata" to "Expense Source" Throughout the App
 
-## Current Issues Identified
+## Overview
 
-### Issue 1: Khata Tags Displayed Inline
-Currently, the Khata/category badge is shown inline with the date in the description area:
-```
-[Icon] Description
-       Feb 8, 2026 • [Category Badge]    +৳5,000
-```
-
-### Issue 2: Pagination Only Shows When >10 Items
-The pagination controls are conditionally rendered only when `data.recentTransactions.length > 10`, making it invisible for users with fewer transactions.
+This plan renames all user-facing instances of "Khata" to "Expense Source" across the entire application for consistent terminology. Note that the app name "KhataFlow" and internal code references (variable names, database table names, file names) will remain unchanged to avoid breaking functionality.
 
 ---
 
-## Solution
+## Scope of Changes
 
-### Change 1: Convert to Table Layout with Separate Khata Column
-Transform the Recent Transactions from a list/card layout to a proper table with columns:
-- **Date** - Transaction date
-- **Description** - Transaction description  
-- **Khata/Category** - Separate column for the Khata badge (only for expenses)
-- **Amount** - Transaction amount with +/- indicator
+### What Will Be Changed
+- All **user-facing text** (labels, headings, descriptions, placeholders, toast messages, alerts)
+- Table column headers
+- Button labels
+- Dialog titles and descriptions
+- Navigation menu labels
 
-### Change 2: Always Show Pagination Controls
-Remove the condition that hides pagination when items ≤ 10. This provides consistent UI and allows users to change items per page even with fewer entries.
+### What Will NOT Be Changed
+- The app name "KhataFlow" (brand name)
+- File names (e.g., `KhataDialog.tsx`, `useKhataTransfers.ts`)
+- Variable names, function names, type names in code
+- Database table names (e.g., `khata_transfers`)
+- Query keys and internal identifiers
 
 ---
 
-## Visual Layout After Changes
+## Files to Modify
 
+| File | Changes |
+|------|---------|
+| `src/components/AppLayout.tsx` | Nav item label: "Khatas" → "Expense Sources" |
+| `src/pages/Khatas.tsx` | Page title, descriptions, button labels, toast messages, dialog references |
+| `src/components/KhataDialog.tsx` | Dialog titles: "Edit Khata" → "Edit Expense Source", button labels |
+| `src/pages/Expenses.tsx` | Table header, descriptions, card titles mentioning "Khata" |
+| `src/pages/Revenue.tsx` | Descriptions mentioning "khatas" |
+| `src/pages/Reports.tsx` | Chart labels, card titles mentioning "Khata" |
+| `src/pages/Dashboard.tsx` | Table column header: "Khata" → "Expense Source" |
+| `src/components/TransferDialog.tsx` | Labels: "From Khata" → "From Expense Source", descriptions |
+| `src/components/ExpenseDialog.tsx` | Labels and placeholders mentioning "khata" |
+| `src/components/ResetDataDialog.tsx` | List items mentioning "Khatas" and "khata transfers" |
+
+---
+
+## Detailed Changes by File
+
+### 1. `src/components/AppLayout.tsx`
 ```text
-+----------------------------------------------------------------+
-| Recent Transactions                                            |
-| Latest income and expenses                                     |
-+----------------------------------------------------------------+
-| Date         | Description      | Khata        | Amount        |
-|--------------|------------------|--------------|---------------|
-| Feb 8, 2026  | Monthly Salary   | —            | +৳50,000      |
-| Feb 7, 2026  | Groceries        | [Food]       | -৳5,000       |
-| Feb 6, 2026  | Fuel             | [Transport]  | -৳2,500       |
-| Feb 5, 2026  | Freelance Work   | —            | +৳15,000      |
-+----------------------------------------------------------------+
-| Showing 1-10 of 45 entries  [10 ▾]  [< Prev] Page 1 of 5 [Next>]|
-+----------------------------------------------------------------+
+Line 21: { label: "Khatas", href: "/khatas", icon: Wallet }
+       → { label: "Expense Sources", href: "/khatas", icon: Wallet }
 ```
 
+### 2. `src/pages/Khatas.tsx`
+- Line 52: Toast: "Khata created" → "Expense source created"
+- Line 63: Toast: "Khata updated" → "Expense source updated"
+- Line 75: Toast: "Khata deleted" → "Expense source deleted"
+- Line 85: Toast: "Default khatas created" → "Default expense sources created"
+- Line 103: Page title: "Expense Accounts (Khatas)" → "Expense Sources"
+- Line 123: Button: "Add Khata" → "Add Expense Source"
+- Line 153: Text: "Create khatas to..." → "Create expense sources to..."
+- Line 268: Dialog title: "Delete this khata?" → "Delete this expense source?"
+
+### 3. `src/components/KhataDialog.tsx`
+- Line 86: Dialog title: "Edit Khata" / "Create Khata" → "Edit Expense Source" / "Create Expense Source"
+- Line 184: Button: "Create Khata" → "Create Expense Source"
+
+### 4. `src/pages/Expenses.tsx`
+- Line 210: Description: "...by khata" → "...by expense source"
+- Line 242: Alert: "...expense accounts (khatas)..." → "...expense sources..."
+- Line 315: Card title: "Spending by Khata" → "Spending by Expense Source"
+- Line 347: Card title: "Khata Balances" → "Expense Source Balances"
+- Line 395: Text: "...selected khata's balance" → "...selected expense source's balance"
+- Line 415: Table header: "Khata" → "Expense Source"
+
+### 5. `src/pages/Revenue.tsx`
+- Line 149: Toast: "...allocated to X khatas" → "...allocated to X expense sources"
+- Line 202: Description: "...allocate to khatas" → "...allocate to expense sources"
+- Line 226: Alert: "No active khatas!" → "No active expense sources!"
+- Line 326: Text: "...your active khatas" → "...your active expense sources"
+- Line 431: Alert: "...allocations to khatas" → "...allocations to expense sources"
+
+### 6. `src/pages/Reports.tsx`
+- Line 419: Variable for tooltip uses "expenseByKhata" (internal - keep)
+- Chart labels/titles containing "Khata" → "Expense Source"
+
+### 7. `src/pages/Dashboard.tsx`
+- Line 630: Table header: "Khata" → "Expense Source"
+
+### 8. `src/components/TransferDialog.tsx`
+- Line 109-110: Description: "Move funds between khatas..." → "Move funds between expense sources..."
+- Line 117: Label: "From Khata" → "From Expense Source"
+- Line 119: Placeholder: "Select source khata" → "Select source expense source" → Better: "Select source"
+- Line 143: Label: "To Khata" → "To Expense Source"
+- Line 146: Placeholder: "Select destination khata" → "Select destination"
+- Line 174: Alert: "...same khata" → "...same expense source"
+
+### 9. `src/components/ExpenseDialog.tsx`
+- Line 36: Validation message: "Please select a khata" → "Please select an expense source"
+- Line 107: Description: "...from one of your khatas" → "...from one of your expense sources"
+- Line 113: Label: "Khata (Expense Account)" → "Expense Source"
+- Line 119: Placeholder: "Select a khata" → "Select an expense source"
+
+### 10. `src/components/ResetDataDialog.tsx`
+- Line 110: "All expense accounts (Khatas)" → "All expense sources"
+- Line 111: "All khata transfers" → "All expense source transfers"
+
 ---
 
-## Technical Implementation
+## Summary
 
-### File to Modify: `src/pages/Dashboard.tsx`
-
-**Changes:**
-
-1. **Import Table components** (add to imports around line 6):
-   - Import `Table`, `TableBody`, `TableCell`, `TableHead`, `TableHeader`, `TableRow` from `@/components/ui/table`
-
-2. **Replace list layout with table** (lines 624-669):
-   - Convert the current `div` with `space-y-3` to a proper `Table` component
-   - Create table header with columns: Date, Description, Khata, Amount
-   - Move the icon inline with description
-   - Move Khata badge to its own column (show "—" for revenues which don't have Khata)
-
-3. **Always show pagination** (line 671):
-   - Remove the condition `data.recentTransactions.length > 10 &&`
-   - Pagination will always be visible when there are transactions
+| Category | Count |
+|----------|-------|
+| Files to modify | 10 |
+| Text changes | ~35 individual text updates |
+| Preserved items | App name "KhataFlow", all code internals, database tables, file names |
 
 ---
 
-## Expected Results
+## Expected Result
 
-| Before | After |
-|--------|-------|
-| List/card layout | Proper table with columns |
-| Khata inline with date | Khata in separate column |
-| Pagination hidden when ≤10 items | Pagination always visible |
-| Harder to scan data | Easy column-based scanning |
-
----
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `src/pages/Dashboard.tsx` | Replace list layout with table, add Khata column, always show pagination |
+After this change, users will see consistent "Expense Source" terminology throughout the app while the underlying code structure and database remain stable. The URL `/khatas` will still work, but the navigation will display "Expense Sources".
