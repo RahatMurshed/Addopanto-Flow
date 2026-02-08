@@ -15,13 +15,12 @@ export function useExpenses() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["expenses", user?.id],
+    queryKey: ["expenses"],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("expenses")
         .select("*, expense_accounts(name, color)")
-        .eq("user_id", user.id)
         .order("date", { ascending: false });
       if (error) throw error;
       return data as ExpenseWithAccount[];
@@ -46,9 +45,9 @@ export function useCreateExpense() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["account_balances", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -69,9 +68,9 @@ export function useUpdateExpense() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["account_balances", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -86,9 +85,9 @@ export function useDeleteExpense() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["account_balances", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -109,36 +108,32 @@ export function useAccountBalances() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["account_balances", user?.id],
+    queryKey: ["account_balances"],
     queryFn: async () => {
       if (!user) return [];
 
       // Get all accounts
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
-        .select("*")
-        .eq("user_id", user.id);
+        .select("*");
       if (accountsError) throw accountsError;
 
       // Get all allocations
       const { data: allocations, error: allocationsError } = await supabase
         .from("allocations")
-        .select("expense_account_id, amount")
-        .eq("user_id", user.id);
+        .select("expense_account_id, amount");
       if (allocationsError) throw allocationsError;
 
       // Get all expenses
       const { data: expenses, error: expensesError } = await supabase
         .from("expenses")
-        .select("expense_account_id, amount")
-        .eq("user_id", user.id);
+        .select("expense_account_id, amount");
       if (expensesError) throw expensesError;
 
       // Get all khata transfers
       const { data: transfers, error: transfersError } = await supabase
         .from("khata_transfers")
-        .select("from_account_id, to_account_id, amount")
-        .eq("user_id", user.id);
+        .select("from_account_id, to_account_id, amount");
       if (transfersError) throw transfersError;
 
       // Calculate balances per account
@@ -183,7 +178,7 @@ export function useExpenseSummary() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["expense_summary", user?.id],
+    queryKey: ["expense_summary"],
     queryFn: async () => {
       if (!user) return { thisMonth: 0, thisYear: 0, total: 0 };
 
@@ -193,8 +188,7 @@ export function useExpenseSummary() {
 
       const { data, error } = await supabase
         .from("expenses")
-        .select("amount, date")
-        .eq("user_id", user.id);
+        .select("amount, date");
       if (error) throw error;
 
       const thisMonth = data
