@@ -1,196 +1,179 @@
 
-# Shared Data Model with Role-Based Permissions
+# Fix Role-Based Access Control & Data Synchronization Issues
 
-This plan implements a fully shared data model where all financial data is global across all roles. Any authorized user can view all data, and write operations are controlled by role and permission levels.
-
----
-
-## Current State Analysis
-
-### Data Visibility (Already Working)
-- All SELECT operations already return all data (no user_id filter in queries)
-- RLS SELECT policies use `USING (true)` for authenticated users
-
-### Write Operations (Need Fixes)
-| Table | Current INSERT | Current UPDATE/DELETE |
-|-------|---------------|----------------------|
-| revenues | Only owner (`user_id = auth.uid()`) | Only owner |
-| expenses | Only owner | Only owner |
-| expense_accounts | Only owner | Only owner |
-| revenue_sources | Only owner | Only owner |
-| allocations | Only owner | Only owner |
-| khata_transfers | Only owner | Only owner |
-
-### Hooks (Need Fixes)
-- `useRevenues.ts` lines 52, 123: Filters expense_accounts by `user_id` when creating allocations
-- Dashboard queries (lines 85-91) filter by `user_id` - should be removed for shared data
+This plan addresses all the reported bugs in the RBAC system and data management.
 
 ---
 
-## Target State
+## Issues Identified
 
-### Permission Matrix
+### Issue 1: Reports Page Data Not Changing
+**Problem**: The Reports page queries data filtered by `user_id` instead of showing global shared data.
+**Location**: `src/pages/Reports.tsx` lines 57-63
 
-| Operation | Cipher | Admin | Moderator | User |
-|-----------|--------|-------|-----------|------|
-| **View All Data** | Yes | Yes | Yes | No |
-| **Add Revenue** | Yes | Yes | If `can_add_revenue` | No |
-| **Add Expense** | Yes | Yes | If `can_add_expense` | No |
-| **Add Expense Source** | Yes | Yes | If `can_add_expense_source` | No |
-| **Transfer** | Yes | Yes | If `can_transfer` | No |
-| **Edit** | Yes | Yes | Based on permission | No |
-| **Delete** | Yes | Yes | Based on permission | No |
-
----
-
-## Implementation
-
-### 1. Database Migration
-
-Create helper functions and update RLS policies:
-
-```sql
--- Helper function: can add revenue
-CREATE OR REPLACE FUNCTION public.can_add_revenue(_user_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF has_role(_user_id, 'cipher') OR has_role(_user_id, 'admin') THEN
-    RETURN true;
-  END IF;
-  IF has_role(_user_id, 'moderator') THEN
-    RETURN EXISTS (
-      SELECT 1 FROM moderator_permissions mp 
-      WHERE mp.user_id = _user_id AND mp.can_add_revenue = true
-    );
-  END IF;
-  RETURN false;
-END;
-$$;
-
--- Similar functions for:
--- can_add_expense
--- can_add_expense_source  
--- can_transfer
--- can_edit_delete (only cipher/admin)
-```
-
-Update policies for all 6 financial tables:
-- DROP existing INSERT/UPDATE/DELETE policies
-- CREATE new policies using permission functions
-
-### 2. Frontend Hook Changes
-
-| File | Changes |
-|------|---------|
-| `useModeratorPermissions.ts` | Add `can_add_expense_source` and `can_transfer` fields |
-| `RoleContext.tsx` | Add `canAddExpenseSource` and `canTransfer` computed permissions |
-| `useRevenues.ts` | Remove `.eq("user_id", user.id)` filter when fetching expense_accounts (lines 52, 123) |
-| `Dashboard.tsx` | Remove `.eq("user_id", user.id)` from all queries (lines 85-91) |
-
-### 3. UI Permission Guards
-
-| Page | Changes |
-|------|---------|
-| `Khatas.tsx` | Wrap "Add Expense Source" with `canAddExpenseSource`, Edit/Delete with `canEdit`/`canDelete` |
-| `Expenses.tsx` | Wrap "Transfer" button with `canTransfer` permission |
-| `Revenue.tsx` | Already has `canAddRevenue`, `canEdit`, `canDelete` guards |
-| `Dashboard.tsx` | Add `canTransfer` guard to Transfer quick action |
-| `ModeratorControl.tsx` | Add toggles for `can_add_expense_source` and `can_transfer` |
-| `RegistrationRequests.tsx` | Add toggles for new permissions during approval |
-
-### 4. Edge Function Update
-
-Update `admin-users/index.ts` to handle new permissions:
 ```typescript
-permissions: {
-  can_add_revenue,
-  can_add_expense,
-  can_view_reports,
-  can_add_expense_source,  // NEW
-  can_transfer,            // NEW
-}
+// Current (WRONG) - filtering by user_id
+supabase.from("revenues").select("*").eq("user_id", user.id),
+supabase.from("expenses").select("*").eq("user_id", user.id),
+supabase.from("allocations").select("*").eq("user_id", user.id),
+supabase.from("expense_accounts").select("*").eq("user_id", user.id),
+supabase.from("revenue_sources").select("*").eq("user_id", user.id),
 ```
+
+**Fix**: Remove all `.eq("user_id", user.id)` filters to show global data.
+
+---
+
+### Issue 2: Moderator Permission Changes Not Reflected
+**Problem**: When admin/cipher updates moderator permissions, the changes don't immediately reflect in the UI because:
+1. The `staleTime` is set to 5 minutes in `useModeratorPermissions.ts`
+2. No cache invalidation is triggered across all related queries
+
+**Location**: `src/hooks/useModeratorPermissions.ts` line 44
+
+**Fix**: 
+- Reduce `staleTime` to 30 seconds
+- Add cache invalidation for role context when permissions change
+- Invalidate the moderator's permission cache when admin updates it
+
+---
+
+### Issue 3: User Page Loading Slowly
+**Problem**: The edge function `admin-users` fetches ALL users from `auth.admin.listUsers()` without pagination.
+**Location**: `supabase/functions/admin-users/index.ts` lines 257-260
+
+**Fix**: Add pagination support to the edge function and frontend.
+
+---
+
+### Issue 4: Deleted Users Still Have Access
+**Problem**: When a user is deleted, they are not forcibly logged out. The deletion only removes from database but the user's active session remains valid.
+**Location**: `supabase/functions/admin-users/index.ts` line 125
+
+**Fix**: 
+1. Before deleting, sign out the user's sessions using Supabase admin API
+2. Set up realtime listener to detect when user is deleted and force logout
+
+---
+
+## Implementation Plan
+
+### Step 1: Fix Reports Page - Remove User ID Filters
+**File**: `src/pages/Reports.tsx`
+
+Remove `.eq("user_id", user.id)` from all 5 queries in the `reportData` useQuery to show global shared data.
+
+---
+
+### Step 2: Fix Moderator Permission Sync Issues
+**Files to modify**:
+- `src/hooks/useModeratorPermissions.ts` - Reduce staleTime, improve cache invalidation
+- `src/pages/ModeratorControl.tsx` - Invalidate target moderator's cache after update
+
+**Changes**:
+1. Reduce `staleTime` from 5 minutes to 30 seconds
+2. After updating permissions, invalidate all related caches
+3. Add `refetchOnWindowFocus: true` to ensure fresh data
+
+---
+
+### Step 3: Force Logout Deleted Users
+**Files to modify**:
+- `supabase/functions/admin-users/index.ts` - Sign out user sessions before deletion
+- `src/contexts/AuthContext.tsx` - Add realtime listener for user deletion
+
+**Edge Function Changes**:
+```typescript
+// Before deleting, sign out all user sessions
+await adminClient.auth.admin.signOut(userId, 'global');
+
+// Then delete the user
+await adminClient.auth.admin.deleteUser(userId);
+```
+
+**AuthContext Changes**:
+Add a realtime subscription to `user_roles` table to detect when current user's role is deleted, then force logout.
+
+---
+
+### Step 4: Improve User Page Performance
+**Files to modify**:
+- `supabase/functions/admin-users/index.ts` - Add pagination
+- `src/pages/UserManagement.tsx` - Implement pagination UI
+
+**Edge Function Changes**:
+Add `page` and `perPage` query parameters to limit results.
 
 ---
 
 ## Files to Modify
 
-### Database (1 migration)
-- Create 5 permission helper functions
-- Update RLS policies for 6 tables (revenues, expenses, expense_accounts, revenue_sources, allocations, khata_transfers)
-
-### Frontend Files (10 files)
-1. `src/hooks/useModeratorPermissions.ts` - Add new permission fields
-2. `src/contexts/RoleContext.tsx` - Add computed permissions
-3. `src/hooks/useRevenues.ts` - Remove user_id filter for expense_accounts
-4. `src/pages/Dashboard.tsx` - Remove user_id filters from queries
-5. `src/pages/Khatas.tsx` - Add permission guards
-6. `src/pages/Expenses.tsx` - Add Transfer permission guard
-7. `src/pages/ModeratorControl.tsx` - Add new permission toggles
-8. `src/pages/RegistrationRequests.tsx` - Add new permission toggles
-9. `src/components/RoleGuard.tsx` - Add new permission types
-10. `supabase/functions/admin-users/index.ts` - Handle new permissions
+| # | File | Changes |
+|---|------|---------|
+| 1 | `src/pages/Reports.tsx` | Remove `.eq("user_id", user.id)` from all 5 data queries |
+| 2 | `src/hooks/useModeratorPermissions.ts` | Reduce staleTime, add refetchOnWindowFocus |
+| 3 | `src/pages/ModeratorControl.tsx` | Invalidate target moderator's permission cache after update |
+| 4 | `supabase/functions/admin-users/index.ts` | Add session signout before user deletion, add pagination |
+| 5 | `src/contexts/AuthContext.tsx` | Add realtime listener to detect user deletion and force logout |
+| 6 | `src/pages/UserManagement.tsx` | Improve loading states and add pagination |
 
 ---
 
 ## Technical Details
 
-### Database Function Pattern
+### Force Logout Implementation
 
-Using `SECURITY DEFINER` prevents RLS infinite recursion:
+The edge function will sign out all user sessions before deletion:
 
-```sql
-CREATE OR REPLACE FUNCTION can_edit_delete(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT has_role(_user_id, 'cipher') OR has_role(_user_id, 'admin')
-$$;
+```typescript
+// In admin-users/index.ts handleDeleteUser
+// Sign out all sessions for the user being deleted
+const { error: signOutError } = await adminClient.auth.admin.signOut(
+  userId, 
+  'global'  // This signs out all sessions
+);
+
+// Then proceed with deletion
+const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 ```
 
-### RLS Policy Pattern
+### Realtime User Deletion Detection
 
-```sql
--- INSERT: Role + permission based
-CREATE POLICY "Authorized users can insert revenues"
-ON revenues FOR INSERT
-WITH CHECK (can_add_revenue(auth.uid()));
+Add to AuthContext:
 
--- UPDATE/DELETE: Admin/Cipher only
-CREATE POLICY "Admins can update revenues"
-ON revenues FOR UPDATE
-USING (can_edit_delete(auth.uid()));
+```typescript
+// Subscribe to user_roles changes for current user
+const channel = supabase
+  .channel('user-role-changes')
+  .on(
+    'postgres_changes',
+    {
+      event: 'DELETE',
+      schema: 'public',
+      table: 'user_roles',
+      filter: `user_id=eq.${user.id}`,
+    },
+    async () => {
+      // User was deleted, force logout
+      await supabase.auth.signOut();
+    }
+  )
+  .subscribe();
 ```
 
-### Frontend Permission Flow
+### Cache Invalidation Flow
 
-```text
-User Action --> RoleContext --> Permission Check
-                     |
-                     v
-              isCipher/isAdmin? --> Always allowed
-                     |
-                     v
-              isModerator? --> Check moderator_permissions table
-                     |
-                     v
-              Other roles --> Not allowed
-```
+When admin updates moderator permissions:
+1. Invalidate `["moderator-permissions", targetUserId]`
+2. The moderator's RoleContext will refetch on next render or window focus
 
 ---
 
-## Summary of Changes
+## Summary
 
-1. **Database**: Create permission functions, update RLS policies to check roles instead of ownership
-2. **Hooks**: Remove user_id filters from queries so all users see shared data
-3. **Context**: Add `canAddExpenseSource` and `canTransfer` computed permissions
-4. **Pages**: Add UI permission guards to hide/show action buttons
-5. **Admin Pages**: Add controls for new moderator permissions
-6. **Edge Function**: Include new permissions in approval flow
+| Issue | Root Cause | Fix |
+|-------|------------|-----|
+| Reports data not changing | User ID filter on queries | Remove filters |
+| Permission changes not reflected | Long staleTime + no cross-user cache invalidation | Reduce staleTime, improve invalidation |
+| User page slow | No pagination on user list | Add pagination |
+| Deleted users still have access | Sessions not invalidated | Sign out sessions before deletion + realtime listener |
