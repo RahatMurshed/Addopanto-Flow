@@ -55,11 +55,11 @@ export default function Reports() {
       if (!user) return null;
 
       const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes] = await Promise.all([
-        supabase.from("revenues").select("*").eq("user_id", user.id),
-        supabase.from("expenses").select("*").eq("user_id", user.id),
-        supabase.from("allocations").select("*").eq("user_id", user.id),
-        supabase.from("expense_accounts").select("*").eq("user_id", user.id),
-        supabase.from("revenue_sources").select("*").eq("user_id", user.id),
+        supabase.from("revenues").select("*"),
+        supabase.from("expenses").select("*"),
+        supabase.from("allocations").select("*"),
+        supabase.from("expense_accounts").select("*"),
+        supabase.from("revenue_sources").select("*"),
       ]);
 
       if (revenuesRes.error) throw revenuesRes.error;

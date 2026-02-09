@@ -41,7 +41,8 @@ export function useModeratorPermissions(targetUserId?: string) {
       return data as ModeratorPermissions | null;
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds for faster sync
+    refetchOnWindowFocus: true,
   });
 
   const updatePermissionsMutation = useMutation({
@@ -77,7 +78,10 @@ export function useModeratorPermissions(targetUserId?: string) {
       }
     },
     onSuccess: () => {
+      // Invalidate this user's permissions and all moderator-permissions queries
       queryClient.invalidateQueries({ queryKey: ["moderator-permissions", userId] });
+      queryClient.invalidateQueries({ queryKey: ["moderator-permissions"] });
+      queryClient.invalidateQueries({ queryKey: ["moderators"] });
       toast({ title: "Permissions updated" });
     },
     onError: (error) => {
