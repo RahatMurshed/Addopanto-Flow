@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
@@ -35,7 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { RoleGuard } from "@/components/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
-import { Loader2, Users, Search, ShieldAlert, Trash2 } from "lucide-react";
+import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 interface UserWithRole {
@@ -43,6 +43,13 @@ interface UserWithRole {
   email: string | null;
   role: AppRole;
   created_at: string;
+}
+
+interface PaginationInfo {
+  page: number;
+  perPage: number;
+  total: number;
+  hasMore: boolean;
 }
 
 export default function UserManagement() {
@@ -64,19 +71,60 @@ export default function UserManagement() {
   } | null>(null);
   const [deleteEmailInput, setDeleteEmailInput] = useState("");
 
-  // Fetch all users with their roles and emails via edge function
-  const { data: users = [], isLoading } = useQuery({
+  // Fetch users with infinite scrolling pagination
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["admin-users"],
-    queryFn: async (): Promise<UserWithRole[]> => {
+    queryFn: async ({ pageParam = 1 }): Promise<{ users: UserWithRole[]; pagination: PaginationInfo }> => {
       const { data, error } = await supabase.functions.invoke("admin-users", {
         method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: null,
       });
 
-      if (error) throw error;
-      return data.users || [];
+      // The invoke doesn't support query params directly, so we call with URL
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?page=${pageParam}&perPage=50`,
+        {
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+
+      const result = await response.json();
+      return {
+        users: result.users || [],
+        pagination: result.pagination || { page: pageParam, perPage: 50, total: 0, hasMore: false },
+      };
     },
-    enabled: canManageUsers,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.pagination.hasMore) {
+        return lastPage.pagination.page + 1;
+      }
+      return undefined;
+    },
+    initialPageParam: 1,
+    enabled: canManageUsers && !!session?.access_token,
   });
+
+  // Flatten all pages into a single array
+  const users = useMemo(() => {
+    return data?.pages.flatMap((page) => page.users) || [];
+  }, [data]);
 
   // Filter users by search query
   const filteredUsers = useMemo(() => {
@@ -368,6 +416,24 @@ export default function UserManagement() {
                     })}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+
+            {/* Load More Button */}
+            {hasNextPage && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronDown className="mr-2 h-4 w-4" />
+                  )}
+                  Load More
+                </Button>
               </div>
             )}
           </CardContent>

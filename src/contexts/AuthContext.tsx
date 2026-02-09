@@ -35,6 +35,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Listen for user_roles deletion to detect when current user is deleted and force logout
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('user-role-deletion')
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'user_roles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async () => {
+          console.log('User role deleted, forcing logout');
+          await supabase.auth.signOut();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,

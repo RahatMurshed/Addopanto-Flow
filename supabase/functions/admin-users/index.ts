@@ -121,6 +121,15 @@ Deno.serve(async (req) => {
         return json(403, { error: "Cannot delete cipher users" });
       }
 
+      // IMPORTANT: Sign out all user sessions before deletion to force logout
+      try {
+        await adminClient.auth.admin.signOut(userId, "global");
+        console.log(`Signed out all sessions for user ${userId}`);
+      } catch (signOutErr) {
+        console.warn("Failed to sign out user sessions (non-fatal):", signOutErr);
+        // Continue with deletion even if sign out fails
+      }
+
       // Delete user from auth.users (cascade will handle related data)
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
@@ -236,6 +245,8 @@ Deno.serve(async (req) => {
     if (req.method === "GET") {
       const url = new URL(req.url);
       const pendingOnly = url.searchParams.get("pending") === "true";
+      const page = parseInt(url.searchParams.get("page") || "1", 10);
+      const perPage = parseInt(url.searchParams.get("perPage") || "50", 10);
 
       if (pendingOnly) {
         // Return pending registration requests
@@ -253,9 +264,12 @@ Deno.serve(async (req) => {
         return json(200, { requests });
       }
 
-      // Get all users from auth.users using admin API
+      // Get all users from auth.users using admin API with pagination
       const { data: authUsers, error: authError } =
-        await adminClient.auth.admin.listUsers();
+        await adminClient.auth.admin.listUsers({
+          page,
+          perPage,
+        });
 
       if (authError) {
         console.error("Error fetching auth users:", authError);
@@ -297,7 +311,15 @@ Deno.serve(async (req) => {
           return true;
         });
 
-      return json(200, { users });
+      return json(200, { 
+        users,
+        pagination: {
+          page,
+          perPage,
+          total: authUsers.total || users.length,
+          hasMore: users.length === perPage,
+        }
+      });
     }
 
     // Handle POST - Delete, approve, or reject a user
