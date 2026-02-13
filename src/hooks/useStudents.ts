@@ -10,6 +10,8 @@ export interface Student {
   phone: string | null;
   enrollment_date: string;
   billing_start_month: string;
+  course_start_month: string | null;
+  course_end_month: string | null;
   admission_fee_total: number;
   monthly_fee_amount: number;
   status: "active" | "inactive" | "graduated";
@@ -26,6 +28,8 @@ export interface StudentInsert {
   phone?: string | null;
   enrollment_date: string;
   billing_start_month: string;
+  course_start_month?: string | null;
+  course_end_month?: string | null;
   admission_fee_total?: number;
   monthly_fee_amount?: number;
   status?: "active" | "inactive" | "graduated";

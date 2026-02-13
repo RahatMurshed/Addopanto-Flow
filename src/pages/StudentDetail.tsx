@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Plus, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import StudentDialog from "@/components/StudentDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
@@ -89,7 +89,7 @@ export default function StudentDetail() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
-        <div className="grid gap-4 md:grid-cols-2"><Skeleton className="h-48" /><Skeleton className="h-48" /></div>
+        <div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-48" /><Skeleton className="h-48" /><Skeleton className="h-48" /></div>
         <Skeleton className="h-64" />
       </div>
     );
@@ -105,6 +105,8 @@ export default function StudentDetail() {
   }
 
   const admissionPercent = summary.admissionTotal > 0 ? Math.min(100, (summary.admissionPaid / summary.admissionTotal) * 100) : 0;
+  const monthlyTotal = summary.monthlyPaidTotal + summary.monthlyPendingTotal;
+  const monthlyPercent = monthlyTotal > 0 ? Math.min(100, (summary.monthlyPaidTotal / monthlyTotal) * 100) : 0;
 
   const formatMethod = (m: string) => {
     const map: Record<string, string> = { cash: "Cash", card: "Card", bank_transfer: "Bank Transfer", mobile_banking: "Mobile Banking", other: "Other" };
@@ -135,30 +137,32 @@ export default function StudentDetail() {
         </div>
       </div>
 
-      {/* Fee Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Admission Fee Card */}
+      {/* Three Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {/* Card 1: Admission Fee */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Admission Fee</CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <GraduationCap className="h-5 w-5 text-primary" />
+              </div>
+              <CardTitle className="text-base">Admission Fee</CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {summary.admissionTotal > 0 ? (
               <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total</span>
-                  <span className="font-semibold">{formatCurrency(summary.admissionTotal, currency)}</span>
-                </div>
+                <p className="text-2xl font-bold">{formatCurrency(summary.admissionTotal, currency)}</p>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Paid</span>
-                  <span className="font-semibold text-primary">{formatCurrency(summary.admissionPaid, currency)}</span>
+                  <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(summary.admissionPaid, currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Pending</span>
-                  <span className="font-semibold text-destructive">{formatCurrency(Math.max(0, summary.admissionTotal - summary.admissionPaid), currency)}</span>
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(summary.admissionPending, currency)}</span>
                 </div>
                 <Progress value={admissionPercent} className="h-2" />
-                <p className="text-xs text-muted-foreground text-right">{admissionPercent.toFixed(0)}% paid</p>
+                <p className="text-xs text-muted-foreground text-right">{admissionPercent.toFixed(0)}% complete</p>
               </>
             ) : (
               <p className="text-sm text-muted-foreground">No admission fee set</p>
@@ -166,107 +170,96 @@ export default function StudentDetail() {
           </CardContent>
         </Card>
 
-        {/* Monthly Tuition Card */}
+        {/* Card 2: Monthly Tuition */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Monthly Tuition</CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
+                <CalendarDays className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <CardTitle className="text-base">Monthly Tuition</CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {Number(student.monthly_fee_amount) > 0 ? (
               <>
+                <p className="text-2xl font-bold">{formatCurrency(monthlyTotal, currency)}</p>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Monthly Rate</span>
-                  <span className="font-semibold">{formatCurrency(Number(student.monthly_fee_amount), currency)}/mo</span>
+                  <span className="text-muted-foreground">Paid ({summary.monthlyPaidMonths.length} mo)</span>
+                  <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(summary.monthlyPaidTotal, currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Paid</span>
-                  <span className="text-primary font-semibold">{summary.monthlyPaidMonths.length} months ({formatCurrency(summary.monthlyPaidTotal, currency)})</span>
+                  <span className="text-muted-foreground">Pending ({summary.monthlyOverdueMonths.length + summary.monthlyPendingMonths.length} mo)</span>
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(summary.monthlyPendingTotal, currency)}</span>
                 </div>
-                {summary.monthlyOverdueMonths.length > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Overdue</span>
-                    <span className="text-destructive font-semibold">{summary.monthlyOverdueMonths.length} months</span>
-                  </div>
-                )}
-                {summary.monthlyPendingMonths.length > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Pending</span>
-                    <span className="font-semibold">{summary.monthlyPendingMonths.length} months ({formatCurrency(summary.monthlyPendingTotal, currency)})</span>
-                  </div>
-                )}
-                <StudentMonthGrid summary={summary} />
-                <MonthlyBreakdownList
-                  summary={summary}
-                  payments={payments}
-                  feeHistory={feeHistory}
-                  monthlyFeeAmount={Number(student.monthly_fee_amount)}
-                  currency={currency}
-                />
+                <Progress value={monthlyPercent} className="h-2" />
+                <p className="text-xs text-muted-foreground text-right">{monthlyPercent.toFixed(0)}% complete</p>
               </>
             ) : (
               <p className="text-sm text-muted-foreground">No monthly fee set</p>
             )}
           </CardContent>
         </Card>
+
+        {/* Card 3: Overall Total */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle className="text-base">Overall Total</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-2xl font-bold">{formatCurrency(summary.totalExpected, currency)}</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total Paid</span>
+              <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(summary.totalPaid, currency)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total Pending</span>
+              <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(summary.totalPending, currency)}</span>
+            </div>
+            <Progress value={summary.overallPercent} className="h-2" />
+            <p className="text-xs text-muted-foreground text-right">{summary.overallPercent.toFixed(0)}% complete</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Total Revenue Breakdown */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Total Revenue Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Admission */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Admission Fee</span>
-              <span className="font-semibold">{formatCurrency(summary.admissionTotal, currency)}</span>
-            </div>
-            <div className="flex justify-between text-xs pl-4">
-              <span className="text-muted-foreground">Paid</span>
-              <span className="text-primary">{formatCurrency(summary.admissionPaid, currency)}</span>
-            </div>
-            {summary.admissionPending > 0 && (
-              <div className="flex justify-between text-xs pl-4">
-                <span className="text-muted-foreground">Pending</span>
-                <span className="text-destructive">{formatCurrency(summary.admissionPending, currency)}</span>
-              </div>
-            )}
-          </div>
+      {/* Monthly Fee Visual Grid & Breakdown */}
+      {Number(student.monthly_fee_amount) > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Monthly Fee Breakdown</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {formatCurrency(Number(student.monthly_fee_amount), currency)}/month
+              {student.course_start_month && ` · From ${student.course_start_month}`}
+              {student.course_end_month && ` to ${student.course_end_month}`}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <StudentMonthGrid summary={summary} />
 
-          {/* Monthly */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Monthly Tuition</span>
-              <span className="font-semibold">{formatCurrency(Number(student.monthly_fee_amount), currency)}/mo</span>
-            </div>
-            <div className="flex justify-between text-xs pl-4">
-              <span className="text-muted-foreground">Paid ({summary.monthlyPaidMonths.length} months)</span>
-              <span className="text-primary">{formatCurrency(summary.monthlyPaidTotal, currency)}</span>
-            </div>
-            {summary.monthlyPendingTotal > 0 && (
-              <div className="flex justify-between text-xs pl-4">
-                <span className="text-muted-foreground">Pending ({summary.monthlyOverdueMonths.length + summary.monthlyPendingMonths.length} months)</span>
-                <span className="text-destructive">{formatCurrency(summary.monthlyPendingTotal, currency)}</span>
+            {/* Overall Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Overall Payment Progress</span>
+                <span className="font-semibold">{summary.overallPercent.toFixed(0)}%</span>
               </div>
-            )}
-          </div>
+              <Progress value={summary.overallPercent} className="h-3" />
+            </div>
 
-          {/* Totals */}
-          <div className="border-t pt-2 space-y-1">
-            <div className="flex justify-between text-sm font-bold">
-              <span>TOTAL PAID</span>
-              <span className="text-primary">{formatCurrency(summary.totalPaid, currency)}</span>
-            </div>
-            {summary.totalPending > 0 && (
-              <div className="flex justify-between text-sm font-bold">
-                <span>TOTAL PENDING</span>
-                <span className="text-destructive">{formatCurrency(summary.totalPending, currency)}</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            <MonthlyBreakdownList
+              summary={summary}
+              payments={payments}
+              feeHistory={feeHistory}
+              monthlyFeeAmount={Number(student.monthly_fee_amount)}
+              currency={currency}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Payment History */}
       <Card>

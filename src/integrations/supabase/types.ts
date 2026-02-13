@@ -425,6 +425,8 @@ export type Database = {
         Row: {
           admission_fee_total: number
           billing_start_month: string
+          course_end_month: string | null
+          course_start_month: string | null
           created_at: string
           email: string | null
           enrollment_date: string
@@ -441,6 +443,8 @@ export type Database = {
         Insert: {
           admission_fee_total?: number
           billing_start_month: string
+          course_end_month?: string | null
+          course_start_month?: string | null
           created_at?: string
           email?: string | null
           enrollment_date: string
@@ -457,6 +461,8 @@ export type Database = {
         Update: {
           admission_fee_total?: number
           billing_start_month?: string
+          course_end_month?: string | null
+          course_start_month?: string | null
           created_at?: string
           email?: string | null
           enrollment_date?: string
