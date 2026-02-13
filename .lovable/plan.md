@@ -1,93 +1,102 @@
 
 
-# Fix Student Details Dashboard - Monthly Fee Display
+# Monthly Overdue Section for Students Dashboard
 
-## Problem
+## Overview
 
-The student details dashboard has a critical bug: **months that start in the future are completely invisible**. For this student, billing starts in March 2026 but today is February 2026, so the month generation logic produces zero months. This causes:
+Add a new "Monthly Overdue Report" section below the existing students table on the Students page. This section lets admins select a specific month and view all students with overdue fees for that month, complete with summary metrics, severity indicators, and export functionality.
 
-- Monthly Tuition card showing 0 instead of the expected 4,000
-- "No billing months yet" in the month grid
-- "No months to display yet" in the breakdown list
-- Monthly pending not contributing to Total Pending (shows 2,500 instead of 6,500)
+---
 
-The root cause is in `computeStudentSummary` where `allMonths` is capped at `min(course_end_month, currentMonth)`. When `billingStart > currentMonth`, no months are generated.
+## Layout
 
-## Fix
+The new section appears below the existing students table and includes:
 
-### 1. Update Month Generation Logic (`src/hooks/useStudentPayments.ts`)
+1. **Section Header** with month selector dropdown and filter toggle (specific month vs. all overdue)
+2. **Three Summary Metric Cards** showing total overdue students, total overdue amount, and average days overdue
+3. **Overdue Students Table** with severity indicators
+4. **Export Button** (CSV/PDF) for the overdue report
 
-Change `allMonths` to include ALL months from `billing_start_month` to `course_end_month` (or `currentMonth` if no end date set). The current month should only affect classification (overdue vs pending), not visibility.
+---
 
-**Current (broken):**
+## Implementation Details
+
+### 1. New Component: `src/components/StudentOverdueSection.tsx`
+
+A self-contained component that receives the students list, all payments, and student summaries as props.
+
+**Props:**
+- `students` - all student records
+- `allPayments` - all student payments
+- `studentSummaries` - pre-computed summary map
+- `currency` - user currency string
+
+**State:**
+- `selectedMonth` - the month string (e.g., "2025-01") from a dropdown, defaults to previous month
+- `filterMode` - "specific" (one month) or "all" (all overdue months)
+
+**Month Dropdown:** Uses the existing `Select` component, populated with months from all students' billing ranges. Defaults to the month before the current month.
+
+**Computed Data (per selected month or all):**
+For each student, check if the selected month is in their `monthlyOverdueMonths` or `monthlyPartialMonths` arrays. Build a table row with:
+
+- **Student Name** (clickable, navigates to detail)
+- **Monthly Fee** - the expected fee for that month
+- **Amount Paid** - from `monthlyPaymentsByMonth`
+- **Amount Remaining** - fee minus paid
+- **Overdue Month(s)** - the month label(s)
+- **Days Overdue** - calculated as days from end of that month to today
+- **Severity Badge** - based on days overdue:
+  - 1-30 days: Yellow "Low"
+  - 31-60 days: Orange "Medium"  
+  - 61-90 days: Red "High"
+  - 90+ days: Dark red "Critical"
+
+**Summary Metrics (3 cards at top):**
+- Total students with overdue payments for selected month
+- Total overdue amount (sum of remaining across all overdue students)
+- Average days overdue
+
+**Export:**
+- CSV: Headers = Student Name, Student ID, Monthly Fee, Amount Paid, Amount Remaining, Overdue Month, Days Overdue, Severity
+- PDF: Uses existing `exportToPDF` utility with the section element ID
+
+### 2. Integrate into `src/pages/Students.tsx`
+
+- Import and render `StudentOverdueSection` below the students table card
+- Pass `students`, `allPayments`, `studentSummaries`, and `currency` as props
+- Only render when there are students
+
+### 3. Days Overdue Calculation
+
 ```
-capEnd = min(course_end_month, currentMonth)
-// if billingStart > currentMonth -> no months generated
+daysOverdue = daysSince(lastDayOfOverdueMonth, today)
+// e.g., for month "2025-01": lastDay = Jan 31, 2025
+// If today is Feb 13, 2026: daysOverdue = 379
 ```
 
-**Fixed:**
-```
-capEnd = course_end_month || currentMonth
-// whichever is later, so future months show as "pending"
-```
+Using `differenceInDays` from `date-fns`.
 
-Classification stays the same:
-- `paid >= fee` -> paid
-- `0 < paid < fee` -> partial
-- `paid === 0 && month < currentMonth` -> overdue
-- `paid === 0 && month >= currentMonth` -> pending
+### 4. Styling
 
-This also means `allMonths` and `allCourseMonths` become identical when `course_end_month` is set, which simplifies the code. We can merge them into one loop.
+- Summary cards use red/warning theme: red icons, red text for amounts
+- Table rows have a left border colored by severity (yellow/orange/red/dark-red)
+- Severity badges use matching color variants
+- Section header has a red `AlertTriangle` icon
 
-### 2. Monthly Tuition Card Total Fix (`src/pages/StudentDetail.tsx`)
+---
 
-The Monthly Tuition card currently shows `monthlyPaidTotal + monthlyPendingTotal` as the header amount. Once the month generation is fixed, this will correctly reflect the total expected monthly fees.
+## Files to Create/Modify
 
-However, the card should show the total expected monthly amount (sum of all course month fees), not just paid+pending. This should use the course-duration-based total from `totalExpected - admissionTotal`.
-
-**Change:** Replace `monthlyTotal = monthlyPaidTotal + monthlyPendingTotal` with `monthlyTotal = totalExpected - admissionTotal` so it always shows the full course cost.
-
-### 3. Remove Redundant `allCourseMonths` Logic
-
-Since `allMonths` will now cover the full course range, the separate `allCourseMonths` loop becomes redundant. Merge them into a single month generation that goes from `billingStart` to `max(course_end_month, currentMonth)`.
-
-## Files to Modify
-
-| File | Change |
+| File | Action |
 |------|--------|
-| `src/hooks/useStudentPayments.ts` | Fix month generation to include future months; remove redundant `allCourseMonths` |
-| `src/pages/StudentDetail.tsx` | Fix Monthly Tuition card total to use course-based expected amount |
+| `src/components/StudentOverdueSection.tsx` | **Create** - New overdue report component |
+| `src/pages/Students.tsx` | **Modify** - Import and render the new section below the table |
 
-## Technical Details
+## Edge Cases
 
-### Updated Month Generation
-
-```typescript
-// Generate months from billing_start to the end of the course or current month (whichever is later)
-const allMonths: string[] = [];
-if (billingStart && student.monthly_fee_amount > 0) {
-  let [year, month] = billingStart.split("-").map(Number);
-  const courseEnd = student.course_end_month || currentMonth;
-  // Use whichever is later: course_end_month or currentMonth
-  const endBound = courseEnd > currentMonth ? courseEnd : currentMonth;
-  let cursor = billingStart;
-  while (cursor <= endBound) {
-    allMonths.push(cursor);
-    month++;
-    if (month > 12) { month = 1; year++; }
-    cursor = `${year}-${String(month).padStart(2, "0")}`;
-  }
-}
-```
-
-The `allCourseMonths` loop is removed since `allMonths` now covers the same range. `totalExpectedMonthly` is computed from `allMonths` directly.
-
-### Monthly Tuition Card
-
-```typescript
-// Instead of: monthlyTotal = summary.monthlyPaidTotal + summary.monthlyPendingTotal
-const monthlyExpectedTotal = summary.totalExpected - summary.admissionTotal;
-```
-
-This ensures the card header always shows the full course tuition cost regardless of payment status.
-
+- Students with no monthly fee (`monthly_fee_amount === 0`) are excluded
+- Students whose billing hasn't started yet have no overdue months
+- If no students are overdue for the selected month, show an empty state message
+- Partial payments show remaining amount, not full fee
+- "All overdue" mode aggregates across all months, showing one row per student-month combination
