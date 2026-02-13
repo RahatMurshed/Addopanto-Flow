@@ -113,6 +113,7 @@ export type Database = {
       }
       company_join_requests: {
         Row: {
+          banned_until: string | null
           company_id: string
           id: string
           message: string | null
@@ -124,6 +125,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          banned_until?: string | null
           company_id: string
           id?: string
           message?: string | null
@@ -135,6 +137,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          banned_until?: string | null
           company_id?: string
           id?: string
           message?: string | null
