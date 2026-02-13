@@ -172,28 +172,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Step 4: AFTER auth user is deleted, insert ban record with a placeholder user_id
-      // This ensures the record survives (no cascade from auth.users deletion)
-      if (targetEmail) {
-        const bannedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { error: banError } = await adminClient
-          .from("registration_requests")
-          .insert({
-            user_id: crypto.randomUUID(),
-            email: targetEmail,
-            status: "rejected",
-            banned_until: bannedUntil,
-            reviewed_at: new Date().toISOString(),
-            reviewed_by: user.id,
-          });
-
-        if (banError) {
-          console.error("Failed to insert ban record:", banError);
-        } else {
-          console.log(`Set 7-day ban for ${targetEmail} until ${bannedUntil}`);
-        }
-      }
-
       return json(200, { success: true });
     };
 
