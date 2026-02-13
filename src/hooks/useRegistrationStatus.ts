@@ -23,7 +23,6 @@ export function useRegistrationStatus(): RegistrationStatusResult {
     }
 
     try {
-      // First check if user has a role (approved users)
       const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
@@ -36,13 +35,11 @@ export function useRegistrationStatus(): RegistrationStatusResult {
         return;
       }
 
-      // If user has a role, they're approved
       if (roleData) {
         setStatus("has_role");
         return;
       }
 
-      // No role - check registration request status
       const { data: requestData, error: requestError } = await supabase
         .from("registration_requests")
         .select("status, rejection_reason")
@@ -63,8 +60,6 @@ export function useRegistrationStatus(): RegistrationStatusResult {
           setStatus(requestData.status as RegistrationStatus);
         }
       } else {
-        // No role and no request - this is a legacy user from before the approval feature
-        // Grant them access as if they have a role
         setStatus("has_role");
       }
     } catch (err) {
@@ -76,6 +71,56 @@ export function useRegistrationStatus(): RegistrationStatusResult {
   useEffect(() => {
     checkStatus();
   }, [checkStatus]);
+
+  // Realtime: registration_requests updates (reject/approve)
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("reg-status-" + user.id)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "registration_requests",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          checkStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, checkStatus]);
+
+  // Realtime: user_roles insert (approval creates role)
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("role-insert-" + user.id)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_roles",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          checkStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, checkStatus]);
 
   return {
     status,

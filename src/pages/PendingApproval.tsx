@@ -19,7 +19,7 @@ export default function PendingApproval() {
   useEffect(() => {
     const interval = setInterval(() => {
       refetch();
-    }, 10000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [refetch]);
