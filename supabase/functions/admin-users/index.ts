@@ -121,16 +121,28 @@ Deno.serve(async (req) => {
         return json(403, { error: "Cannot delete cipher users" });
       }
 
-      // IMPORTANT: Sign out all user sessions before deletion to force logout
+      // Step 1: Delete user_roles first to trigger Realtime event while connection is alive
+      const { error: roleDeleteError } = await adminClient
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId);
+
+      if (roleDeleteError) {
+        console.warn("Failed to delete user_roles (non-fatal):", roleDeleteError);
+      }
+
+      // Small delay to allow Realtime event to propagate to client
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 2: Sign out all sessions (backup to invalidate refresh tokens)
       try {
         await adminClient.auth.admin.signOut(userId, "global");
         console.log(`Signed out all sessions for user ${userId}`);
       } catch (signOutErr) {
         console.warn("Failed to sign out user sessions (non-fatal):", signOutErr);
-        // Continue with deletion even if sign out fails
       }
 
-      // Delete user from auth.users (cascade will handle related data)
+      // Step 3: Delete user from auth.users (cascade handles remaining data)
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
       if (deleteError) {
