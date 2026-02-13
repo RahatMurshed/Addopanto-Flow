@@ -13,6 +13,7 @@ import { AlertTriangle, Users, DollarSign, Clock } from "lucide-react";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { exportToPDF } from "@/utils/exportUtils";
 import ExportButtons from "@/components/ExportButtons";
+import MonthYearPicker from "@/components/MonthYearPicker";
 import type { StudentSummary } from "@/hooks/useStudentPayments";
 
 interface Student {
@@ -66,29 +67,11 @@ interface Props {
 export default function StudentOverdueSection({ students, studentSummaries, currency }: Props) {
   const navigate = useNavigate();
 
-  // Collect all overdue months across all students
-  const allOverdueMonthsSet = useMemo(() => {
-    const set = new Set<string>();
-    for (const s of students) {
-      const sum = studentSummaries.get(s.id);
-      if (!sum) continue;
-      for (const m of sum.monthlyOverdueMonths) set.add(m);
-      for (const m of sum.monthlyPartialMonths) set.add(m);
-    }
-    return set;
-  }, [students, studentSummaries]);
-
-  const sortedMonths = useMemo(
-    () => Array.from(allOverdueMonthsSet).sort().reverse(),
-    [allOverdueMonthsSet]
-  );
-
   // Default to previous month
   const now = new Date();
   const prevMonth = `${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}-${String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, "0")}`;
-  const defaultMonth = sortedMonths.includes(prevMonth) ? prevMonth : sortedMonths[0] || prevMonth;
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  const [selectedMonth, setSelectedMonth] = useState<string>(prevMonth);
   const [filterMode, setFilterMode] = useState<"specific" | "all">("specific");
 
   // Build overdue rows
@@ -101,9 +84,10 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
       const sum = studentSummaries.get(s.id);
       if (!sum) continue;
 
+      const allOverdue = [...sum.monthlyOverdueMonths, ...sum.monthlyPartialMonths];
       const monthsToCheck = filterMode === "all"
-        ? [...sum.monthlyOverdueMonths, ...sum.monthlyPartialMonths]
-        : [...sum.monthlyOverdueMonths, ...sum.monthlyPartialMonths].filter(m => m === selectedMonth);
+        ? allOverdue
+        : allOverdue.filter(m => m === selectedMonth);
 
       for (const m of monthsToCheck) {
         const fee = Number(s.monthly_fee_amount);
@@ -167,8 +151,6 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
     await exportToPDF("overdue-section", "overdue_report", "Monthly Overdue Report", label);
   };
 
-  const hasData = sortedMonths.length > 0;
-
   return (
     <Card id="overdue-section">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -177,7 +159,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
           <CardTitle className="text-base">Monthly Overdue Report</CardTitle>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={filterMode} onValueChange={(v) => setFilterMode(v as "specific" | "all")} disabled={!hasData}>
+          <Select value={filterMode} onValueChange={(v) => setFilterMode(v as "specific" | "all")}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -186,22 +168,13 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
               <SelectItem value="all">All Overdue</SelectItem>
             </SelectContent>
           </Select>
-          {filterMode === "specific" && hasData && (
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {sortedMonths.map(m => (
-                  <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {filterMode === "specific" && (
+            <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} minYear={2020} maxYear={2030} />
           )}
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={!hasData || overdueRows.length === 0}
+            disabled={overdueRows.length === 0}
           />
         </div>
       </CardHeader>
@@ -244,7 +217,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
               <AlertTriangle className="h-6 w-6 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground">
-              {hasData ? "No overdue students for the selected period." : "No overdue payments found. This section will show students with past-due monthly fees."}
+              No overdue students for the selected period.
             </p>
           </div>
         ) : (
