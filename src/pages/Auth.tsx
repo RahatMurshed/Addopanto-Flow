@@ -21,6 +21,10 @@ interface BanInfo {
   rejection_reason: string | null;
 }
 
+interface PendingInfo {
+  isPending: true;
+}
+
 async function checkBan(email: string): Promise<BanInfo | null> {
   const { data, error } = await supabase.functions.invoke("check-ban", {
     body: { email },
@@ -70,6 +74,20 @@ function RejectionMessage({ reason }: { reason: string | null }) {
   );
 }
 
+function PendingMessage() {
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-6 text-center">
+      <ShieldAlert className="h-8 w-8 text-yellow-600" />
+      <div className="space-y-2">
+        <h3 className="font-semibold text-yellow-700 dark:text-yellow-500">Account Pending Approval</h3>
+        <p className="text-sm text-muted-foreground">
+          Your account is pending approval from an administrator. Please wait for approval before logging in.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function RegistrationSuccess() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -106,7 +124,7 @@ export default function Auth() {
   const [showReset, setShowReset] = useState(false);
   const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
   const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
-  const [rejectionInfo, setRejectionInfo] = useState<{ reason: string | null } | null>(null);
+  const [pendingInfo, setPendingInfo] = useState<PendingInfo | null>(null);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -114,9 +132,12 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
 
+  const [rejectionInfo, setRejectionInfo] = useState<{ reason: string | null } | null>(null);
+
   const clearAlerts = () => {
     setBanInfo(null);
     setRejectionInfo(null);
+    setPendingInfo(null);
   };
 
   const handleGoogleLogin = async () => {
@@ -171,9 +192,9 @@ export default function Auth() {
     }
 
     if (regData?.status === "pending") {
-      // Allow pending users through — ProtectedRoute will redirect to /pending
+      await signOut();
+      setPendingInfo({ isPending: true });
       setLoading(false);
-      navigate("/");
       return;
     }
 
@@ -287,6 +308,7 @@ export default function Auth() {
 
         {banInfo?.banned && <BanMessage banInfo={banInfo} />}
         {rejectionInfo && <RejectionMessage reason={rejectionInfo.reason} />}
+        {pendingInfo && <PendingMessage />}
 
         <Tabs defaultValue="login" className="w-full" onValueChange={() => clearAlerts()}>
           <TabsList className="grid w-full grid-cols-2">
