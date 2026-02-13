@@ -376,7 +376,7 @@ export default function StudentDetail() {
                 </Badge>
                 <span className="text-muted-foreground">{formatCurrency(Number(p.amount), currency)}</span>
               </div>
-              <p className="text-sm whitespace-pre-wrap">{p.description}</p>
+              <p className="text-sm whitespace-pre-wrap break-all">{p.description}</p>
             </div>
           </div>
         );
