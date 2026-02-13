@@ -66,7 +66,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const interval = setInterval(async () => {
-      // Check 1: Does the user's role still exist?
+      // Check registration request status first
+      const { data: regData } = await supabase
+        .from("registration_requests")
+        .select("status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // If rejected, force local logout
+      if (regData?.status === "rejected") {
+        console.log('User rejected, forcing logout');
+        await supabase.auth.signOut({ scope: 'local' });
+        return;
+      }
+
+      // If pending, skip role check (no role expected yet)
+      if (regData?.status === "pending") {
+        return;
+      }
+
+      // For approved/legacy users: check role still exists
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("id")
@@ -79,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Check 2: Is the auth session still valid?
+      // Validate auth session
       const { error } = await supabase.auth.getUser();
       if (error) {
         console.log('Session validation failed, forcing logout:', error.message);
