@@ -1,107 +1,43 @@
 
 
-# Apply Same Force-Logout Fix to Reject Workflow
+# Fix: Force Instant Logout for Deleted Users
 
-## Problem
+## Root Cause
 
-The `handleRejectUser` function in the edge function currently just deletes the user from auth directly, without first attempting to sign them out or trigger any Realtime event. A rejected user who is still browsing the app (e.g., on the pending approval screen) will keep their session active until it naturally expires.
+All `signOut()` calls in the AuthContext use the default scope, which calls the server to revoke the session before clearing local state. After the admin deletes the user from auth, the server call fails because the user no longer exists. This can prevent the local session from being cleared, leaving the deleted user still logged in.
 
-## Changes
+## Solution
 
-### File 1: `supabase/functions/admin-users/index.ts` -- `handleRejectUser`
+Use `{ scope: 'local' }` on all force-logout `signOut()` calls. This skips the server roundtrip and immediately clears local storage and triggers `onAuthStateChange`, guaranteeing the user is logged out regardless of server state.
 
-Apply the same 3-step deletion sequence used in `handleDeleteUser`:
+## File Change: `src/contexts/AuthContext.tsx`
 
-1. Delete `user_roles` row (if any exists) to fire a Realtime event
-2. Wait 500ms for propagation
-3. Sign out all sessions server-side
-4. Delete user from auth
+Three `signOut()` calls need `{ scope: 'local' }`:
 
-Updated `handleRejectUser` (lines 227-254):
+1. **Realtime listener** (line 54): When a `user_roles` DELETE event is received
+2. **Polling - role check** (line 78): When `user_roles` query returns null
+3. **Polling - session check** (line 86): When `getUser()` fails
 
+Change each from:
 ```typescript
-const handleRejectUser = async (userId: string, reason?: string) => {
-  // Update registration request status first
-  const { error: updateError } = await adminClient
-    .from("registration_requests")
-    .update({
-      status: "rejected",
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: user.id,
-      rejection_reason: reason || null,
-    })
-    .eq("user_id", userId)
-    .eq("status", "pending");
-
-  if (updateError) {
-    console.error("Error updating registration request:", updateError);
-    return json(500, { error: "Failed to update registration request" });
-  }
-
-  // Step 1: Delete user_roles if any exist (triggers Realtime logout)
-  const { error: roleDeleteError } = await adminClient
-    .from("user_roles")
-    .delete()
-    .eq("user_id", userId);
-
-  if (roleDeleteError) {
-    console.warn("Failed to delete user_roles during reject (non-fatal):", roleDeleteError);
-  }
-
-  // Step 2: Delay to allow Realtime event propagation
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Step 3: Sign out all sessions
-  try {
-    await adminClient.auth.admin.signOut(userId, "global");
-  } catch (signOutErr) {
-    console.warn("Failed to sign out rejected user (non-fatal):", signOutErr);
-  }
-
-  // Step 4: Delete user from auth.users
-  const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
-
-  if (deleteError) {
-    console.error("Error deleting rejected user:", deleteError);
-    return json(500, { error: "Failed to delete user account" });
-  }
-
-  return json(200, { success: true });
-};
+await supabase.auth.signOut();
+```
+To:
+```typescript
+await supabase.auth.signOut({ scope: 'local' });
 ```
 
-### File 2: `src/contexts/AuthContext.tsx` -- Reduce polling interval
+The voluntary `signOut` function (line 108) should keep the default scope since the user still exists when they log out themselves.
 
-Change the fallback polling from 30 seconds to 5 seconds, and add a `user_roles` existence check for faster detection:
+## No Edge Function Changes
 
-```typescript
-const interval = setInterval(async () => {
-  // Check 1: Does role still exist?
-  const { data: roleData } = await supabase
-    .from("user_roles")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+The edge function already follows the correct sequence and does not need modifications.
 
-  if (!roleData) {
-    console.log("User role not found, forcing logout");
-    await supabase.auth.signOut();
-    return;
-  }
+## Summary
 
-  // Check 2: Is auth session valid?
-  const { error } = await supabase.auth.getUser();
-  if (error) {
-    console.log("Session validation failed, forcing logout:", error.message);
-    await supabase.auth.signOut();
-  }
-}, 5000);
-```
-
-## Files to Modify
-
-| # | File | Change |
-|---|------|--------|
-| 1 | `supabase/functions/admin-users/index.ts` | Add force-logout steps to `handleRejectUser` |
-| 2 | `src/contexts/AuthContext.tsx` | Reduce polling to 5s, add `user_roles` check |
+| What | Before | After |
+|------|--------|-------|
+| Force-logout signOut scope | Default (server + local) | Local only |
+| Behavior when user deleted | Server call fails, local state may persist | Local state always cleared instantly |
+| Files changed | 1 (`AuthContext.tsx`) | Same |
 
