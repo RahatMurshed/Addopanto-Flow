@@ -1,114 +1,113 @@
 
 
-# Fix: Complete Rejection & Ban Enforcement on Auth Page
+# Smart Loading States Throughout the App
 
-## Problem Analysis
+## Overview
+Add polished loading indicators across the app: skeleton loaders for data pages, descriptive button text during actions, disabled form fields during submission, and hardened dialogs that prevent dismissal during operations.
 
-After reviewing all the current code, here are the remaining issues:
+## Changes by Area
 
-1. **Rejected users briefly see PendingApproval page**: When an active user gets rejected, the `user_roles` DELETE Realtime listener in `AuthContext` forces a local signOut. The user lands on `/auth` via `ProtectedRoute`, but **no rejection message is displayed** because there's no mechanism to pass rejection info through the signOut redirect.
+### 1. Reusable Skeleton Components (New File)
+Create `src/components/SkeletonLoaders.tsx` with reusable skeleton components:
+- **SkeletonTable**: Configurable rows/columns, mimics table layout with header + body
+- **SkeletonCards**: Grid of skeleton stat cards (for Dashboard metrics)
+- **SkeletonPageHeader**: Title + description placeholder
+- Uses existing `Skeleton` component from `src/components/ui/skeleton.tsx`
 
-2. **PendingApproval still handles rejection**: Lines 29-33 of `PendingApproval.tsx` sign out and navigate to `/auth` when status is `"rejected"`, causing a brief flash of the pending page before redirect.
+### 2. Dashboard (`src/pages/Dashboard.tsx`)
+- Replace the full-page `Loader2` spinner (lines 350-356) with skeleton cards for the 5 metric cards + skeleton chart area + skeleton transactions table
+- This gives users a sense of the page layout while data loads
 
-3. **AuthContext polling skips rejected users instead of logging them out**: Lines 77-79 in `AuthContext.tsx` return early for rejected status, leaving the user logged in on the `/pending` page until PendingApproval's own redirect kicks in (creating the 1-second flash).
+### 3. Revenue Page (`src/pages/Revenue.tsx`)
+- Replace full-page spinner with skeleton table (matching the revenue table layout)
+- Add loading text to delete confirmation button: "Deleting..." with spinner
 
-4. **ProtectedRoute doesn't handle rejected status**: It only redirects `"pending"` to `/pending`. A rejected user with an active session passes through to protected routes momentarily.
+### 4. Expenses Page (`src/pages/Expenses.tsx`)
+- Replace full-page spinner with skeleton table
+- Add loading text to delete confirmation button: "Deleting..." with spinner
 
-## Solution
+### 5. Khatas Page (`src/pages/Khatas.tsx`)
+- Replace full-page spinner (lines 95-101) with skeleton card grid matching khata cards
+- Add loading text: "Creating..." / "Deleting..." on action buttons
 
-All rejection/ban messages display exclusively on the Auth page. No separate rejection page exists. Three enforcement layers:
+### 6. User Management Page (`src/pages/UserManagement.tsx`)
+- Replace full-page spinner (lines 282-288) with skeleton table (columns: User, Role, Change Role, Member Since, Actions)
+- Add descriptive loading text on delete button in dialog: "Deleting..."
+- Add descriptive loading text on role change confirm button: "Updating..."
+- Disable Cancel button and prevent dialog close (`onOpenChange` guarded) while mutations are pending
 
+### 7. Registration Requests Page (`src/pages/RegistrationRequests.tsx`)
+- Replace the center spinner (lines 382-385) with skeleton tabs + skeleton table rows
+- Add descriptive text to all action buttons during loading:
+  - Approve: "Approving..."
+  - Reject: "Rejecting..."
+  - Delete: "Deleting..."
+  - Accept: "Accepting..."
+- Disable Cancel buttons and prevent dialog/alert-dialog close while mutations are pending (guard `onOpenChange` handlers)
+
+### 8. Auth Page (`src/pages/Auth.tsx`)
+- Add descriptive loading text:
+  - Login button: "Logging in..." (already has spinner, just add text)
+  - Signup button: "Creating account..." 
+  - Reset password button: "Sending..." 
+- Disable all form `Input` fields during submission (add `disabled={loading || googleLoading}` to all inputs)
+
+### 9. Settings Page (`src/pages/SettingsPage.tsx`)
+- Save button already has "Saving..." text -- verify fields are disabled during save
+- Add `disabled={saving}` to all form inputs during save
+
+### 10. Moderator Control Page (`src/pages/ModeratorControl.tsx`)
+- Replace full-page spinner with skeleton cards for moderator permission cards
+
+### 11. Reports Page (`src/pages/Reports.tsx`)
+- Replace loading spinner with skeleton chart + skeleton table areas
+
+## Technical Details
+
+### SkeletonTable Component
 ```text
-Layer 1 (Pre-login):  check-ban edge function blocks banned/rejected emails
-Layer 2 (Post-login): Auth.tsx checks registration_requests, signs out + shows message
-Layer 3 (Active session): AuthContext forces immediate logout for rejected users
-                          ProtectedRoute catches any remaining rejected sessions
++--------------------------------------------------+
+| [====]     [========]    [======]    [====]       |  <- header
+|--------------------------------------------------|
+| [========] [==========]  [======]    [====]       |  <- row 1
+| [======]   [========]    [========]  [======]     |  <- row 2
+| [========] [==========]  [======]    [====]       |  <- row 3
+|  ...                                              |
++--------------------------------------------------+
 ```
+Uses `Skeleton` with `animate-pulse`, rounded rectangles with varying widths for natural look.
 
-## File Changes
+### Dialog Hardening Pattern
+For all confirmation dialogs, during pending mutations:
+- `onOpenChange` callback checks if mutation is pending; if so, does nothing (prevents Escape key or overlay click from closing)
+- Cancel button gets `disabled={mutation.isPending}`
+- Action button shows spinner + descriptive text and is disabled
 
-### 1. `src/contexts/AuthContext.tsx` -- Force logout for rejected users
+### Button Loading Text Map
+| Button | Normal Text | Loading Text |
+|--------|------------|--------------|
+| Login | Login | Logging in... |
+| Sign Up | Create Account | Creating account... |
+| Approve | Approve | Approving... |
+| Reject | Reject (1-day ban) | Rejecting... |
+| Delete | Delete | Deleting... |
+| Accept | Accept & Grant Access | Accepting... |
+| Save | Save Changes | Saving... |
+| Confirm (role) | Confirm | Updating... |
+| Send Reset Link | Send Reset Link | Sending... |
 
-**Current**: Polling (line 77) skips rejected/pending users entirely.
-**Change**: Keep skipping `pending` users (they belong on `/pending` page). For `rejected` users, force an immediate `signOut({ scope: 'local' })` so they are kicked to `/auth` instantly.
+### Files Modified
+1. **New**: `src/components/SkeletonLoaders.tsx`
+2. `src/pages/Dashboard.tsx`
+3. `src/pages/Revenue.tsx`
+4. `src/pages/Expenses.tsx`
+5. `src/pages/Khatas.tsx`
+6. `src/pages/UserManagement.tsx`
+7. `src/pages/RegistrationRequests.tsx`
+8. `src/pages/Auth.tsx`
+9. `src/pages/SettingsPage.tsx`
+10. `src/pages/ModeratorControl.tsx`
+11. `src/pages/Reports.tsx`
 
-```typescript
-// Line 77 change:
-if (regData?.status === "pending") {
-  return; // Pending users stay on /pending page
-}
-
-if (regData?.status === "rejected") {
-  console.log('User rejected, forcing logout');
-  await supabase.auth.signOut({ scope: 'local' });
-  return;
-}
-```
-
-### 2. `src/App.tsx` -- ProtectedRoute handles rejected status
-
-**Current**: Only redirects `"pending"` to `/pending`.
-**Change**: Add `"rejected"` check that signs out and redirects to `/auth`. This is a safety net -- by the time ProtectedRoute runs, AuthContext polling should have already logged out rejected users.
-
-```typescript
-if (status === "rejected") {
-  return <Navigate to="/auth" replace />;
-}
-```
-
-### 3. `src/pages/PendingApproval.tsx` -- Remove rejection handling entirely
-
-**Current**: Lines 29-33 detect `"rejected"` status, sign out, and navigate to `/auth`.
-**Change**: Remove the rejected status check. This page only handles `"pending"` users. AuthContext and ProtectedRoute handle rejected users.
-
-Remove:
-```typescript
-if (status === "rejected") {
-  supabase.auth.signOut({ scope: "local" }).then(() => {
-    navigate("/auth", { replace: true });
-  });
-}
-```
-
-### 4. `src/pages/Auth.tsx` -- No changes needed
-
-The current Auth.tsx already has all the correct enforcement:
-- Pre-login `checkBan()` blocks banned emails (line 140-151)
-- Post-login status check catches rejected users, signs out, shows inline rejection message (line 160-178)
-- `BanMessage` and `RejectionMessage` components display on the auth page (line 288-289)
-- Signup immediately signs out and shows success card (line 222-227)
-
-### 5. `supabase/functions/check-ban/index.ts` -- No changes needed
-
-Already returns both `banned` (active ban) and `rejected` (ban expired but still rejected) flags correctly.
-
-## Summary Table
-
-| # | File | Change |
-|---|------|--------|
-| 1 | `src/contexts/AuthContext.tsx` | Force logout for rejected users in polling (not skip) |
-| 2 | `src/App.tsx` | Add rejected status redirect to /auth in ProtectedRoute |
-| 3 | `src/pages/PendingApproval.tsx` | Remove rejection handling (lines 29-33) |
-| 4 | `src/pages/Auth.tsx` | No changes |
-| 5 | `check-ban` edge function | No changes |
-
-## Expected Behavior After Fix
-
-**User gets rejected while logged in:**
-1. Admin clicks Reject -> `handleRejectUser` deletes `user_roles` and calls `signOut(userId, "global")`
-2. Realtime `user_roles` DELETE listener in AuthContext fires -> instant local signOut
-3. User becomes null -> ProtectedRoute redirects to `/auth`
-4. Next login attempt -> `checkBan` catches the 1-day ban -> shows "Account Banned" on auth page
-
-**Rejected user tries to log in (during ban):**
-1. User enters credentials -> `checkBan` returns `banned: true` -> "Account Banned for X hours" shown on auth page
-2. Login is never attempted
-
-**Rejected user tries to log in (after ban expires):**
-1. `checkBan` returns `rejected: true` -> "Access Denied" shown on auth page
-2. Login is never attempted
-
-**Admin re-approves rejected user:**
-1. If user is not logged in: next login attempt succeeds normally (no ban, no rejection flag since status changed to "approved")
-2. Ban is cleared, role is created, user can access dashboard
+No new dependencies required -- uses existing `Skeleton` component and `Loader2` icon.
 
