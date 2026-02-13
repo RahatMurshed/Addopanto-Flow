@@ -24,8 +24,22 @@ export default function CompanyMembers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
+  // Fetch cipher user IDs (only needed for non-cipher users to filter them out)
+  const { data: cipherUserIds = [] } = useQuery({
+    queryKey: ["cipher-user-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "cipher");
+      if (error) throw error;
+      return data.map((r) => r.user_id);
+    },
+    enabled: !isCipher && canManageMembers,
+  });
+
   // Fetch members
-  const { data: members = [], isLoading: membersLoading } = useQuery({
+  const { data: rawMembers = [], isLoading: membersLoading } = useQuery({
     queryKey: ["company-members", activeCompanyId],
     queryFn: async () => {
       if (!activeCompanyId) return [];
@@ -39,6 +53,12 @@ export default function CompanyMembers() {
     },
     enabled: !!activeCompanyId && canManageMembers,
   });
+
+  // Filter out cipher members for non-cipher users
+  const members = useMemo(() => {
+    if (isCipher || cipherUserIds.length === 0) return rawMembers;
+    return rawMembers.filter((m) => !cipherUserIds.includes(m.user_id));
+  }, [rawMembers, cipherUserIds, isCipher]);
 
   // Fetch member emails
   const { data: profiles = [] } = useQuery({
