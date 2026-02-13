@@ -274,7 +274,7 @@ export default function UserManagement() {
   // Available roles based on current user's role (removed "user" option)
   const availableRoles: AppRole[] = isCipher
     ? ["cipher", "admin", "moderator"]
-    : ["admin", "moderator"];
+    : ["moderator"];
 
   // Redirect if not authorized (after all hooks)
   if (!canManageUsers) {

@@ -70,7 +70,7 @@ export function useUserRole() {
     canManageRole: (targetRole: AppRole): boolean => {
       if (hasNoRole) return false;
       if (role === "cipher") return true;
-      if (role === "admin" && targetRole !== "cipher") return true;
+      if (role === "admin" && targetRole === "moderator") return true;
       return false;
     },
   };
