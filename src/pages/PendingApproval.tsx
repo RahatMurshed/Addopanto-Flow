@@ -14,6 +14,16 @@ export default function PendingApproval() {
   const { status, rejectionReason, refetch } = useRegistrationStatus();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [rejectedLocked, setRejectedLocked] = useState(false);
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
+
+  // Latch rejection state so it survives signOut clearing the user
+  useEffect(() => {
+    if (status === "rejected" && !rejectedLocked) {
+      setRejectedLocked(true);
+      setLockedReason(rejectionReason);
+    }
+  }, [status, rejectionReason, rejectedLocked]);
 
   // Poll every 10 seconds to check if approved
   useEffect(() => {
@@ -33,15 +43,14 @@ export default function PendingApproval() {
 
   // Handle rejection - force logout
   useEffect(() => {
-    if (status === "rejected" && !isLoggingOut) {
+    if (rejectedLocked && !isLoggingOut) {
       setIsLoggingOut(true);
       toast({
         title: "Access Denied",
-        description: rejectionReason || "Your registration request has been rejected.",
+        description: lockedReason || "Your registration request has been rejected.",
         variant: "destructive",
       });
       
-      // Auto logout after showing message
       const timeout = setTimeout(async () => {
         await supabase.auth.signOut({ scope: 'local' });
         navigate("/auth", { replace: true });
@@ -49,7 +58,7 @@ export default function PendingApproval() {
 
       return () => clearTimeout(timeout);
     }
-  }, [status, rejectionReason, signOut, navigate, toast, isLoggingOut]);
+  }, [rejectedLocked, lockedReason, navigate, toast, isLoggingOut]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -57,7 +66,7 @@ export default function PendingApproval() {
   };
 
   // Show rejection screen
-  if (status === "rejected") {
+  if (rejectedLocked) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
@@ -73,7 +82,7 @@ export default function PendingApproval() {
               <div className="space-y-2">
                 <h3 className="font-semibold text-destructive">Access Denied</h3>
                 <p className="text-sm text-muted-foreground">
-                  {rejectionReason || "Your registration request has been rejected by an administrator."}
+                  {lockedReason || "Your registration request has been rejected by an administrator."}
                 </p>
               </div>
             </div>

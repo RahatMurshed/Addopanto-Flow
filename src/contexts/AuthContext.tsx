@@ -73,15 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      // If rejected, force local logout
-      if (regData?.status === "rejected") {
-        console.log('User rejected, forcing logout');
-        await supabase.auth.signOut({ scope: 'local' });
-        return;
-      }
-
-      // If pending, skip role check (no role expected yet)
-      if (regData?.status === "pending") {
+      // If rejected or pending, skip role check (PendingApproval page handles these)
+      if (regData?.status === "rejected" || regData?.status === "pending") {
         return;
       }
 
