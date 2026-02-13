@@ -143,6 +143,28 @@ export function useCreateStudentPayment() {
   });
 }
 
+export function useUpdateStudentPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<StudentPaymentInsert> & { id: string }) => {
+      const { data: updated, error } = await supabase
+        .from("student_payments")
+        .update(data as any)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return updated as StudentPayment;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["student_payments"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["revenues"] });
+    },
+  });
+}
+
 export function useDeleteStudentPayment() {
   const queryClient = useQueryClient();
 

@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Student } from "@/hooks/useStudents";
-import type { StudentPaymentInsert, StudentSummary } from "@/hooks/useStudentPayments";
+import type { StudentPayment, StudentPaymentInsert, StudentSummary } from "@/hooks/useStudentPayments";
 
 const paymentSchema = z.object({
   payment_type: z.enum(["admission", "monthly"]),
@@ -38,12 +38,16 @@ interface StudentPaymentDialogProps {
   student: Student;
   summary: StudentSummary;
   onSave: (data: StudentPaymentInsert & { studentName?: string }) => Promise<void>;
+  editingPayment?: StudentPayment | null;
+  onUpdate?: (data: Partial<StudentPaymentInsert> & { id: string }) => Promise<void>;
 }
 
-export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave }: StudentPaymentDialogProps) {
+export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate }: StudentPaymentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+
+  const isEditing = !!editingPayment;
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -60,28 +64,48 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const paymentType = form.watch("payment_type");
 
   // Available unpaid months for monthly payments (including partial)
+  // When editing, also include the months from the editing payment
   const unpaidMonths = useMemo(() => {
-    return [...summary.monthlyOverdueMonths, ...summary.monthlyPartialMonths, ...summary.monthlyPendingMonths].sort();
-  }, [summary]);
+    const base = [...summary.monthlyOverdueMonths, ...summary.monthlyPartialMonths, ...summary.monthlyPendingMonths];
+    if (editingPayment?.months_covered) {
+      for (const m of editingPayment.months_covered) {
+        if (!base.includes(m)) base.push(m);
+      }
+      base.sort();
+    }
+    return base;
+  }, [summary, editingPayment]);
 
   useEffect(() => {
     if (open) {
-      const defaultType = summary.admissionStatus !== "paid" ? "admission" : "monthly";
-      form.reset({
-        payment_type: defaultType,
-        amount: 0,
-        payment_date: format(new Date(), "yyyy-MM-dd"),
-        payment_method: "cash",
-        receipt_number: null,
-        description: null,
-      });
-      setSelectedMonths([]);
+      if (editingPayment) {
+        form.reset({
+          payment_type: editingPayment.payment_type as "admission" | "monthly",
+          amount: Number(editingPayment.amount),
+          payment_date: editingPayment.payment_date,
+          payment_method: editingPayment.payment_method,
+          receipt_number: editingPayment.receipt_number || null,
+          description: editingPayment.description || null,
+        });
+        setSelectedMonths(editingPayment.months_covered || []);
+      } else {
+        const defaultType = summary.admissionStatus !== "paid" ? "admission" : "monthly";
+        form.reset({
+          payment_type: defaultType,
+          amount: 0,
+          payment_date: format(new Date(), "yyyy-MM-dd"),
+          payment_method: "cash",
+          receipt_number: null,
+          description: null,
+        });
+        setSelectedMonths([]);
+      }
     }
-  }, [open, summary, form]);
+  }, [open, summary, form, editingPayment]);
 
-  // Auto-calculate amount when months change (use remaining amount for partial months)
+  // Auto-calculate amount when months change (only for new payments)
   useEffect(() => {
-    if (paymentType === "monthly" && selectedMonths.length > 0) {
+    if (!isEditing && paymentType === "monthly" && selectedMonths.length > 0) {
       let total = 0;
       for (const m of selectedMonths) {
         const fee = Number(student.monthly_fee_amount);
@@ -90,7 +114,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
       }
       form.setValue("amount", total);
     }
-  }, [selectedMonths, paymentType, student.monthly_fee_amount, summary.monthlyPaymentsByMonth, form]);
+  }, [selectedMonths, paymentType, student.monthly_fee_amount, summary.monthlyPaymentsByMonth, form, isEditing]);
 
   const toggleMonth = (month: string) => {
     setSelectedMonths((prev) =>
@@ -101,17 +125,30 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const handleSubmit = async (data: PaymentFormData) => {
     setSaving(true);
     try {
-      await onSave({
-        student_id: student.id,
-        payment_type: data.payment_type,
-        amount: data.amount,
-        payment_date: data.payment_date,
-        payment_method: data.payment_method,
-        months_covered: data.payment_type === "monthly" ? selectedMonths : null,
-        receipt_number: data.receipt_number || null,
-        description: data.description || null,
-        studentName: student.name,
-      });
+      if (isEditing && onUpdate) {
+        await onUpdate({
+          id: editingPayment!.id,
+          payment_type: data.payment_type,
+          amount: data.amount,
+          payment_date: data.payment_date,
+          payment_method: data.payment_method,
+          months_covered: data.payment_type === "monthly" ? selectedMonths : null,
+          receipt_number: data.receipt_number || null,
+          description: data.description || null,
+        });
+      } else {
+        await onSave({
+          student_id: student.id,
+          payment_type: data.payment_type,
+          amount: data.amount,
+          payment_date: data.payment_date,
+          payment_method: data.payment_method,
+          months_covered: data.payment_type === "monthly" ? selectedMonths : null,
+          receipt_number: data.receipt_number || null,
+          description: data.description || null,
+          studentName: student.name,
+        });
+      }
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -130,7 +167,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => { if (saving) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (saving) e.preventDefault(); }}>
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Payment" : "Record Payment"}</DialogTitle>
           <DialogDescription>Payment for {student.name}</DialogDescription>
         </DialogHeader>
 
@@ -238,7 +275,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {saving ? "Recording..." : "Record Payment"}
+              {saving ? (isEditing ? "Saving..." : "Recording...") : (isEditing ? "Save Changes" : "Record Payment")}
             </Button>
           </DialogFooter>
         </form>

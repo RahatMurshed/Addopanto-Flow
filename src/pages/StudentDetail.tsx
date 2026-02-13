@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudent, useUpdateStudent, type StudentInsert } from "@/hooks/useStudents";
 import {
-  useStudentPayments, useCreateStudentPayment, useDeleteStudentPayment,
+  useStudentPayments, useCreateStudentPayment, useUpdateStudentPayment, useDeleteStudentPayment,
   useMonthlyFeeHistory, computeStudentSummary,
 } from "@/hooks/useStudentPayments";
 import { useRole } from "@/contexts/RoleContext";
@@ -43,10 +43,12 @@ export default function StudentDetail() {
 
   const updateMutation = useUpdateStudent();
   const createPaymentMutation = useCreateStudentPayment();
+  const updatePaymentMutation = useUpdateStudentPayment();
   const deletePaymentMutation = useDeleteStudentPayment();
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<typeof payments[0] | null>(null);
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
 
   const summary = useMemo(() => {
@@ -73,6 +75,21 @@ export default function StudentDetail() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
     }
+  };
+
+  const handleUpdatePayment = async (data: any) => {
+    try {
+      await updatePaymentMutation.mutateAsync(data);
+      toast({ title: "Payment updated" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  };
+
+  const openEditPayment = (payment: typeof payments[0]) => {
+    setEditingPayment(payment);
+    setPaymentDialogOpen(true);
   };
 
   const handleDeletePayment = async () => {
@@ -310,7 +327,7 @@ export default function StudentDetail() {
                     <TableHead className="hidden md:table-cell">Months</TableHead>
                     <TableHead className="hidden lg:table-cell">Receipt</TableHead>
                     
-                    {canDelete && <TableHead className="w-16">Actions</TableHead>}
+                    {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -334,11 +351,20 @@ export default function StudentDetail() {
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm">{p.receipt_number || "—"}</TableCell>
                       
-                      {canDelete && (
+                      {(canEdit || canDelete) && (
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletePaymentId(p.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            {canEdit && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditPayment(p)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletePaymentId(p.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -375,6 +401,18 @@ export default function StudentDetail() {
                   {p.payment_type}
                 </Badge>
                 <span className="text-muted-foreground">{formatCurrency(Number(p.amount), currency)}</span>
+                <span className="ml-auto flex gap-1">
+                  {canEdit && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditPayment(p)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeletePaymentId(p.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </span>
               </div>
               <p className="text-sm whitespace-pre-wrap break-all">{p.description}</p>
             </div>
@@ -417,10 +455,12 @@ export default function StudentDetail() {
       {/* Payment Dialog */}
       <StudentPaymentDialog
         open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
+        onOpenChange={(open) => { setPaymentDialogOpen(open); if (!open) setEditingPayment(null); }}
         student={student}
         summary={summary}
         onSave={handlePayment}
+        editingPayment={editingPayment}
+        onUpdate={handleUpdatePayment}
       />
 
       {/* Delete Payment Confirmation */}
