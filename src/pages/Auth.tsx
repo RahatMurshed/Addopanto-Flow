@@ -10,13 +10,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, TrendingUp, CheckCircle, ShieldAlert } from "lucide-react";
+import { Loader2, TrendingUp, CheckCircle, ShieldAlert, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface BanInfo {
   banned: boolean;
   banned_until: string | null;
   ban_type: "rejected" | "deleted" | null;
+  rejected: boolean;
+  rejection_reason: string | null;
 }
 
 async function checkBan(email: string): Promise<BanInfo | null> {
@@ -48,6 +50,20 @@ function BanMessage({ banInfo }: { banInfo: BanInfo }) {
         <p className="text-sm text-muted-foreground">{reason}</p>
         <p className="text-sm text-muted-foreground">
           You can try again in <strong>{remaining}</strong>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function RejectionMessage({ reason }: { reason: string | null }) {
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
+      <XCircle className="h-8 w-8 text-destructive" />
+      <div className="space-y-2">
+        <h3 className="font-semibold text-destructive">Access Denied</h3>
+        <p className="text-sm text-muted-foreground">
+          {reason || "Your registration request has been rejected by an administrator."}
         </p>
       </div>
     </div>
@@ -90,6 +106,7 @@ export default function Auth() {
   const [showReset, setShowReset] = useState(false);
   const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
   const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
+  const [rejectionInfo, setRejectionInfo] = useState<{ reason: string | null } | null>(null);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -97,9 +114,14 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
 
+  const clearAlerts = () => {
+    setBanInfo(null);
+    setRejectionInfo(null);
+  };
+
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
-    setBanInfo(null);
+    clearAlerts();
     const { error } = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
     });
@@ -111,7 +133,7 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBanInfo(null);
+    clearAlerts();
     setLoading(true);
 
     // Check ban before attempting login
@@ -121,19 +143,48 @@ export default function Auth() {
       setLoading(false);
       return;
     }
+    // Check if rejected (ban expired but still rejected)
+    if (ban?.rejected) {
+      setRejectionInfo({ reason: ban.rejection_reason });
+      setLoading(false);
+      return;
+    }
 
     const { error } = await signIn(loginEmail, loginPassword);
-    setLoading(false);
     if (error) {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
-    } else {
-      navigate("/");
+      setLoading(false);
+      return;
     }
+
+    // Post-login: check registration status
+    const { data: regData } = await supabase
+      .from("registration_requests")
+      .select("status, rejection_reason")
+      .maybeSingle();
+
+    if (regData?.status === "rejected") {
+      await signOut();
+      setRejectionInfo({ reason: regData.rejection_reason });
+      setLoading(false);
+      return;
+    }
+
+    if (regData?.status === "pending") {
+      // Allow pending users through — ProtectedRoute will redirect to /pending
+      setLoading(false);
+      navigate("/");
+      return;
+    }
+
+    // Approved or has role — proceed
+    setLoading(false);
+    navigate("/");
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBanInfo(null);
+    clearAlerts();
 
     if (signupPassword !== signupConfirm) {
       toast({ title: "Passwords don't match", variant: "destructive" });
@@ -150,6 +201,11 @@ export default function Auth() {
     const ban = await checkBan(signupEmail);
     if (ban?.banned) {
       setBanInfo(ban);
+      setLoading(false);
+      return;
+    }
+    if (ban?.rejected) {
+      setRejectionInfo({ reason: ban.rejection_reason });
       setLoading(false);
       return;
     }
@@ -230,8 +286,9 @@ export default function Auth() {
         </div>
 
         {banInfo?.banned && <BanMessage banInfo={banInfo} />}
+        {rejectionInfo && <RejectionMessage reason={rejectionInfo.reason} />}
 
-        <Tabs defaultValue="login" className="w-full" onValueChange={() => setBanInfo(null)}>
+        <Tabs defaultValue="login" className="w-full" onValueChange={() => clearAlerts()}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
