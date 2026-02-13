@@ -159,6 +159,15 @@ export default function Students() {
         </Card>
       </div>
 
+      {/* Monthly Overdue Section */}
+      {students.length > 0 && (
+        <StudentOverdueSection
+          students={students}
+          studentSummaries={studentSummaries}
+          currency={currency}
+        />
+      )}
+
       {/* Students Table */}
       {students.length === 0 ? (
         <Card>
@@ -265,15 +274,6 @@ export default function Students() {
             />
           </CardContent>
         </Card>
-      )}
-
-      {/* Monthly Overdue Section */}
-      {students.length > 0 && (
-        <StudentOverdueSection
-          students={students}
-          studentSummaries={studentSummaries}
-          currency={currency}
-        />
       )}
 
       {/* Create Student Dialog */}
