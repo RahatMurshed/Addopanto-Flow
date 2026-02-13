@@ -158,9 +158,14 @@ export default function ModeratorControl() {
 
       if (error) throw error;
 
+      // Fetch emails from user_profiles for all moderators
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("user_id, email");
+
       return (data || []).map((m) => ({
         user_id: m.user_id,
-        email: m.user_id === currentUser?.id ? currentUser.email : null,
+        email: profiles?.find((p) => p.user_id === m.user_id)?.email ?? null,
         created_at: m.created_at,
       }));
     },

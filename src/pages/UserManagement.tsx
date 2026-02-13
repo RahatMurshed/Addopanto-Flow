@@ -81,15 +81,7 @@ export default function UserManagement() {
   } = useInfiniteQuery({
     queryKey: ["admin-users"],
     queryFn: async ({ pageParam = 1 }): Promise<{ users: UserWithRole[]; pagination: PaginationInfo }> => {
-      const { data, error } = await supabase.functions.invoke("admin-users", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: null,
-      });
-
-      // The invoke doesn't support query params directly, so we call with URL
+      // Use fetch with query params for pagination
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?page=${pageParam}&perPage=50`,
         {
