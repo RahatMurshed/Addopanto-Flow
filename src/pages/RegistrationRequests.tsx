@@ -493,8 +493,8 @@ export default function RegistrationRequests() {
             <AlertDialogHeader>
               <AlertDialogTitle>Permanently Delete User</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to permanently delete <span className="font-medium">{deleteDialog?.email}</span>? 
-                Their account will be removed and they will be banned from signing up again for 7 days.
+                Are you sure you want to delete <span className="font-medium">{deleteDialog?.email}</span>? 
+                The account will be removed and they can send a sign up request again.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
