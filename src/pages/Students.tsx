@@ -219,6 +219,8 @@ export default function Students() {
                             const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
                             return totalPendingMonths > 0 ? (
                               <Badge variant="destructive">{totalPendingMonths} months pending</Badge>
+                            ) : sum.monthlyPaidMonths.length > 0 ? (
+                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                             ) : (
                               <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                             );
