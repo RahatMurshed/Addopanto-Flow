@@ -167,7 +167,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
     await exportToPDF("overdue-section", "overdue_report", "Monthly Overdue Report", label);
   };
 
-  if (sortedMonths.length === 0) return null;
+  const hasData = sortedMonths.length > 0;
 
   return (
     <Card id="overdue-section">
@@ -177,7 +177,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
           <CardTitle className="text-base">Monthly Overdue Report</CardTitle>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={filterMode} onValueChange={(v) => setFilterMode(v as "specific" | "all")}>
+          <Select value={filterMode} onValueChange={(v) => setFilterMode(v as "specific" | "all")} disabled={!hasData}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -186,7 +186,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
               <SelectItem value="all">All Overdue</SelectItem>
             </SelectContent>
           </Select>
-          {filterMode === "specific" && (
+          {filterMode === "specific" && hasData && (
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue />
@@ -201,7 +201,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={overdueRows.length === 0}
+            disabled={!hasData || overdueRows.length === 0}
           />
         </div>
       </CardHeader>
@@ -243,7 +243,9 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
             <div className="mb-3 rounded-full bg-muted p-3">
               <AlertTriangle className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground">No overdue students for the selected period.</p>
+            <p className="text-muted-foreground">
+              {hasData ? "No overdue students for the selected period." : "No overdue payments found. This section will show students with past-due monthly fees."}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
