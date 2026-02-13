@@ -25,12 +25,6 @@ export default function PendingApproval() {
     if (status === "has_role" || status === "approved") {
       navigate("/", { replace: true });
     }
-    // If rejected, send back to auth page where rejection message will show on next login
-    if (status === "rejected") {
-      supabase.auth.signOut({ scope: "local" }).then(() => {
-        navigate("/auth", { replace: true });
-      });
-    }
   }, [status, navigate]);
 
   const handleSignOut = async () => {
