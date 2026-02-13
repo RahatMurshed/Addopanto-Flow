@@ -185,7 +185,24 @@ export default function Auth() {
       return;
     }
 
-    // Post-login: check registration status
+    // Post-login: check if user already has a role (approved users skip registration check)
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+
+      if (roleData) {
+        // User has a role — they're approved, proceed directly
+        setLoading(false);
+        navigate("/");
+        return;
+      }
+    }
+
+    // No role found — check registration status
     const { data: regData } = await supabase
       .from("registration_requests")
       .select("status, rejection_reason")
@@ -205,7 +222,7 @@ export default function Auth() {
       return;
     }
 
-    // Approved or has role — proceed
+    // Approved or unknown — proceed
     setLoading(false);
     navigate("/");
   };
