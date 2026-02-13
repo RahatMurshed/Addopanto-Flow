@@ -122,7 +122,14 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
-  const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false);
+  const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(() => {
+    const stored = sessionStorage.getItem("registration_success");
+    if (stored) {
+      sessionStorage.removeItem("registration_success");
+      return true;
+    }
+    return false;
+  });
   const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
   const [pendingInfo, setPendingInfo] = useState<PendingInfo | null>(null);
 
@@ -241,6 +248,8 @@ export default function Auth() {
       }
       setLoading(false);
     } else {
+      // Persist flag before signOut — component may unmount due to PublicRoute redirect
+      sessionStorage.setItem("registration_success", "true");
       // Immediately sign out — user must wait for admin approval
       await signOut();
       setLoading(false);
