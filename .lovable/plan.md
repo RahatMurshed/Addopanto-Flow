@@ -1,202 +1,90 @@
 
-# Complete Registration Workflow Overhaul
+# Fix: Rejection & Ban Enforcement on Auth Page
 
-## Overview
+## Problem Summary
 
-This plan addresses all 4 requirements with a secure frontend + backend implementation.
+Two issues remain:
+1. Rejected users see a rejection message on `/pending` page, then get redirected back to "Awaiting Approval" or auth page -- confusing UX
+2. Rejected/banned users can still successfully log in and access the app for a few seconds before being auto-logged out
 
-## Current Problems
+## Root Cause
 
-1. Rejection screen auto-redirects to "Awaiting Approval" after 3 seconds due to signOut clearing user state
-2. Users get a full authenticated session immediately on signup (before approval)
-3. No ban enforcement on login -- only on signup via the database trigger
-4. Permanently deleted users see generic "Invalid credentials" instead of a ban message
+- The `check-ban` edge function only catches users with an **active ban** (`banned_until > now()`). A rejected user whose 1-day ban has expired can still `signInWithPassword` successfully since their auth account still exists.
+- After login, `ProtectedRoute` detects `status === "rejected"` and sends them to `/pending`, but `AuthContext` polling and state clearing causes race conditions.
+- There is no post-login server-side check that blocks the session for rejected users.
 
-## Architecture
+## Solution
+
+All rejection/ban feedback will happen on the **Auth page itself**. Rejected users will never reach `/pending`. The flow becomes:
 
 ```text
-SIGNUP FLOW:
-  User signs up
-    -> Supabase creates auth user + trigger creates pending request
-    -> Frontend immediately signs out
-    -> Shows "Registration submitted" message on Auth page
-    -> User stays on Auth page (NOT redirected to /pending)
-
-LOGIN FLOW:
-  User enters credentials
-    -> Call check-ban edge function with email FIRST
-    -> If banned: show ban message with remaining time, block login
-    -> If not banned: proceed with Supabase signIn
-    -> After signIn: ProtectedRoute checks status
-      -> pending -> /pending page
-      -> rejected (no active ban) -> /pending shows rejection card
-      -> approved/has_role -> Dashboard
-
-REJECTION PAGE:
-  Shows rejection card permanently (no auto-logout)
-  "Go to Auth Page" button (manual navigation + signOut)
-  If admin re-approves while user is on this page -> auto-redirect to Dashboard
+Login attempt:
+  1. check-ban (pre-login) -> if active ban -> show ban message, block login
+  2. signIn() -> if credentials wrong -> show error
+  3. Post-login status check -> query registration_requests
+     -> if "rejected" (no active ban) -> signOut + show "rejected" message on auth page
+     -> if "pending" -> signOut + show "pending" message on auth page  
+     -> if approved/has_role -> navigate to dashboard
 ```
 
 ## Changes
 
-### 1. New Edge Function: `check-ban`
+### 1. `check-ban` Edge Function -- Also return rejected status without active ban
 
-A lightweight public-facing edge function that checks if an email has an active ban.
+Currently the query filters by `gt("banned_until", now())` so it misses rejected users whose ban expired. Add a second query: if no active ban found, also check for `status = "rejected"` to return a `rejected` (non-banned) flag.
 
-- Input: `{ email: string }`
-- Uses service role to query `registration_requests` by email
-- Returns: `{ banned: boolean, banned_until: string | null, ban_type: "rejected" | "deleted" | null }`
-- Does NOT reveal other user data -- only ban status
-- Called before login and signup attempts
+New response shape adds a `rejected` field:
+- Active ban: `{ banned: true, banned_until: "...", ban_type: "rejected"|"deleted", rejected: false }`
+- Rejected but ban expired: `{ banned: false, banned_until: null, ban_type: null, rejected: true, rejection_reason: "..." }`
+- Clean: `{ banned: false, rejected: false }`
 
-```typescript
-// supabase/functions/check-ban/index.ts
-// Takes email, checks registration_requests for active banned_until
-// Returns ban status without exposing sensitive data
-```
+### 2. `Auth.tsx` -- Post-login status check + inline rejection display
 
-### 2. Auth.tsx -- Signup & Login Changes
+**handleLogin changes:**
+- After successful `signIn()`, immediately query `registration_requests` for the logged-in user
+- If status is `"rejected"`: call `signOut()`, set a new `rejectionInfo` state, display rejection message inline on auth page
+- If status is `"pending"`: call `signOut()`, set `showRegistrationSuccess(true)` to show the "Awaiting Approval" card
+- If no blocking status (approved or has role): navigate to `/`
 
-**Signup:**
-- After successful `signUp()`, immediately call `signOut()` 
-- Show a success card: "Registration submitted! Please wait for admin approval. You can try logging in once approved."
-- Do NOT navigate to `/` or `/pending`
+**New UI state:**
+- Add `rejectionInfo` state with reason text
+- When set, display a rejection alert card (similar to `BanMessage`) on the auth page showing "Your account has been rejected" with the reason
+- This replaces the `/pending` rejection screen entirely
 
-**Login:**
-- Before calling `signIn()`, call the `check-ban` edge function with the email
-- If banned: show ban message with remaining time (e.g., "You are banned for 23 hours" or "You are banned for 6 days"), do not attempt login
-- If not banned: proceed with normal `signIn()` flow
-- After successful login, navigate to `/` (ProtectedRoute handles routing)
+### 3. `App.tsx` -- Remove rejected redirect to /pending
 
-### 3. PendingApproval.tsx -- Permanent Rejection Screen
-
-Remove the auto-logout behavior entirely:
-- Remove the `setTimeout` that calls `signOut` after 3 seconds
-- Remove the "You will be logged out automatically..." text
-- Add a "Go to Auth Page" button that calls `signOut()` then navigates to `/auth`
-- Keep the Realtime listener: if admin approves while on this page, auto-redirect to Dashboard
-- Keep the sticky rejection state (`rejectedLocked`) so it survives state changes
-
-### 4. AuthContext.tsx -- Remove user_roles DELETE listener interference
-
-The Realtime listener on `user_roles` DELETE events (line 38-62) forces logout when a role is deleted. For rejected users (who never had a role), this is fine. But we need to ensure the rejection handler in edge function (which deletes roles) doesn't conflict.
-
-Current polling logic (already fixed) correctly skips pending/rejected users -- no changes needed here.
-
-### 5. Edge Function `admin-users` -- Minor adjustment for accept-rejected
-
-When accepting a rejected user (`accept-rejected` action), the edge function already:
-- Updates status to "approved"
-- Clears `banned_until`
-- Creates user_role + moderator_permissions
-
-This triggers Realtime events that the rejected user's PendingApproval page picks up, auto-redirecting them. No changes needed here.
-
-## Technical Details
-
-### check-ban Edge Function
+Change `ProtectedRoute` to only redirect `"pending"` status to `/pending`. Remove `"rejected"` from the condition -- rejected users will never get past `handleLogin` in Auth.tsx (they are signed out before navigation).
 
 ```typescript
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  
-  const { email } = await req.json();
-  if (!email) return json(400, { error: "Missing email" });
-  
-  // Use service role to check registration_requests
-  const { data } = await adminClient
-    .from("registration_requests")
-    .select("banned_until, status")
-    .eq("email", email)
-    .gt("banned_until", new Date().toISOString())
-    .maybeSingle();
-  
-  if (data) {
-    return json(200, {
-      banned: true,
-      banned_until: data.banned_until,
-      ban_type: data.status === "rejected" ? "rejected" : "deleted"
-    });
-  }
-  
-  return json(200, { banned: false });
-});
-```
-
-### Auth.tsx Signup Handler Changes
-
-```typescript
-const handleSignup = async (e) => {
-  // Check ban first
-  const banCheck = await supabase.functions.invoke("check-ban", {
-    body: { email: signupEmail }
-  });
-  if (banCheck.data?.banned) {
-    // Show ban message with remaining time
-    return;
-  }
-  
-  const { error } = await signUp(signupEmail, signupPassword);
-  if (!error) {
-    await signOut(); // Immediately sign out
-    setShowRegistrationSuccess(true); // Show success message
-    // Do NOT navigate
-  }
-};
-```
-
-### Auth.tsx Login Handler Changes
-
-```typescript
-const handleLogin = async (e) => {
-  // Check ban first
-  const banCheck = await supabase.functions.invoke("check-ban", {
-    body: { email: loginEmail }
-  });
-  if (banCheck.data?.banned) {
-    // Show ban message
-    return;
-  }
-  
-  const { error } = await signIn(loginEmail, loginPassword);
-  if (!error) {
-    navigate("/"); // ProtectedRoute handles pending/rejected routing
-  }
-};
-```
-
-### PendingApproval.tsx Rejection Card
-
-```typescript
-if (rejectedLocked) {
-  return (
-    <Card>
-      <XCircle icon />
-      <h3>Access Denied</h3>
-      <p>{lockedReason || "Your request has been rejected."}</p>
-      <p className="text-xs">If an administrator re-approves your account, 
-         you will be automatically redirected.</p>
-      <Button onClick={handleSignOut}>
-        <LogOut /> Go to Auth Page
-      </Button>
-    </Card>
-  );
+if (status === "pending") {
+  return <Navigate to="/pending" replace />;
 }
 ```
+
+### 4. `PendingApproval.tsx` -- Remove rejection handling
+
+Remove all rejection-related code:
+- Remove `rejectedLocked` / `lockedReason` state
+- Remove the rejection card UI
+- Keep only the "Awaiting Approval" pending card
+- Keep Realtime listeners for auto-redirect on approval
+
+### 5. `AuthContext.tsx` -- No changes needed
+
+The polling already skips `pending` and `rejected` users. The `user_roles` DELETE listener handles permanent deletions. No modifications required.
 
 ## File Changes Summary
 
 | # | File | Action | Description |
 |---|------|--------|-------------|
-| 1 | `supabase/functions/check-ban/index.ts` | Create | New edge function to check email ban status |
-| 2 | `src/pages/Auth.tsx` | Modify | Add ban check before login/signup, sign out after signup, show success/ban messages |
-| 3 | `src/pages/PendingApproval.tsx` | Modify | Remove auto-logout, add "Go to Auth Page" button, keep Realtime for auto-approval redirect |
-| 4 | `src/contexts/AuthContext.tsx` | No change | Already correctly handles pending/rejected users |
+| 1 | `supabase/functions/check-ban/index.ts` | Modify | Also check for rejected status when no active ban found |
+| 2 | `src/pages/Auth.tsx` | Modify | Add post-login status check, inline rejection/pending display, sign out rejected users immediately |
+| 3 | `src/App.tsx` | Modify | Remove `"rejected"` from ProtectedRoute redirect |
+| 4 | `src/pages/PendingApproval.tsx` | Modify | Remove all rejection UI, keep only pending approval card |
 
-## Security Considerations
+## Security Notes
 
-- The `check-ban` edge function only returns ban status (boolean + timestamp), not user data
-- Ban enforcement happens server-side via the `handle_new_user` trigger (for signups) and the edge function (for logins)
-- The frontend ban check is a UX convenience; the real enforcement is backend-side (rejected users have no role, so RLS blocks all data access)
-- Rate limiting on the `check-ban` function could be added later if abuse is detected
+- Rejected users are signed out immediately after login -- they never access any protected route
+- The `check-ban` edge function catches active bans before login is even attempted
+- Post-login check catches rejected users whose ban has expired
+- RLS policies still block data access for users without roles as a final safety net
