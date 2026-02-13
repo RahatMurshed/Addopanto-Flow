@@ -36,6 +36,8 @@ import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { RoleGuard } from "@/components/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown } from "lucide-react";
+import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Navigate } from "react-router-dom";
 
 interface UserWithRole {
@@ -281,8 +283,12 @@ export default function UserManagement() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <SkeletonTable rows={8} columns={5} />
       </div>
     );
   }
@@ -433,7 +439,7 @@ export default function UserManagement() {
       </RoleGuard>
 
       {/* Role Change Confirmation Dialog */}
-      <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => !open && setRoleChangeConfirm(null)}>
+      <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open && !changeRoleMutation.isPending) setRoleChangeConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Role Change</AlertDialogTitle>
@@ -449,10 +455,10 @@ export default function UserManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRoleChange}>
+            <AlertDialogCancel disabled={changeRoleMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRoleChange} disabled={changeRoleMutation.isPending}>
               {changeRoleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirm
+              {changeRoleMutation.isPending ? "Updating..." : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -462,7 +468,7 @@ export default function UserManagement() {
       <AlertDialog
         open={!!deleteConfirm}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !deleteUserMutation.isPending) {
             setDeleteConfirm(null);
             setDeleteEmailInput("");
           }
@@ -500,7 +506,7 @@ export default function UserManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeleteUser}
               disabled={
@@ -511,7 +517,7 @@ export default function UserManagement() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
             >
               {deleteUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

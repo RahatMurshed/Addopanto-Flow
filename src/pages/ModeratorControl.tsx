@@ -14,6 +14,8 @@ import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { RoleGuard } from "@/components/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2, Shield, Search, ShieldAlert, TrendingUp, Receipt, FileText, Wallet, ArrowLeftRight } from "lucide-react";
+import { SkeletonModeratorCards } from "@/components/SkeletonLoaders";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Navigate } from "react-router-dom";
 
 interface ModeratorUser {
@@ -190,8 +192,12 @@ export default function ModeratorControl() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-52 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <SkeletonModeratorCards count={3} />
       </div>
     );
   }

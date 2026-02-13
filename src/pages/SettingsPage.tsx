@@ -136,12 +136,12 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="business-name">Business Name</Label>
-                <Input id="business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" />
+                <Input id="business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" disabled={saving} />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Currency</Label>
-                  <Select value={currency} onValueChange={setCurrency}>
+                  <Select value={currency} onValueChange={setCurrency} disabled={saving}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="BDT">BDT (৳)</SelectItem>
@@ -153,7 +153,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Fiscal Year Starts</Label>
-                  <Select value={fiscalMonth} onValueChange={setFiscalMonth}>
+                  <Select value={fiscalMonth} onValueChange={setFiscalMonth} disabled={saving}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {months.map((m, i) => (
@@ -165,7 +165,7 @@ export default function SettingsPage() {
               </div>
               <Button type="submit" disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
+                {saving ? "Saving..." : "Save Changes"}
               </Button>
             </form>
           </CardContent>
