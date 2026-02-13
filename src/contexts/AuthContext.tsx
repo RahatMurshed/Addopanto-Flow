@@ -61,6 +61,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
+  // Fallback: periodically validate session in case Realtime misses the deletion event
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      const { error } = await supabase.auth.getUser();
+      if (error) {
+        console.log('Session validation failed, forcing logout:', error.message);
+        await supabase.auth.signOut();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,
