@@ -422,7 +422,7 @@ export default function RegistrationRequests() {
 
         {/* Approve Dialog (for pending) */}
         <Dialog open={!!approveDialog} onOpenChange={(open) => { if (!open && !approveMutation.isPending) setApproveDialog(null); }}>
-          <DialogContent>
+          <DialogContent onInteractOutside={(e) => { if (approveMutation.isPending) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (approveMutation.isPending) e.preventDefault(); }}>
             <DialogHeader>
               <DialogTitle>Approve Registration</DialogTitle>
               <DialogDescription>
@@ -442,7 +442,7 @@ export default function RegistrationRequests() {
 
         {/* Accept from Rejected Dialog */}
         <Dialog open={!!acceptFromRejectedDialog} onOpenChange={(open) => { if (!open && !acceptFromRejectedMutation.isPending) setAcceptFromRejectedDialog(null); }}>
-          <DialogContent>
+          <DialogContent onInteractOutside={(e) => { if (acceptFromRejectedMutation.isPending) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (acceptFromRejectedMutation.isPending) e.preventDefault(); }}>
             <DialogHeader>
               <DialogTitle>Accept Rejected User</DialogTitle>
               <DialogDescription>
@@ -462,7 +462,7 @@ export default function RegistrationRequests() {
 
         {/* Reject Dialog */}
         <AlertDialog open={!!rejectDialog} onOpenChange={(open) => { if (!open && !rejectMutation.isPending) setRejectDialog(null); }}>
-          <AlertDialogContent>
+          <AlertDialogContent onEscapeKeyDown={(e) => { if (rejectMutation.isPending) e.preventDefault(); }}>
             <AlertDialogHeader>
               <AlertDialogTitle>Reject Registration</AlertDialogTitle>
               <AlertDialogDescription>
@@ -484,7 +484,7 @@ export default function RegistrationRequests() {
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setRejectionReason("")} disabled={rejectMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => rejectDialog && rejectMutation.mutate(rejectDialog)}
+                onClick={(e) => { e.preventDefault(); rejectDialog && rejectMutation.mutate(rejectDialog); }}
                 disabled={rejectMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >
@@ -497,7 +497,7 @@ export default function RegistrationRequests() {
 
         {/* Permanent Delete Dialog */}
         <AlertDialog open={!!deleteDialog} onOpenChange={(open) => { if (!open && !permanentDeleteMutation.isPending) setDeleteDialog(null); }}>
-          <AlertDialogContent>
+          <AlertDialogContent onEscapeKeyDown={(e) => { if (permanentDeleteMutation.isPending) e.preventDefault(); }}>
             <AlertDialogHeader>
               <AlertDialogTitle>Permanently Delete User</AlertDialogTitle>
               <AlertDialogDescription>
@@ -508,7 +508,7 @@ export default function RegistrationRequests() {
             <AlertDialogFooter>
               <AlertDialogCancel disabled={permanentDeleteMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => deleteDialog && permanentDeleteMutation.mutate(deleteDialog)}
+                onClick={(e) => { e.preventDefault(); deleteDialog && permanentDeleteMutation.mutate(deleteDialog); }}
                 disabled={permanentDeleteMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >

@@ -81,7 +81,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => { if (saving) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (saving) e.preventDefault(); }}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Expense Source" : "Create Expense Source"}</DialogTitle>
           <DialogDescription>

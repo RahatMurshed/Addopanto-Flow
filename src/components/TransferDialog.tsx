@@ -103,7 +103,7 @@ export default function TransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && isPending) return; onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => { if (isPending) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (isPending) e.preventDefault(); }}>
         <DialogHeader>
           <DialogTitle>Transfer Balance</DialogTitle>
           <DialogDescription>

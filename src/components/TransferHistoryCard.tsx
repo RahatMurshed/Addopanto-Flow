@@ -271,8 +271,8 @@ export default function TransferHistoryCard({
       </Card>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteId(null); }}>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (isDeleting) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this transfer?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -280,13 +280,14 @@ export default function TransferHistoryCard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={(e) => { e.preventDefault(); handleDelete(); }}
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
