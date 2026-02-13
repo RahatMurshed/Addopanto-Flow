@@ -1,186 +1,182 @@
 
-# Redesign: Rejection and Permanent Delete Workflows
 
-## Overview
+# Fix: Rejection Messages, Instant Approval Redirect, and Speed
 
-Currently, rejecting a user deletes them from auth immediately, allowing them to sign up again right away. The new design keeps rejected users in the system with time-based bans, adds a "permanent delete" option, and allows re-accepting rejected users.
+## Root Cause Analysis
 
-## New Behavior Summary
+There are three interconnected bugs:
 
-| Action | User Experience | Ban Duration |
-|--------|----------------|--------------|
-| **Reject** | Instant logout + rejection message. Can't login/signup. | 1 day |
-| **Permanent Delete** (from rejected tab) | Auth account deleted. Can't signup. | 7 days |
-| **Accept** (from rejected tab) | Instant access as Moderator | None |
+### Bug 1: AuthContext polling logs out pending users
+The 5-second polling in `AuthContext.tsx` checks if the user has a `user_roles` entry. **Pending users never have a role**, so the polling immediately forces them out every 5 seconds. This causes constant logout loops for users on the Pending Approval screen and prevents them from ever seeing a rejection or approval message.
 
-## Database Changes
+### Bug 2: No Realtime on registration_requests
+The Pending Approval page uses a 10-second HTTP poll to check status. There is no Realtime subscription on the `registration_requests` table, so approval and rejection are detected slowly (up to 10 seconds late).
 
-### Migration: Add `banned_until` column to `registration_requests`
+### Bug 3: Rejection message timing conflict
+Even if the rejection status is detected, the AuthContext polling (Bug 1) logs the user out before the PendingApproval page can show the rejection message.
 
-```sql
-ALTER TABLE registration_requests 
-  ADD COLUMN banned_until timestamptz DEFAULT NULL;
-```
+## Fix Summary
 
-### Migration: Update `handle_new_user()` trigger
+| # | File | Change |
+|---|------|--------|
+| 1 | `src/contexts/AuthContext.tsx` | Smart polling: skip role check for pending users, detect rejection |
+| 2 | `src/hooks/useRegistrationStatus.ts` | Add Realtime subscription for instant status changes |
+| 3 | `src/pages/PendingApproval.tsx` | Reduce backup polling from 10s to 3s |
 
-The trigger must check if the email is banned before creating a new registration request. If banned, it should raise an exception to block signup.
+## Detailed Changes
 
-```sql
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-BEGIN
-  -- Check if email is banned
-  IF EXISTS (
-    SELECT 1 FROM registration_requests 
-    WHERE email = NEW.email 
-      AND banned_until > now()
-  ) THEN
-    RAISE EXCEPTION 'This email has been temporarily blocked. Please try again later.';
-  END IF;
+### File 1: `src/contexts/AuthContext.tsx` -- Fix polling logic
 
-  -- Create user profile
-  INSERT INTO public.user_profiles (user_id, email) 
-  VALUES (NEW.id, NEW.email);
-  
-  -- Clean up old rejected/deleted requests for this email
-  DELETE FROM public.registration_requests WHERE email = NEW.email;
-  
-  -- Create new pending request
-  INSERT INTO public.registration_requests (user_id, email, status)
-  VALUES (NEW.id, NEW.email, 'pending');
-  
-  RETURN NEW;
-END;
-$$;
-```
+The 5-second polling interval (lines 65-91) currently does:
+1. Check `user_roles` -- if missing, force logout
+2. Check `getUser()` -- if error, force logout
 
-## Edge Function Changes (`supabase/functions/admin-users/index.ts`)
+**Problem**: Pending users have no role, so step 1 always triggers logout.
 
-### 1. Rewrite `handleRejectUser`
-
-**Stop deleting the user from auth.** Instead:
-1. Update `registration_requests` to status=rejected, set `banned_until = now + 1 day`
-2. Sign out all sessions (force logout)
-3. Keep the auth user alive (so the ban can be checked on next login attempt)
+**Fix**: Before checking roles, check the user's `registration_requests` status:
+- If **"pending"**: do nothing (expected -- no role yet)
+- If **"rejected"**: force local logout immediately
+- If **"approved"** or has a role: use the existing role-check logic (force logout if role disappears)
+- If no registration request exists (legacy user): use existing logic
 
 ```typescript
-const handleRejectUser = async (userId: string, reason?: string) => {
-  const { error: updateError } = await adminClient
+const interval = setInterval(async () => {
+  // Check registration request status first
+  const { data: regData } = await supabase
     .from("registration_requests")
-    .update({
-      status: "rejected",
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: user.id,
-      rejection_reason: reason || null,
-      banned_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 1 day
-    })
-    .eq("user_id", userId)
-    .eq("status", "pending");
+    .select("status")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  if (updateError) return json(500, { error: "Failed to update request" });
+  // If rejected, force logout immediately
+  if (regData?.status === "rejected") {
+    console.log("User rejected, forcing logout");
+    await supabase.auth.signOut({ scope: "local" });
+    return;
+  }
 
-  // Force logout
-  try {
-    await adminClient.auth.admin.signOut(userId, "global");
-  } catch (e) { /* non-fatal */ }
+  // If pending, skip role check (no role expected yet)
+  if (regData?.status === "pending") {
+    return;
+  }
 
-  return json(200, { success: true });
-};
+  // For approved/legacy users: check role still exists
+  const { data: roleData } = await supabase
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!roleData) {
+    console.log("User role not found, forcing logout");
+    await supabase.auth.signOut({ scope: "local" });
+    return;
+  }
+
+  // Validate auth session
+  const { error } = await supabase.auth.getUser();
+  if (error) {
+    console.log("Session invalid, forcing logout:", error.message);
+    await supabase.auth.signOut({ scope: "local" });
+  }
+}, 5000);
 ```
 
-### 2. Add `handlePermanentDelete`
+### File 2: `src/hooks/useRegistrationStatus.ts` -- Add Realtime
 
-New action for permanently deleting a rejected user:
-1. Update `banned_until = now + 7 days` on the registration request
-2. Delete user roles (if any)
-3. Sign out all sessions
-4. Delete user from auth (but the `registration_requests` row with `banned_until` stays)
-
-### 3. Add `handleAcceptFromRejected`
-
-New action for accepting a previously rejected user:
-1. Update `registration_requests` to status=approved, clear `banned_until`
-2. Create `user_roles` entry (moderator)
-3. Create `moderator_permissions` entry with configurable permissions
-
-### 4. Add new POST action routes
+Add a Realtime subscription on `registration_requests` filtered to the current user. When an `UPDATE` event is received (admin approves or rejects), immediately re-run `checkStatus()`. This gives near-instant detection instead of waiting for the next poll.
 
 ```typescript
-if (body.action === "permanent-delete") {
-  return await handlePermanentDelete(body.userId);
-}
-if (body.action === "accept-rejected") {
-  return await handleAcceptFromRejected(body.userId, body.permissions);
-}
+// Inside the hook, add a new useEffect:
+useEffect(() => {
+  if (!user) return;
+
+  const channel = supabase
+    .channel("reg-status-" + user.id)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "registration_requests",
+        filter: `user_id=eq.${user.id}`,
+      },
+      () => {
+        checkStatus();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user, checkStatus]);
 ```
 
-## Frontend Changes
+Also add a Realtime listener for `INSERT` on `user_roles` (for when an admin approves and creates the role):
 
-### 1. Auth page (`src/pages/Auth.tsx`)
+```typescript
+useEffect(() => {
+  if (!user) return;
 
-After a failed login, check if the error indicates a banned user. Also, modify signup to catch the trigger exception and show a user-friendly "temporarily blocked" message.
+  const channel = supabase
+    .channel("role-insert-" + user.id)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "user_roles",
+        filter: `user_id=eq.${user.id}`,
+      },
+      () => {
+        checkStatus();
+      }
+    )
+    .subscribe();
 
-### 2. Pending Approval page (`src/pages/PendingApproval.tsx`)
-
-When status is "rejected": show the rejection message and auto-logout. The `signOut` call uses `{ scope: 'local' }` for instant local cleanup.
-
-### 3. Registration Requests page (`src/pages/RegistrationRequests.tsx`)
-
-Update the **Rejected tab** to show two new action buttons per row:
-- **Accept** -- opens an approve dialog with permission toggles (reuses existing pattern)
-- **Permanently Delete** -- confirmation dialog, warns about 7-day ban
-
-Add new mutations for `permanent-delete` and `accept-rejected` actions.
-
-### 4. `useRegistrationStatus.ts`
-
-No changes needed -- it already handles the "rejected" status correctly and the `ProtectedRoute` in `App.tsx` handles redirection.
-
-### 5. `AuthContext.tsx`
-
-The existing 5-second polling + Realtime listener will detect the forced logout (signOut clears the session server-side, and the polling catches it). No changes needed.
-
-## Technical Details
-
-### File Change Summary
-
-| File | Change |
-|------|--------|
-| **Migration SQL** | Add `banned_until` column; update `handle_new_user()` trigger to block banned emails |
-| `supabase/functions/admin-users/index.ts` | Rewrite `handleRejectUser` (no auth delete); add `handlePermanentDelete` and `handleAcceptFromRejected` |
-| `src/pages/RegistrationRequests.tsx` | Add Accept/Delete buttons to rejected tab; add new mutations and dialogs |
-| `src/pages/Auth.tsx` | Show "temporarily blocked" error on signup if email is banned |
-| `src/pages/PendingApproval.tsx` | Use `{ scope: 'local' }` for signOut on rejection |
-
-### Flow Diagrams
-
-**Reject flow:**
-```text
-Admin clicks Reject
-  -> Edge fn: status=rejected, banned_until=+1day, signOut(global)
-  -> Client (within 5s): polling detects no role -> signOut({ scope: 'local' })
-  -> User sees Auth page
-  -> If user tries login: rejected status detected -> shown rejection message
-  -> If user tries signup: trigger blocks it for 1 day
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user, checkStatus]);
 ```
 
-**Permanent Delete flow:**
-```text
-Admin clicks Permanent Delete (from rejected tab)
-  -> Edge fn: banned_until=+7days, delete roles, signOut, delete auth user
-  -> registration_requests row stays with banned_until
-  -> If user tries signup within 7 days: trigger raises exception
-  -> After 7 days: signup succeeds, old request cleaned up
+**Note**: The `registration_requests` table needs to be added to the Realtime publication. A migration will be required:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.registration_requests;
 ```
 
-**Accept from Rejected flow:**
-```text
-Admin clicks Accept (from rejected tab)
-  -> Edge fn: status=approved, banned_until=null, create role + permissions
-  -> User can login immediately and access the app
+### File 3: `src/pages/PendingApproval.tsx` -- Faster backup polling
+
+Reduce the backup polling interval from 10 seconds to 3 seconds (line 20). With Realtime in place, this is just a safety net.
+
+```typescript
+const interval = setInterval(() => {
+  refetch();
+}, 3000);
 ```
+
+## How Each Scenario Works After the Fix
+
+**Rejection**:
+1. Admin clicks Reject
+2. Edge fn: sets status="rejected", signOut(global)
+3. Realtime fires UPDATE on registration_requests
+4. `useRegistrationStatus` instantly detects "rejected"
+5. PendingApproval shows rejection message with reason
+6. After 3 seconds, auto-logout via `signOut({ scope: 'local' })`
+7. User sees Auth page, cannot login (session revoked) or signup (1-day ban)
+
+**Approval**:
+1. Admin clicks Approve
+2. Edge fn: sets status="approved", creates user_role + permissions
+3. Realtime fires INSERT on user_roles AND UPDATE on registration_requests
+4. `useRegistrationStatus` instantly detects "has_role"
+5. PendingApproval redirects to Dashboard immediately
+
+**Permanent Delete**:
+1. Admin clicks Permanently Delete (from rejected tab)
+2. Edge fn: sets 7-day ban, deletes auth user
+3. User is already logged out (was rejected first)
+4. If they try to sign up within 7 days, the trigger blocks them
+
