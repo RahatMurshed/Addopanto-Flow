@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
@@ -26,9 +26,18 @@ import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
 import StudentOverdueSection from "@/components/StudentOverdueSection";
+import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/components/StudentFilters";
 
 export default function Students() {
-  const { data: students = [], isLoading } = useStudents();
+  const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
+
+  // Server-side filters passed to hook
+  const { data: students = [], isLoading } = useStudents({
+    search: filters.search,
+    status: filters.status,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+  });
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete } = useRole();
   const { data: userProfile } = useUserProfile();
@@ -55,7 +64,35 @@ export default function Students() {
     return map;
   }, [students, allPayments]);
 
-  // Summary cards
+  // Client-side payment status filters (admission & monthly depend on computed summaries)
+  const filteredStudents = useMemo(() => {
+    let result = students;
+
+    if (filters.admissionStatus !== "all") {
+      result = result.filter((s) => {
+        const sum = studentSummaries.get(s.id);
+        if (!sum) return false;
+        if (sum.admissionTotal === 0) return filters.admissionStatus === "paid";
+        return sum.admissionStatus === filters.admissionStatus;
+      });
+    }
+
+    if (filters.monthlyStatus !== "all") {
+      result = result.filter((s) => {
+        const sum = studentSummaries.get(s.id);
+        if (!sum) return false;
+        if (Number(s.monthly_fee_amount) === 0) return filters.monthlyStatus === "paid";
+        if (filters.monthlyStatus === "overdue") return sum.monthlyOverdueMonths.length > 0;
+        if (filters.monthlyStatus === "pending") return (sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length + sum.monthlyOverdueMonths.length) > 0;
+        if (filters.monthlyStatus === "paid") return sum.monthlyOverdueMonths.length === 0 && sum.monthlyPartialMonths.length === 0 && sum.monthlyPendingMonths.length === 0;
+        return true;
+      });
+    }
+
+    return result;
+  }, [students, studentSummaries, filters.admissionStatus, filters.monthlyStatus]);
+
+  // Summary cards (use all server-returned students, not filtered)
   const totalStudents = students.length;
   const activeStudents = students.filter((s) => s.status === "active").length;
   const pendingAdmission = students.filter((s) => {
@@ -67,7 +104,12 @@ export default function Students() {
     return sum && sum.monthlyOverdueMonths.length > 0;
   }).length;
 
-  const pagination = usePagination(students);
+  const pagination = usePagination(filteredStudents);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    pagination.goToPage(1);
+  }, [filters]);
 
   const handleCreate = async (data: StudentInsert) => {
     try {
@@ -169,7 +211,7 @@ export default function Students() {
       )}
 
       {/* Students Table */}
-      {students.length === 0 ? (
+      {students.length === 0 && filters.search === "" && filters.status === "all" ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 rounded-full bg-muted p-4"><GraduationCap className="h-8 w-8 text-muted-foreground" /></div>
@@ -180,98 +222,120 @@ export default function Students() {
         </Card>
       ) : (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">All Students</CardTitle>
-            <span className="text-sm text-muted-foreground">{totalStudents} students</span>
+          <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">All Students</CardTitle>
+              <span className="text-sm text-muted-foreground">{filteredStudents.length} students</span>
+            </div>
+            <StudentFilters
+              filters={filters}
+              onChange={setFilters}
+              totalResults={filteredStudents.length}
+              totalStudents={totalStudents}
+            />
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Student ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Admission</TableHead>
-                    <TableHead>Monthly</TableHead>
-                    <TableHead className="hidden md:table-cell">Total Paid</TableHead>
-                    <TableHead className="hidden md:table-cell">Total Pending</TableHead>
-                    <TableHead className="w-28">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagination.paginatedItems.map((s) => {
-                    const sum = studentSummaries.get(s.id)!;
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">{s.name}</TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">{s.student_id_number || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">{s.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {sum.admissionTotal === 0 ? (
-                            <span className="text-muted-foreground text-sm">N/A</span>
-                          ) : sum.admissionStatus === "paid" ? (
-                            <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                          ) : sum.admissionStatus === "partial" ? (
-                            <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
-                              {formatCurrency(sum.admissionPaid, currency)}/{formatCurrency(sum.admissionTotal, currency)}
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive">Pending</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {Number(s.monthly_fee_amount) === 0 ? (
-                            <span className="text-muted-foreground text-sm">N/A</span>
-                          ) : (() => {
-                            const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
-                            return totalPendingMonths > 0 ? (
-                              <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{totalPendingMonths} months pending</Badge>
-                            ) : sum.monthlyPaidMonths.length > 0 ? (
+            {filteredStudents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="mb-3 rounded-full bg-muted p-3">
+                  <Search className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground">No students match your filters.</p>
+                <Button variant="link" className="mt-2" onClick={() => setFilters(defaultFilters)}>
+                  Clear all filters
+                </Button>
+              </div>
+            ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">Student ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Admission</TableHead>
+                      <TableHead>Monthly</TableHead>
+                      <TableHead className="hidden md:table-cell">Total Paid</TableHead>
+                      <TableHead className="hidden md:table-cell">Total Pending</TableHead>
+                      <TableHead className="w-28">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagination.paginatedItems.map((s) => {
+                      const sum = studentSummaries.get(s.id)!;
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{s.name}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground">{s.student_id_number || "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">{s.status}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {sum.admissionTotal === 0 ? (
+                              <span className="text-muted-foreground text-sm">N/A</span>
+                            ) : sum.admissionStatus === "paid" ? (
                               <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                            ) : sum.admissionStatus === "partial" ? (
+                              <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
+                                {formatCurrency(sum.admissionPaid, currency)}/{formatCurrency(sum.admissionTotal, currency)}
+                              </Badge>
                             ) : (
-                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell font-semibold text-primary">
-                          {formatCurrency(sum.totalPaid, currency)}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell font-semibold text-destructive">
-                          {sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {canAddRevenue && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
-                                <CreditCard className="h-4 w-4" />
-                              </Button>
+                              <Badge variant="destructive">Pending</Badge>
                             )}
-                            {canDelete && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(s.id)}>
-                                <Trash2 className="h-4 w-4" />
+                          </TableCell>
+                          <TableCell>
+                            {Number(s.monthly_fee_amount) === 0 ? (
+                              <span className="text-muted-foreground text-sm">N/A</span>
+                            ) : (() => {
+                              const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
+                              return totalPendingMonths > 0 ? (
+                                <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{totalPendingMonths} months pending</Badge>
+                              ) : sum.monthlyPaidMonths.length > 0 ? (
+                                <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                              ) : (
+                                <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell font-semibold text-primary">
+                            {formatCurrency(sum.totalPaid, currency)}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell font-semibold text-destructive">
+                            {sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
+                                <Eye className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <TablePagination
-              currentPage={pagination.currentPage} totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems} startIndex={pagination.startIndex}
-              endIndex={pagination.endIndex} itemsPerPage={pagination.itemsPerPage}
-              onPageChange={pagination.goToPage} onItemsPerPageChange={pagination.setItemsPerPage}
-              canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev}
-            />
+                              {canAddRevenue && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
+                                  <CreditCard className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(s.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={pagination.currentPage} totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems} startIndex={pagination.startIndex}
+                endIndex={pagination.endIndex} itemsPerPage={pagination.itemsPerPage}
+                onPageChange={pagination.goToPage} onItemsPerPageChange={pagination.setItemsPerPage}
+                canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev}
+              />
+            </>
+            )}
           </CardContent>
         </Card>
       )}
