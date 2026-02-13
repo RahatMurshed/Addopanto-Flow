@@ -24,18 +24,27 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
 import { useToast } from "@/hooks/use-toast";
 
+const yyyyMmRegex = /^\d{4}-\d{2}$/;
+
 const studentSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   student_id_number: z.string().max(50).nullable().optional(),
   email: z.string().email("Invalid email").nullable().optional().or(z.literal("")),
   phone: z.string().max(20).nullable().optional(),
   enrollment_date: z.string().min(1, "Enrollment date is required"),
-  billing_start_month: z.string().regex(/^\d{4}-\d{2}$/, "Format: YYYY-MM"),
+  billing_start_month: z.string().regex(yyyyMmRegex, "Format: YYYY-MM"),
+  course_start_month: z.string().regex(yyyyMmRegex, "Format: YYYY-MM").nullable().optional().or(z.literal("")),
+  course_end_month: z.string().regex(yyyyMmRegex, "Format: YYYY-MM").nullable().optional().or(z.literal("")),
   admission_fee_total: z.number().min(0, "Must be >= 0"),
   monthly_fee_amount: z.number().min(0, "Must be >= 0"),
   status: z.enum(["active", "inactive", "graduated"]),
   notes: z.string().max(500).nullable().optional(),
-});
+}).refine((data) => {
+  if (data.course_start_month && data.course_end_month) {
+    return data.course_end_month >= data.course_start_month;
+  }
+  return true;
+}, { message: "Course end must be after start", path: ["course_end_month"] });
 
 type StudentFormData = z.infer<typeof studentSchema>;
 
@@ -95,6 +104,8 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
         phone: student?.phone || null,
         enrollment_date: student?.enrollment_date || format(new Date(), "yyyy-MM-dd"),
         billing_start_month: student?.billing_start_month || currentYearMonth,
+        course_start_month: student?.course_start_month || "",
+        course_end_month: student?.course_end_month || "",
         admission_fee_total: student ? Number(student.admission_fee_total) : 0,
         monthly_fee_amount: student ? Number(student.monthly_fee_amount) : 0,
         status: student?.status || "active",
@@ -113,13 +124,16 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
     setSaving(true);
     try {
       setSavingStep("Creating student...");
+      const billingMonth = data.billing_start_month || data.course_start_month || currentYearMonth;
       const result = await onSave({
         name: data.name,
         student_id_number: data.student_id_number || null,
         email: data.email || null,
         phone: data.phone || null,
         enrollment_date: data.enrollment_date,
-        billing_start_month: data.billing_start_month,
+        billing_start_month: billingMonth,
+        course_start_month: data.course_start_month || null,
+        course_end_month: data.course_end_month || null,
         admission_fee_total: data.admission_fee_total,
         monthly_fee_amount: data.monthly_fee_amount,
         status: data.status,
@@ -231,6 +245,19 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
               <Label htmlFor="billing_start_month">First Billing Month *</Label>
               <Input id="billing_start_month" placeholder="YYYY-MM" disabled={saving} {...form.register("billing_start_month")} />
               {form.formState.errors.billing_start_month && <p className="text-sm text-destructive">{form.formState.errors.billing_start_month.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="course_start_month">Course Start Month</Label>
+              <Input id="course_start_month" placeholder="YYYY-MM" disabled={saving} {...form.register("course_start_month")} />
+              {form.formState.errors.course_start_month && <p className="text-sm text-destructive">{form.formState.errors.course_start_month.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="course_end_month">Course End Month</Label>
+              <Input id="course_end_month" placeholder="YYYY-MM" disabled={saving} {...form.register("course_end_month")} />
+              {form.formState.errors.course_end_month && <p className="text-sm text-destructive">{form.formState.errors.course_end_month.message}</p>}
             </div>
           </div>
 
