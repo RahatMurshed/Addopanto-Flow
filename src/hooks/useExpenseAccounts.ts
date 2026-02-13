@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type ExpenseAccount = Tables<"expense_accounts">;
@@ -27,14 +28,16 @@ export function useExpenseAccounts() {
 
 export function useCreateExpenseAccount() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (account: Omit<ExpenseAccountInsert, "user_id">) => {
+    mutationFn: async (account: Omit<ExpenseAccountInsert, "user_id" | "company_id">) => {
       if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
       const { data, error } = await supabase
         .from("expense_accounts")
-        .insert({ ...account, user_id: user.id })
+        .insert({ ...account, user_id: user.id, company_id: activeCompanyId })
         .select()
         .single();
       if (error) throw error;
@@ -47,7 +50,6 @@ export function useCreateExpenseAccount() {
 }
 
 export function useUpdateExpenseAccount() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -68,7 +70,6 @@ export function useUpdateExpenseAccount() {
 }
 
 export function useDeleteExpenseAccount() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -84,6 +85,7 @@ export function useDeleteExpenseAccount() {
 
 export function useCreateDefaultAccounts() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   const defaultAccounts = [
@@ -98,8 +100,9 @@ export function useCreateDefaultAccounts() {
   return useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
       const { error } = await supabase.from("expense_accounts").insert(
-        defaultAccounts.map((acc) => ({ ...acc, user_id: user.id }))
+        defaultAccounts.map((acc) => ({ ...acc, user_id: user.id, company_id: activeCompanyId }))
       );
       if (error) throw error;
     },

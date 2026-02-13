@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type Revenue = Tables<"revenues">;
@@ -31,21 +32,23 @@ export function useRevenues() {
 
 export function useCreateRevenue() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (revenue: Omit<RevenueInsert, "user_id">) => {
+    mutationFn: async (revenue: Omit<RevenueInsert, "user_id" | "company_id">) => {
       if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
 
       // Insert revenue
       const { data: revenueData, error: revenueError } = await supabase
         .from("revenues")
-        .insert({ ...revenue, user_id: user.id })
+        .insert({ ...revenue, user_id: user.id, company_id: activeCompanyId })
         .select()
         .single();
       if (revenueError) throw revenueError;
 
-      // Get active expense accounts (global - all accounts)
+      // Get active expense accounts
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
         .select("id, allocation_percentage")
@@ -58,6 +61,7 @@ export function useCreateRevenue() {
           .filter((acc) => acc.allocation_percentage > 0)
           .map((acc) => ({
             user_id: user.id,
+            company_id: activeCompanyId,
             revenue_id: revenueData.id,
             expense_account_id: acc.id,
             amount: (revenueData.amount * acc.allocation_percentage) / 100,
@@ -80,6 +84,7 @@ export function useCreateRevenue() {
 
 export function useUpdateRevenue() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -103,8 +108,6 @@ export function useUpdateRevenue() {
 
       // If amount changed, update allocations proportionally
       if (updates.amount !== undefined && updates.amount !== oldRevenue.amount) {
-        const ratio = updates.amount / oldRevenue.amount;
-
         // Get existing allocations for this revenue
         const { data: existingAllocations } = await supabase
           .from("allocations")
@@ -112,10 +115,8 @@ export function useUpdateRevenue() {
           .eq("revenue_id", id);
 
         if (existingAllocations && existingAllocations.length > 0) {
-          // Delete old allocations and recreate with new amounts
           await supabase.from("allocations").delete().eq("revenue_id", id);
 
-          // Get active accounts and recalculate (global - all accounts)
           const { data: accounts } = await supabase
             .from("expense_accounts")
             .select("id, allocation_percentage")
@@ -126,6 +127,7 @@ export function useUpdateRevenue() {
               .filter((acc) => acc.allocation_percentage > 0)
               .map((acc) => ({
                 user_id: user!.id,
+                company_id: activeCompanyId!,
                 revenue_id: id,
                 expense_account_id: acc.id,
                 amount: (updates.amount! * acc.allocation_percentage) / 100,
@@ -148,12 +150,10 @@ export function useUpdateRevenue() {
 }
 
 export function useDeleteRevenue() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // Allocations will be deleted automatically via CASCADE
       const { error } = await supabase.from("revenues").delete().eq("id", id);
       if (error) throw error;
     },

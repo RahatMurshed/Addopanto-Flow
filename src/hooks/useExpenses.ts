@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type Expense = Tables<"expenses">;
@@ -31,14 +32,16 @@ export function useExpenses() {
 
 export function useCreateExpense() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (expense: Omit<ExpenseInsert, "user_id">) => {
+    mutationFn: async (expense: Omit<ExpenseInsert, "user_id" | "company_id">) => {
       if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
       const { data, error } = await supabase
         .from("expenses")
-        .insert({ ...expense, user_id: user.id })
+        .insert({ ...expense, user_id: user.id, company_id: activeCompanyId })
         .select()
         .single();
       if (error) throw error;
@@ -53,7 +56,6 @@ export function useCreateExpense() {
 }
 
 export function useUpdateExpense() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -76,7 +78,6 @@ export function useUpdateExpense() {
 }
 
 export function useDeleteExpense() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -112,31 +113,26 @@ export function useAccountBalances() {
     queryFn: async () => {
       if (!user) return [];
 
-      // Get all accounts
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
         .select("*");
       if (accountsError) throw accountsError;
 
-      // Get all allocations
       const { data: allocations, error: allocationsError } = await supabase
         .from("allocations")
         .select("expense_account_id, amount");
       if (allocationsError) throw allocationsError;
 
-      // Get all expenses
       const { data: expenses, error: expensesError } = await supabase
         .from("expenses")
         .select("expense_account_id, amount");
       if (expensesError) throw expensesError;
 
-      // Get all khata transfers
       const { data: transfers, error: transfersError } = await supabase
         .from("khata_transfers")
         .select("from_account_id, to_account_id, amount");
       if (transfersError) throw transfersError;
 
-      // Calculate balances per account
       const balances: AccountBalance[] = accounts.map((account) => {
         const totalAllocated = allocations
           .filter((a) => a.expense_account_id === account.id)
@@ -146,7 +142,6 @@ export function useAccountBalances() {
           .filter((e) => e.expense_account_id === account.id)
           .reduce((sum, e) => sum + Number(e.amount), 0);
 
-        // Add incoming transfers to allocated, outgoing transfers to spent
         const transfersIn = (transfers ?? [])
           .filter((t) => t.to_account_id === account.id)
           .reduce((sum, t) => sum + Number(t.amount), 0);

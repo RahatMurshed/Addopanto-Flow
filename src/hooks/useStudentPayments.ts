@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export interface StudentPayment {
   id: string;
@@ -13,6 +14,7 @@ export interface StudentPayment {
   receipt_number: string | null;
   description: string | null;
   user_id: string;
+  company_id: string;
   created_at: string;
 }
 
@@ -51,23 +53,24 @@ export function useStudentPayments(studentId?: string) {
 
 export function useCreateStudentPayment() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payment: StudentPaymentInsert & { studentName?: string }) => {
       if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
       const { studentName, ...paymentData } = payment;
 
       // Insert student payment
       const { data, error } = await supabase
         .from("student_payments")
-        .insert({ ...paymentData, user_id: user.id } as any)
+        .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId } as any)
         .select()
         .single();
       if (error) throw error;
 
       // Also insert into revenues table for integration
-      // Find or create "Student Fees" revenue source
       let sourceId: string | null = null;
       const { data: sources } = await supabase
         .from("revenue_sources")
@@ -80,7 +83,7 @@ export function useCreateStudentPayment() {
       } else {
         const { data: newSource } = await supabase
           .from("revenue_sources")
-          .insert({ name: "Student Fees", user_id: user.id })
+          .insert({ name: "Student Fees", user_id: user.id, company_id: activeCompanyId })
           .select("id")
           .single();
         if (newSource) sourceId = newSource.id;
@@ -97,15 +100,14 @@ export function useCreateStudentPayment() {
         source_id: sourceId,
         description: desc,
         user_id: user.id,
+        company_id: activeCompanyId,
       });
       if (revError) console.error("Failed to create revenue entry:", revError);
 
-      // Also create allocations for the revenue (same logic as useCreateRevenue)
-      // Get the last inserted revenue to get its id
+      // Also create allocations for the revenue
       const { data: lastRevenue } = await supabase
         .from("revenues")
         .select("id")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
@@ -121,6 +123,7 @@ export function useCreateStudentPayment() {
             .filter((acc) => acc.allocation_percentage > 0)
             .map((acc) => ({
               user_id: user.id,
+              company_id: activeCompanyId,
               revenue_id: lastRevenue.id,
               expense_account_id: acc.id,
               amount: (paymentData.amount * acc.allocation_percentage) / 100,
@@ -233,7 +236,6 @@ export function computeStudentSummary(
   payments: StudentPayment[],
   feeHistory: MonthlyFeeHistory[] = []
 ): StudentSummary {
-  // Admission
   const admissionPayments = payments.filter((p) => p.payment_type === "admission");
   const admissionPaid = admissionPayments.reduce((s, p) => s + Number(p.amount), 0);
   const admissionTotal = Number(student.admission_fee_total);
@@ -244,19 +246,16 @@ export function computeStudentSummary(
       ? "partial"
       : admissionTotal > 0
       ? "pending"
-      : "paid"; // no admission fee = considered paid
+      : "paid";
 
-  // Monthly
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const billingStart = student.billing_start_month;
 
-  // Generate all months from billing_start to the end of the course or current month (whichever is later)
   const allMonths: string[] = [];
   if (billingStart && student.monthly_fee_amount > 0) {
     let [year, month] = billingStart.split("-").map(Number);
     const courseEnd = student.course_end_month || currentMonth;
-    // Use whichever is later: course_end_month or currentMonth
     const endBound = courseEnd > currentMonth ? courseEnd : currentMonth;
     let cursor = billingStart;
     while (cursor <= endBound) {
@@ -267,11 +266,9 @@ export function computeStudentSummary(
     }
   }
 
-  // Collect all months covered by monthly payments
   const monthlyPayments = payments.filter((p) => p.payment_type === "monthly");
   const paidMonthsSet = new Set<string>();
   
-  // Track cumulative payments per month for partial payment support
   const monthPaymentTotals = new Map<string, number>();
   for (const p of monthlyPayments) {
     if (p.months_covered) {
@@ -281,7 +278,6 @@ export function computeStudentSummary(
     }
   }
 
-  // Determine fee for each month using fee history
   const getFeeForMonth = (month: string): number => {
     if (feeHistory.length === 0) return Number(student.monthly_fee_amount);
     let fee = Number(student.monthly_fee_amount);
@@ -316,10 +312,7 @@ export function computeStudentSummary(
   }
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
-
-  // monthlyPaidTotal = actual money received for monthly payments
   const monthlyPaidTotal = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
-  // monthlyPendingTotal = remaining owed across partial + overdue + pending months
   let monthlyPendingTotal = 0;
   for (const m of [...monthlyPartialMonths, ...monthlyOverdueMonths, ...monthlyPendingMonths]) {
     const fee = getFeeForMonth(m);
@@ -330,7 +323,6 @@ export function computeStudentSummary(
   const admissionPending = Math.max(0, admissionTotal - admissionPaid);
   const totalPending = admissionPending + monthlyPendingTotal;
 
-  // Compute totalExpected from allMonths (now covers full course range)
   let totalExpectedMonthly = 0;
   for (const m of allMonths) {
     totalExpectedMonthly += getFeeForMonth(m);

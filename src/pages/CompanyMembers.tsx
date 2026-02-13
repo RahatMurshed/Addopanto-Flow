@@ -1,0 +1,378 @@
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { Users, Shield, UserPlus, Search, Check, X, Loader2, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Navigate } from "react-router-dom";
+
+export default function CompanyMembers() {
+  const { user } = useAuth();
+  const { activeCompanyId, activeCompany, canManageMembers, isCipher } = useCompany();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+
+  // Fetch members
+  const { data: members = [], isLoading: membersLoading } = useQuery({
+    queryKey: ["company-members", activeCompanyId],
+    queryFn: async () => {
+      if (!activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("company_memberships")
+        .select("*")
+        .eq("company_id", activeCompanyId)
+        .order("joined_at", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompanyId && canManageMembers,
+  });
+
+  // Fetch member emails
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["member-profiles", members.map(m => m.user_id)],
+    queryFn: async () => {
+      if (members.length === 0) return [];
+      const { data } = await supabase
+        .from("user_profiles")
+        .select("user_id, email");
+      return data ?? [];
+    },
+    enabled: members.length > 0,
+  });
+
+  // Fetch join requests
+  const { data: joinRequests = [], isLoading: requestsLoading } = useQuery({
+    queryKey: ["company-join-requests", activeCompanyId],
+    queryFn: async () => {
+      if (!activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("company_join_requests")
+        .select("*")
+        .eq("company_id", activeCompanyId)
+        .order("requested_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompanyId && canManageMembers,
+  });
+
+  // Fetch join request emails
+  const { data: requestProfiles = [] } = useQuery({
+    queryKey: ["request-profiles", joinRequests.map(r => r.user_id)],
+    queryFn: async () => {
+      if (joinRequests.length === 0) return [];
+      const userIds = joinRequests.map(r => r.user_id);
+      const { data } = await supabase
+        .from("user_profiles")
+        .select("user_id, email")
+        .in("user_id", userIds);
+      return data ?? [];
+    },
+    enabled: joinRequests.length > 0,
+  });
+
+  const getEmail = (userId: string) => {
+    return profiles.find(p => p.user_id === userId)?.email || 
+           requestProfiles.find(p => p.user_id === userId)?.email || userId;
+  };
+
+  const pendingRequests = joinRequests.filter(r => r.status === "pending");
+
+  // Update member mutation
+  const updateMemberMutation = useMutation({
+    mutationFn: async ({ memberId, updates }: { memberId: string; updates: Record<string, any> }) => {
+      const { error } = await supabase
+        .from("company_memberships")
+        .update(updates)
+        .eq("id", memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
+      toast({ title: "Member updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Approve join request
+  const approveRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const req = joinRequests.find(r => r.id === requestId);
+      if (!req || !activeCompanyId) return;
+      
+      // Update request status
+      await supabase
+        .from("company_join_requests")
+        .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq("id", requestId);
+
+      // Create membership
+      await supabase
+        .from("company_memberships")
+        .insert({
+          user_id: req.user_id,
+          company_id: activeCompanyId,
+          role: "moderator" as any,
+          status: "active",
+          approved_by: user?.id,
+        });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-join-requests", activeCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
+      toast({ title: "Member approved" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Reject join request
+  const rejectRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      await supabase
+        .from("company_join_requests")
+        .update({ status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq("id", requestId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-join-requests", activeCompanyId] });
+      toast({ title: "Request rejected" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Remove member
+  const removeMemberMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from("company_memberships")
+        .delete()
+        .eq("id", memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
+      toast({ title: "Member removed" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Generate invite code
+  const generateInviteMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("company-join", {
+        body: { action: "generate-invite", companyId: activeCompanyId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+      toast({ title: "Invite code generated", description: data?.inviteCode });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const filteredMembers = useMemo(() => {
+    if (!search.trim()) return members;
+    const q = search.toLowerCase();
+    return members.filter(m => {
+      const email = getEmail(m.user_id);
+      return email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
+    });
+  }, [members, search, profiles]);
+
+  if (!canManageMembers) return <Navigate to="/" replace />;
+
+  const roleBadge = (role: string) => {
+    const colors: Record<string, string> = {
+      admin: "bg-primary/15 text-primary border-primary/30",
+      moderator: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
+      viewer: "bg-muted text-muted-foreground",
+    };
+    return <Badge className={colors[role] || ""}>{role}</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Company Members</h1>
+        <p className="text-muted-foreground">Manage members, permissions, and join requests</p>
+      </div>
+
+      <Tabs defaultValue="members">
+        <TabsList>
+          <TabsTrigger value="members" className="gap-2">
+            <Users className="h-4 w-4" /> Members ({members.length})
+          </TabsTrigger>
+          <TabsTrigger value="requests" className="gap-2">
+            <UserPlus className="h-4 w-4" /> Requests
+            {pendingRequests.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingRequests.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="invite" className="gap-2">
+            <Shield className="h-4 w-4" /> Invite
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="members" className="space-y-4 mt-4">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search members..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="hidden md:table-cell">Revenue</TableHead>
+                    <TableHead className="hidden md:table-cell">Expense</TableHead>
+                    <TableHead className="hidden md:table-cell">Transfer</TableHead>
+                    <TableHead className="hidden md:table-cell">Reports</TableHead>
+                    <TableHead className="hidden lg:table-cell">Students</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMembers.map((member) => {
+                    const isCurrentUser = member.user_id === user?.id;
+                    const isAdmin = member.role === "admin";
+                    return (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <p className="font-medium">{getEmail(member.user_id)}{isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}</p>
+                        </TableCell>
+                        <TableCell>
+                          {isCurrentUser || isAdmin ? (
+                            roleBadge(member.role)
+                          ) : (
+                            <Select
+                              value={member.role}
+                              onValueChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { role: v } })}
+                            >
+                              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="moderator">Moderator</SelectItem>
+                                <SelectItem value="viewer">Viewer</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableCell>
+                        {["can_add_revenue", "can_add_expense", "can_transfer", "can_view_reports", "can_manage_students"].map((perm) => (
+                          <TableCell key={perm} className={perm === "can_manage_students" ? "hidden lg:table-cell" : "hidden md:table-cell"}>
+                            <Switch
+                              checked={isAdmin || member[perm as keyof typeof member] as boolean}
+                              disabled={isAdmin || isCurrentUser}
+                              onCheckedChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { [perm]: v } })}
+                            />
+                          </TableCell>
+                        ))}
+                        <TableCell>
+                          {!isCurrentUser && !isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMemberMutation.mutate(member.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="requests" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Join Requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingRequests.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No pending requests</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingRequests.map((req) => (
+                      <TableRow key={req.id}>
+                        <TableCell className="font-medium">{getEmail(req.user_id)}</TableCell>
+                        <TableCell className="max-w-[200px] truncate text-muted-foreground">{req.message || "—"}</TableCell>
+                        <TableCell>{format(new Date(req.requested_at), "MMM d, yyyy")}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" className="text-emerald-600 gap-1" onClick={() => approveRequestMutation.mutate(req.id)}>
+                              <Check className="h-3 w-3" /> Approve
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-destructive gap-1" onClick={() => rejectRequestMutation.mutate(req.id)}>
+                              <X className="h-3 w-3" /> Reject
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invite" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Invite Settings</CardTitle>
+              <CardDescription>Manage invite codes and join password for this company</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {activeCompany?.invite_code && (
+                <div className="flex items-center gap-3 rounded-lg border p-4">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">Current Invite Code</p>
+                    <p className="font-mono text-lg font-bold">{activeCompany.invite_code}</p>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={() => {
+                    navigator.clipboard.writeText(activeCompany.invite_code!);
+                    toast({ title: "Copied!" });
+                  }}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <Button variant="outline" onClick={() => generateInviteMutation.mutate()} disabled={generateInviteMutation.isPending}>
+                {generateInviteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                {activeCompany?.invite_code ? "Regenerate" : "Generate"} Invite Code
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
