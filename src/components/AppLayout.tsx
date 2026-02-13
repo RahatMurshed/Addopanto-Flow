@@ -30,6 +30,7 @@ import {
   Plus,
   GraduationCap,
   ArrowLeftRight,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,10 +61,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Build nav items dynamically based on role
   const navItems = [
     ...baseNavItems,
-    // Settings - visible to Admin and Cipher only
     ...((isCompanyAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
-    // Company Members (replaces users/requests/moderators)
     ...(canManageMembers ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
+    ...((isCompanyAdmin || isCipher) ? [{ label: "User Management", href: "/users", icon: ShieldCheck }] : []),
   ];
 
   const handleLogout = async () => {

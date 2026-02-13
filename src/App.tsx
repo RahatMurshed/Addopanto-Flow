@@ -22,6 +22,7 @@ import CompanySelection from "@/pages/CompanySelection";
 import JoinCompany from "@/pages/JoinCompany";
 import CreateCompany from "@/pages/CreateCompany";
 import CompanyMembers from "@/pages/CompanyMembers";
+import UserManagement from "@/pages/UserManagement";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -117,6 +118,7 @@ const App = () => (
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
               
               <Route path="*" element={<NotFound />} />
             </Routes>

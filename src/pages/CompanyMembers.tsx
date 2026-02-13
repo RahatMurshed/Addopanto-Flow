@@ -19,7 +19,7 @@ import { Navigate } from "react-router-dom";
 
 export default function CompanyMembers() {
   const { user } = useAuth();
-  const { activeCompanyId, activeCompany, canManageMembers, isCipher } = useCompany();
+  const { activeCompanyId, activeCompany, canManageMembers, isCipher, isCompanyAdmin } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -253,14 +253,18 @@ export default function CompanyMembers() {
                 <TableBody>
                   {filteredMembers.map((member) => {
                     const isCurrentUser = member.user_id === user?.id;
-                    const isAdmin = member.role === "admin";
+                    const memberIsAdmin = member.role === "admin";
+                    // Cipher can manage everyone except themselves; admin can manage non-admins
+                    const canModifyMember = !isCurrentUser && (isCipher || (isCompanyAdmin && !memberIsAdmin));
+                    // Permissions switches: admins always have all perms, only modifiable if canModifyMember
+                    const permsDisabled = !canModifyMember || memberIsAdmin;
                     return (
                       <TableRow key={member.id}>
                         <TableCell>
                           <p className="font-medium">{getEmail(member.user_id)}{isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}</p>
                         </TableCell>
                         <TableCell>
-                          {isCurrentUser || isAdmin ? (
+                          {!canModifyMember ? (
                             roleBadge(member.role)
                           ) : (
                             <Select
@@ -269,7 +273,7 @@ export default function CompanyMembers() {
                             >
                               <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="admin">Admin</SelectItem>
+                                {isCipher && <SelectItem value="admin">Admin</SelectItem>}
                                 <SelectItem value="moderator">Moderator</SelectItem>
                                 <SelectItem value="viewer">Viewer</SelectItem>
                               </SelectContent>
@@ -279,14 +283,14 @@ export default function CompanyMembers() {
                         {["can_add_revenue", "can_add_expense", "can_transfer", "can_view_reports", "can_manage_students"].map((perm) => (
                           <TableCell key={perm} className={perm === "can_manage_students" ? "hidden lg:table-cell" : "hidden md:table-cell"}>
                             <Switch
-                              checked={isAdmin || member[perm as keyof typeof member] as boolean}
-                              disabled={isAdmin || isCurrentUser}
+                              checked={memberIsAdmin || member[perm as keyof typeof member] as boolean}
+                              disabled={permsDisabled}
                               onCheckedChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { [perm]: v } })}
                             />
                           </TableCell>
                         ))}
                         <TableCell>
-                          {!isCurrentUser && !isAdmin && (
+                          {canModifyMember && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMemberMutation.mutate(member.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
