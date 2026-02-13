@@ -1,34 +1,29 @@
 
 
-# Fix Payment Notes Timeline Card Layout Overflow
+# Make Monthly Overdue Section Always Visible
 
 ## Problem
 
-The Payment Notes card breaks the page layout because long text without spaces (e.g., "rgheeeeeeeeeeeeeerheerererererer...") overflows horizontally, stretching the card beyond the page width.
+The `StudentOverdueSection` component currently returns `null` when there are no overdue months. Since all your students' billing starts in March 2026 (next month), there are no overdue payments yet -- only future pending ones. The section is working correctly but is completely hidden when empty.
 
-## Fix
+## Solution
 
-Add `overflow-wrap: anywhere` (via Tailwind's `break-all` or `break-words` class) to the note text paragraph so long unbroken strings wrap properly within the card boundaries.
+Make the Monthly Overdue Section always visible on the Students page, even when there are no overdue students. This way admins can see the section exists and will be populated once billing months pass.
 
-## File to Modify
+## Changes
 
 | File | Change |
 |------|--------|
-| `src/pages/StudentDetail.tsx` | Add `break-all` class to the note text `<p>` element in the Payment Notes timeline |
+| `src/components/StudentOverdueSection.tsx` | Remove the early `return null` when no overdue months exist. Instead, show an empty state message within the card. |
 
 ## Technical Details
 
-On line 379, update the note text paragraph from:
+In `StudentOverdueSection.tsx`, the line `if (sortedMonths.length === 0) return null;` (around line 140) prevents the entire section from rendering. The fix:
 
-```tsx
-<p className="text-sm whitespace-pre-wrap">{p.description}</p>
-```
+1. Remove the early return
+2. When there are no overdue months, show the card header with the title and an empty state message like "No overdue payments found. This section will show students with past-due monthly fees."
+3. Disable the month selector and export buttons when there's no data
+4. Keep the summary cards visible showing zeros so admins understand the metrics that will be tracked
 
-to:
-
-```tsx
-<p className="text-sm whitespace-pre-wrap break-all">{p.description}</p>
-```
-
-This ensures any long continuous string (no spaces) will break at the card boundary instead of overflowing and stretching the entire page layout.
+This ensures the section is always visible and discoverable on the Students dashboard.
 
