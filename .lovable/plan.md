@@ -1,68 +1,107 @@
 
 
-# Fix: Deleted Users Still Have Access
+# Apply Same Force-Logout Fix to Reject Workflow
 
-## Root Cause
+## Problem
 
-The current deletion flow in the `admin-users` Edge Function is:
-1. `signOut(userId, "global")` -- invalidates the target user's session tokens
-2. `deleteUser(userId)` -- cascades to delete `user_roles`
+The `handleRejectUser` function in the edge function currently just deletes the user from auth directly, without first attempting to sign them out or trigger any Realtime event. A rejected user who is still browsing the app (e.g., on the pending approval screen) will keep their session active until it naturally expires.
 
-The problem: Step 1 breaks the target user's Realtime WebSocket connection. So when Step 2 cascades and deletes the `user_roles` row, the Realtime DELETE event never reaches the client. The deleted user's cached JWT remains valid (up to 1 hour) and they keep seeing data.
+## Changes
 
-## Fix
+### File 1: `supabase/functions/admin-users/index.ts` -- `handleRejectUser`
 
-Reorder the deletion flow to:
-1. **Delete `user_roles` explicitly first** -- triggers Realtime DELETE event while the user's connection is still alive, causing the client-side listener to call `signOut()`
-2. **Sign out all sessions** -- server-side backup to invalidate refresh tokens
-3. **Delete user from auth** -- final cleanup
+Apply the same 3-step deletion sequence used in `handleDeleteUser`:
 
-## File Changes
+1. Delete `user_roles` row (if any exists) to fire a Realtime event
+2. Wait 500ms for propagation
+3. Sign out all sessions server-side
+4. Delete user from auth
 
-### File 1: `supabase/functions/admin-users/index.ts`
-
-In `handleDeleteUser`, change the order:
-
-```text
-Current flow:
-  signOut(userId) --> deleteUser(userId) [cascade deletes user_roles]
-
-New flow:
-  DELETE from user_roles WHERE user_id = userId  --> small delay --> signOut(userId) --> deleteUser(userId)
-```
-
-The explicit `user_roles` DELETE fires the Realtime event while the user's WebSocket is still connected, triggering immediate client-side logout.
-
-### File 2: `src/contexts/AuthContext.tsx`
-
-Add a fallback periodic session validation. If Realtime somehow misses the event, periodically check if the session is still valid by calling `getUser()`. If the user no longer exists, force logout. This runs every 30 seconds as a safety net.
-
-## Technical Details
-
-### Edge Function Change (handleDeleteUser)
+Updated `handleRejectUser` (lines 227-254):
 
 ```typescript
-// Step 1: Delete user_roles first to trigger Realtime event
-await adminClient
-  .from("user_roles")
-  .delete()
-  .eq("user_id", userId);
+const handleRejectUser = async (userId: string, reason?: string) => {
+  // Update registration request status first
+  const { error: updateError } = await adminClient
+    .from("registration_requests")
+    .update({
+      status: "rejected",
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user.id,
+      rejection_reason: reason || null,
+    })
+    .eq("user_id", userId)
+    .eq("status", "pending");
 
-// Small delay to allow Realtime event to propagate
-await new Promise(resolve => setTimeout(resolve, 500));
+  if (updateError) {
+    console.error("Error updating registration request:", updateError);
+    return json(500, { error: "Failed to update registration request" });
+  }
 
-// Step 2: Sign out all sessions (backup)
-try {
-  await adminClient.auth.admin.signOut(userId, "global");
-} catch (e) {
-  // non-fatal
-}
+  // Step 1: Delete user_roles if any exist (triggers Realtime logout)
+  const { error: roleDeleteError } = await adminClient
+    .from("user_roles")
+    .delete()
+    .eq("user_id", userId);
 
-// Step 3: Delete user from auth
-await adminClient.auth.admin.deleteUser(userId);
+  if (roleDeleteError) {
+    console.warn("Failed to delete user_roles during reject (non-fatal):", roleDeleteError);
+  }
+
+  // Step 2: Delay to allow Realtime event propagation
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Step 3: Sign out all sessions
+  try {
+    await adminClient.auth.admin.signOut(userId, "global");
+  } catch (signOutErr) {
+    console.warn("Failed to sign out rejected user (non-fatal):", signOutErr);
+  }
+
+  // Step 4: Delete user from auth.users
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+
+  if (deleteError) {
+    console.error("Error deleting rejected user:", deleteError);
+    return json(500, { error: "Failed to delete user account" });
+  }
+
+  return json(200, { success: true });
+};
 ```
 
-### AuthContext Fallback
+### File 2: `src/contexts/AuthContext.tsx` -- Reduce polling interval
 
-Add an interval-based session check that runs every 30 seconds when the user is logged in. It calls `supabase.auth.getUser()` and if the response indicates the user no longer exists, it forces a local sign-out. This acts as a safety net in case Realtime misses the event.
+Change the fallback polling from 30 seconds to 5 seconds, and add a `user_roles` existence check for faster detection:
+
+```typescript
+const interval = setInterval(async () => {
+  // Check 1: Does role still exist?
+  const { data: roleData } = await supabase
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!roleData) {
+    console.log("User role not found, forcing logout");
+    await supabase.auth.signOut();
+    return;
+  }
+
+  // Check 2: Is auth session valid?
+  const { error } = await supabase.auth.getUser();
+  if (error) {
+    console.log("Session validation failed, forcing logout:", error.message);
+    await supabase.auth.signOut();
+  }
+}, 5000);
+```
+
+## Files to Modify
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `supabase/functions/admin-users/index.ts` | Add force-logout steps to `handleRejectUser` |
+| 2 | `src/contexts/AuthContext.tsx` | Reduce polling to 5s, add `user_roles` check |
 
