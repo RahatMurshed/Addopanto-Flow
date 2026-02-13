@@ -220,6 +220,41 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_fee_history: {
+        Row: {
+          created_at: string
+          effective_from: string
+          id: string
+          monthly_amount: number
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from: string
+          id?: string
+          monthly_amount: number
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          id?: string
+          monthly_amount?: number
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_fee_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registration_requests: {
         Row: {
           banned_until: string | null
@@ -336,6 +371,107 @@ export type Database = {
           },
         ]
       }
+      student_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          months_covered: string[] | null
+          payment_date: string
+          payment_method: string
+          payment_type: string
+          receipt_number: string | null
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          months_covered?: string[] | null
+          payment_date?: string
+          payment_method?: string
+          payment_type: string
+          receipt_number?: string | null
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          months_covered?: string[] | null
+          payment_date?: string
+          payment_method?: string
+          payment_type?: string
+          receipt_number?: string | null
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          admission_fee_total: number
+          billing_start_month: string
+          created_at: string
+          email: string | null
+          enrollment_date: string
+          id: string
+          monthly_fee_amount: number
+          name: string
+          notes: string | null
+          phone: string | null
+          status: Database["public"]["Enums"]["student_status"]
+          student_id_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admission_fee_total?: number
+          billing_start_month: string
+          created_at?: string
+          email?: string | null
+          enrollment_date: string
+          id?: string
+          monthly_fee_amount?: number
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["student_status"]
+          student_id_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admission_fee_total?: number
+          billing_start_month?: string
+          created_at?: string
+          email?: string | null
+          enrollment_date?: string
+          id?: string
+          monthly_fee_amount?: number
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["student_status"]
+          student_id_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           business_name: string | null
@@ -419,6 +555,7 @@ export type Database = {
     }
     Enums: {
       app_role: "cipher" | "admin" | "moderator" | "user"
+      student_status: "active" | "inactive" | "graduated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -547,6 +684,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["cipher", "admin", "moderator", "user"],
+      student_status: ["active", "inactive", "graduated"],
     },
   },
 } as const

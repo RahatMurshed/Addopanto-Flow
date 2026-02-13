@@ -19,6 +19,8 @@ import ModeratorControl from "@/pages/ModeratorControl";
 import RegistrationRequests from "@/pages/RegistrationRequests";
 import PendingApproval from "@/pages/PendingApproval";
 import NotFound from "@/pages/NotFound";
+import Students from "@/pages/Students";
+import StudentDetail from "@/pages/StudentDetail";
 import { useRegistrationStatus } from "@/hooks/useRegistrationStatus";
 import { Loader2 } from "lucide-react";
 
@@ -82,6 +84,8 @@ const App = () => (
               <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
               <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
               <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+              <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+              <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />

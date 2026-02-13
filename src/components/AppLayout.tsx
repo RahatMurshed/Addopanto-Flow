@@ -20,6 +20,7 @@ import {
   Users,
   Shield,
   UserPlus,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const baseNavItems = [
   { label: "Expense Sources", href: "/khatas", icon: Wallet },
   { label: "Revenue", href: "/revenue", icon: TrendingUp },
   { label: "Expenses", href: "/expenses", icon: Receipt },
+  { label: "Students", href: "/students", icon: GraduationCap },
   { label: "Reports", href: "/reports", icon: FileText },
 ];
 
