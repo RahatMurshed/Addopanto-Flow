@@ -1,76 +1,58 @@
 
 
-# Admin Role Restriction: Admins Can Only Manage Moderators
+# Fix Company Members Management + Add Global User Management Route
 
-## Overview
-Currently admins can manage other admins. This change restricts admins so they can only manage and delete **moderators**, while **cipher** can manage everything (admins, moderators, and other ciphers).
+## Problem Summary
+Three issues are preventing you from managing users:
+
+1. **Company Members page blocks managing admin-role members** -- even for cipher users who should have full control
+2. **No route to the Global User Management page** (`UserManagement.tsx` exists but has no route in `App.tsx`)
+3. **Navigation missing** -- no link to access global user management from the sidebar
 
 ## Changes
 
-### 1. Frontend: Update role management logic
-**File: `src/hooks/useUserRole.ts`**
-- Update `canManageRole` so admin can only manage `moderator` role (not `admin` or `cipher`)
+### 1. Fix CompanyMembers.tsx -- Allow cipher users to manage all members
 
-### 2. Frontend: Restrict available roles for admins
-**File: `src/pages/UserManagement.tsx`**
-- Admin's available roles dropdown: only `["moderator"]` (currently includes `"admin"`)
-- Cipher remains: `["cipher", "admin", "moderator"]`
+**File: `src/pages/CompanyMembers.tsx`**
 
-### 3. Backend: Update edge function guard
-**File: `supabase/functions/admin-users/index.ts`**
-- Add check: if caller is admin and target is admin, block the delete operation (currently only blocks cipher targets)
-
-### 4. Database: Tighten RLS policies on `user_roles`
-Update three policies (DELETE, UPDATE, INSERT) so that admins can only operate on moderator-role users:
-- **DELETE**: Admin can only delete where target role = `moderator`
-- **UPDATE**: Admin can only update where target role = `moderator`  
-- **INSERT**: Admin can only insert `moderator` role (currently blocks only `cipher`)
-
-### Summary of permission matrix
-
-| Action | Cipher | Admin |
-|--------|--------|-------|
-| Manage cipher | Yes | No |
-| Manage admin | Yes | No |
-| Manage moderator | Yes | Yes |
-| Delete cipher | Yes | No |
-| Delete admin | Yes | No |
-| Delete moderator | Yes | Yes |
-
-### Technical: SQL migration
-
-```sql
--- UPDATE policy: admin can only update moderator-role users
-DROP POLICY "Authorized users can update roles" ON public.user_roles;
-CREATE POLICY "Authorized users can update roles" ON public.user_roles
-FOR UPDATE USING (
-  CASE
-    WHEN is_cipher(auth.uid()) THEN true
-    WHEN has_role(auth.uid(), 'admin') AND role = 'moderator' THEN true
-    ELSE false
-  END
-);
-
--- DELETE policy: admin can only delete moderator-role users
-DROP POLICY "Authorized users can delete roles" ON public.user_roles;
-CREATE POLICY "Authorized users can delete roles" ON public.user_roles
-FOR DELETE USING (
-  CASE
-    WHEN is_cipher(auth.uid()) THEN true
-    WHEN has_role(auth.uid(), 'admin') AND role = 'moderator' THEN true
-    ELSE false
-  END
-);
-
--- INSERT policy: admin can only insert moderator role
-DROP POLICY "Authorized users can insert roles" ON public.user_roles;
-CREATE POLICY "Authorized users can insert roles" ON public.user_roles
-FOR INSERT WITH CHECK (
-  CASE
-    WHEN is_cipher(auth.uid()) THEN true
-    WHEN has_role(auth.uid(), 'admin') AND role = 'moderator' THEN true
-    ELSE false
-  END
-);
+Currently the page has hardcoded logic:
 ```
+const isAdmin = member.role === "admin";
+// Then uses isAdmin to disable role changes and hide delete button
+```
+
+This needs to be updated so that **cipher users can manage admin members too**:
+- A cipher user can change any member's role and delete any member (except themselves)
+- A company admin can manage moderators and viewers, but not other admins
+- The role dropdown for cipher users should include "admin", "moderator", "viewer"
+
+### 2. Add UserManagement route to App.tsx
+
+**File: `src/App.tsx`**
+- Import `UserManagement` page
+- Add route: `/users` pointing to `UserManagement` component (inside `ProtectedRoute`)
+
+### 3. Add navigation link to UserManagement
+
+**File: `src/components/AppLayout.tsx`**
+- Add a "User Management" nav link visible only to cipher and admin users
+- This is where global roles (cipher, admin, moderator) are managed
+
+## Technical Details
+
+### CompanyMembers.tsx changes (lines 254-296)
+Replace the `isAdmin` check with a permission-aware check:
+- `const canModifyMember = !isCurrentUser && (isCipher || (isCompanyAdmin && member.role !== "admin"))`
+- Use `canModifyMember` to control the role dropdown and delete button
+- Cipher users see all role options; non-cipher admins see moderator/viewer only
+
+### App.tsx changes
+```tsx
+import UserManagement from "@/pages/UserManagement";
+// Add route:
+<Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+```
+
+### AppLayout.tsx changes
+- Add nav item for `/users` with a shield icon, conditionally shown for admin/cipher roles
 
