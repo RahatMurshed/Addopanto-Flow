@@ -70,8 +70,9 @@ export default function Students() {
 
   const handleCreate = async (data: StudentInsert) => {
     try {
-      await createMutation.mutateAsync(data);
+      const result = await createMutation.mutateAsync(data);
       toast({ title: "Student added successfully" });
+      return result;
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
@@ -184,6 +185,7 @@ export default function Students() {
                     <TableHead>Admission</TableHead>
                     <TableHead>Monthly</TableHead>
                     <TableHead className="hidden md:table-cell">Total Paid</TableHead>
+                    <TableHead className="hidden md:table-cell">Total Pending</TableHead>
                     <TableHead className="w-28">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -221,6 +223,9 @@ export default function Students() {
                         </TableCell>
                         <TableCell className="hidden md:table-cell font-semibold text-primary">
                           {formatCurrency(sum.totalPaid, currency)}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell font-semibold text-destructive">
+                          {sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -265,7 +270,7 @@ export default function Students() {
           open={paymentDialogOpen}
           onOpenChange={(o) => { setPaymentDialogOpen(o); if (!o) setSelectedStudent(null); }}
           student={selectedStudent}
-          summary={studentSummaries.get(selectedStudent.id) || { admissionPaid: 0, admissionTotal: 0, admissionStatus: "pending", monthlyPaidMonths: [], monthlyOverdueMonths: [], monthlyPendingMonths: [], totalPaid: 0 }}
+          summary={studentSummaries.get(selectedStudent.id) || { admissionPaid: 0, admissionTotal: 0, admissionPending: 0, admissionStatus: "pending", monthlyPaidMonths: [], monthlyOverdueMonths: [], monthlyPendingMonths: [], monthlyPaidTotal: 0, monthlyPendingTotal: 0, totalPaid: 0, totalPending: 0 }}
           onSave={handlePayment}
         />
       )}
