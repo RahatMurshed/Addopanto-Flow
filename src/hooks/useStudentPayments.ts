@@ -229,38 +229,18 @@ export function computeStudentSummary(
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const billingStart = student.billing_start_month;
 
-  // Generate all months from billing_start to end (bounded by course_end_month if set)
+  // Generate all months from billing_start to the end of the course or current month (whichever is later)
   const allMonths: string[] = [];
   if (billingStart && student.monthly_fee_amount > 0) {
     let [year, month] = billingStart.split("-").map(Number);
-    // Use course_end_month if set, capped at current month; otherwise just current month
-    const courseEnd = student.course_end_month || null;
-    const capEnd = courseEnd && courseEnd < currentMonth ? courseEnd : currentMonth;
+    const courseEnd = student.course_end_month || currentMonth;
+    // Use whichever is later: course_end_month or currentMonth
+    const endBound = courseEnd > currentMonth ? courseEnd : currentMonth;
     let cursor = billingStart;
-    while (cursor <= capEnd) {
+    while (cursor <= endBound) {
       allMonths.push(cursor);
       month++;
-      if (month > 12) {
-        month = 1;
-        year++;
-      }
-      cursor = `${year}-${String(month).padStart(2, "0")}`;
-    }
-  }
-
-  // Also compute full course months for totalExpected (including future months up to course_end_month)
-  const allCourseMonths: string[] = [];
-  if (billingStart && student.monthly_fee_amount > 0) {
-    let [year, month] = billingStart.split("-").map(Number);
-    const fullEnd = student.course_end_month || currentMonth;
-    let cursor = billingStart;
-    while (cursor <= fullEnd) {
-      allCourseMonths.push(cursor);
-      month++;
-      if (month > 12) {
-        month = 1;
-        year++;
-      }
+      if (month > 12) { month = 1; year++; }
       cursor = `${year}-${String(month).padStart(2, "0")}`;
     }
   }
@@ -328,9 +308,9 @@ export function computeStudentSummary(
   const admissionPending = Math.max(0, admissionTotal - admissionPaid);
   const totalPending = admissionPending + monthlyPendingTotal;
 
-  // Compute totalExpected using full course duration (not capped at current month)
+  // Compute totalExpected from allMonths (now covers full course range)
   let totalExpectedMonthly = 0;
-  for (const m of allCourseMonths) {
+  for (const m of allMonths) {
     totalExpectedMonthly += getFeeForMonth(m);
   }
   const totalExpected = admissionTotal + totalExpectedMonthly;

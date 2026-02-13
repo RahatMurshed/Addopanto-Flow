@@ -105,7 +105,7 @@ export default function StudentDetail() {
   }
 
   const admissionPercent = summary.admissionTotal > 0 ? Math.min(100, (summary.admissionPaid / summary.admissionTotal) * 100) : 0;
-  const monthlyTotal = summary.monthlyPaidTotal + summary.monthlyPendingTotal;
+  const monthlyTotal = summary.totalExpected - summary.admissionTotal;
   const monthlyPercent = monthlyTotal > 0 ? Math.min(100, (summary.monthlyPaidTotal / monthlyTotal) * 100) : 0;
 
   const formatMethod = (m: string) => {
