@@ -286,13 +286,13 @@ export default function Auth() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Email</Label>
-                <Input id="reset-email" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
+                <Input id="reset-email" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required disabled={loading} />
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Reset Link
+                {loading ? "Sending..." : "Send Reset Link"}
               </Button>
               <Button type="button" variant="ghost" className="w-full" onClick={() => setShowReset(false)}>
                 Back to Login
@@ -360,15 +360,15 @@ export default function Auth() {
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" type="email" placeholder="you@example.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
+                    <Input id="login-email" type="email" placeholder="you@example.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required disabled={loading || googleLoading} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
-                    <Input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
+                    <Input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required disabled={loading || googleLoading} />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Login
+                    {loading ? "Logging in..." : "Login"}
                   </Button>
                   <Button type="button" variant="link" className="w-full text-sm" onClick={() => setShowReset(true)}>
                     Forgot password?
@@ -413,19 +413,19 @@ export default function Auth() {
                 <form onSubmit={handleSignup} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
-                    <Input id="signup-email" type="email" placeholder="you@example.com" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required />
+                    <Input id="signup-email" type="email" placeholder="you@example.com" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required disabled={loading || googleLoading} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
-                    <Input id="signup-password" type="password" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required />
+                    <Input id="signup-password" type="password" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required disabled={loading || googleLoading} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-confirm">Confirm Password</Label>
-                    <Input id="signup-confirm" type="password" value={signupConfirm} onChange={(e) => setSignupConfirm(e.target.value)} required />
+                    <Input id="signup-confirm" type="password" value={signupConfirm} onChange={(e) => setSignupConfirm(e.target.value)} required disabled={loading || googleLoading} />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create Account
+                    {loading ? "Creating account..." : "Create Account"}
                   </Button>
                 </form>
               </CardContent>

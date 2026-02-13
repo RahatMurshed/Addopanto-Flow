@@ -44,6 +44,8 @@ import {
   TrendingDown,
   ArrowLeftRight,
 } from "lucide-react";
+import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { Skeleton } from "@/components/ui/skeleton";
 import ExpenseDialog from "@/components/ExpenseDialog";
 import TransferDialog from "@/components/TransferDialog";
 import TransferHistoryCard from "@/components/TransferHistoryCard";
@@ -200,8 +202,12 @@ export default function Expenses() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-32 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <SkeletonTable rows={6} columns={4} />
       </div>
     );
   }
@@ -542,7 +548,7 @@ export default function Expenses() {
       />
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open && !deleteMutation.isPending) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this expense?</AlertDialogTitle>
@@ -551,13 +557,14 @@ export default function Expenses() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
+              disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

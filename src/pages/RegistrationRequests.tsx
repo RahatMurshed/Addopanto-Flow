@@ -39,6 +39,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight, Trash2 } from "lucide-react";
+import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RegistrationRequest {
   id: string;
@@ -380,8 +382,13 @@ export default function RegistrationRequests() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                </div>
+                <SkeletonTable rows={4} columns={3} />
               </div>
             ) : (
               <Tabs defaultValue="pending">
@@ -414,7 +421,7 @@ export default function RegistrationRequests() {
         </Card>
 
         {/* Approve Dialog (for pending) */}
-        <Dialog open={!!approveDialog} onOpenChange={(open) => !open && setApproveDialog(null)}>
+        <Dialog open={!!approveDialog} onOpenChange={(open) => { if (!open && !approveMutation.isPending) setApproveDialog(null); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Approve Registration</DialogTitle>
@@ -424,17 +431,17 @@ export default function RegistrationRequests() {
             </DialogHeader>
             {approveDialog && <PermissionToggles data={approveDialog} onChange={setApproveDialog} />}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setApproveDialog(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setApproveDialog(null)} disabled={approveMutation.isPending}>Cancel</Button>
               <Button onClick={() => approveDialog && approveMutation.mutate(approveDialog)} disabled={approveMutation.isPending} className="gap-2">
                 {approveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Approve & Grant Access
+                {approveMutation.isPending ? "Approving..." : "Approve & Grant Access"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Accept from Rejected Dialog */}
-        <Dialog open={!!acceptFromRejectedDialog} onOpenChange={(open) => !open && setAcceptFromRejectedDialog(null)}>
+        <Dialog open={!!acceptFromRejectedDialog} onOpenChange={(open) => { if (!open && !acceptFromRejectedMutation.isPending) setAcceptFromRejectedDialog(null); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Accept Rejected User</DialogTitle>
@@ -444,17 +451,17 @@ export default function RegistrationRequests() {
             </DialogHeader>
             {acceptFromRejectedDialog && <PermissionToggles data={acceptFromRejectedDialog} onChange={setAcceptFromRejectedDialog} />}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAcceptFromRejectedDialog(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setAcceptFromRejectedDialog(null)} disabled={acceptFromRejectedMutation.isPending}>Cancel</Button>
               <Button onClick={() => acceptFromRejectedDialog && acceptFromRejectedMutation.mutate(acceptFromRejectedDialog)} disabled={acceptFromRejectedMutation.isPending} className="gap-2">
                 {acceptFromRejectedMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Accept & Grant Access
+                {acceptFromRejectedMutation.isPending ? "Accepting..." : "Accept & Grant Access"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Reject Dialog */}
-        <AlertDialog open={!!rejectDialog} onOpenChange={(open) => !open && setRejectDialog(null)}>
+        <AlertDialog open={!!rejectDialog} onOpenChange={(open) => { if (!open && !rejectMutation.isPending) setRejectDialog(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Reject Registration</AlertDialogTitle>
@@ -471,24 +478,25 @@ export default function RegistrationRequests() {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 className="mt-2"
+                disabled={rejectMutation.isPending}
               />
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setRejectionReason("")}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setRejectionReason("")} disabled={rejectMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => rejectDialog && rejectMutation.mutate(rejectDialog)}
                 disabled={rejectMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >
                 {rejectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Reject (1-day ban)
+                {rejectMutation.isPending ? "Rejecting..." : "Reject (1-day ban)"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
         {/* Permanent Delete Dialog */}
-        <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialog open={!!deleteDialog} onOpenChange={(open) => { if (!open && !permanentDeleteMutation.isPending) setDeleteDialog(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Permanently Delete User</AlertDialogTitle>
@@ -498,14 +506,14 @@ export default function RegistrationRequests() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={permanentDeleteMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteDialog && permanentDeleteMutation.mutate(deleteDialog)}
                 disabled={permanentDeleteMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >
                 {permanentDeleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Delete
+                {permanentDeleteMutation.isPending ? "Deleting..." : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
