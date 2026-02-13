@@ -1,131 +1,136 @@
 
 
-# Enhance Student Revenue Management System
+# Add Course Duration Fields and Redesign Student Detail Dashboard
 
-Most of the requested functionality already exists in the codebase. This plan focuses on the actual gaps between what's built and what's requested.
+## Overview
 
----
-
-## What Already Exists (No Changes Needed)
-
-- Admission Fee Card with total/paid/pending/progress bar
-- Monthly Tuition Card with month grid (green/yellow/red color coding)
-- Total Paid card
-- Payment History table with date, amount, type, method, months, receipt
-- Students list with summary cards (Total, Active, Pending Admission, Overdue Monthly)
-- Students list table with Name, Student ID, Status, Admission badge, Monthly badge, Total Paid, Actions
+Add `course_start_month` and `course_end_month` columns to the students table to define the full enrollment period. Redesign the student detail page with a modern three-card dashboard layout, a visual monthly breakdown bounded by course dates, and an overall progress bar.
 
 ---
 
-## Changes Required
+## 1. Database Migration
 
-### 1. Enhanced Student Detail Page (`src/pages/StudentDetail.tsx`)
+Add two new nullable text columns to `students`:
 
-**A. Expand the Monthly Tuition Card** to show detailed paid/pending/overdue breakdowns below the month grid:
+| Column | Type | Notes |
+|--------|------|-------|
+| course_start_month | text | "YYYY-MM" format, defaults to billing_start_month value |
+| course_end_month | text | "YYYY-MM" format, nullable (open-ended if not set) |
 
-- **Paid months list**: Each paid month with payment date, amount, and receipt number (cross-reference `student_payments` by `months_covered`)
-- **Summary line**: "X months paid (total amount)" in green
-- **Overdue months list**: Each overdue month with the expected fee amount, highlighted in red
-- **Pending months list**: Current/future unpaid months with expected amounts
-- **Summary line**: "Y months pending/overdue (total amount)" in red/yellow
+The existing `billing_start_month` remains as-is (it controls when billing begins, which may differ from course start). The new fields define the course duration window.
 
-**B. Enhance the Total Paid card** to show a full revenue breakdown:
+## 2. Student Dialog Changes (`StudentDialog.tsx`)
 
-```
-Admission Fee:    Total / Paid / Pending
-Monthly Tuition:  Rate/mo | X months paid (amount) | Y months pending (amount)
----
-TOTAL PAID:       combined amount
-TOTAL PENDING:    combined amount
-```
+Replace the plain text input for "First Billing Month" with a proper month/year picker approach, and add two new date-picker-style month selectors:
 
-This replaces the current single-line "Total Revenue from Student" card.
+- **Course Start Month**: Month picker (popover with month/year grid or simple YYYY-MM input with calendar guidance)
+- **Course End Month**: Month picker (same style, must be >= course start month)
+- **First Billing Month**: Stays as-is but auto-fills from Course Start Month when left blank
 
-**C. Add `monthlyPaidTotal` and `monthlyPendingTotal` to `StudentSummary`** in `useStudentPayments.ts` so the detail page can show monetary totals, not just month counts.
+Since React Day Picker doesn't have a native month-only picker, these will use simple YYYY-MM inputs with validation. The enrollment date field already has a proper date picker.
 
-### 2. Enhanced Student Dialog with Initial Payment (`src/components/StudentDialog.tsx`)
+## 3. Redesigned Student Detail Page (`StudentDetail.tsx`)
 
-Add an optional "Record Initial Payment" collapsible section at the bottom of the create form (hidden during edit):
+### Layout: Three summary cards at top, then monthly visual, then payment history
 
-**New fields (only shown when creating):**
-- Collapsible toggle: "Record initial payment now"
-- When expanded:
-  - Payment Type: Admission / Monthly / Both (radio)
-  - If Admission: Amount field (pre-filled with admission fee total, editable for partial)
-  - If Monthly: Month selector (starting from billing_start_month) + auto-calculated amount
-  - Payment Method dropdown
-  - Receipt Number (optional)
-- **Live Payment Summary box** at bottom showing:
-  - Admission: total, initial payment, remaining
-  - Monthly: rate, months selected, payment, remaining
-  - Total Initial Payment amount
-  - Total Pending after this payment
+**Card 1 -- Admission Fee:**
+- Icon with colored background circle
+- Total admission fee (large number)
+- Paid amount in green
+- Pending amount in red/orange
+- Mini progress bar
 
-**Implementation:**
-- `StudentDialog` currently calls `onSave(StudentInsert)` which returns a promise
-- Change signature: `onSave` returns the created student (with `id`), then if initial payment fields are filled, automatically call `useCreateStudentPayment` within the dialog
-- Requires passing `createPaymentMutation` as a prop or importing the hook directly
+**Card 2 -- Monthly Tuition:**
+- Total expected tuition (months in range x rate)
+- Paid amount and month count in green
+- Pending/overdue amount and month count in red/orange
+- Mini progress bar
 
-### 3. Students List - Add Total Pending Column (`src/pages/Students.tsx`)
+**Card 3 -- Overall Total:**
+- Grand total (admission + monthly combined)
+- Total paid in green
+- Total pending in red
+- Overall completion percentage with progress bar
 
-Add a "Total Pending" column after "Total Paid" showing the combined admission + monthly pending amount in red/destructive color. This uses data already computed in `studentSummaries`.
+**Below cards:**
+- Full-width monthly fee visual grid (existing `StudentMonthGrid`) showing months from course_start_month to course_end_month (or current month if no end set)
+- Overall payment completion progress bar with percentage label
+- Monthly breakdown list (existing `MonthlyBreakdownList`) with paid/overdue/pending sections
 
-Requires `monthlyPendingTotal` from the enhanced `StudentSummary`.
+### Changes to computation logic
 
----
+Update `computeStudentSummary` to accept optional `course_end_month`. When set, the month range is bounded by it instead of always extending to current month. This affects which months are "pending" vs just not yet in range.
 
-## Files to Modify
+## 4. Hook and Type Updates
 
-| File | Changes |
-|------|---------|
-| `src/hooks/useStudentPayments.ts` | Add `monthlyPaidTotal`, `monthlyPendingTotal` fields to `StudentSummary`. Compute monetary totals in `computeStudentSummary`. |
-| `src/pages/StudentDetail.tsx` | Replace single-line total card with detailed breakdown card. Add paid/pending/overdue month lists below month grid in Monthly Tuition card. |
-| `src/components/StudentDialog.tsx` | Add collapsible initial payment section for create mode. Add live payment summary. Import and use `useCreateStudentPayment` hook. |
-| `src/pages/Students.tsx` | Add "Total Pending" column to table. |
+### `useStudents.ts`
+- Add `course_start_month` and `course_end_month` to `Student` interface and `StudentInsert` interface
 
----
+### `useStudentPayments.ts`
+- Update `computeStudentSummary` to accept `course_end_month` parameter
+- When `course_end_month` is set, cap the month generation at that month instead of current month
+- Add `totalExpected` field to summary (admission total + all monthly fees for the course duration)
+
+### `StudentDialog.tsx`
+- Add `course_start_month` and `course_end_month` to form schema with YYYY-MM validation
+- Add two new input fields in the form grid
+- Auto-populate `billing_start_month` from `course_start_month` if not manually set
+
+## 5. Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/hooks/useStudents.ts` | Add `course_start_month`, `course_end_month` to Student and StudentInsert interfaces |
+| `src/hooks/useStudentPayments.ts` | Update `computeStudentSummary` to respect course_end_month; add `totalExpected` to summary |
+| `src/components/StudentDialog.tsx` | Add course_start_month and course_end_month fields with YYYY-MM inputs |
+| `src/pages/StudentDetail.tsx` | Redesign with 3 summary cards, progress bar, cleaner layout |
 
 ## Technical Details
 
-### A. `computeStudentSummary` Enhancements
+### Database Migration SQL
 
-Add to the `StudentSummary` interface:
+```sql
+ALTER TABLE students
+  ADD COLUMN course_start_month text,
+  ADD COLUMN course_end_month text;
 
-```typescript
-monthlyPaidTotal: number;      // sum of fees for all fully-paid months
-monthlyPendingTotal: number;   // sum of fees for overdue + pending months
-admissionPending: number;      // admissionTotal - admissionPaid (clamped to 0)
-totalPending: number;          // admissionPending + monthlyPendingTotal
+-- Backfill course_start_month from billing_start_month for existing rows
+UPDATE students SET course_start_month = billing_start_month WHERE course_start_month IS NULL;
 ```
 
-Computed using `getFeeForMonth()` which already exists and uses the fee history.
+### Updated StudentSummary Fields
 
-### B. StudentDialog Initial Payment Flow
+```typescript
+interface StudentSummary {
+  // existing fields...
+  totalExpected: number;        // admissionTotal + sum of all monthly fees across course duration
+  overallPercent: number;       // (totalPaid / totalExpected) * 100
+}
+```
 
-1. User fills student info and fee amounts
-2. Optionally expands "Record Initial Payment" (uses Radix `Collapsible`)
-3. Selects payment type and enters details
-4. Live summary box updates as values change (using `useMemo` / `watch`)
-5. On submit:
-   - First, call `onSave(studentData)` which creates the student and returns the `Student` object with `id`
-   - Then, if initial payment is configured, call `createPaymentMutation.mutateAsync()` with the student ID
-   - Show combined saving state ("Creating student..." then "Recording payment...")
-6. Both operations must succeed before dialog closes; if payment fails, student is still created and user is notified
+### Month Range Logic
 
-### C. Monthly Detail Breakdown
+```typescript
+// If course_end_month is set, use min(course_end_month, currentMonth) as the end
+// If not set, use currentMonth (existing behavior)
+const endMonth = student.course_end_month
+  ? (student.course_end_month < currentMonth ? student.course_end_month : currentMonth)
+  : currentMonth;
+```
 
-For each paid month, find the matching payment(s) from the `payments` array by checking if `months_covered` includes that month. Display:
-- Month name (e.g., "Jan 2026")  
-- Payment date  
-- Amount (payment amount / number of months covered, for split display)  
-- Receipt number if available  
+### Student Detail Card Layout
 
-This is purely frontend computation using data already fetched.
+Three cards in a responsive grid (`grid-cols-1 md:grid-cols-3`), each with:
+- Header with icon and title
+- Large primary number (total)
+- Two sub-lines: paid (green text) and pending (red/orange text)
+- Thin progress bar at bottom of card
 
-### D. Validation for Initial Payment
+Below: full-width card containing the month grid and breakdown list, plus an overall progress bar with percentage.
 
-- Admission payment amount: must be > 0 and <= admission_fee_total
-- Monthly payment: at least one month must be selected
-- Monthly amount: auto-calculated but editable (for partial), must be > 0
-- Payment method: required if any payment amount > 0
+### Validation
+
+- `course_start_month`: optional, YYYY-MM format
+- `course_end_month`: optional, YYYY-MM format, must be >= course_start_month if both set
+- If course_start_month is set and billing_start_month is empty, auto-fill billing_start_month
 
