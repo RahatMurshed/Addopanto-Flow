@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import StudentDialog from "@/components/StudentDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
@@ -129,6 +129,12 @@ export default function StudentDetail() {
               Enrolled {format(new Date(student.enrollment_date), "MMM d, yyyy")}
               {student.email && ` · ${student.email}`}
             </p>
+            {student.notes && (
+              <p className="text-sm text-muted-foreground mt-1 italic">
+                <StickyNote className="inline h-3.5 w-3.5 mr-1" />
+                {student.notes}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
