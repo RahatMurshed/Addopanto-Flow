@@ -309,7 +309,7 @@ export default function StudentDetail() {
                     <TableHead className="hidden sm:table-cell">Method</TableHead>
                     <TableHead className="hidden md:table-cell">Months</TableHead>
                     <TableHead className="hidden lg:table-cell">Receipt</TableHead>
-                    <TableHead className="hidden lg:table-cell">Description</TableHead>
+                    
                     {canDelete && <TableHead className="w-16">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -333,7 +333,7 @@ export default function StudentDetail() {
                           : "—"}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm">{p.receipt_number || "—"}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-sm">{p.description || "—"}</TableCell>
+                      
                       {canDelete && (
                         <TableCell>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletePaymentId(p.id)}>
