@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Check, Clock, AlertTriangle } from "lucide-react";
+import { Check, Clock, AlertTriangle, CircleDot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StudentSummary } from "@/hooks/useStudentPayments";
 
@@ -11,6 +11,7 @@ interface StudentMonthGridProps {
 export default function StudentMonthGrid({ summary, className }: StudentMonthGridProps) {
   const allMonths = [
     ...summary.monthlyPaidMonths,
+    ...summary.monthlyPartialMonths,
     ...summary.monthlyOverdueMonths,
     ...summary.monthlyPendingMonths,
   ].sort();
@@ -29,6 +30,7 @@ export default function StudentMonthGrid({ summary, className }: StudentMonthGri
     <div className={cn("grid grid-cols-4 sm:grid-cols-6 gap-2", className)}>
       {allMonths.map((m) => {
         const isPaid = summary.monthlyPaidMonths.includes(m);
+        const isPartial = summary.monthlyPartialMonths.includes(m);
         const isOverdue = summary.monthlyOverdueMonths.includes(m);
         return (
           <div
@@ -36,13 +38,15 @@ export default function StudentMonthGrid({ summary, className }: StudentMonthGri
             className={cn(
               "flex flex-col items-center justify-center rounded-lg border p-2 text-xs font-medium",
               isPaid && "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400",
+              isPartial && "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
               isOverdue && "border-destructive/30 bg-destructive/10 text-destructive",
-              !isPaid && !isOverdue && "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
+              !isPaid && !isPartial && !isOverdue && "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
             )}
           >
             {isPaid && <Check className="h-3.5 w-3.5 mb-0.5" />}
+            {isPartial && <CircleDot className="h-3.5 w-3.5 mb-0.5" />}
             {isOverdue && <AlertTriangle className="h-3.5 w-3.5 mb-0.5" />}
-            {!isPaid && !isOverdue && <Clock className="h-3.5 w-3.5 mb-0.5" />}
+            {!isPaid && !isPartial && !isOverdue && <Clock className="h-3.5 w-3.5 mb-0.5" />}
             <span>{formatMonth(m)}</span>
           </div>
         );

@@ -59,9 +59,9 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
 
   const paymentType = form.watch("payment_type");
 
-  // Available unpaid months for monthly payments
+  // Available unpaid months for monthly payments (including partial)
   const unpaidMonths = useMemo(() => {
-    return [...summary.monthlyOverdueMonths, ...summary.monthlyPendingMonths].sort();
+    return [...summary.monthlyOverdueMonths, ...summary.monthlyPartialMonths, ...summary.monthlyPendingMonths].sort();
   }, [summary]);
 
   useEffect(() => {
@@ -79,13 +79,18 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     }
   }, [open, summary, form]);
 
-  // Auto-calculate amount when months change
+  // Auto-calculate amount when months change (use remaining amount for partial months)
   useEffect(() => {
     if (paymentType === "monthly" && selectedMonths.length > 0) {
-      const total = selectedMonths.length * Number(student.monthly_fee_amount);
+      let total = 0;
+      for (const m of selectedMonths) {
+        const fee = Number(student.monthly_fee_amount);
+        const alreadyPaid = summary.monthlyPaymentsByMonth?.get(m) || 0;
+        total += Math.max(0, fee - alreadyPaid);
+      }
       form.setValue("amount", total);
     }
-  }, [selectedMonths, paymentType, student.monthly_fee_amount, form]);
+  }, [selectedMonths, paymentType, student.monthly_fee_amount, summary.monthlyPaymentsByMonth, form]);
 
   const toggleMonth = (month: string) => {
     setSelectedMonths((prev) =>
@@ -151,15 +156,31 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
             <div className="space-y-2">
               <Label>Select Months</Label>
               <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto rounded-md border p-2">
-                {unpaidMonths.map((m) => (
-                  <label key={m} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox checked={selectedMonths.includes(m)} onCheckedChange={() => toggleMonth(m)} />
-                    <span className={summary.monthlyOverdueMonths.includes(m) ? "text-destructive font-medium" : ""}>{formatMonth(m)}</span>
-                  </label>
-                ))}
+                {unpaidMonths.map((m) => {
+                  const isPartial = summary.monthlyPartialMonths?.includes(m);
+                  const alreadyPaid = summary.monthlyPaymentsByMonth?.get(m) || 0;
+                  const fee = Number(student.monthly_fee_amount);
+                  const remaining = fee - alreadyPaid;
+                  return (
+                    <label key={m} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox checked={selectedMonths.includes(m)} onCheckedChange={() => toggleMonth(m)} />
+                      <div className="flex flex-col">
+                        <span className={cn(
+                          summary.monthlyOverdueMonths.includes(m) && "text-destructive font-medium",
+                          isPartial && "text-amber-600 dark:text-amber-400 font-medium"
+                        )}>{formatMonth(m)}</span>
+                        {isPartial && (
+                          <span className="text-[10px] text-muted-foreground">{remaining} remaining</span>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
               {selectedMonths.length > 0 && (
-                <p className="text-xs text-muted-foreground">{selectedMonths.length} month(s) × {student.monthly_fee_amount} = {selectedMonths.length * Number(student.monthly_fee_amount)} (editable below)</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedMonths.length} month(s) selected — remaining total auto-calculated (editable below)
+                </p>
               )}
             </div>
           )}

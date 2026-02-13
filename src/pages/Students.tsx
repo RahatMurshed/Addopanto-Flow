@@ -215,11 +215,14 @@ export default function Students() {
                         <TableCell>
                           {Number(s.monthly_fee_amount) === 0 ? (
                             <span className="text-muted-foreground text-sm">N/A</span>
-                          ) : sum.monthlyOverdueMonths.length > 0 ? (
-                            <Badge variant="destructive">{sum.monthlyOverdueMonths.length} overdue</Badge>
-                          ) : (
-                            <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
-                          )}
+                          ) : (() => {
+                            const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
+                            return totalPendingMonths > 0 ? (
+                              <Badge variant="destructive">{totalPendingMonths} months pending</Badge>
+                            ) : (
+                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="hidden md:table-cell font-semibold text-primary">
                           {formatCurrency(sum.totalPaid, currency)}
@@ -270,7 +273,7 @@ export default function Students() {
           open={paymentDialogOpen}
           onOpenChange={(o) => { setPaymentDialogOpen(o); if (!o) setSelectedStudent(null); }}
           student={selectedStudent}
-          summary={studentSummaries.get(selectedStudent.id) || { admissionPaid: 0, admissionTotal: 0, admissionPending: 0, admissionStatus: "pending", monthlyPaidMonths: [], monthlyOverdueMonths: [], monthlyPendingMonths: [], monthlyPaidTotal: 0, monthlyPendingTotal: 0, totalPaid: 0, totalPending: 0, totalExpected: 0, overallPercent: 0 }}
+          summary={studentSummaries.get(selectedStudent.id) || { admissionPaid: 0, admissionTotal: 0, admissionPending: 0, admissionStatus: "pending", monthlyPaidMonths: [], monthlyPartialMonths: [], monthlyOverdueMonths: [], monthlyPendingMonths: [], monthlyPaymentsByMonth: new Map(), monthlyPaidTotal: 0, monthlyPendingTotal: 0, totalPaid: 0, totalPending: 0, totalExpected: 0, overallPercent: 0 }}
           onSave={handlePayment}
         />
       )}

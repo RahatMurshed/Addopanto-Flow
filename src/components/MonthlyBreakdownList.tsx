@@ -43,10 +43,11 @@ function findPaymentForMonth(month: string, payments: StudentPayment[]) {
 
 export default function MonthlyBreakdownList({ summary, payments, feeHistory, monthlyFeeAmount, currency }: MonthlyBreakdownListProps) {
   const hasPaid = summary.monthlyPaidMonths.length > 0;
+  const hasPartial = summary.monthlyPartialMonths.length > 0;
   const hasOverdue = summary.monthlyOverdueMonths.length > 0;
   const hasPending = summary.monthlyPendingMonths.length > 0;
 
-  if (!hasPaid && !hasOverdue && !hasPending) {
+  if (!hasPaid && !hasPartial && !hasOverdue && !hasPending) {
     return <p className="text-sm text-muted-foreground">No months to display yet.</p>;
   }
 
@@ -59,10 +60,19 @@ export default function MonthlyBreakdownList({ summary, payments, feeHistory, mo
             {summary.monthlyPaidMonths.length} paid ({formatCurrency(summary.monthlyPaidTotal, currency)})
           </span>
         )}
+        {hasPartial && (
+          <span className="text-amber-600 dark:text-amber-400 font-medium">
+            {summary.monthlyPartialMonths.length} partial
+          </span>
+        )}
         {hasOverdue && (
           <span className="text-destructive font-medium">
             {summary.monthlyOverdueMonths.length} overdue ({formatCurrency(
-              summary.monthlyOverdueMonths.reduce((s, m) => s + getFeeForMonth(m, monthlyFeeAmount, feeHistory), 0),
+              summary.monthlyOverdueMonths.reduce((s, m) => {
+                const fee = getFeeForMonth(m, monthlyFeeAmount, feeHistory);
+                const paid = summary.monthlyPaymentsByMonth.get(m) || 0;
+                return s + (fee - paid);
+              }, 0),
               currency
             )})
           </span>
@@ -85,6 +95,33 @@ export default function MonthlyBreakdownList({ summary, payments, feeHistory, mo
                 <div key={m} className="flex items-center justify-between px-3 py-2 text-sm">
                   <span className="font-medium text-destructive">{formatMonth(m)}</span>
                   <span className="text-destructive font-semibold">{formatCurrency(fee, currency)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Partially Paid months */}
+      {hasPartial && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Partially Paid</p>
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 divide-y divide-amber-500/10">
+            {summary.monthlyPartialMonths.map((m) => {
+              const fee = getFeeForMonth(m, monthlyFeeAmount, feeHistory);
+              const paid = summary.monthlyPaymentsByMonth.get(m) || 0;
+              const remaining = fee - paid;
+              return (
+                <div key={m} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{formatMonth(m)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      Paid {formatCurrency(paid, currency)}
+                    </span>
+                  </div>
+                  <span className="text-amber-700 dark:text-amber-400 font-semibold">
+                    {formatCurrency(remaining, currency)} remaining
+                  </span>
                 </div>
               );
             })}
