@@ -1,182 +1,76 @@
 
 
-# Fix: Rejection Messages, Instant Approval Redirect, and Speed
+# Fix: Rejection Message Replaced by "Awaiting Approval"
 
-## Root Cause Analysis
+## Root Cause
 
-There are three interconnected bugs:
+There is a race condition between two competing systems:
 
-### Bug 1: AuthContext polling logs out pending users
-The 5-second polling in `AuthContext.tsx` checks if the user has a `user_roles` entry. **Pending users never have a role**, so the polling immediately forces them out every 5 seconds. This causes constant logout loops for users on the Pending Approval screen and prevents them from ever seeing a rejection or approval message.
+1. **PendingApproval page** detects rejection via Realtime/polling, shows the "Access Denied" rejection card, and schedules a logout after 3 seconds
+2. **AuthContext polling** (every 5 seconds) also detects rejection and immediately calls `signOut({ scope: 'local' })`
 
-### Bug 2: No Realtime on registration_requests
-The Pending Approval page uses a 10-second HTTP poll to check status. There is no Realtime subscription on the `registration_requests` table, so approval and rejection are detected slowly (up to 10 seconds late).
+When AuthContext wins the race (which it often does), the `signOut` clears the user session. This causes `useRegistrationStatus` to reset status back to `"loading"` (since `user` is now null). The PendingApproval page re-renders and, since status is no longer `"rejected"`, it falls through to the default "Awaiting Approval" view.
 
-### Bug 3: Rejection message timing conflict
-Even if the rejection status is detected, the AuthContext polling (Bug 1) logs the user out before the PendingApproval page can show the rejection message.
+Additionally, `ProtectedRoute` only redirects `"pending"` status to `/pending` but does NOT redirect `"rejected"` status there -- so rejected users on protected routes never see the rejection screen.
 
 ## Fix Summary
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `src/contexts/AuthContext.tsx` | Smart polling: skip role check for pending users, detect rejection |
-| 2 | `src/hooks/useRegistrationStatus.ts` | Add Realtime subscription for instant status changes |
-| 3 | `src/pages/PendingApproval.tsx` | Reduce backup polling from 10s to 3s |
+| 1 | `src/contexts/AuthContext.tsx` | Remove the `rejected` logout from polling -- let PendingApproval handle it |
+| 2 | `src/App.tsx` | Redirect `"rejected"` status to `/pending` in ProtectedRoute |
+| 3 | `src/pages/PendingApproval.tsx` | Make rejection state "sticky" so it survives the signOut clearing the user |
 
 ## Detailed Changes
 
-### File 1: `src/contexts/AuthContext.tsx` -- Fix polling logic
+### 1. AuthContext.tsx -- Stop competing with PendingApproval
 
-The 5-second polling interval (lines 65-91) currently does:
-1. Check `user_roles` -- if missing, force logout
-2. Check `getUser()` -- if error, force logout
+Remove the rejected-status check from the 5-second polling interval. The PendingApproval page already handles rejection display and delayed logout. Having two systems fight over it causes the bug.
 
-**Problem**: Pending users have no role, so step 1 always triggers logout.
+The polling should only handle:
+- Pending users: skip role check (no change)
+- Approved/legacy users: check role exists, validate session (no change)
+- Rejected users: **do nothing** (let PendingApproval handle it)
 
-**Fix**: Before checking roles, check the user's `registration_requests` status:
-- If **"pending"**: do nothing (expected -- no role yet)
-- If **"rejected"**: force local logout immediately
-- If **"approved"** or has a role: use the existing role-check logic (force logout if role disappears)
-- If no registration request exists (legacy user): use existing logic
+### 2. App.tsx -- Redirect rejected users to /pending
 
-```typescript
-const interval = setInterval(async () => {
-  // Check registration request status first
-  const { data: regData } = await supabase
-    .from("registration_requests")
-    .select("status")
-    .eq("user_id", user.id)
-    .maybeSingle();
+In `ProtectedRoute`, add `status === "rejected"` alongside the existing `"pending"` check so rejected users are always sent to the PendingApproval page where they can see the rejection message.
 
-  // If rejected, force logout immediately
-  if (regData?.status === "rejected") {
-    console.log("User rejected, forcing logout");
-    await supabase.auth.signOut({ scope: "local" });
-    return;
-  }
-
-  // If pending, skip role check (no role expected yet)
-  if (regData?.status === "pending") {
-    return;
-  }
-
-  // For approved/legacy users: check role still exists
-  const { data: roleData } = await supabase
-    .from("user_roles")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!roleData) {
-    console.log("User role not found, forcing logout");
-    await supabase.auth.signOut({ scope: "local" });
-    return;
-  }
-
-  // Validate auth session
-  const { error } = await supabase.auth.getUser();
-  if (error) {
-    console.log("Session invalid, forcing logout:", error.message);
-    await supabase.auth.signOut({ scope: "local" });
-  }
-}, 5000);
+```
+if (status === "pending" || status === "rejected") {
+  return <Navigate to="/pending" replace />;
+}
 ```
 
-### File 2: `src/hooks/useRegistrationStatus.ts` -- Add Realtime
+### 3. PendingApproval.tsx -- Sticky rejection state
 
-Add a Realtime subscription on `registration_requests` filtered to the current user. When an `UPDATE` event is received (admin approves or rejects), immediately re-run `checkStatus()`. This gives near-instant detection instead of waiting for the next poll.
+The problem: when `signOut` fires, `user` becomes null, `useRegistrationStatus` resets to `"loading"`, and the rejection screen disappears.
+
+Fix: Store the rejection state in local component state. Once `status === "rejected"` is detected, latch it so subsequent status changes (from the signOut clearing the user) don't override it. The component will show the rejection screen until the auto-logout navigates to `/auth`.
 
 ```typescript
-// Inside the hook, add a new useEffect:
+const [rejectedLocked, setRejectedLocked] = useState(false);
+const [lockedReason, setLockedReason] = useState<string | null>(null);
+
 useEffect(() => {
-  if (!user) return;
-
-  const channel = supabase
-    .channel("reg-status-" + user.id)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "registration_requests",
-        filter: `user_id=eq.${user.id}`,
-      },
-      () => {
-        checkStatus();
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [user, checkStatus]);
+  if (status === "rejected" && !rejectedLocked) {
+    setRejectedLocked(true);
+    setLockedReason(rejectionReason);
+  }
+}, [status, rejectionReason, rejectedLocked]);
 ```
 
-Also add a Realtime listener for `INSERT` on `user_roles` (for when an admin approves and creates the role):
+Then use `rejectedLocked` instead of `status === "rejected"` for rendering the rejection card and triggering the logout timer.
 
-```typescript
-useEffect(() => {
-  if (!user) return;
+## Expected Behavior After Fix
 
-  const channel = supabase
-    .channel("role-insert-" + user.id)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "user_roles",
-        filter: `user_id=eq.${user.id}`,
-      },
-      () => {
-        checkStatus();
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [user, checkStatus]);
-```
-
-**Note**: The `registration_requests` table needs to be added to the Realtime publication. A migration will be required:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.registration_requests;
-```
-
-### File 3: `src/pages/PendingApproval.tsx` -- Faster backup polling
-
-Reduce the backup polling interval from 10 seconds to 3 seconds (line 20). With Realtime in place, this is just a safety net.
-
-```typescript
-const interval = setInterval(() => {
-  refetch();
-}, 3000);
-```
-
-## How Each Scenario Works After the Fix
-
-**Rejection**:
+**Rejection flow:**
 1. Admin clicks Reject
-2. Edge fn: sets status="rejected", signOut(global)
-3. Realtime fires UPDATE on registration_requests
-4. `useRegistrationStatus` instantly detects "rejected"
-5. PendingApproval shows rejection message with reason
-6. After 3 seconds, auto-logout via `signOut({ scope: 'local' })`
-7. User sees Auth page, cannot login (session revoked) or signup (1-day ban)
+2. Realtime fires, `useRegistrationStatus` detects `"rejected"` instantly
+3. PendingApproval latches the rejection state and shows the "Access Denied" card with the reason
+4. After 3 seconds, PendingApproval calls `signOut({ scope: 'local' })` and navigates to `/auth`
+5. AuthContext polling does NOT interfere -- it skips rejected users entirely
+6. User sees the full rejection message for the entire 3 seconds before being redirected
 
-**Approval**:
-1. Admin clicks Approve
-2. Edge fn: sets status="approved", creates user_role + permissions
-3. Realtime fires INSERT on user_roles AND UPDATE on registration_requests
-4. `useRegistrationStatus` instantly detects "has_role"
-5. PendingApproval redirects to Dashboard immediately
-
-**Permanent Delete**:
-1. Admin clicks Permanently Delete (from rejected tab)
-2. Edge fn: sets 7-day ban, deletes auth user
-3. User is already logged out (was rejected first)
-4. If they try to sign up within 7 days, the trigger blocks them
+**Approval flow:** No change -- works as before via Realtime.
 
