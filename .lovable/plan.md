@@ -1,260 +1,131 @@
 
-# Student Revenue Management System - Implementation Plan
 
-## Overview
+# Enhance Student Revenue Management System
 
-This plan adds a student payment tracking system that extends the existing Revenue page. Students will be separate data records (not app login users for now -- see note below) with admission fees, monthly tuition tracking, partial payment support, and admin-configurable billing start months.
-
-**Important note on "Students as app users":** Since your app uses an approval-based registration flow (signup -> pending -> admin approves -> role assigned), making students log in would mean each student needs to go through that same approval flow and get a role. This is a Phase 2 enhancement. Phase 1 focuses on the core data model and admin-facing UI. Phase 2 adds a `student` role and a student-facing portal where they can view their own payment status.
+Most of the requested functionality already exists in the codebase. This plan focuses on the actual gaps between what's built and what's requested.
 
 ---
 
-## Phase 1: Core System (This Implementation)
+## What Already Exists (No Changes Needed)
 
-### A. Database Schema
+- Admission Fee Card with total/paid/pending/progress bar
+- Monthly Tuition Card with month grid (green/yellow/red color coding)
+- Total Paid card
+- Payment History table with date, amount, type, method, months, receipt
+- Students list with summary cards (Total, Active, Pending Admission, Overdue Monthly)
+- Students list table with Name, Student ID, Status, Admission badge, Monthly badge, Total Paid, Actions
 
-**4 new tables + 1 new enum:**
+---
 
-#### 1. `student_status` enum
+## Changes Required
+
+### 1. Enhanced Student Detail Page (`src/pages/StudentDetail.tsx`)
+
+**A. Expand the Monthly Tuition Card** to show detailed paid/pending/overdue breakdowns below the month grid:
+
+- **Paid months list**: Each paid month with payment date, amount, and receipt number (cross-reference `student_payments` by `months_covered`)
+- **Summary line**: "X months paid (total amount)" in green
+- **Overdue months list**: Each overdue month with the expected fee amount, highlighted in red
+- **Pending months list**: Current/future unpaid months with expected amounts
+- **Summary line**: "Y months pending/overdue (total amount)" in red/yellow
+
+**B. Enhance the Total Paid card** to show a full revenue breakdown:
+
 ```
-'active', 'inactive', 'graduated'
+Admission Fee:    Total / Paid / Pending
+Monthly Tuition:  Rate/mo | X months paid (amount) | Y months pending (amount)
+---
+TOTAL PAID:       combined amount
+TOTAL PENDING:    combined amount
 ```
 
-#### 2. `students` table
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | auto-generated |
-| name | text | required |
-| student_id_number | text | optional custom ID (e.g. "STU-001") |
-| email | text | optional contact |
-| phone | text | optional contact |
-| enrollment_date | date | required |
-| billing_start_month | text | format "YYYY-MM", admin sets this |
-| admission_fee_total | numeric | default 0, the total admission fee |
-| monthly_fee_amount | numeric | default 0, current monthly rate |
-| status | student_status | default 'active' |
-| notes | text | optional |
-| user_id | uuid | who created the record |
-| created_at | timestamptz | auto |
-| updated_at | timestamptz | auto |
+This replaces the current single-line "Total Revenue from Student" card.
 
-#### 3. `student_payments` table
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | auto-generated |
-| student_id | uuid (FK -> students) | required, ON DELETE CASCADE |
-| payment_date | date | required |
-| amount | numeric | required, positive |
-| payment_type | text | 'admission' or 'monthly' |
-| payment_method | text | 'cash', 'card', 'bank_transfer', 'mobile_banking', 'other' |
-| months_covered | text[] | for monthly: ["2024-01", "2024-02"] |
-| receipt_number | text | optional |
-| description | text | optional notes |
-| user_id | uuid | who recorded the payment |
-| created_at | timestamptz | auto |
+**C. Add `monthlyPaidTotal` and `monthlyPendingTotal` to `StudentSummary`** in `useStudentPayments.ts` so the detail page can show monetary totals, not just month counts.
 
-#### 4. `monthly_fee_history` table
-Tracks fee changes per student over time so past months use the correct rate.
+### 2. Enhanced Student Dialog with Initial Payment (`src/components/StudentDialog.tsx`)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | auto-generated |
-| student_id | uuid (FK -> students) | ON DELETE CASCADE |
-| monthly_amount | numeric | the fee amount |
-| effective_from | text | "YYYY-MM" format |
-| user_id | uuid | who set it |
-| created_at | timestamptz | auto |
+Add an optional "Record Initial Payment" collapsible section at the bottom of the create form (hidden during edit):
 
-#### RLS Policies (all 4 tables)
-- **SELECT**: All authenticated users can view (same shared-data model as existing tables)
-- **INSERT**: `can_add_revenue(auth.uid())` -- same permission as adding revenue
-- **UPDATE**: `can_edit_delete(auth.uid())` -- admin/cipher only
-- **DELETE**: `can_edit_delete(auth.uid())` -- admin/cipher only
+**New fields (only shown when creating):**
+- Collapsible toggle: "Record initial payment now"
+- When expanded:
+  - Payment Type: Admission / Monthly / Both (radio)
+  - If Admission: Amount field (pre-filled with admission fee total, editable for partial)
+  - If Monthly: Month selector (starting from billing_start_month) + auto-calculated amount
+  - Payment Method dropdown
+  - Receipt Number (optional)
+- **Live Payment Summary box** at bottom showing:
+  - Admission: total, initial payment, remaining
+  - Monthly: rate, months selected, payment, remaining
+  - Total Initial Payment amount
+  - Total Pending after this payment
 
-#### Revenue Integration
-When a student payment is recorded, a corresponding row is also inserted into the existing `revenues` table with:
-- `source_id` pointing to a revenue source named "Student Fees" (auto-created)
-- `description` referencing the student name and payment type
-- `amount` matching the payment
+**Implementation:**
+- `StudentDialog` currently calls `onSave(StudentInsert)` which returns a promise
+- Change signature: `onSave` returns the created student (with `id`), then if initial payment fields are filled, automatically call `useCreateStudentPayment` within the dialog
+- Requires passing `createPaymentMutation` as a prop or importing the hook directly
 
-This ensures student payments appear in the existing Dashboard, Revenue page, and Reports automatically.
+### 3. Students List - Add Total Pending Column (`src/pages/Students.tsx`)
+
+Add a "Total Pending" column after "Total Paid" showing the combined admission + monthly pending amount in red/destructive color. This uses data already computed in `studentSummaries`.
+
+Requires `monthlyPendingTotal` from the enhanced `StudentSummary`.
 
 ---
 
-### B. New Pages & Navigation
+## Files to Modify
 
-#### 1. `/students` -- Students List Page
-**Nav item**: "Students" with GraduationCap icon, added after "Revenue" in sidebar
-
-**Layout:**
-- Header: "Students" title + "Add Student" button (permission-gated)
-- Summary cards: Total Students, Active Students, Pending Admission Fees, Overdue Monthly Payments
-- Date filter (reuse AdvancedDateFilter) for filtering payment activity
-- Table with columns:
-
-| Name | Student ID | Status | Admission | Monthly Status | Total Paid | Actions |
-|------|-----------|--------|-----------|----------------|------------|---------|
-
-- Admission column shows: "Paid" (green badge), "Partial: X/Y" (yellow badge), "Pending" (red badge)
-- Monthly Status shows: "Current" (green), "X months overdue" (red), or "N/A" if no monthly fee
-- Actions: View Details, Add Payment
-- Pagination (reuse `usePagination` + `TablePagination`)
-- Skeleton loading states
-
-#### 2. `/students/:id` -- Student Detail Page
-**Layout:**
-- Back button to students list
-- Student info header (name, ID, enrollment date, status badge, edit button)
-- Two main sections side by side on desktop, stacked on mobile:
-
-**Admission Fee Card:**
-- Total fee, amount paid, amount pending
-- Progress bar showing percentage paid
-- Payment history list for admission payments
-
-**Monthly Tuition Card:**
-- Current monthly rate
-- Month grid showing paid/pending/overdue months (color-coded)
-- Months are calculated from `billing_start_month` to current month
-- Each month shows: paid (green check), pending (yellow), overdue (red)
-- "Add Payment" button
-
-**Payment History Table:**
-- All payments for this student, newest first
-- Columns: Date, Amount, Type (admission/monthly), Method, Months Covered, Receipt #, Actions
-- Edit/Delete actions (admin only)
-
-#### 3. Student Dialog (Create/Edit)
-**Reusable dialog component** (`StudentDialog.tsx`):
-- Name (required, max 100 chars)
-- Student ID Number (optional, max 50 chars)
-- Email (optional, validated)
-- Phone (optional)
-- Enrollment Date (date picker)
-- First Billing Month (month/year picker -- admin decides)
-- Admission Fee Total (number, >= 0)
-- Monthly Fee Amount (number, >= 0)
-- Status (select: active/inactive/graduated)
-- Notes (textarea, optional)
-
-#### 4. Payment Dialog
-**Reusable dialog component** (`StudentPaymentDialog.tsx`):
-- Student (pre-selected if opened from student detail)
-- Payment Type: Admission or Monthly (radio/select)
-- If Monthly: Multi-select for months (shows unpaid months, allows selecting multiple)
-- Amount: Auto-calculated for monthly (months x rate), editable for partial
-- Payment Date (date picker)
-- Payment Method (select)
-- Receipt Number (optional)
-- Notes (optional)
-
----
-
-### C. Hooks (following existing patterns)
-
-| Hook | Purpose |
+| File | Changes |
 |------|---------|
-| `useStudents.ts` | CRUD for students table |
-| `useStudentPayments.ts` | CRUD for student_payments + revenue integration |
-| `useStudentSummary.ts` | Computed data: admission status, monthly status, overdue calculations |
-
-**Overdue calculation logic:**
-- Generate all months from `billing_start_month` to current month (or end month if student is inactive/graduated)
-- Cross-reference with `student_payments` where `payment_type = 'monthly'` and check `months_covered`
-- For partial payments: track cumulative amount paid per month vs the fee rate for that month (from `monthly_fee_history`)
-- A month is "overdue" if it's in the past and not fully paid
-- A month is "pending" if it's the current month and not yet paid
-
-**Admission status logic:**
-- Sum all payments where `payment_type = 'admission'`
-- Compare against `admission_fee_total`
-- Status: "Paid" if sum >= total, "Partial" if sum > 0 but < total, "Pending" if sum = 0
-
----
-
-### D. Integration with Existing Revenue Page
-
-The Revenue page (`/revenue`) gets a new "Student Payments" revenue source automatically. Student payments create entries in the `revenues` table so they show up in:
-- Dashboard revenue totals and charts
-- Revenue page transaction list
-- Reports page analytics
-- All export functions (CSV/PDF)
-
-No changes needed to the Revenue page itself -- integration happens at the data layer.
-
----
-
-### E. Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/pages/Students.tsx` | Students list page |
-| `src/pages/StudentDetail.tsx` | Individual student detail page |
-| `src/components/StudentDialog.tsx` | Create/edit student dialog |
-| `src/components/StudentPaymentDialog.tsx` | Record payment dialog |
-| `src/components/StudentMonthGrid.tsx` | Visual month grid (paid/pending/overdue) |
-| `src/hooks/useStudents.ts` | Students CRUD hooks |
-| `src/hooks/useStudentPayments.ts` | Payments CRUD + revenue integration hooks |
-
-### F. Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/App.tsx` | Add `/students` and `/students/:id` routes |
-| `src/components/AppLayout.tsx` | Add "Students" nav item with GraduationCap icon |
-
----
-
-### G. Security
-
-- All new tables get RLS enabled with the same pattern as existing financial tables
-- Uses existing `can_add_revenue` and `can_edit_delete` SECURITY DEFINER functions
-- Moderators with `can_add_revenue` permission can add students and record payments
-- Only admin/cipher can edit or delete students and payments
-- `user_id` column on all tables for audit trail
-
----
-
-## Phase 2 (Future -- Not in This Implementation)
-
-- Student login portal (add `student` role to `app_role` enum)
-- Student can view their own payment status and history
-- Payment reminders and notifications
-- Receipt PDF generation
-- Fee change history tracking with effective dates
-- Bulk payment operations
-- Advanced analytics and charts on a dedicated student revenue dashboard
-- Discount/scholarship/waiver tracking
-- Late fee calculation
-- Grace period settings
+| `src/hooks/useStudentPayments.ts` | Add `monthlyPaidTotal`, `monthlyPendingTotal` fields to `StudentSummary`. Compute monetary totals in `computeStudentSummary`. |
+| `src/pages/StudentDetail.tsx` | Replace single-line total card with detailed breakdown card. Add paid/pending/overdue month lists below month grid in Monthly Tuition card. |
+| `src/components/StudentDialog.tsx` | Add collapsible initial payment section for create mode. Add live payment summary. Import and use `useCreateStudentPayment` hook. |
+| `src/pages/Students.tsx` | Add "Total Pending" column to table. |
 
 ---
 
 ## Technical Details
 
-### Database Migration SQL (Summary)
+### A. `computeStudentSummary` Enhancements
 
-1. Create `student_status` enum
-2. Create `students` table with RLS
-3. Create `student_payments` table with RLS  
-4. Create `monthly_fee_history` table with RLS
-5. Add `updated_at` trigger to `students` table
-6. Create a "Student Fees" revenue source (or let the hook auto-create it on first payment)
+Add to the `StudentSummary` interface:
 
-### Validation Rules
+```typescript
+monthlyPaidTotal: number;      // sum of fees for all fully-paid months
+monthlyPendingTotal: number;   // sum of fees for overdue + pending months
+admissionPending: number;      // admissionTotal - admissionPaid (clamped to 0)
+totalPending: number;          // admissionPending + monthlyPendingTotal
+```
 
-- Student name: required, 1-100 characters, trimmed
-- Amount: required, positive number
-- billing_start_month: required, format "YYYY-MM", must be on or after enrollment month
-- months_covered: required for monthly payments, at least one month selected
-- receipt_number: optional, max 50 characters
-- email: optional, valid email format if provided
-- phone: optional, max 20 characters
+Computed using `getFeeForMonth()` which already exists and uses the fee history.
 
-### Edge Cases Handled
+### B. StudentDialog Initial Payment Flow
 
-- Student enrolled mid-month: admin explicitly sets first billing month
-- Fee changes: `monthly_fee_history` tracks rate changes; overdue calculation uses the rate that was active for each month
-- Partial payments: amount is tracked cumulatively per month; a month is "paid" only when cumulative >= rate
-- Student becomes inactive: stop generating future pending months at the status change date
-- Deleting a student: CASCADE deletes all payments; corresponding revenue entries remain for audit (with description noting the student)
+1. User fills student info and fee amounts
+2. Optionally expands "Record Initial Payment" (uses Radix `Collapsible`)
+3. Selects payment type and enters details
+4. Live summary box updates as values change (using `useMemo` / `watch`)
+5. On submit:
+   - First, call `onSave(studentData)` which creates the student and returns the `Student` object with `id`
+   - Then, if initial payment is configured, call `createPaymentMutation.mutateAsync()` with the student ID
+   - Show combined saving state ("Creating student..." then "Recording payment...")
+6. Both operations must succeed before dialog closes; if payment fails, student is still created and user is notified
+
+### C. Monthly Detail Breakdown
+
+For each paid month, find the matching payment(s) from the `payments` array by checking if `months_covered` includes that month. Display:
+- Month name (e.g., "Jan 2026")  
+- Payment date  
+- Amount (payment amount / number of months covered, for split display)  
+- Receipt number if available  
+
+This is purely frontend computation using data already fetched.
+
+### D. Validation for Initial Payment
+
+- Admission payment amount: must be > 0 and <= admission_fee_total
+- Monthly payment: at least one month must be selected
+- Monthly amount: auto-calculated but editable (for partial), must be > 0
+- Payment method: required if any payment amount > 0
+
