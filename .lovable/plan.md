@@ -1,113 +1,116 @@
 
 
-# Smart Loading States Throughout the App
+# Fix Modal Loading States - Keep Modals Open During Actions
 
-## Overview
-Add polished loading indicators across the app: skeleton loaders for data pages, descriptive button text during actions, disabled form fields during submission, and hardened dialogs that prevent dismissal during operations.
+## Root Cause
 
-## Changes by Area
+The `AlertDialogAction` component from Radix UI has **built-in close behavior** -- clicking it automatically triggers the dialog to close, regardless of any `onOpenChange` guard. The `onOpenChange` guard fires, but by then Radix has already initiated the close animation. This is why users see the "Deleting..." text flash for a split second before the modal disappears.
 
-### 1. Reusable Skeleton Components (New File)
-Create `src/components/SkeletonLoaders.tsx` with reusable skeleton components:
-- **SkeletonTable**: Configurable rows/columns, mimics table layout with header + body
-- **SkeletonCards**: Grid of skeleton stat cards (for Dashboard metrics)
-- **SkeletonPageHeader**: Title + description placeholder
-- Uses existing `Skeleton` component from `src/components/ui/skeleton.tsx`
+Similarly, `DialogContent` renders a built-in X (close) button that is never disabled, and neither `onEscapeKeyDown` nor `onInteractOutside` are blocked during pending operations.
 
-### 2. Dashboard (`src/pages/Dashboard.tsx`)
-- Replace the full-page `Loader2` spinner (lines 350-356) with skeleton cards for the 5 metric cards + skeleton chart area + skeleton transactions table
-- This gives users a sense of the page layout while data loads
+## Fix Strategy
 
-### 3. Revenue Page (`src/pages/Revenue.tsx`)
-- Replace full-page spinner with skeleton table (matching the revenue table layout)
-- Add loading text to delete confirmation button: "Deleting..." with spinner
+Two changes are needed:
 
-### 4. Expenses Page (`src/pages/Expenses.tsx`)
-- Replace full-page spinner with skeleton table
-- Add loading text to delete confirmation button: "Deleting..." with spinner
+### A. Add `e.preventDefault()` to all `AlertDialogAction` onClick handlers
 
-### 5. Khatas Page (`src/pages/Khatas.tsx`)
-- Replace full-page spinner (lines 95-101) with skeleton card grid matching khata cards
-- Add loading text: "Creating..." / "Deleting..." on action buttons
+Calling `e.preventDefault()` stops Radix from auto-closing the dialog. The dialog then stays open while the mutation runs, and closes only when `onSuccess` sets the state to `null`.
 
-### 6. User Management Page (`src/pages/UserManagement.tsx`)
-- Replace full-page spinner (lines 282-288) with skeleton table (columns: User, Role, Change Role, Member Since, Actions)
-- Add descriptive loading text on delete button in dialog: "Deleting..."
-- Add descriptive loading text on role change confirm button: "Updating..."
-- Disable Cancel button and prevent dialog close (`onOpenChange` guarded) while mutations are pending
+### B. Add `onInteractOutside` and `onEscapeKeyDown` guards to `DialogContent` and `AlertDialogContent`
 
-### 7. Registration Requests Page (`src/pages/RegistrationRequests.tsx`)
-- Replace the center spinner (lines 382-385) with skeleton tabs + skeleton table rows
-- Add descriptive text to all action buttons during loading:
-  - Approve: "Approving..."
-  - Reject: "Rejecting..."
-  - Delete: "Deleting..."
-  - Accept: "Accepting..."
-- Disable Cancel buttons and prevent dialog/alert-dialog close while mutations are pending (guard `onOpenChange` handlers)
+For `Dialog`-based modals (Approve, Accept), the built-in X button and overlay/escape dismissal also need to be blocked during pending operations.
 
-### 8. Auth Page (`src/pages/Auth.tsx`)
-- Add descriptive loading text:
-  - Login button: "Logging in..." (already has spinner, just add text)
-  - Signup button: "Creating account..." 
-  - Reset password button: "Sending..." 
-- Disable all form `Input` fields during submission (add `disabled={loading || googleLoading}` to all inputs)
+## Files to Modify
 
-### 9. Settings Page (`src/pages/SettingsPage.tsx`)
-- Save button already has "Saving..." text -- verify fields are disabled during save
-- Add `disabled={saving}` to all form inputs during save
+### 1. `src/pages/RegistrationRequests.tsx`
+**4 dialogs to fix:**
 
-### 10. Moderator Control Page (`src/pages/ModeratorControl.tsx`)
-- Replace full-page spinner with skeleton cards for moderator permission cards
+- **Reject AlertDialog** (line 487): Add `e.preventDefault()` to `AlertDialogAction` onClick
+- **Permanent Delete AlertDialog** (line 511): Add `e.preventDefault()` to `AlertDialogAction` onClick
+- **Approve Dialog** (line 425): Add `onInteractOutside`/`onEscapeKeyDown` guards to `DialogContent` when `approveMutation.isPending`
+- **Accept from Rejected Dialog** (line 445): Same guards for `acceptFromRejectedMutation.isPending`
 
-### 11. Reports Page (`src/pages/Reports.tsx`)
-- Replace loading spinner with skeleton chart + skeleton table areas
+### 2. `src/pages/UserManagement.tsx`
+**2 AlertDialogs to fix:**
+
+- **Role Change AlertDialog** (line 459): Add `e.preventDefault()` to `AlertDialogAction` onClick
+- **Delete User AlertDialog** (line 511): Add `e.preventDefault()` to `AlertDialogAction` onClick
+
+### 3. `src/pages/Revenue.tsx`
+**1 AlertDialog to fix:**
+
+- **Delete AlertDialog** (line 454-455): Add `e.preventDefault()` to `AlertDialogAction` onClick
+
+### 4. `src/pages/Expenses.tsx`
+**1 AlertDialog to fix:**
+
+- **Delete AlertDialog** (line 561-562): Add `e.preventDefault()` to `AlertDialogAction` onClick
+
+### 5. `src/pages/Khatas.tsx`
+**1 AlertDialog to fix:**
+
+- **Delete AlertDialog** (line 297): Add `e.preventDefault()` to `AlertDialogAction` onClick
+
+### 6. `src/components/TransferHistoryCard.tsx`
+**1 AlertDialog to fix (also missing loading guards entirely):**
+
+- Add `e.preventDefault()` to `AlertDialogAction` onClick
+- Add `onOpenChange` guard for `isDeleting`
+- Disable Cancel button during `isDeleting`
+- Add "Deleting..." loading text
+
+### 7. `src/components/RevenueDialog.tsx`, `ExpenseDialog.tsx`, `TransferDialog.tsx`, `KhataDialog.tsx`
+**Dialog-based modals:** Add `onInteractOutside` and `onEscapeKeyDown` guards to `DialogContent` to prevent closing via overlay click or Escape key during save operations.
 
 ## Technical Details
 
-### SkeletonTable Component
-```text
-+--------------------------------------------------+
-| [====]     [========]    [======]    [====]       |  <- header
-|--------------------------------------------------|
-| [========] [==========]  [======]    [====]       |  <- row 1
-| [======]   [========]    [========]  [======]     |  <- row 2
-| [========] [==========]  [======]    [====]       |  <- row 3
-|  ...                                              |
-+--------------------------------------------------+
+### Pattern for AlertDialogAction fix:
+
+Before (broken -- dialog auto-closes on click):
+```tsx
+<AlertDialogAction onClick={() => mutation.mutate(data)}>
 ```
-Uses `Skeleton` with `animate-pulse`, rounded rectangles with varying widths for natural look.
 
-### Dialog Hardening Pattern
-For all confirmation dialogs, during pending mutations:
-- `onOpenChange` callback checks if mutation is pending; if so, does nothing (prevents Escape key or overlay click from closing)
-- Cancel button gets `disabled={mutation.isPending}`
-- Action button shows spinner + descriptive text and is disabled
+After (dialog stays open until mutation completes):
+```tsx
+<AlertDialogAction onClick={(e) => { e.preventDefault(); mutation.mutate(data); }}>
+```
 
-### Button Loading Text Map
-| Button | Normal Text | Loading Text |
-|--------|------------|--------------|
-| Login | Login | Logging in... |
-| Sign Up | Create Account | Creating account... |
-| Approve | Approve | Approving... |
-| Reject | Reject (1-day ban) | Rejecting... |
-| Delete | Delete | Deleting... |
-| Accept | Accept & Grant Access | Accepting... |
-| Save | Save Changes | Saving... |
-| Confirm (role) | Confirm | Updating... |
-| Send Reset Link | Send Reset Link | Sending... |
+### Pattern for Dialog content hardening:
 
-### Files Modified
-1. **New**: `src/components/SkeletonLoaders.tsx`
-2. `src/pages/Dashboard.tsx`
-3. `src/pages/Revenue.tsx`
-4. `src/pages/Expenses.tsx`
-5. `src/pages/Khatas.tsx`
-6. `src/pages/UserManagement.tsx`
-7. `src/pages/RegistrationRequests.tsx`
-8. `src/pages/Auth.tsx`
-9. `src/pages/SettingsPage.tsx`
-10. `src/pages/ModeratorControl.tsx`
-11. `src/pages/Reports.tsx`
+```tsx
+<DialogContent
+  onInteractOutside={(e) => { if (isPending) e.preventDefault(); }}
+  onEscapeKeyDown={(e) => { if (isPending) e.preventDefault(); }}
+>
+```
 
-No new dependencies required -- uses existing `Skeleton` component and `Loader2` icon.
+### Pattern for AlertDialogContent hardening:
+
+```tsx
+<AlertDialogContent
+  onEscapeKeyDown={(e) => { if (isPending) e.preventDefault(); }}
+>
+```
+
+Note: AlertDialogContent already blocks outside clicks by default (Radix behavior), but does NOT block Escape key.
+
+## Summary of all changes
+
+| File | Component | Fix |
+|------|-----------|-----|
+| RegistrationRequests.tsx | Reject AlertDialog | `e.preventDefault()` on Action click |
+| RegistrationRequests.tsx | Delete AlertDialog | `e.preventDefault()` on Action click |
+| RegistrationRequests.tsx | Approve Dialog | `onInteractOutside` + `onEscapeKeyDown` guards |
+| RegistrationRequests.tsx | Accept Dialog | `onInteractOutside` + `onEscapeKeyDown` guards |
+| UserManagement.tsx | Role Change AlertDialog | `e.preventDefault()` on Action click |
+| UserManagement.tsx | Delete User AlertDialog | `e.preventDefault()` on Action click |
+| Revenue.tsx | Delete AlertDialog | `e.preventDefault()` on Action click |
+| Expenses.tsx | Delete AlertDialog | `e.preventDefault()` on Action click |
+| Khatas.tsx | Delete AlertDialog | `e.preventDefault()` on Action click |
+| TransferHistoryCard.tsx | Delete AlertDialog | `e.preventDefault()` + add loading guards |
+| RevenueDialog.tsx | Dialog | `onInteractOutside` + `onEscapeKeyDown` guards |
+| ExpenseDialog.tsx | Dialog | `onInteractOutside` + `onEscapeKeyDown` guards |
+| TransferDialog.tsx | Dialog | `onInteractOutside` + `onEscapeKeyDown` guards |
+| KhataDialog.tsx | Dialog | `onInteractOutside` + `onEscapeKeyDown` guards |
 
