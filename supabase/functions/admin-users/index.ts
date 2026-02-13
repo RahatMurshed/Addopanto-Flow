@@ -116,9 +116,9 @@ Deno.serve(async (req) => {
 
       const targetUserRole = targetRole?.role || "user";
 
-      // Admins cannot delete cipher users
-      if (!isCipher && targetUserRole === "cipher") {
-        return json(403, { error: "Cannot delete cipher users" });
+      // Admins can only delete moderators
+      if (!isCipher && targetUserRole !== "moderator") {
+        return json(403, { error: "Admins can only delete moderators" });
       }
 
       // Look up the user's email BEFORE deleting
