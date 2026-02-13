@@ -38,7 +38,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) return <Navigate to="/auth" replace />;
   
   // Check if user is pending approval (no role assigned yet)
-  if (status === "pending") {
+  if (status === "pending" || status === "rejected") {
     return <Navigate to="/pending" replace />;
   }
   
