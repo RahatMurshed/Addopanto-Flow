@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { useRegistrationStatus } from "@/hooks/useRegistrationStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +43,7 @@ export default function PendingApproval() {
       
       // Auto logout after showing message
       const timeout = setTimeout(async () => {
-        await signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         navigate("/auth", { replace: true });
       }, 3000);
 

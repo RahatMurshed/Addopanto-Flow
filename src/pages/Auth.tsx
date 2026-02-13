@@ -63,7 +63,12 @@ export default function Auth() {
     const { error } = await signUp(signupEmail, signupPassword);
     setLoading(false);
     if (error) {
-      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+      const msg = error.message || "";
+      if (msg.toLowerCase().includes("temporarily blocked") || msg.toLowerCase().includes("banned")) {
+        toast({ title: "Registration blocked", description: "This email has been temporarily blocked. Please try again later.", variant: "destructive" });
+      } else {
+        toast({ title: "Signup failed", description: msg, variant: "destructive" });
+      }
     } else {
       toast({ title: "Check your email", description: "We sent you a verification link." });
     }

@@ -38,7 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight } from "lucide-react";
+import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight, Trash2 } from "lucide-react";
 
 interface RegistrationRequest {
   id: string;
@@ -49,6 +49,7 @@ interface RegistrationRequest {
   reviewed_at: string | null;
   reviewed_by: string | null;
   rejection_reason: string | null;
+  banned_until: string | null;
   can_add_revenue: boolean;
   can_add_expense: boolean;
   can_add_expense_source: boolean;
@@ -72,6 +73,8 @@ export default function RegistrationRequests() {
   const [approveDialog, setApproveDialog] = useState<ApproveDialogData | null>(null);
   const [rejectDialog, setRejectDialog] = useState<RegistrationRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState<RegistrationRequest | null>(null);
+  const [acceptFromRejectedDialog, setAcceptFromRejectedDialog] = useState<ApproveDialogData | null>(null);
 
   // Fetch registration requests
   const { data: requests = [], isLoading } = useQuery({
@@ -91,30 +94,33 @@ export default function RegistrationRequests() {
   const approvedRequests = requests.filter((r) => r.status === "approved");
   const rejectedRequests = requests.filter((r) => r.status === "rejected");
 
+  const invokeAdminAction = async (body: Record<string, unknown>) => {
+    const { data: result, error } = await supabase.functions.invoke("admin-users", {
+      method: "POST",
+      body,
+      headers: session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : undefined,
+    });
+    if (error) throw error;
+    if (result?.error) throw new Error(result.error);
+    return result;
+  };
+
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async (data: ApproveDialogData) => {
-      const { data: result, error } = await supabase.functions.invoke("admin-users", {
-        method: "POST",
-        body: {
-          action: "approve",
-          userId: data.request.user_id,
-          permissions: {
-            can_add_revenue: data.canAddRevenue,
-            can_add_expense: data.canAddExpense,
-            can_add_expense_source: data.canAddExpenseSource,
-            can_transfer: data.canTransfer,
-            can_view_reports: data.canViewReports,
-          },
+      return invokeAdminAction({
+        action: "approve",
+        userId: data.request.user_id,
+        permissions: {
+          can_add_revenue: data.canAddRevenue,
+          can_add_expense: data.canAddExpense,
+          can_add_expense_source: data.canAddExpenseSource,
+          can_transfer: data.canTransfer,
+          can_view_reports: data.canViewReports,
         },
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
       });
-
-      if (error) throw error;
-      if (result?.error) throw new Error(result.error);
-      return result;
     },
     onSuccess: () => {
       toast({ title: "User approved", description: "The user has been granted access as a Moderator." });
@@ -129,30 +135,63 @@ export default function RegistrationRequests() {
   // Reject mutation
   const rejectMutation = useMutation({
     mutationFn: async (request: RegistrationRequest) => {
-      const { data: result, error } = await supabase.functions.invoke("admin-users", {
-        method: "POST",
-        body: {
-          action: "reject",
-          userId: request.user_id,
-          reason: rejectionReason || undefined,
-        },
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
+      return invokeAdminAction({
+        action: "reject",
+        userId: request.user_id,
+        reason: rejectionReason || undefined,
       });
-
-      if (error) throw error;
-      if (result?.error) throw new Error(result.error);
-      return result;
     },
     onSuccess: () => {
-      toast({ title: "User rejected", description: "The registration request has been rejected and the user has been removed." });
+      toast({ title: "User rejected", description: "The user has been rejected and banned for 1 day." });
       queryClient.invalidateQueries({ queryKey: ["registration-requests"] });
       setRejectDialog(null);
       setRejectionReason("");
     },
     onError: (error: Error) => {
       toast({ title: "Failed to reject", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Permanent delete mutation
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (request: RegistrationRequest) => {
+      return invokeAdminAction({
+        action: "permanent-delete",
+        userId: request.user_id,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "User permanently deleted", description: "The user has been deleted and banned for 7 days." });
+      queryClient.invalidateQueries({ queryKey: ["registration-requests"] });
+      setDeleteDialog(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Accept from rejected mutation
+  const acceptFromRejectedMutation = useMutation({
+    mutationFn: async (data: ApproveDialogData) => {
+      return invokeAdminAction({
+        action: "accept-rejected",
+        userId: data.request.user_id,
+        permissions: {
+          can_add_revenue: data.canAddRevenue,
+          can_add_expense: data.canAddExpense,
+          can_add_expense_source: data.canAddExpenseSource,
+          can_transfer: data.canTransfer,
+          can_view_reports: data.canViewReports,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "User accepted", description: "The rejected user has been granted Moderator access." });
+      queryClient.invalidateQueries({ queryKey: ["registration-requests"] });
+      setAcceptFromRejectedDialog(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to accept", description: error.message, variant: "destructive" });
     },
   });
 
@@ -167,59 +206,148 @@ export default function RegistrationRequests() {
     });
   };
 
-  const RequestsTable = ({ items, showActions }: { items: RegistrationRequest[]; showActions: boolean }) => (
+  const openAcceptFromRejectedDialog = (request: RegistrationRequest) => {
+    setAcceptFromRejectedDialog({
+      request,
+      canAddRevenue: true,
+      canAddExpense: true,
+      canAddExpenseSource: false,
+      canTransfer: false,
+      canViewReports: true,
+    });
+  };
+
+  const PermissionToggles = ({ 
+    data, 
+    onChange 
+  }: { 
+    data: ApproveDialogData; 
+    onChange: (updated: ApproveDialogData) => void;
+  }) => (
+    <div className="space-y-4 py-4">
+      <div className="flex items-center justify-between">
+        <Label>Can Add Revenue</Label>
+        <Switch checked={data.canAddRevenue} onCheckedChange={(c) => onChange({ ...data, canAddRevenue: c })} />
+      </div>
+      <div className="flex items-center justify-between">
+        <Label>Can Add Expense</Label>
+        <Switch checked={data.canAddExpense} onCheckedChange={(c) => onChange({ ...data, canAddExpense: c })} />
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-muted-foreground" />
+          <Label>Can Add Expense Sources</Label>
+        </div>
+        <Switch checked={data.canAddExpenseSource} onCheckedChange={(c) => onChange({ ...data, canAddExpenseSource: c })} />
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+          <Label>Can Transfer</Label>
+        </div>
+        <Switch checked={data.canTransfer} onCheckedChange={(c) => onChange({ ...data, canTransfer: c })} />
+      </div>
+      <div className="flex items-center justify-between">
+        <Label>Can View Reports</Label>
+        <Switch checked={data.canViewReports} onCheckedChange={(c) => onChange({ ...data, canViewReports: c })} />
+      </div>
+    </div>
+  );
+
+  const PendingTable = ({ items }: { items: RegistrationRequest[] }) => (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Email</TableHead>
           <TableHead>Requested</TableHead>
-          {!showActions && <TableHead>Reviewed</TableHead>}
-          {showActions && <TableHead className="text-right">Actions</TableHead>}
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {items.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showActions ? 3 : 3} className="text-center text-muted-foreground py-8">
-              No requests found
-            </TableCell>
+            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">No requests found</TableCell>
           </TableRow>
         ) : (
           items.map((request) => (
             <TableRow key={request.id}>
               <TableCell className="font-medium">{request.email}</TableCell>
               <TableCell>{format(new Date(request.requested_at), "MMM d, yyyy h:mm a")}</TableCell>
-              {!showActions && (
-                <TableCell>
-                  {request.reviewed_at
-                    ? format(new Date(request.reviewed_at), "MMM d, yyyy h:mm a")
-                    : "-"}
-                </TableCell>
-              )}
-              {showActions && (
               <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400"
-                      onClick={() => openApproveDialog(request)}
-                    >
-                      <Check className="h-4 w-4" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1 text-destructive hover:bg-destructive/10"
-                      onClick={() => setRejectDialog(request)}
-                    >
-                      <X className="h-4 w-4" />
-                      Reject
-                    </Button>
-                  </div>
-                </TableCell>
-              )}
+                <div className="flex items-center justify-end gap-2">
+                  <Button size="sm" variant="outline" className="gap-1 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400" onClick={() => openApproveDialog(request)}>
+                    <Check className="h-4 w-4" /> Approve
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1 text-destructive hover:bg-destructive/10" onClick={() => setRejectDialog(request)}>
+                    <X className="h-4 w-4" /> Reject
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+
+  const HistoryTable = ({ items }: { items: RegistrationRequest[] }) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Email</TableHead>
+          <TableHead>Requested</TableHead>
+          <TableHead>Reviewed</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">No requests found</TableCell>
+          </TableRow>
+        ) : (
+          items.map((request) => (
+            <TableRow key={request.id}>
+              <TableCell className="font-medium">{request.email}</TableCell>
+              <TableCell>{format(new Date(request.requested_at), "MMM d, yyyy h:mm a")}</TableCell>
+              <TableCell>{request.reviewed_at ? format(new Date(request.reviewed_at), "MMM d, yyyy h:mm a") : "-"}</TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+
+  const RejectedTable = ({ items }: { items: RegistrationRequest[] }) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Email</TableHead>
+          <TableHead>Rejected</TableHead>
+          <TableHead>Reason</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No rejected requests</TableCell>
+          </TableRow>
+        ) : (
+          items.map((request) => (
+            <TableRow key={request.id}>
+              <TableCell className="font-medium">{request.email}</TableCell>
+              <TableCell>{request.reviewed_at ? format(new Date(request.reviewed_at), "MMM d, yyyy h:mm a") : "-"}</TableCell>
+              <TableCell className="max-w-[200px] truncate text-muted-foreground">{request.rejection_reason || "-"}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button size="sm" variant="outline" className="gap-1 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400" onClick={() => openAcceptFromRejectedDialog(request)}>
+                    <Check className="h-4 w-4" /> Accept
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1 text-destructive hover:bg-destructive/10" onClick={() => setDeleteDialog(request)}>
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </Button>
+                </div>
+              </TableCell>
             </TableRow>
           ))
         )}
@@ -272,98 +400,54 @@ export default function RegistrationRequests() {
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="pending" className="mt-4">
-                  <RequestsTable items={pendingRequests} showActions={true} />
+                  <PendingTable items={pendingRequests} />
                 </TabsContent>
                 <TabsContent value="approved" className="mt-4">
-                  <RequestsTable items={approvedRequests} showActions={false} />
+                  <HistoryTable items={approvedRequests} />
                 </TabsContent>
                 <TabsContent value="rejected" className="mt-4">
-                  <RequestsTable items={rejectedRequests} showActions={false} />
+                  <RejectedTable items={rejectedRequests} />
                 </TabsContent>
               </Tabs>
             )}
           </CardContent>
         </Card>
 
-        {/* Approve Dialog */}
+        {/* Approve Dialog (for pending) */}
         <Dialog open={!!approveDialog} onOpenChange={(open) => !open && setApproveDialog(null)}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Approve Registration</DialogTitle>
               <DialogDescription>
-                Configure permissions for <span className="font-medium">{approveDialog?.request.email}</span>. 
-                They will be granted Moderator access.
+                Configure permissions for <span className="font-medium">{approveDialog?.request.email}</span>. They will be granted Moderator access.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="can-add-revenue">Can Add Revenue</Label>
-                <Switch
-                  id="can-add-revenue"
-                  checked={approveDialog?.canAddRevenue ?? true}
-                  onCheckedChange={(checked) =>
-                    approveDialog && setApproveDialog({ ...approveDialog, canAddRevenue: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="can-add-expense">Can Add Expense</Label>
-                <Switch
-                  id="can-add-expense"
-                  checked={approveDialog?.canAddExpense ?? true}
-                  onCheckedChange={(checked) =>
-                    approveDialog && setApproveDialog({ ...approveDialog, canAddExpense: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor="can-add-expense-source">Can Add Expense Sources</Label>
-                </div>
-                <Switch
-                  id="can-add-expense-source"
-                  checked={approveDialog?.canAddExpenseSource ?? false}
-                  onCheckedChange={(checked) =>
-                    approveDialog && setApproveDialog({ ...approveDialog, canAddExpenseSource: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor="can-transfer">Can Transfer</Label>
-                </div>
-                <Switch
-                  id="can-transfer"
-                  checked={approveDialog?.canTransfer ?? false}
-                  onCheckedChange={(checked) =>
-                    approveDialog && setApproveDialog({ ...approveDialog, canTransfer: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="can-view-reports">Can View Reports</Label>
-                <Switch
-                  id="can-view-reports"
-                  checked={approveDialog?.canViewReports ?? true}
-                  onCheckedChange={(checked) =>
-                    approveDialog && setApproveDialog({ ...approveDialog, canViewReports: checked })
-                  }
-                />
-              </div>
-            </div>
+            {approveDialog && <PermissionToggles data={approveDialog} onChange={setApproveDialog} />}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setApproveDialog(null)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => approveDialog && approveMutation.mutate(approveDialog)}
-                disabled={approveMutation.isPending}
-                className="gap-2"
-              >
+              <Button variant="outline" onClick={() => setApproveDialog(null)}>Cancel</Button>
+              <Button onClick={() => approveDialog && approveMutation.mutate(approveDialog)} disabled={approveMutation.isPending} className="gap-2">
                 {approveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Approve & Grant Access
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Accept from Rejected Dialog */}
+        <Dialog open={!!acceptFromRejectedDialog} onOpenChange={(open) => !open && setAcceptFromRejectedDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Accept Rejected User</DialogTitle>
+              <DialogDescription>
+                Re-accept <span className="font-medium">{acceptFromRejectedDialog?.request.email}</span> and grant Moderator access. The ban will be lifted immediately.
+              </DialogDescription>
+            </DialogHeader>
+            {acceptFromRejectedDialog && <PermissionToggles data={acceptFromRejectedDialog} onChange={setAcceptFromRejectedDialog} />}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAcceptFromRejectedDialog(null)}>Cancel</Button>
+              <Button onClick={() => acceptFromRejectedDialog && acceptFromRejectedMutation.mutate(acceptFromRejectedDialog)} disabled={acceptFromRejectedMutation.isPending} className="gap-2">
+                {acceptFromRejectedMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Accept & Grant Access
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -376,7 +460,7 @@ export default function RegistrationRequests() {
               <AlertDialogTitle>Reject Registration</AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to reject <span className="font-medium">{rejectDialog?.email}</span>? 
-                This will permanently delete their account.
+                They will be banned from logging in or signing up for 1 day.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4">
@@ -397,7 +481,31 @@ export default function RegistrationRequests() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >
                 {rejectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Reject & Delete
+                Reject (1-day ban)
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Permanent Delete Dialog */}
+        <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Permanently Delete User</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete <span className="font-medium">{deleteDialog?.email}</span>? 
+                Their account will be removed and they will be banned from signing up again for 7 days.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteDialog && permanentDeleteMutation.mutate(deleteDialog)}
+                disabled={permanentDeleteMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+              >
+                {permanentDeleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Permanently Delete (7-day ban)
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
