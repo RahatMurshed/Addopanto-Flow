@@ -1,1 +1,4 @@
 project_id = "zrmhhnepzbwbihdshwcm"
+
+[functions.check-ban]
+verify_jwt = false

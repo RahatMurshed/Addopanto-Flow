@@ -6,14 +6,11 @@ import { useRegistrationStatus } from "@/hooks/useRegistrationStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Clock, LogOut, XCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
 export default function PendingApproval() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { status, rejectionReason, refetch } = useRegistrationStatus();
-  const { toast } = useToast();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [rejectedLocked, setRejectedLocked] = useState(false);
   const [lockedReason, setLockedReason] = useState<string | null>(null);
 
@@ -25,47 +22,28 @@ export default function PendingApproval() {
     }
   }, [status, rejectionReason, rejectedLocked]);
 
-  // Poll every 10 seconds to check if approved
+  // Poll every 3 seconds to check if approved
   useEffect(() => {
     const interval = setInterval(() => {
       refetch();
     }, 3000);
-
     return () => clearInterval(interval);
   }, [refetch]);
 
-  // Redirect to dashboard if approved
+  // Redirect to dashboard if approved (works even from rejection screen if admin re-approves)
   useEffect(() => {
     if (status === "has_role" || status === "approved") {
+      setRejectedLocked(false);
       navigate("/", { replace: true });
     }
   }, [status, navigate]);
 
-  // Handle rejection - force logout
-  useEffect(() => {
-    if (rejectedLocked && !isLoggingOut) {
-      setIsLoggingOut(true);
-      toast({
-        title: "Access Denied",
-        description: lockedReason || "Your registration request has been rejected.",
-        variant: "destructive",
-      });
-      
-      const timeout = setTimeout(async () => {
-        await supabase.auth.signOut({ scope: 'local' });
-        navigate("/auth", { replace: true });
-      }, 3000);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [rejectedLocked, lockedReason, navigate, toast, isLoggingOut]);
-
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
+    await supabase.auth.signOut({ scope: "local" });
+    navigate("/auth", { replace: true });
   };
 
-  // Show rejection screen
+  // Show rejection screen — permanent until user clicks "Go to Auth Page"
   if (rejectedLocked) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -88,8 +66,17 @@ export default function PendingApproval() {
             </div>
 
             <div className="text-center text-xs text-muted-foreground">
-              You will be logged out automatically...
+              If an administrator re-approves your account, you will be automatically redirected.
             </div>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-4 w-4" />
+              Go to Auth Page
+            </Button>
           </CardContent>
         </Card>
       </div>
