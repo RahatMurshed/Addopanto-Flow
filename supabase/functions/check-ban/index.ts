@@ -29,27 +29,61 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data, error } = await supabaseAdmin
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check for active ban first
+    const { data: banData, error: banError } = await supabaseAdmin
       .from("registration_requests")
       .select("banned_until, status")
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", normalizedEmail)
       .gt("banned_until", new Date().toISOString())
       .maybeSingle();
 
-    if (error) {
-      console.error("DB error:", error);
+    if (banError) {
+      console.error("DB error:", banError);
       return jsonResponse(500, { error: "Internal error" });
     }
 
-    if (data) {
+    if (banData) {
       return jsonResponse(200, {
         banned: true,
-        banned_until: data.banned_until,
-        ban_type: data.status === "rejected" ? "rejected" : "deleted",
+        banned_until: banData.banned_until,
+        ban_type: banData.status === "rejected" ? "rejected" : "deleted",
+        rejected: false,
+        rejection_reason: null,
       });
     }
 
-    return jsonResponse(200, { banned: false, banned_until: null, ban_type: null });
+    // No active ban — check if rejected (ban expired but still rejected status)
+    const { data: rejectedData, error: rejError } = await supabaseAdmin
+      .from("registration_requests")
+      .select("status, rejection_reason")
+      .eq("email", normalizedEmail)
+      .eq("status", "rejected")
+      .maybeSingle();
+
+    if (rejError) {
+      console.error("DB error:", rejError);
+      return jsonResponse(500, { error: "Internal error" });
+    }
+
+    if (rejectedData) {
+      return jsonResponse(200, {
+        banned: false,
+        banned_until: null,
+        ban_type: null,
+        rejected: true,
+        rejection_reason: rejectedData.rejection_reason,
+      });
+    }
+
+    return jsonResponse(200, {
+      banned: false,
+      banned_until: null,
+      ban_type: null,
+      rejected: false,
+      rejection_reason: null,
+    });
   } catch (e) {
     console.error("Error:", e);
     return jsonResponse(500, { error: "Internal error" });
