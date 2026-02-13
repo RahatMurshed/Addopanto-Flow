@@ -206,24 +206,24 @@ Deno.serve(async (req) => {
         return json(500, { error: "Failed to update registration request" });
       }
 
-      // Create user role as moderator
+      // Create or update user role as moderator (upsert to handle re-approvals)
       const { error: roleInsertError } = await adminClient
         .from("user_roles")
-        .insert({
+        .upsert({
           user_id: userId,
           role: "moderator",
           assigned_by: user.id,
-        });
+        }, { onConflict: "user_id,role" });
 
       if (roleInsertError) {
         console.error("Error inserting user role:", roleInsertError);
         return json(500, { error: "Failed to assign user role" });
       }
 
-      // Create moderator permissions
+      // Create or update moderator permissions
       const { error: permError } = await adminClient
         .from("moderator_permissions")
-        .insert({
+        .upsert({
           user_id: userId,
           can_add_revenue: permissions.can_add_revenue,
           can_add_expense: permissions.can_add_expense,
@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
           can_transfer: permissions.can_transfer,
           can_view_reports: permissions.can_view_reports,
           controlled_by: user.id,
-        });
+        }, { onConflict: "user_id" });
 
       if (permError) {
         console.error("Error inserting moderator permissions:", permError);
@@ -366,10 +366,10 @@ Deno.serve(async (req) => {
         return json(500, { error: "Failed to update registration request" });
       }
 
-      // Create user role as moderator
+      // Create or update user role as moderator (upsert to handle re-approvals)
       const { error: roleError } = await adminClient
         .from("user_roles")
-        .insert({ user_id: userId, role: "moderator", assigned_by: user.id });
+        .upsert({ user_id: userId, role: "moderator", assigned_by: user.id }, { onConflict: "user_id,role" });
 
       if (roleError) {
         console.error("Error inserting role:", roleError);
