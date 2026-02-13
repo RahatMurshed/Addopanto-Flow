@@ -188,8 +188,19 @@ export default function StudentDetail() {
                   <span className="text-muted-foreground">Paid ({summary.monthlyPaidMonths.length} mo)</span>
                   <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(summary.monthlyPaidTotal, currency)}</span>
                 </div>
+                {summary.monthlyPartialMonths.length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Partial ({summary.monthlyPartialMonths.length} mo)</span>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(
+                        summary.monthlyPartialMonths.reduce((s, m) => s + (summary.monthlyPaymentsByMonth.get(m) || 0), 0),
+                        currency
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Pending ({summary.monthlyOverdueMonths.length + summary.monthlyPendingMonths.length} mo)</span>
+                  <span className="text-muted-foreground">Pending ({summary.monthlyOverdueMonths.length + summary.monthlyPartialMonths.length + summary.monthlyPendingMonths.length} mo)</span>
                   <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(summary.monthlyPendingTotal, currency)}</span>
                 </div>
                 <Progress value={monthlyPercent} className="h-2" />

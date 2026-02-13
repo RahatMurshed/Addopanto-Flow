@@ -194,8 +194,10 @@ export interface StudentSummary {
   admissionPending: number;
   admissionStatus: "paid" | "partial" | "pending";
   monthlyPaidMonths: string[];
+  monthlyPartialMonths: string[];
   monthlyOverdueMonths: string[];
   monthlyPendingMonths: string[];
+  monthlyPaymentsByMonth: Map<string, number>;
   monthlyPaidTotal: number;
   monthlyPendingTotal: number;
   totalPaid: number;
@@ -290,15 +292,20 @@ export function computeStudentSummary(
   };
 
   const monthlyPaidMonths: string[] = [];
+  const monthlyPartialMonths: string[] = [];
   const monthlyOverdueMonths: string[] = [];
   const monthlyPendingMonths: string[] = [];
+  const monthlyPaymentsByMonth = new Map<string, number>();
 
   for (const m of allMonths) {
     const fee = getFeeForMonth(m);
     const paid = monthPaymentTotals.get(m) || 0;
+    monthlyPaymentsByMonth.set(m, paid);
     if (paid >= fee) {
       monthlyPaidMonths.push(m);
       paidMonthsSet.add(m);
+    } else if (paid > 0) {
+      monthlyPartialMonths.push(m);
     } else if (m < currentMonth) {
       monthlyOverdueMonths.push(m);
     } else {
@@ -308,14 +315,14 @@ export function computeStudentSummary(
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
 
-  // Compute monetary totals for monthly
-  let monthlyPaidTotal = 0;
-  for (const m of monthlyPaidMonths) {
-    monthlyPaidTotal += getFeeForMonth(m);
-  }
+  // monthlyPaidTotal = actual money received for monthly payments
+  const monthlyPaidTotal = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
+  // monthlyPendingTotal = remaining owed across partial + overdue + pending months
   let monthlyPendingTotal = 0;
-  for (const m of [...monthlyOverdueMonths, ...monthlyPendingMonths]) {
-    monthlyPendingTotal += getFeeForMonth(m);
+  for (const m of [...monthlyPartialMonths, ...monthlyOverdueMonths, ...monthlyPendingMonths]) {
+    const fee = getFeeForMonth(m);
+    const paid = monthlyPaymentsByMonth.get(m) || 0;
+    monthlyPendingTotal += (fee - paid);
   }
 
   const admissionPending = Math.max(0, admissionTotal - admissionPaid);
@@ -335,8 +342,10 @@ export function computeStudentSummary(
     admissionPending,
     admissionStatus,
     monthlyPaidMonths,
+    monthlyPartialMonths,
     monthlyOverdueMonths,
     monthlyPendingMonths,
+    monthlyPaymentsByMonth,
     monthlyPaidTotal,
     monthlyPendingTotal,
     totalPaid,
