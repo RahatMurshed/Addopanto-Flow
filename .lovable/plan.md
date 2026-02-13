@@ -1,65 +1,68 @@
 
-# Fix All Detected Errors
 
-## Errors Found
+# Fix: Deleted Users Still Have Access
 
-### Error 1: Realtime Not Enabled for `user_roles` Table (Critical)
-The `AuthContext.tsx` has a Realtime listener on `user_roles` to force logout deleted users, but Realtime is NOT enabled for any table. The listener silently does nothing -- deleted users keep their active sessions.
+## Root Cause
 
-**Fix**: Run a database migration to add `user_roles` to the `supabase_realtime` publication.
+The current deletion flow in the `admin-users` Edge Function is:
+1. `signOut(userId, "global")` -- invalidates the target user's session tokens
+2. `deleteUser(userId)` -- cascades to delete `user_roles`
 
-### Error 2: Duplicate/Wasted API Call in UserManagement (Bug)
-In `src/pages/UserManagement.tsx` lines 84-90, there is an unused `supabase.functions.invoke("admin-users")` call that fires before the actual `fetch()` call on line 93. This means every page load makes TWO requests to the edge function -- one is completely discarded. This wastes resources and slows down the page.
+The problem: Step 1 breaks the target user's Realtime WebSocket connection. So when Step 2 cascades and deletes the `user_roles` row, the Realtime DELETE event never reaches the client. The deleted user's cached JWT remains valid (up to 1 hour) and they keep seeing data.
 
-**Fix**: Remove the unused `supabase.functions.invoke` call (lines 84-90) and keep only the `fetch()` call.
+## Fix
 
-### Error 3: ModeratorControl Shows No Emails for Other Moderators (Bug)
-In `src/pages/ModeratorControl.tsx` line 163, moderator emails are only set for the current user. All other moderators show their UUID instead of email, making it impossible to identify them.
+Reorder the deletion flow to:
+1. **Delete `user_roles` explicitly first** -- triggers Realtime DELETE event while the user's connection is still alive, causing the client-side listener to call `signOut()`
+2. **Sign out all sessions** -- server-side backup to invalidate refresh tokens
+3. **Delete user from auth** -- final cleanup
 
-**Fix**: Fetch moderator emails from `user_profiles` table (which stores emails) and join with the user_roles query.
+## File Changes
 
-### Error 4: `useAccountBalances` Missing Pagination Guard (Minor)
-All queries to `expenses`, `allocations`, etc. have no `.limit()` -- Supabase defaults to 1000 rows. For users with more than 1000 transactions, data will be silently truncated, producing incorrect balances.
+### File 1: `supabase/functions/admin-users/index.ts`
 
-**Fix**: Not critical now but worth noting. No change for this round.
+In `handleDeleteUser`, change the order:
 
----
+```text
+Current flow:
+  signOut(userId) --> deleteUser(userId) [cascade deletes user_roles]
 
-## Implementation Plan
-
-### Step 1: Database Migration -- Enable Realtime for `user_roles`
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.user_roles;
+New flow:
+  DELETE from user_roles WHERE user_id = userId  --> small delay --> signOut(userId) --> deleteUser(userId)
 ```
 
-### Step 2: Fix UserManagement Duplicate Call
-**File**: `src/pages/UserManagement.tsx`
+The explicit `user_roles` DELETE fires the Realtime event while the user's WebSocket is still connected, triggering immediate client-side logout.
 
-Remove the unused `supabase.functions.invoke` block (lines 84-90) so only the paginated `fetch()` call remains.
+### File 2: `src/contexts/AuthContext.tsx`
 
-### Step 3: Fix ModeratorControl Missing Emails
-**File**: `src/pages/ModeratorControl.tsx`
+Add a fallback periodic session validation. If Realtime somehow misses the event, periodically check if the session is still valid by calling `getUser()`. If the user no longer exists, force logout. This runs every 30 seconds as a safety net.
 
-Update the moderators query to also fetch emails from `user_profiles`:
+## Technical Details
+
+### Edge Function Change (handleDeleteUser)
+
 ```typescript
-const { data: profiles } = await supabase
-  .from("user_profiles")
-  .select("user_id, email");
+// Step 1: Delete user_roles first to trigger Realtime event
+await adminClient
+  .from("user_roles")
+  .delete()
+  .eq("user_id", userId);
 
-// Map emails to moderators
-return data.map(m => ({
-  user_id: m.user_id,
-  email: profiles?.find(p => p.user_id === m.user_id)?.email || null,
-  created_at: m.created_at,
-}));
+// Small delay to allow Realtime event to propagate
+await new Promise(resolve => setTimeout(resolve, 500));
+
+// Step 2: Sign out all sessions (backup)
+try {
+  await adminClient.auth.admin.signOut(userId, "global");
+} catch (e) {
+  // non-fatal
+}
+
+// Step 3: Delete user from auth
+await adminClient.auth.admin.deleteUser(userId);
 ```
 
----
+### AuthContext Fallback
 
-## Files to Modify
+Add an interval-based session check that runs every 30 seconds when the user is logged in. It calls `supabase.auth.getUser()` and if the response indicates the user no longer exists, it forces a local sign-out. This acts as a safety net in case Realtime misses the event.
 
-| # | File | Change |
-|---|------|--------|
-| 1 | Database migration | Enable Realtime on `user_roles` |
-| 2 | `src/pages/UserManagement.tsx` | Remove unused `supabase.functions.invoke` call |
-| 3 | `src/pages/ModeratorControl.tsx` | Fetch moderator emails from `user_profiles` |
