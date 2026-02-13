@@ -1,136 +1,153 @@
 
+# Support Partial Monthly Payments and Improve List Display
 
-# Add Course Duration Fields and Redesign Student Detail Dashboard
+## Problem
 
-## Overview
-
-Add `course_start_month` and `course_end_month` columns to the students table to define the full enrollment period. Redesign the student detail page with a modern three-card dashboard layout, a visual monthly breakdown bounded by course dates, and an overall progress bar.
+Currently, monthly fees are binary -- a month is either fully paid or not paid. The user wants monthly fees to support partial payments (like admission fees), and wants the students list to show total pending months and total pending amount (admission + monthly combined).
 
 ---
 
-## 1. Database Migration
+## Changes Required
 
-Add two new nullable text columns to `students`:
+### 1. Computation Logic (`src/hooks/useStudentPayments.ts`)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| course_start_month | text | "YYYY-MM" format, defaults to billing_start_month value |
-| course_end_month | text | "YYYY-MM" format, nullable (open-ended if not set) |
+**Add partial monthly payment tracking:**
 
-The existing `billing_start_month` remains as-is (it controls when billing begins, which may differ from course start). The new fields define the course duration window.
+- Add a new `monthlyPartialMonths` array to `StudentSummary` for months that have some payment but not the full fee
+- Add a `monthlyPaymentsByMonth` map to track actual paid amount per month (already partially exists as `monthPaymentTotals`)
+- Change the paid/pending classification: a month is "paid" only when paid >= fee, "partial" when 0 < paid < fee, "overdue"/"pending" when paid === 0
+- Adjust `monthlyPaidTotal` to reflect actual amounts paid (not expected fees), and `monthlyPendingTotal` to reflect remaining amounts owed
 
-## 2. Student Dialog Changes (`StudentDialog.tsx`)
+**Updated StudentSummary interface additions:**
+```typescript
+monthlyPartialMonths: string[];          // months with 0 < paid < fee
+monthlyPaymentsByMonth: Map<string, number>; // actual paid amount per month
+```
 
-Replace the plain text input for "First Billing Month" with a proper month/year picker approach, and add two new date-picker-style month selectors:
+**Updated classification logic:**
+```
+For each billing month:
+  fee = getFeeForMonth(month)
+  paid = sum of payments covering that month
+  if paid >= fee -> monthlyPaidMonths
+  else if paid > 0 -> monthlyPartialMonths  (NEW)
+  else if month < currentMonth -> monthlyOverdueMonths
+  else -> monthlyPendingMonths
+```
 
-- **Course Start Month**: Month picker (popover with month/year grid or simple YYYY-MM input with calendar guidance)
-- **Course End Month**: Month picker (same style, must be >= course start month)
-- **First Billing Month**: Stays as-is but auto-fills from Course Start Month when left blank
+**Updated monetary totals:**
+- `monthlyPaidTotal` = sum of actual payments for all monthly-type payments (real money received)
+- `monthlyPendingTotal` = sum of (fee - paid) for all partial, overdue, and pending months (real money still owed)
 
-Since React Day Picker doesn't have a native month-only picker, these will use simple YYYY-MM inputs with validation. The enrollment date field already has a proper date picker.
+### 2. Student Month Grid (`src/components/StudentMonthGrid.tsx`)
 
-## 3. Redesigned Student Detail Page (`StudentDetail.tsx`)
+- Add a fourth state for partial months: amber/orange background with a "partial" indicator icon
+- Show partial months distinctly from fully paid (green) and unpaid (red/yellow)
+- Optionally show paid/total amount in the grid cell for partial months
 
-### Layout: Three summary cards at top, then monthly visual, then payment history
+### 3. Monthly Breakdown List (`src/components/MonthlyBreakdownList.tsx`)
 
-**Card 1 -- Admission Fee:**
-- Icon with colored background circle
-- Total admission fee (large number)
-- Paid amount in green
-- Pending amount in red/orange
-- Mini progress bar
+- Add a "Partially Paid" section between "Overdue" and "Paid" sections
+- For partial months, show: month name, amount paid, amount remaining, payment date
+- Update summary line to include partial count
 
-**Card 2 -- Monthly Tuition:**
-- Total expected tuition (months in range x rate)
-- Paid amount and month count in green
-- Pending/overdue amount and month count in red/orange
-- Mini progress bar
+### 4. Student Detail Dashboard (`src/pages/StudentDetail.tsx`)
 
-**Card 3 -- Overall Total:**
-- Grand total (admission + monthly combined)
-- Total paid in green
-- Total pending in red
-- Overall completion percentage with progress bar
+- Monthly Tuition card: include partial months in the breakdown display (e.g., "3 paid, 2 partial, 2 pending")
+- The progress bar and percentages will automatically update since they use `monthlyPaidTotal` / total
 
-**Below cards:**
-- Full-width monthly fee visual grid (existing `StudentMonthGrid`) showing months from course_start_month to course_end_month (or current month if no end set)
-- Overall payment completion progress bar with percentage label
-- Monthly breakdown list (existing `MonthlyBreakdownList`) with paid/overdue/pending sections
+### 5. Payment Dialog (`src/components/StudentPaymentDialog.tsx`)
 
-### Changes to computation logic
+- When recording monthly payments, allow the amount field to be freely editable (already is) so partial amounts work
+- Show the fee amount and already-paid amount for selected months so the admin knows what's remaining
+- For months that are partially paid, show them in the "unpaid months" list with a "partial" indicator and remaining amount
 
-Update `computeStudentSummary` to accept optional `course_end_month`. When set, the month range is bounded by it instead of always extending to current month. This affects which months are "pending" vs just not yet in range.
+### 6. Students List (`src/pages/Students.tsx`)
 
-## 4. Hook and Type Updates
+**Monthly column changes:**
+- Currently shows "X overdue" or "Current"
+- Change to show total pending months count (overdue + partial + pending combined), e.g., "7 months pending" or "4 months pending"
+- If all months are fully paid, show "Current" badge
 
-### `useStudents.ts`
-- Add `course_start_month` and `course_end_month` to `Student` interface and `StudentInsert` interface
+**Total Pending column:**
+- Already shows `sum.totalPending` which is `admissionPending + monthlyPendingTotal`
+- Will automatically reflect correct values once computation logic is updated to include partial amounts in pending
 
-### `useStudentPayments.ts`
-- Update `computeStudentSummary` to accept `course_end_month` parameter
-- When `course_end_month` is set, cap the month generation at that month instead of current month
-- Add `totalExpected` field to summary (admission total + all monthly fees for the course duration)
+---
 
-### `StudentDialog.tsx`
-- Add `course_start_month` and `course_end_month` to form schema with YYYY-MM validation
-- Add two new input fields in the form grid
-- Auto-populate `billing_start_month` from `course_start_month` if not manually set
+## Files to Modify
 
-## 5. Files to Modify
+| File | Changes |
+|------|---------|
+| `src/hooks/useStudentPayments.ts` | Add `monthlyPartialMonths`, `monthlyPaymentsByMonth` to `StudentSummary`. Update classification to support partial. Recalculate monetary totals based on actual payments vs. expected fees. |
+| `src/components/StudentMonthGrid.tsx` | Add amber/orange styling for partial months with distinct icon. |
+| `src/components/MonthlyBreakdownList.tsx` | Add "Partially Paid" section showing paid/remaining for each partial month. |
+| `src/pages/StudentDetail.tsx` | Update Monthly Tuition card text to mention partial months. |
+| `src/components/StudentPaymentDialog.tsx` | Show remaining amount for partially-paid months in the month selector. |
+| `src/pages/Students.tsx` | Change Monthly column to show total pending month count. Ensure Total Pending shows full course pending. |
 
-| File | Change |
-|------|--------|
-| `src/hooks/useStudents.ts` | Add `course_start_month`, `course_end_month` to Student and StudentInsert interfaces |
-| `src/hooks/useStudentPayments.ts` | Update `computeStudentSummary` to respect course_end_month; add `totalExpected` to summary |
-| `src/components/StudentDialog.tsx` | Add course_start_month and course_end_month fields with YYYY-MM inputs |
-| `src/pages/StudentDetail.tsx` | Redesign with 3 summary cards, progress bar, cleaner layout |
+---
 
 ## Technical Details
 
-### Database Migration SQL
-
-```sql
-ALTER TABLE students
-  ADD COLUMN course_start_month text,
-  ADD COLUMN course_end_month text;
-
--- Backfill course_start_month from billing_start_month for existing rows
-UPDATE students SET course_start_month = billing_start_month WHERE course_start_month IS NULL;
-```
-
-### Updated StudentSummary Fields
+### A. Updated `computeStudentSummary` Logic
 
 ```typescript
-interface StudentSummary {
-  // existing fields...
-  totalExpected: number;        // admissionTotal + sum of all monthly fees across course duration
-  overallPercent: number;       // (totalPaid / totalExpected) * 100
+// Per-month classification
+const monthlyPartialMonths: string[] = [];
+const monthPaymentsByMonth = new Map<string, number>();
+
+for (const m of allMonths) {
+  const fee = getFeeForMonth(m);
+  const paid = monthPaymentTotals.get(m) || 0;
+  monthPaymentsByMonth.set(m, paid);
+  
+  if (paid >= fee) {
+    monthlyPaidMonths.push(m);
+  } else if (paid > 0) {
+    monthlyPartialMonths.push(m);  // NEW
+  } else if (m < currentMonth) {
+    monthlyOverdueMonths.push(m);
+  } else {
+    monthlyPendingMonths.push(m);
+  }
 }
+
+// Monetary totals based on actual money
+monthlyPaidTotal = sum of all monthly payment amounts (actual money received)
+monthlyPendingTotal = sum of (fee - paid) for partial + overdue + pending months
 ```
 
-### Month Range Logic
+### B. Students List Monthly Column
 
-```typescript
-// If course_end_month is set, use min(course_end_month, currentMonth) as the end
-// If not set, use currentMonth (existing behavior)
-const endMonth = student.course_end_month
-  ? (student.course_end_month < currentMonth ? student.course_end_month : currentMonth)
-  : currentMonth;
+```
+// Instead of just showing overdue count:
+const totalPendingMonths = sum.monthlyOverdueMonths.length 
+  + sum.monthlyPartialMonths.length 
+  + sum.monthlyPendingMonths.length;
+
+// Display:
+if (totalPendingMonths > 0) -> Badge: "X months pending"  
+else -> Badge: "Current"
 ```
 
-### Student Detail Card Layout
+### C. Month Grid Partial State
 
-Three cards in a responsive grid (`grid-cols-1 md:grid-cols-3`), each with:
-- Header with icon and title
-- Large primary number (total)
-- Two sub-lines: paid (green text) and pending (red/orange text)
-- Thin progress bar at bottom of card
+Partial months get a distinct amber style:
+- Border: `border-amber-500/30`
+- Background: `bg-amber-500/10`
+- Text: `text-amber-700 dark:text-amber-400`
+- Icon: A circle-half or similar indicator
 
-Below: full-width card containing the month grid and breakdown list, plus an overall progress bar with percentage.
+### D. Payment Dialog Enhancement
 
-### Validation
+For partially paid months in the month selector:
+- Show them with remaining amount, e.g., "Jan 2026 (BDT 400 remaining)"
+- Pre-calculate the amount when selecting partial months as the sum of remaining fees
+- The admin can still freely edit the amount field for any custom partial payment
 
-- `course_start_month`: optional, YYYY-MM format
-- `course_end_month`: optional, YYYY-MM format, must be >= course_start_month if both set
-- If course_start_month is set and billing_start_month is empty, auto-fill billing_start_month
+### E. Edge Cases
 
+- A single payment covering multiple months: the payment amount is split evenly across covered months (existing behavior)
+- Multiple payments for the same month: amounts accumulate (existing behavior)
+- Partial payment on a month that later gets a second payment completing it: moves from partial to paid automatically on next data refresh
