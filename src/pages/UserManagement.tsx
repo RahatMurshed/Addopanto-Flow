@@ -440,7 +440,7 @@ export default function UserManagement() {
 
       {/* Role Change Confirmation Dialog */}
       <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open && !changeRoleMutation.isPending) setRoleChangeConfirm(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (changeRoleMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Role Change</AlertDialogTitle>
             <AlertDialogDescription>
@@ -456,7 +456,7 @@ export default function UserManagement() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changeRoleMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRoleChange} disabled={changeRoleMutation.isPending}>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmRoleChange(); }} disabled={changeRoleMutation.isPending}>
               {changeRoleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {changeRoleMutation.isPending ? "Updating..." : "Confirm"}
             </AlertDialogAction>
@@ -474,7 +474,7 @@ export default function UserManagement() {
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (deleteUserMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -508,7 +508,7 @@ export default function UserManagement() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDeleteUser}
+              onClick={(e) => { e.preventDefault(); confirmDeleteUser(); }}
               disabled={
                 deleteUserMutation.isPending ||
                 ((deleteConfirm?.role === "admin" || deleteConfirm?.role === "cipher") &&

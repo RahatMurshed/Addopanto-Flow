@@ -107,7 +107,7 @@ export default function RevenueDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => { if (saving) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (saving) e.preventDefault(); }}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Revenue" : "Add Revenue"}</DialogTitle>
           <DialogDescription>
