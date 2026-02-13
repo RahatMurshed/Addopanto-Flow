@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         async () => {
           console.log('User role deleted, forcing logout');
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
         }
       )
       .subscribe();
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!roleData) {
         console.log('User role not found, forcing logout');
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         return;
       }
 
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.getUser();
       if (error) {
         console.log('Session validation failed, forcing logout:', error.message);
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
       }
     }, 5000);
 
