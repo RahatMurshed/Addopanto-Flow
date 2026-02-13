@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Plus,
   GraduationCap,
+  ArrowLeftRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
