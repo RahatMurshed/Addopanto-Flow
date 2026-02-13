@@ -20,6 +20,7 @@ export default function CreateCompany() {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [description, setDescription] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [currency, setCurrency] = useState("BDT");
@@ -72,13 +73,22 @@ export default function CreateCompany() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
                 <Label>Company Name *</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My Company" required />
+                <Input value={name} onChange={(e) => {
+                  const val = e.target.value;
+                  setName(val);
+                  if (!slugManuallyEdited) {
+                    setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
+                  }
+                }} placeholder="My Company" required />
               </div>
               <div className="space-y-2">
                 <Label>URL Slug</Label>
                 <Input
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                  onChange={(e) => {
+                    setSlugManuallyEdited(true);
+                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                  }}
                   placeholder="my-company"
                 />
               </div>
