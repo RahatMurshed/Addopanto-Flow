@@ -15,9 +15,14 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Separator } from "@/components/ui/separator";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
+import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
+import { useToast } from "@/hooks/use-toast";
 
 const studentSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -38,13 +43,29 @@ interface StudentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   student?: Student | null;
-  onSave: (data: StudentInsert) => Promise<void>;
+  onSave: (data: StudentInsert) => Promise<Student | void>;
 }
+
+const defaultPayment: InitialPaymentData = {
+  paymentType: "admission",
+  admissionAmount: 0,
+  monthlyMonths: [],
+  monthlyAmount: 0,
+  paymentMethod: "cash",
+  receiptNumber: "",
+};
 
 export default function StudentDialog({ open, onOpenChange, student, onSave }: StudentDialogProps) {
   const [saving, setSaving] = useState(false);
+  const [savingStep, setSavingStep] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [initialPayment, setInitialPayment] = useState<InitialPaymentData>(defaultPayment);
   const isEdit = !!student;
+
+  const createPaymentMutation = useCreateStudentPayment();
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
+  const { toast } = useToast();
 
   const now = new Date();
   const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -79,13 +100,20 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
         status: student?.status || "active",
         notes: student?.notes || null,
       });
+      setInitialPayment(defaultPayment);
     }
   }, [open, student, form]);
+
+  const hasInitialPayment = !isEdit && (
+    (initialPayment.paymentType === "admission" || initialPayment.paymentType === "both") && initialPayment.admissionAmount > 0 ||
+    (initialPayment.paymentType === "monthly" || initialPayment.paymentType === "both") && initialPayment.monthlyMonths.length > 0
+  );
 
   const handleSubmit = async (data: StudentFormData) => {
     setSaving(true);
     try {
-      await onSave({
+      setSavingStep("Creating student...");
+      const result = await onSave({
         name: data.name,
         student_id_number: data.student_id_number || null,
         email: data.email || null,
@@ -97,13 +125,57 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
         status: data.status,
         notes: data.notes || null,
       });
+
+      // Record initial payment if configured
+      if (hasInitialPayment && result && "id" in result) {
+        setSavingStep("Recording payment...");
+        const showAdmission = initialPayment.paymentType === "admission" || initialPayment.paymentType === "both";
+        const showMonthly = initialPayment.paymentType === "monthly" || initialPayment.paymentType === "both";
+
+        try {
+          if (showAdmission && initialPayment.admissionAmount > 0) {
+            await createPaymentMutation.mutateAsync({
+              student_id: result.id,
+              payment_type: "admission",
+              amount: initialPayment.admissionAmount,
+              payment_date: format(new Date(), "yyyy-MM-dd"),
+              payment_method: initialPayment.paymentMethod,
+              receipt_number: initialPayment.receiptNumber || null,
+              studentName: data.name,
+            });
+          }
+          if (showMonthly && initialPayment.monthlyMonths.length > 0 && initialPayment.monthlyAmount > 0) {
+            await createPaymentMutation.mutateAsync({
+              student_id: result.id,
+              payment_type: "monthly",
+              amount: initialPayment.monthlyAmount,
+              payment_date: format(new Date(), "yyyy-MM-dd"),
+              payment_method: initialPayment.paymentMethod,
+              months_covered: initialPayment.monthlyMonths,
+              receipt_number: initialPayment.receiptNumber || null,
+              studentName: data.name,
+            });
+          }
+        } catch (payErr: any) {
+          toast({
+            title: "Student created but payment failed",
+            description: payErr.message,
+            variant: "destructive",
+          });
+        }
+      }
+
       onOpenChange(false);
     } finally {
       setSaving(false);
+      setSavingStep("");
     }
   };
 
   const selectedDate = form.watch("enrollment_date");
+  const watchedAdmission = form.watch("admission_fee_total");
+  const watchedMonthly = form.watch("monthly_fee_amount");
+  const watchedBillingStart = form.watch("billing_start_month");
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
@@ -190,11 +262,27 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
             <Textarea id="notes" rows={2} disabled={saving} {...form.register("notes")} />
           </div>
 
+          {/* Initial Payment Section (create mode only) */}
+          {!isEdit && (watchedAdmission > 0 || watchedMonthly > 0) && (
+            <>
+              <Separator />
+              <InitialPaymentSection
+                admissionFeeTotal={watchedAdmission}
+                monthlyFeeAmount={watchedMonthly}
+                billingStartMonth={watchedBillingStart}
+                currency={currency}
+                disabled={saving}
+                value={initialPayment}
+                onChange={setInitialPayment}
+              />
+            </>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {saving ? "Saving..." : isEdit ? "Save Changes" : "Add Student"}
+              {saving ? savingStep || "Saving..." : isEdit ? "Save Changes" : "Add Student"}
             </Button>
           </DialogFooter>
         </form>

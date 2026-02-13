@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import StudentDialog from "@/components/StudentDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import StudentMonthGrid from "@/components/StudentMonthGrid";
+import MonthlyBreakdownList from "@/components/MonthlyBreakdownList";
 
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -179,7 +180,7 @@ export default function StudentDetail() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Paid</span>
-                  <span className="text-primary font-semibold">{summary.monthlyPaidMonths.length} months</span>
+                  <span className="text-primary font-semibold">{summary.monthlyPaidMonths.length} months ({formatCurrency(summary.monthlyPaidTotal, currency)})</span>
                 </div>
                 {summary.monthlyOverdueMonths.length > 0 && (
                   <div className="flex justify-between text-sm">
@@ -187,7 +188,20 @@ export default function StudentDetail() {
                     <span className="text-destructive font-semibold">{summary.monthlyOverdueMonths.length} months</span>
                   </div>
                 )}
+                {summary.monthlyPendingMonths.length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Pending</span>
+                    <span className="font-semibold">{summary.monthlyPendingMonths.length} months ({formatCurrency(summary.monthlyPendingTotal, currency)})</span>
+                  </div>
+                )}
                 <StudentMonthGrid summary={summary} />
+                <MonthlyBreakdownList
+                  summary={summary}
+                  payments={payments}
+                  feeHistory={feeHistory}
+                  monthlyFeeAmount={Number(student.monthly_fee_amount)}
+                  currency={currency}
+                />
               </>
             ) : (
               <p className="text-sm text-muted-foreground">No monthly fee set</p>
@@ -196,12 +210,60 @@ export default function StudentDetail() {
         </Card>
       </div>
 
-      {/* Total Paid */}
+      {/* Total Revenue Breakdown */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-muted-foreground">Total Revenue from {student.name}</span>
-            <span className="text-xl font-bold text-primary">{formatCurrency(summary.totalPaid, currency)}</span>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Total Revenue Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Admission */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Admission Fee</span>
+              <span className="font-semibold">{formatCurrency(summary.admissionTotal, currency)}</span>
+            </div>
+            <div className="flex justify-between text-xs pl-4">
+              <span className="text-muted-foreground">Paid</span>
+              <span className="text-primary">{formatCurrency(summary.admissionPaid, currency)}</span>
+            </div>
+            {summary.admissionPending > 0 && (
+              <div className="flex justify-between text-xs pl-4">
+                <span className="text-muted-foreground">Pending</span>
+                <span className="text-destructive">{formatCurrency(summary.admissionPending, currency)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Monthly */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Monthly Tuition</span>
+              <span className="font-semibold">{formatCurrency(Number(student.monthly_fee_amount), currency)}/mo</span>
+            </div>
+            <div className="flex justify-between text-xs pl-4">
+              <span className="text-muted-foreground">Paid ({summary.monthlyPaidMonths.length} months)</span>
+              <span className="text-primary">{formatCurrency(summary.monthlyPaidTotal, currency)}</span>
+            </div>
+            {summary.monthlyPendingTotal > 0 && (
+              <div className="flex justify-between text-xs pl-4">
+                <span className="text-muted-foreground">Pending ({summary.monthlyOverdueMonths.length + summary.monthlyPendingMonths.length} months)</span>
+                <span className="text-destructive">{formatCurrency(summary.monthlyPendingTotal, currency)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Totals */}
+          <div className="border-t pt-2 space-y-1">
+            <div className="flex justify-between text-sm font-bold">
+              <span>TOTAL PAID</span>
+              <span className="text-primary">{formatCurrency(summary.totalPaid, currency)}</span>
+            </div>
+            {summary.totalPending > 0 && (
+              <div className="flex justify-between text-sm font-bold">
+                <span>TOTAL PENDING</span>
+                <span className="text-destructive">{formatCurrency(summary.totalPending, currency)}</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

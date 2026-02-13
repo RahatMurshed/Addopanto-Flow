@@ -191,11 +191,15 @@ export function useMonthlyFeeHistory(studentId?: string) {
 export interface StudentSummary {
   admissionPaid: number;
   admissionTotal: number;
+  admissionPending: number;
   admissionStatus: "paid" | "partial" | "pending";
   monthlyPaidMonths: string[];
   monthlyOverdueMonths: string[];
   monthlyPendingMonths: string[];
+  monthlyPaidTotal: number;
+  monthlyPendingTotal: number;
   totalPaid: number;
+  totalPending: number;
 }
 
 export function computeStudentSummary(
@@ -283,13 +287,30 @@ export function computeStudentSummary(
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
 
+  // Compute monetary totals for monthly
+  let monthlyPaidTotal = 0;
+  for (const m of monthlyPaidMonths) {
+    monthlyPaidTotal += getFeeForMonth(m);
+  }
+  let monthlyPendingTotal = 0;
+  for (const m of [...monthlyOverdueMonths, ...monthlyPendingMonths]) {
+    monthlyPendingTotal += getFeeForMonth(m);
+  }
+
+  const admissionPending = Math.max(0, admissionTotal - admissionPaid);
+  const totalPending = admissionPending + monthlyPendingTotal;
+
   return {
     admissionPaid,
     admissionTotal,
+    admissionPending,
     admissionStatus,
     monthlyPaidMonths,
     monthlyOverdueMonths,
     monthlyPendingMonths,
+    monthlyPaidTotal,
+    monthlyPendingTotal,
     totalPaid,
+    totalPending,
   };
 }
