@@ -106,7 +106,7 @@ export default function RevenueDialog({
   const selectedDate = form.watch("date");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Revenue" : "Add Revenue"}</DialogTitle>
@@ -124,6 +124,7 @@ export default function RevenueDialog({
               step="0.01"
               min="0.01"
               placeholder="0.00"
+              disabled={saving}
               {...form.register("amount", { valueAsNumber: true })}
             />
             {form.formState.errors.amount && (
@@ -167,6 +168,7 @@ export default function RevenueDialog({
             <Select
               value={form.watch("source_id") || "none"}
               onValueChange={(value) => form.setValue("source_id", value === "none" ? null : value)}
+              disabled={saving}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a source" />
@@ -186,6 +188,7 @@ export default function RevenueDialog({
                 value={newSourceName}
                 onChange={(e) => setNewSourceName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSource())}
+                disabled={saving}
               />
               <Button
                 type="button"
@@ -205,17 +208,18 @@ export default function RevenueDialog({
               id="description"
               placeholder="Add notes about this revenue..."
               rows={3}
+              disabled={saving}
               {...form.register("description")}
             />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEdit ? "Save Changes" : "Add Revenue"}
+              {saving ? "Saving..." : isEdit ? "Save Changes" : "Add Revenue"}
             </Button>
           </DialogFooter>
         </form>

@@ -99,7 +99,7 @@ export default function ExpenseDialog({
     : null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Expense" : "Add Expense"}</DialogTitle>
@@ -114,6 +114,7 @@ export default function ExpenseDialog({
             <Select
               value={form.watch("expense_account_id")}
               onValueChange={(value) => form.setValue("expense_account_id", value)}
+              disabled={saving}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select an expense source" />
@@ -150,6 +151,7 @@ export default function ExpenseDialog({
               step="0.01"
               min="0.01"
               placeholder="0.00"
+              disabled={saving}
               {...form.register("amount", { valueAsNumber: true })}
             />
             {form.formState.errors.amount && (
@@ -203,17 +205,18 @@ export default function ExpenseDialog({
               id="description"
               placeholder="What was this expense for..."
               rows={3}
+              disabled={saving}
               {...form.register("description")}
             />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEdit ? "Save Changes" : "Add Expense"}
+              {saving ? "Saving..." : isEdit ? "Save Changes" : "Add Expense"}
             </Button>
           </DialogFooter>
         </form>
