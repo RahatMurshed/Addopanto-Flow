@@ -121,6 +121,17 @@ Deno.serve(async (req) => {
         return json(403, { error: "Cannot delete cipher users" });
       }
 
+      // Look up the user's email BEFORE deleting
+      const { data: targetAuthUser, error: authLookupError } =
+        await adminClient.auth.admin.getUserById(userId);
+
+      if (authLookupError) {
+        console.error("Error looking up user:", authLookupError);
+        return json(500, { error: "Failed to look up user" });
+      }
+
+      const targetEmail = targetAuthUser?.user?.email;
+
       // Step 1: Delete user_roles first to trigger Realtime event while connection is alive
       const { error: roleDeleteError } = await adminClient
         .from("user_roles")
@@ -131,10 +142,16 @@ Deno.serve(async (req) => {
         console.warn("Failed to delete user_roles (non-fatal):", roleDeleteError);
       }
 
+      // Delete moderator permissions
+      await adminClient.from("moderator_permissions").delete().eq("user_id", userId);
+
+      // Delete any existing registration_requests for this user (will be recreated as ban)
+      await adminClient.from("registration_requests").delete().eq("user_id", userId);
+
       // Small delay to allow Realtime event to propagate to client
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Step 2: Sign out all sessions (backup to invalidate refresh tokens)
+      // Step 2: Sign out all sessions
       try {
         await adminClient.auth.admin.signOut(userId, "global");
         console.log(`Signed out all sessions for user ${userId}`);
@@ -142,7 +159,7 @@ Deno.serve(async (req) => {
         console.warn("Failed to sign out user sessions (non-fatal):", signOutErr);
       }
 
-      // Step 3: Delete user from auth.users (cascade handles remaining data)
+      // Step 3: Delete user from auth.users
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
       if (deleteError) {
@@ -153,6 +170,28 @@ Deno.serve(async (req) => {
           code: (deleteError as unknown as { code?: string }).code,
           status: (deleteError as unknown as { status?: number }).status,
         });
+      }
+
+      // Step 4: AFTER auth user is deleted, insert ban record with a placeholder user_id
+      // This ensures the record survives (no cascade from auth.users deletion)
+      if (targetEmail) {
+        const bannedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { error: banError } = await adminClient
+          .from("registration_requests")
+          .insert({
+            user_id: crypto.randomUUID(),
+            email: targetEmail,
+            status: "rejected",
+            banned_until: bannedUntil,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: user.id,
+          });
+
+        if (banError) {
+          console.error("Failed to insert ban record:", banError);
+        } else {
+          console.log(`Set 7-day ban for ${targetEmail} until ${bannedUntil}`);
+        }
       }
 
       return json(200, { success: true });
@@ -255,23 +294,22 @@ Deno.serve(async (req) => {
     };
 
     const handlePermanentDelete = async (userId: string) => {
-      // Set 7-day ban on the registration request
-      const { error: updateError } = await adminClient
+      // Look up email before deleting
+      const { data: targetAuthUser } = await adminClient.auth.admin.getUserById(userId);
+      const targetEmail = targetAuthUser?.user?.email;
+
+      // Get existing registration request data
+      const { data: existingReq } = await adminClient
         .from("registration_requests")
-        .update({
-          banned_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        })
+        .select("email")
         .eq("user_id", userId)
-        .eq("status", "rejected");
+        .maybeSingle();
 
-      if (updateError) {
-        console.error("Error updating banned_until:", updateError);
-        return json(500, { error: "Failed to update ban period" });
-      }
+      const emailForBan = targetEmail || existingReq?.email;
 
-      // Delete roles
+      // Delete registration_requests, roles, permissions
+      await adminClient.from("registration_requests").delete().eq("user_id", userId);
       await adminClient.from("user_roles").delete().eq("user_id", userId);
-      // Delete moderator permissions
       await adminClient.from("moderator_permissions").delete().eq("user_id", userId);
 
       // Sign out all sessions
@@ -279,11 +317,32 @@ Deno.serve(async (req) => {
         await adminClient.auth.admin.signOut(userId, "global");
       } catch (e) { /* non-fatal */ }
 
-      // Delete from auth (registration_requests row stays for ban enforcement)
+      // Delete from auth
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
       if (deleteError) {
         console.error("Error deleting user:", deleteError);
         return json(500, { error: "Failed to delete user account" });
+      }
+
+      // AFTER auth user deleted, insert ban record
+      if (emailForBan) {
+        const bannedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { error: banError } = await adminClient
+          .from("registration_requests")
+          .insert({
+            user_id: crypto.randomUUID(),
+            email: emailForBan,
+            status: "rejected",
+            banned_until: bannedUntil,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: user.id,
+          });
+
+        if (banError) {
+          console.error("Failed to insert ban record:", banError);
+        } else {
+          console.log(`Set 7-day permanent delete ban for ${emailForBan} until ${bannedUntil}`);
+        }
       }
 
       return json(200, { success: true });
