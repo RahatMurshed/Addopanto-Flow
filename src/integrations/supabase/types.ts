@@ -222,6 +222,7 @@ export type Database = {
       }
       registration_requests: {
         Row: {
+          banned_until: string | null
           can_add_expense: boolean
           can_add_expense_source: boolean
           can_add_revenue: boolean
@@ -237,6 +238,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          banned_until?: string | null
           can_add_expense?: boolean
           can_add_expense_source?: boolean
           can_add_revenue?: boolean
@@ -252,6 +254,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          banned_until?: string | null
           can_add_expense?: boolean
           can_add_expense_source?: boolean
           can_add_revenue?: boolean

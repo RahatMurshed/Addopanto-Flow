@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
     };
 
     const handleRejectUser = async (userId: string, reason?: string) => {
-      // Update registration request status first
+      // Update registration request: status=rejected, banned for 1 day
       const { error: updateError } = await adminClient
         .from("registration_requests")
         .update({
@@ -233,6 +233,7 @@ Deno.serve(async (req) => {
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id,
           rejection_reason: reason || null,
+          banned_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         })
         .eq("user_id", userId)
         .eq("status", "pending");
@@ -242,33 +243,114 @@ Deno.serve(async (req) => {
         return json(500, { error: "Failed to update registration request" });
       }
 
-      // Step 1: Delete user_roles if any exist (triggers Realtime logout)
-      const { error: roleDeleteError } = await adminClient
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
+      // Delete any roles (triggers Realtime logout)
+      await adminClient.from("user_roles").delete().eq("user_id", userId);
 
-      if (roleDeleteError) {
-        console.warn("Failed to delete user_roles during reject (non-fatal):", roleDeleteError);
-      }
-
-      // Step 2: Delay to allow Realtime event propagation
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Step 3: Sign out all sessions
+      // Force logout all sessions - keep user alive for ban checking
       try {
         await adminClient.auth.admin.signOut(userId, "global");
-        console.log(`Signed out all sessions for rejected user ${userId}`);
-      } catch (signOutErr) {
-        console.warn("Failed to sign out rejected user (non-fatal):", signOutErr);
+      } catch (e) { /* non-fatal */ }
+
+      return json(200, { success: true });
+    };
+
+    const handlePermanentDelete = async (userId: string) => {
+      // Set 7-day ban on the registration request
+      const { error: updateError } = await adminClient
+        .from("registration_requests")
+        .update({
+          banned_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("status", "rejected");
+
+      if (updateError) {
+        console.error("Error updating banned_until:", updateError);
+        return json(500, { error: "Failed to update ban period" });
       }
 
-      // Step 4: Delete user from auth.users
-      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+      // Delete roles
+      await adminClient.from("user_roles").delete().eq("user_id", userId);
+      // Delete moderator permissions
+      await adminClient.from("moderator_permissions").delete().eq("user_id", userId);
 
+      // Sign out all sessions
+      try {
+        await adminClient.auth.admin.signOut(userId, "global");
+      } catch (e) { /* non-fatal */ }
+
+      // Delete from auth (registration_requests row stays for ban enforcement)
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
       if (deleteError) {
-        console.error("Error deleting rejected user:", deleteError);
+        console.error("Error deleting user:", deleteError);
         return json(500, { error: "Failed to delete user account" });
+      }
+
+      return json(200, { success: true });
+    };
+
+    const handleAcceptFromRejected = async (
+      userId: string,
+      permissions?: {
+        can_add_revenue: boolean;
+        can_add_expense: boolean;
+        can_add_expense_source: boolean;
+        can_transfer: boolean;
+        can_view_reports: boolean;
+      }
+    ) => {
+      const perms = permissions || {
+        can_add_revenue: true,
+        can_add_expense: true,
+        can_add_expense_source: false,
+        can_transfer: false,
+        can_view_reports: true,
+      };
+
+      // Update registration request: approved, clear ban
+      const { error: updateError } = await adminClient
+        .from("registration_requests")
+        .update({
+          status: "approved",
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+          banned_until: null,
+          can_add_revenue: perms.can_add_revenue,
+          can_add_expense: perms.can_add_expense,
+          can_add_expense_source: perms.can_add_expense_source,
+          can_transfer: perms.can_transfer,
+          can_view_reports: perms.can_view_reports,
+        })
+        .eq("user_id", userId)
+        .eq("status", "rejected");
+
+      if (updateError) {
+        console.error("Error updating registration request:", updateError);
+        return json(500, { error: "Failed to update registration request" });
+      }
+
+      // Create user role as moderator
+      const { error: roleError } = await adminClient
+        .from("user_roles")
+        .insert({ user_id: userId, role: "moderator", assigned_by: user.id });
+
+      if (roleError) {
+        console.error("Error inserting role:", roleError);
+        return json(500, { error: "Failed to assign role" });
+      }
+
+      // Create moderator permissions
+      const { error: permError } = await adminClient
+        .from("moderator_permissions")
+        .insert({
+          user_id: userId,
+          ...perms,
+          controlled_by: user.id,
+        });
+
+      if (permError) {
+        console.error("Error inserting permissions:", permError);
+        return json(500, { error: "Failed to set permissions" });
       }
 
       return json(200, { success: true });
@@ -390,6 +472,14 @@ Deno.serve(async (req) => {
 
       if (body.action === "reject") {
         return await handleRejectUser(body.userId, body.reason);
+      }
+
+      if (body.action === "permanent-delete") {
+        return await handlePermanentDelete(body.userId);
+      }
+
+      if (body.action === "accept-rejected") {
+        return await handleAcceptFromRejected(body.userId, body.permissions);
       }
 
       // Default: delete user (backward compatibility)
