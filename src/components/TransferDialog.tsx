@@ -102,7 +102,7 @@ export default function TransferDialog({
   const activeAccounts = accounts.filter((a) => a.is_active);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && isPending) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Transfer Balance</DialogTitle>
@@ -115,7 +115,7 @@ export default function TransferDialog({
           {/* From Account */}
           <div className="space-y-2">
             <Label htmlFor="from-account">From Expense Source</Label>
-            <Select value={fromAccountId} onValueChange={setFromAccountId}>
+            <Select value={fromAccountId} onValueChange={setFromAccountId} disabled={isPending}>
               <SelectTrigger id="from-account">
                 <SelectValue placeholder="Select source" />
               </SelectTrigger>
@@ -141,7 +141,7 @@ export default function TransferDialog({
           {/* To Account */}
           <div className="space-y-2">
             <Label htmlFor="to-account">To Expense Source</Label>
-            <Select value={toAccountId} onValueChange={setToAccountId}>
+            <Select value={toAccountId} onValueChange={setToAccountId} disabled={isPending}>
               <SelectTrigger id="to-account">
                 <SelectValue placeholder="Select destination" />
               </SelectTrigger>
@@ -186,6 +186,7 @@ export default function TransferDialog({
               placeholder="0.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              disabled={isPending}
             />
           </div>
 
@@ -262,6 +263,7 @@ export default function TransferDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
+              disabled={isPending}
             />
           </div>
 
@@ -277,12 +279,13 @@ export default function TransferDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isPending}
             >
               Cancel
             </Button>
             <Button type="submit" disabled={!canSubmit}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Transfer
+              {isPending ? "Transferring..." : "Transfer"}
             </Button>
           </DialogFooter>
         </form>

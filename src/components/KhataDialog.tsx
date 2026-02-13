@@ -80,7 +80,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
   const selectedColor = form.watch("color");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Expense Source" : "Create Expense Source"}</DialogTitle>
@@ -95,6 +95,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
             <Input
               id="name"
               placeholder="e.g., Marketing"
+              disabled={saving}
               {...form.register("name")}
             />
             {form.formState.errors.name && (
@@ -112,6 +113,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
                 min="0"
                 max="100"
                 className="w-24"
+                disabled={saving}
                 {...form.register("allocation_percentage", { valueAsNumber: true })}
               />
               <span className="text-muted-foreground">%</span>
@@ -156,6 +158,7 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
               step="0.01"
               min="0"
               placeholder="0.00"
+              disabled={saving}
               {...form.register("expected_monthly_expense", {
                 setValueAs: (v) => (v === "" ? null : parseFloat(v)),
               })}
@@ -171,17 +174,18 @@ export default function KhataDialog({ open, onOpenChange, khata, onSave }: Khata
               <Switch
                 checked={form.watch("is_active")}
                 onCheckedChange={(checked) => form.setValue("is_active", checked)}
+                disabled={saving}
               />
             </div>
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEdit ? "Save Changes" : "Create Expense Source"}
+              {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Expense Source"}
             </Button>
           </DialogFooter>
         </form>
