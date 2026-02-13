@@ -505,7 +505,7 @@ export default function RegistrationRequests() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >
                 {permanentDeleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Permanently Delete (7-day ban)
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
