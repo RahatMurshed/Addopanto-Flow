@@ -1,51 +1,43 @@
 
 
-# Fix Registration Requests Visibility, Admin Login, and Remove Members Page
+# Add Company Members Page with Invite Code and Cipher Visibility
 
-## Root Causes
+## What's Missing
 
-### Issue 1: Registration requests not visible to admin/cipher
-The `RegistrationRequests` page exists but has **no route** in `App.tsx` and **no navigation link** in `AppLayout.tsx`. It is completely inaccessible.
-
-### Issue 2: Admin cannot log in
-In `Auth.tsx` (lines 189-206), after a successful login the code queries `registration_requests` and if the status is `"pending"`, it immediately signs the user out. The problem: `hi@hi.com` has an old `pending` registration request row even though they already have a `moderator` role in `user_roles`. The login logic never checks `user_roles` first, so approved users with stale registration records get blocked.
-
-### Issue 3: Remove Members page
-The `/company/members` route and its navigation link need to be removed entirely.
-
----
+The `CompanyMembers.tsx` page already exists with full functionality (invite code generation, member management, join requests), but it has no route in the app and no navigation link. Additionally, cipher users should be hidden from admin/moderator views.
 
 ## Changes
 
-### 1. Fix login logic in `Auth.tsx` (lines 188-210)
+### 1. Add route for Company Members page
 
-Update the post-login check to query `user_roles` **first**. If the user already has a role, skip the registration request check entirely and proceed to the app.
+**File: `src/App.tsx`**
+- Import `CompanyMembers` from `src/pages/CompanyMembers`
+- Add route: `/company/members` inside `ProtectedRoute`
 
-```
-// Current (broken):
-1. Check registration_requests -> if pending, sign out
+### 2. Add "Members" navigation link
 
-// Fixed:
-1. Check user_roles -> if role exists, proceed to app
-2. Only if NO role: check registration_requests -> if pending, sign out
-```
+**File: `src/components/AppLayout.tsx`**
+- Add a "Members" nav item with `Users` icon, visible to admin and cipher users (those with `canManageMembers`)
+- Place it after the existing admin-only nav items
 
-### 2. Add Registration Requests route to `App.tsx`
+### 3. Filter out cipher members from non-cipher users
 
-- Import `RegistrationRequests` from `src/pages/RegistrationRequests`
-- Add route: `/requests` -> `RegistrationRequests` inside `ProtectedRoute`
+**File: `src/pages/CompanyMembers.tsx`**
 
-### 3. Add "Requests" navigation link to `AppLayout.tsx`
+Currently all members are shown to everyone who can access the page. Update the member list so:
+- **Cipher users** see all members (admin, moderator, viewer -- including other ciphers)
+- **Admin users** cannot see members who are cipher-level users
 
-- Add a "Requests" nav item with `UserPlus` icon, visible to `isCompanyAdmin` or `isCipher` users
-- Show the pending count badge next to it (the `usePendingRequestsCount` hook is already imported)
+This requires knowing which member user_ids have a cipher role in `user_roles`. Add a query to fetch cipher user_ids, then filter them out of the displayed member list when the current user is not cipher.
 
-### 4. Remove Members page route and nav link
+### Technical Details
 
-- **`App.tsx`**: Remove the `/company/members` route and the `CompanyMembers` import
-- **`AppLayout.tsx`**: Remove the "Members" nav item from the `navItems` array (the line with `canManageMembers`)
+**CompanyMembers.tsx cipher filtering:**
+- Add a query: `SELECT user_id FROM user_roles WHERE role = 'cipher'` (only runs if user is not cipher, to filter out cipher members)
+- If the current user is NOT cipher, filter out any members whose `user_id` appears in the cipher list
+- This means admin users will never see cipher users in the members table, requests, etc.
+- Cipher users see everyone with no filtering
 
-### 5. Also fix `AuthContext.tsx` periodic validation (lines 66-100)
+**App.tsx:** Add `<Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />`
 
-The same logic flaw exists in the periodic session validator -- it checks `registration_requests` for pending status and allows them to stay, but for approved users with stale pending records, it could cause issues. Update to check `user_roles` first, same as the login fix.
-
+**AppLayout.tsx:** Add `{ label: "Members", href: "/company/members", icon: Users }` to the conditional nav items for admin/cipher users
