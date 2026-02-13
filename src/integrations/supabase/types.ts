@@ -17,6 +17,7 @@ export type Database = {
       allocations: {
         Row: {
           amount: number
+          company_id: string
           created_at: string
           expense_account_id: string
           id: string
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id: string
           created_at?: string
           expense_account_id: string
           id?: string
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string
           created_at?: string
           expense_account_id?: string
           id?: string
@@ -40,6 +43,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "allocations_expense_account_id_fkey"
             columns: ["expense_account_id"]
@@ -56,10 +66,156 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          created_at: string
+          created_by: string
+          currency: string
+          description: string | null
+          fiscal_year_start_month: number
+          id: string
+          invite_code: string | null
+          join_password: string | null
+          logo_url: string | null
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          currency?: string
+          description?: string | null
+          fiscal_year_start_month?: number
+          id?: string
+          invite_code?: string | null
+          join_password?: string | null
+          logo_url?: string | null
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          currency?: string
+          description?: string | null
+          fiscal_year_start_month?: number
+          id?: string
+          invite_code?: string | null
+          join_password?: string | null
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_join_requests: {
+        Row: {
+          company_id: string
+          id: string
+          message: string | null
+          rejection_reason: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          message?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          message?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_join_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_memberships: {
+        Row: {
+          approved_by: string | null
+          can_add_expense: boolean
+          can_add_expense_source: boolean
+          can_add_revenue: boolean
+          can_manage_students: boolean
+          can_transfer: boolean
+          can_view_reports: boolean
+          company_id: string
+          id: string
+          joined_at: string
+          role: Database["public"]["Enums"]["company_role"]
+          status: string
+          user_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          can_add_expense?: boolean
+          can_add_expense_source?: boolean
+          can_add_revenue?: boolean
+          can_manage_students?: boolean
+          can_transfer?: boolean
+          can_view_reports?: boolean
+          company_id: string
+          id?: string
+          joined_at?: string
+          role?: Database["public"]["Enums"]["company_role"]
+          status?: string
+          user_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          can_add_expense?: boolean
+          can_add_expense_source?: boolean
+          can_add_revenue?: boolean
+          can_manage_students?: boolean
+          can_transfer?: boolean
+          can_view_reports?: boolean
+          company_id?: string
+          id?: string
+          joined_at?: string
+          role?: Database["public"]["Enums"]["company_role"]
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_memberships_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_accounts: {
         Row: {
           allocation_percentage: number
           color: string
+          company_id: string
           created_at: string
           expected_monthly_expense: number | null
           id: string
@@ -71,6 +227,7 @@ export type Database = {
         Insert: {
           allocation_percentage?: number
           color?: string
+          company_id: string
           created_at?: string
           expected_monthly_expense?: number | null
           id?: string
@@ -82,6 +239,7 @@ export type Database = {
         Update: {
           allocation_percentage?: number
           color?: string
+          company_id?: string
           created_at?: string
           expected_monthly_expense?: number | null
           id?: string
@@ -90,11 +248,20 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expense_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expenses: {
         Row: {
           amount: number
+          company_id: string
           created_at: string
           date: string
           description: string | null
@@ -106,6 +273,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id: string
           created_at?: string
           date?: string
           description?: string | null
@@ -117,6 +285,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string
           created_at?: string
           date?: string
           description?: string | null
@@ -127,6 +296,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_expense_account_id_fkey"
             columns: ["expense_account_id"]
@@ -139,6 +315,7 @@ export type Database = {
       khata_transfers: {
         Row: {
           amount: number
+          company_id: string
           created_at: string
           description: string | null
           from_account_id: string
@@ -148,6 +325,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id: string
           created_at?: string
           description?: string | null
           from_account_id: string
@@ -157,6 +335,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string
           created_at?: string
           description?: string | null
           from_account_id?: string
@@ -165,6 +344,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "khata_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "khata_transfers_from_account_id_fkey"
             columns: ["from_account_id"]
@@ -222,6 +408,7 @@ export type Database = {
       }
       monthly_fee_history: {
         Row: {
+          company_id: string
           created_at: string
           effective_from: string
           id: string
@@ -230,6 +417,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company_id: string
           created_at?: string
           effective_from: string
           id?: string
@@ -238,6 +426,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company_id?: string
           created_at?: string
           effective_from?: string
           id?: string
@@ -246,6 +435,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "monthly_fee_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "monthly_fee_history_student_id_fkey"
             columns: ["student_id"]
@@ -308,6 +504,7 @@ export type Database = {
       }
       revenue_sources: {
         Row: {
+          company_id: string
           created_at: string
           id: string
           is_active: boolean
@@ -315,6 +512,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company_id: string
           created_at?: string
           id?: string
           is_active?: boolean
@@ -322,17 +520,27 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company_id?: string
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "revenue_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       revenues: {
         Row: {
           amount: number
+          company_id: string
           created_at: string
           date: string
           description: string | null
@@ -343,6 +551,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id: string
           created_at?: string
           date?: string
           description?: string | null
@@ -353,6 +562,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string
           created_at?: string
           date?: string
           description?: string | null
@@ -362,6 +572,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "revenues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "revenues_source_id_fkey"
             columns: ["source_id"]
@@ -374,6 +591,7 @@ export type Database = {
       student_payments: {
         Row: {
           amount: number
+          company_id: string
           created_at: string
           description: string | null
           id: string
@@ -387,6 +605,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -400,6 +619,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -413,6 +633,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "student_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "student_payments_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
@@ -425,6 +652,7 @@ export type Database = {
         Row: {
           admission_fee_total: number
           billing_start_month: string
+          company_id: string
           course_end_month: string | null
           course_start_month: string | null
           created_at: string
@@ -443,6 +671,7 @@ export type Database = {
         Insert: {
           admission_fee_total?: number
           billing_start_month: string
+          company_id: string
           course_end_month?: string | null
           course_start_month?: string | null
           created_at?: string
@@ -461,6 +690,7 @@ export type Database = {
         Update: {
           admission_fee_total?: number
           billing_start_month?: string
+          company_id?: string
           course_end_month?: string | null
           course_start_month?: string | null
           created_at?: string
@@ -476,10 +706,19 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "students_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {
+          active_company_id: string | null
           business_name: string | null
           created_at: string
           currency: string
@@ -490,6 +729,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          active_company_id?: string | null
           business_name?: string | null
           created_at?: string
           currency?: string
@@ -500,6 +740,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          active_company_id?: string | null
           business_name?: string | null
           created_at?: string
           currency?: string
@@ -509,7 +750,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_active_company_id_fkey"
+            columns: ["active_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -546,6 +795,27 @@ export type Database = {
       can_edit_delete: { Args: { _user_id: string }; Returns: boolean }
       can_transfer: { Args: { _user_id: string }; Returns: boolean }
       can_view_user: { Args: { _target_user_id: string }; Returns: boolean }
+      company_can_add_expense: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_add_expense_source: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_add_revenue: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_edit_delete: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_transfer: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      get_active_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -558,9 +828,18 @@ export type Database = {
         Returns: boolean
       }
       is_cipher: { Args: { _user_id: string }; Returns: boolean }
+      is_company_admin: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_company_member: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "cipher" | "admin" | "moderator" | "user"
+      company_role: "admin" | "moderator" | "viewer"
       student_status: "active" | "inactive" | "graduated"
     }
     CompositeTypes: {
@@ -690,6 +969,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["cipher", "admin", "moderator", "user"],
+      company_role: ["admin", "moderator", "viewer"],
       student_status: ["active", "inactive", "graduated"],
     },
   },

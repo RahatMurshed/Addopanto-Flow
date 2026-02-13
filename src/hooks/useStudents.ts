@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export interface Student {
   id: string;
@@ -17,6 +18,7 @@ export interface Student {
   status: "active" | "inactive" | "graduated";
   notes: string | null;
   user_id: string;
+  company_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -56,17 +58,14 @@ export function useStudents(filters?: StudentFilters) {
       if (!user) return [];
       let query = supabase.from("students").select("*");
 
-      // Server-side status filter
       if (status !== "all") {
         query = query.eq("status", status);
       }
 
-      // Server-side search: name or student_id_number (case-insensitive)
       if (search) {
         query = query.or(`name.ilike.%${search}%,student_id_number.ilike.%${search}%`);
       }
 
-      // Server-side sorting
       query = query.order(sortBy, { ascending: sortOrder });
 
       const { data, error } = await query;
@@ -98,14 +97,16 @@ export function useStudent(id: string | undefined) {
 
 export function useCreateStudent() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (student: StudentInsert) => {
       if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
       const { data, error } = await supabase
         .from("students")
-        .insert({ ...student, user_id: user.id } as any)
+        .insert({ ...student, user_id: user.id, company_id: activeCompanyId } as any)
         .select()
         .single();
       if (error) throw error;
@@ -117,6 +118,7 @@ export function useCreateStudent() {
           monthly_amount: student.monthly_fee_amount!,
           effective_from: student.billing_start_month,
           user_id: user.id,
+          company_id: activeCompanyId,
         } as any);
       }
 
@@ -129,7 +131,6 @@ export function useCreateStudent() {
 }
 
 export function useUpdateStudent() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({

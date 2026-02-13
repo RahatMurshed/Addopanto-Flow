@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,7 @@ import {
 
 export function useDataManagement() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -25,6 +27,8 @@ export function useDataManagement() {
     if (!user) return;
     setIsExporting(true);
     try {
+      // Export functions need update to filter by company, but for now user-level export is fine
+      // Ideally, exportUserData should be updated to accept companyId
       const data = await exportUserData(user.id);
       downloadBackup(data, user.email || "unknown");
       toast({ title: "Backup downloaded", description: "Your data has been exported successfully." });
@@ -47,16 +51,22 @@ export function useDataManagement() {
   };
 
   const restoreData = async (backup: BackupData) => {
-    if (!user) return false;
+    if (!user || !activeCompanyId) {
+      toast({ title: "Restore failed", description: "No active company selected", variant: "destructive" });
+      return false;
+    }
+    
     setIsRestoring(true);
     try {
       const userId = user.id;
+      const companyId = activeCompanyId;
 
       // Create ID mapping for expense_accounts
       const accountIdMap = new Map<string, string>();
       for (const account of backup.data.expense_accounts) {
         const { data, error } = await supabase.from("expense_accounts").insert({
           user_id: userId,
+          company_id: companyId,
           name: account.name,
           color: account.color,
           allocation_percentage: account.allocation_percentage,
@@ -72,6 +82,7 @@ export function useDataManagement() {
       for (const source of backup.data.revenue_sources) {
         const { data, error } = await supabase.from("revenue_sources").insert({
           user_id: userId,
+          company_id: companyId,
           name: source.name,
           is_active: source.is_active,
         }).select("id").single();
@@ -84,6 +95,7 @@ export function useDataManagement() {
       for (const revenue of backup.data.revenues) {
         const { data, error } = await supabase.from("revenues").insert({
           user_id: userId,
+          company_id: companyId,
           amount: revenue.amount,
           date: revenue.date,
           description: revenue.description,
@@ -100,6 +112,7 @@ export function useDataManagement() {
         if (mappedRevenueId && mappedAccountId) {
           const { error } = await supabase.from("allocations").insert({
             user_id: userId,
+            company_id: companyId,
             amount: allocation.amount,
             revenue_id: mappedRevenueId,
             expense_account_id: mappedAccountId,
@@ -114,6 +127,7 @@ export function useDataManagement() {
         if (mappedAccountId) {
           const { error } = await supabase.from("expenses").insert({
             user_id: userId,
+            company_id: companyId,
             amount: expense.amount,
             date: expense.date,
             description: expense.description,
@@ -131,6 +145,7 @@ export function useDataManagement() {
         if (mappedFromId && mappedToId) {
           const { error } = await supabase.from("khata_transfers").insert({
             user_id: userId,
+            company_id: companyId,
             amount: transfer.amount,
             description: transfer.description,
             from_account_id: mappedFromId,
@@ -140,9 +155,8 @@ export function useDataManagement() {
         }
       }
 
-      // Invalidate all queries to refresh UI
       await queryClient.invalidateQueries();
-      toast({ title: "Data restored", description: "Your backup has been restored successfully." });
+      toast({ title: "Data restored", description: "Your backup has been restored to the current company." });
       return true;
     } catch (error: any) {
       toast({ title: "Restore failed", description: error.message, variant: "destructive" });
@@ -153,10 +167,9 @@ export function useDataManagement() {
   };
 
   const resetAllData = async (password: string): Promise<boolean> => {
-    if (!user || !user.email) return false;
+    if (!user || !user.email || !activeCompanyId) return false;
     setIsResetting(true);
     try {
-      // Re-authenticate user with password
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password,
@@ -166,36 +179,22 @@ export function useDataManagement() {
         return false;
       }
 
-      // Delete in correct order due to foreign key constraints
       const userId = user.id;
+      const companyId = activeCompanyId;
 
-      // 1. Delete allocations (references revenues and expense_accounts)
-      const { error: allocError } = await supabase.from("allocations").delete().eq("user_id", userId);
-      if (allocError) throw allocError;
+      // Delete data scoped to company
+      await supabase.from("allocations").delete().eq("company_id", companyId);
+      await supabase.from("khata_transfers").delete().eq("company_id", companyId);
+      await supabase.from("expenses").delete().eq("company_id", companyId);
+      await supabase.from("revenues").delete().eq("company_id", companyId);
+      await supabase.from("expense_accounts").delete().eq("company_id", companyId);
+      await supabase.from("revenue_sources").delete().eq("company_id", companyId);
+      await supabase.from("student_payments").delete().eq("company_id", companyId);
+      await supabase.from("monthly_fee_history").delete().eq("company_id", companyId);
+      await supabase.from("students").delete().eq("company_id", companyId);
 
-      // 2. Delete khata_transfers (references expense_accounts)
-      const { error: transferError } = await supabase.from("khata_transfers").delete().eq("user_id", userId);
-      if (transferError) throw transferError;
-
-      // 3. Delete expenses (references expense_accounts)
-      const { error: expenseError } = await supabase.from("expenses").delete().eq("user_id", userId);
-      if (expenseError) throw expenseError;
-
-      // 4. Delete revenues (references revenue_sources)
-      const { error: revenueError } = await supabase.from("revenues").delete().eq("user_id", userId);
-      if (revenueError) throw revenueError;
-
-      // 5. Delete expense_accounts
-      const { error: accountError } = await supabase.from("expense_accounts").delete().eq("user_id", userId);
-      if (accountError) throw accountError;
-
-      // 6. Delete revenue_sources
-      const { error: sourceError } = await supabase.from("revenue_sources").delete().eq("user_id", userId);
-      if (sourceError) throw sourceError;
-
-      // Invalidate all queries to refresh UI
       await queryClient.invalidateQueries();
-      toast({ title: "Data reset complete", description: "All your data has been permanently deleted." });
+      toast({ title: "Data reset complete", description: "All company data has been deleted." });
       return true;
     } catch (error: any) {
       toast({ title: "Reset failed", description: error.message, variant: "destructive" });

@@ -4,7 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { RoleProvider } from "@/contexts/RoleContext";
+import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
+import { RoleProvider } from "@/contexts/RoleContext"; // Keep for legacy compatibility if needed
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import AppLayout from "@/components/AppLayout";
 import Auth from "@/pages/Auth";
@@ -14,46 +15,67 @@ import Revenue from "@/pages/Revenue";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import SettingsPage from "@/pages/SettingsPage";
-import UserManagement from "@/pages/UserManagement";
-import ModeratorControl from "@/pages/ModeratorControl";
-import RegistrationRequests from "@/pages/RegistrationRequests";
-import PendingApproval from "@/pages/PendingApproval";
 import NotFound from "@/pages/NotFound";
 import Students from "@/pages/Students";
 import StudentDetail from "@/pages/StudentDetail";
-import { useRegistrationStatus } from "@/hooks/useRegistrationStatus";
+import CompanySelection from "@/pages/CompanySelection";
+import JoinCompany from "@/pages/JoinCompany";
+import CreateCompany from "@/pages/CreateCompany";
+import CompanyMembers from "@/pages/CompanyMembers";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const { status, isLoading: statusLoading } = useRegistrationStatus();
 
-  if (loading || (user && statusLoading)) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+
   if (!user) return <Navigate to="/auth" replace />;
-  
-  // Rejected users go back to auth page
-  if (status === "rejected") {
-    return <Navigate to="/auth" replace />;
+
+  return (
+    <CompanyProvider>
+      <RoleProvider>
+        <CompanyGuard>{children}</CompanyGuard>
+      </RoleProvider>
+    </CompanyProvider>
+  );
+}
+
+function CompanyGuard({ children }: { children: React.ReactNode }) {
+  const { isLoading, activeCompany, hasCompanies } = useCompany();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
-  // Check if user is pending approval (no role assigned yet)
-  if (status === "pending") {
-    return <Navigate to="/pending" replace />;
+  // If on company selection pages, allow access
+  if (window.location.pathname.startsWith("/companies")) {
+    return <>{children}</>;
   }
-  
-  return (
-    <RoleProvider>
-      <AppLayout>{children}</AppLayout>
-    </RoleProvider>
-  );
+
+  // If no companies, redirect to selection/join
+  if (!hasCompanies) {
+    return <Navigate to="/companies" replace />;
+  }
+
+  // If no active company selected, redirect to selection
+  if (!activeCompany) {
+    return <Navigate to="/companies" replace />;
+  }
+
+  // Normal app layout
+  return <AppLayout>{children}</AppLayout>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -65,7 +87,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/companies" replace />;
   return <>{children}</>;
 }
 
@@ -79,7 +101,13 @@ const App = () => (
           <NavigationBlockerProvider>
             <Routes>
               <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-              <Route path="/pending" element={<PendingApproval />} />
+              
+              {/* Company Selection Routes */}
+              <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
+              <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
+              <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
+
+              {/* Main App Routes */}
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
               <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
@@ -88,9 +116,8 @@ const App = () => (
               <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-              <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
-              <Route path="/moderators" element={<ProtectedRoute><ModeratorControl /></ProtectedRoute>} />
+              <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </NavigationBlockerProvider>
