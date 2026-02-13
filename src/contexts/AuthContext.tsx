@@ -66,12 +66,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const interval = setInterval(async () => {
+      // Check 1: Does the user's role still exist?
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!roleData) {
+        console.log('User role not found, forcing logout');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // Check 2: Is the auth session still valid?
       const { error } = await supabase.auth.getUser();
       if (error) {
         console.log('Session validation failed, forcing logout:', error.message);
         await supabase.auth.signOut();
       }
-    }, 30000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [user]);

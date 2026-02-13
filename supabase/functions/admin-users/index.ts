@@ -242,7 +242,28 @@ Deno.serve(async (req) => {
         return json(500, { error: "Failed to update registration request" });
       }
 
-      // Delete user from auth.users
+      // Step 1: Delete user_roles if any exist (triggers Realtime logout)
+      const { error: roleDeleteError } = await adminClient
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId);
+
+      if (roleDeleteError) {
+        console.warn("Failed to delete user_roles during reject (non-fatal):", roleDeleteError);
+      }
+
+      // Step 2: Delay to allow Realtime event propagation
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 3: Sign out all sessions
+      try {
+        await adminClient.auth.admin.signOut(userId, "global");
+        console.log(`Signed out all sessions for rejected user ${userId}`);
+      } catch (signOutErr) {
+        console.warn("Failed to sign out rejected user (non-fatal):", signOutErr);
+      }
+
+      // Step 4: Delete user from auth.users
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
       if (deleteError) {
