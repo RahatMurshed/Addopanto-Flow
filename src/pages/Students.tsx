@@ -25,6 +25,7 @@ import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
+import StudentOverdueSection from "@/components/StudentOverdueSection";
 
 export default function Students() {
   const { data: students = [], isLoading } = useStudents();
@@ -264,6 +265,15 @@ export default function Students() {
             />
           </CardContent>
         </Card>
+      )}
+
+      {/* Monthly Overdue Section */}
+      {students.length > 0 && (
+        <StudentOverdueSection
+          students={students}
+          studentSummaries={studentSummaries}
+          currency={currency}
+        />
       )}
 
       {/* Create Student Dialog */}
