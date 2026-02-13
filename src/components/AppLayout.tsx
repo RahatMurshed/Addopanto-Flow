@@ -25,6 +25,7 @@ import {
   Menu,
   X,
   Users,
+  UserPlus,
   Building2,
   ChevronDown,
   Plus,
@@ -62,7 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     ...baseNavItems,
     ...((isCompanyAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
-    ...(canManageMembers ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
+    ...((isCompanyAdmin || isCipher) ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
     ...((isCompanyAdmin || isCipher) ? [{ label: "User Management", href: "/users", icon: ShieldCheck }] : []),
   ];
 
@@ -139,6 +140,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <item.icon className="h-4 w-4" />
               {item.label}
+              {"badge" in item && (item as any).badge > 0 && (
+                <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0.5 min-w-[20px] text-center">
+                  {(item as any).badge}
+                </Badge>
+              )}
             </Link>
           ))}
         </nav>
@@ -196,6 +202,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   >
                     <item.icon className="h-4 w-4" />
                     {item.label}
+                    {"badge" in item && (item as any).badge > 0 && (
+                      <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0.5 min-w-[20px] text-center">
+                        {(item as any).badge}
+                      </Badge>
+                    )}
                   </Link>
                 ))}
               </div>

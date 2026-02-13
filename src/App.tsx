@@ -21,7 +21,7 @@ import StudentDetail from "@/pages/StudentDetail";
 import CompanySelection from "@/pages/CompanySelection";
 import JoinCompany from "@/pages/JoinCompany";
 import CreateCompany from "@/pages/CreateCompany";
-import CompanyMembers from "@/pages/CompanyMembers";
+import RegistrationRequests from "@/pages/RegistrationRequests";
 import UserManagement from "@/pages/UserManagement";
 import { Loader2 } from "lucide-react";
 
@@ -117,7 +117,7 @@ const App = () => (
               <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+              <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
               
               <Route path="*" element={<NotFound />} />

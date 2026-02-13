@@ -66,7 +66,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const interval = setInterval(async () => {
-      // Check registration request status first
+      // Check if user has a role first (approved users)
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (roleData) {
+        // User has a role — just validate auth session
+        const { error } = await supabase.auth.getUser();
+        if (error) {
+          console.log('Session validation failed, forcing logout:', error.message);
+          await supabase.auth.signOut({ scope: 'local' });
+        }
+        return;
+      }
+
+      // No role — check registration request status
       const { data: regData } = await supabase
         .from("registration_requests")
         .select("status")
@@ -85,18 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // For approved/legacy users: check role still exists
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!roleData) {
-        console.log('User role not found, forcing logout');
-        await supabase.auth.signOut({ scope: 'local' });
-        return;
-      }
+      // No role and no registration request — force logout
+      console.log('User role not found, forcing logout');
+      await supabase.auth.signOut({ scope: 'local' });
 
       // Validate auth session
       const { error } = await supabase.auth.getUser();
