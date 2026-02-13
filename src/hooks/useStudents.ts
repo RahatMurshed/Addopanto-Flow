@@ -36,17 +36,40 @@ export interface StudentInsert {
   notes?: string | null;
 }
 
-export function useStudents() {
+export interface StudentFilters {
+  search?: string;
+  status?: "all" | "active" | "inactive" | "graduated";
+  sortBy?: "name" | "enrollment_date" | "monthly_fee_amount";
+  sortOrder?: "asc" | "desc";
+}
+
+export function useStudents(filters?: StudentFilters) {
   const { user } = useAuth();
+  const search = filters?.search?.trim() || "";
+  const status = filters?.status || "all";
+  const sortBy = filters?.sortBy || "name";
+  const sortOrder = (filters?.sortOrder || "asc") === "asc";
 
   return useQuery({
-    queryKey: ["students"],
+    queryKey: ["students", { search, status, sortBy, sortOrder }],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from("students")
-        .select("*")
-        .order("name");
+      let query = supabase.from("students").select("*");
+
+      // Server-side status filter
+      if (status !== "all") {
+        query = query.eq("status", status);
+      }
+
+      // Server-side search: name or student_id_number (case-insensitive)
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,student_id_number.ilike.%${search}%`);
+      }
+
+      // Server-side sorting
+      query = query.order(sortBy, { ascending: sortOrder });
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Student[];
     },
