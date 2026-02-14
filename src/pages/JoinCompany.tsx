@@ -27,12 +27,12 @@ export default function JoinCompany() {
   const { data: allCompanies = [] } = useQuery({
     queryKey: ["all-companies"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("companies")
+      const { data, error } = await (supabase
+        .from("companies_public" as any)
         .select("id, name, slug, description, logo_url")
-        .order("name");
+        .order("name") as any);
       if (error) throw error;
-      return data;
+      return (data ?? []) as Array<{ id: string; name: string; slug: string; description: string | null; logo_url: string | null }>;
     },
   });
 

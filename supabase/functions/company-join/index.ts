@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,7 +68,8 @@ Deno.serve(async (req) => {
       const { name, slug, description, joinPassword, currency } = body;
       if (!name || !slug) return json(400, { error: "Name and slug required" });
 
-      const hashedPassword = joinPassword ? joinPassword : null;
+      // Hash the password before storing
+      const hashedPassword = joinPassword ? await bcrypt.hash(joinPassword) : null;
 
       const { data: company, error: createError } = await adminClient
         .from("companies")
@@ -134,7 +136,16 @@ Deno.serve(async (req) => {
         .single();
 
       if (!company || !company.join_password) return json(400, { error: "Company does not accept password joins" });
-      if (company.join_password !== password) return json(400, { error: "Incorrect password" });
+      
+      // Compare with bcrypt - support both hashed and legacy plaintext passwords
+      let passwordValid = false;
+      try {
+        passwordValid = await bcrypt.compare(password, company.join_password);
+      } catch {
+        // Fallback: direct comparison for legacy plaintext passwords
+        passwordValid = company.join_password === password;
+      }
+      if (!passwordValid) return json(400, { error: "Incorrect password" });
 
       // Check if already a member
       const { data: existing } = await adminClient
