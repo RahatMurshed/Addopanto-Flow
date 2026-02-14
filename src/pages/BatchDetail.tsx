@@ -481,6 +481,9 @@ export default function BatchDetail() {
                       let filteredPending = 0;
                       let worstStatus: "paid" | "pending" | "overdue" | "partial" | "na" = "na";
                       let pendingMonthCount = 0;
+                      let overdueMonthCount = 0;
+                      let partialMonthCount = 0;
+                      let purelyPendingCount = 0;
 
                       if (sum && effMonthly > 0) {
                         const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
@@ -504,6 +507,9 @@ export default function BatchDetail() {
                           else if (allPaid) worstStatus = "paid";
 
                           pendingMonthCount = pendingMonths.length + overdueMonths.length + partialMonths.length;
+                          overdueMonthCount = overdueMonths.length;
+                          partialMonthCount = partialMonths.length;
+                          purelyPendingCount = pendingMonths.length;
                         }
                       }
 
@@ -551,11 +557,11 @@ export default function BatchDetail() {
                                   {worstStatus === "paid" ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                                   ) : worstStatus === "overdue" ? (
-                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{pendingMonthCount} Overdue</Badge>
+                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{overdueMonthCount}/{pendingMonthCount} Overdue</Badge>
                                   ) : worstStatus === "partial" ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{pendingMonthCount} Partial</Badge>
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{partialMonthCount}/{pendingMonthCount} Partial</Badge>
                                   ) : worstStatus === "pending" ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{pendingMonthCount} Pending</Badge>
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{purelyPendingCount}/{pendingMonthCount} Pending</Badge>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
