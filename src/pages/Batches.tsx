@@ -59,8 +59,13 @@ export default function Batches() {
       let totalPending = 0;
       let overdueCount = 0;
       for (const s of students) {
+        const effectiveStudent = {
+          ...s,
+          admission_fee_total: Number(s.admission_fee_total) || Number(b.default_admission_fee) || 0,
+          monthly_fee_amount: Number(s.monthly_fee_amount) || Number(b.default_monthly_fee) || 0,
+        };
         const payments = allPayments.filter((p) => p.student_id === s.id);
-        const sum = computeStudentSummary(s, payments);
+        const sum = computeStudentSummary(effectiveStudent, payments);
         totalCollected += sum.totalPaid;
         totalPending += sum.totalPending;
         if (sum.monthlyOverdueMonths.length > 0) overdueCount++;
