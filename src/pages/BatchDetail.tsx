@@ -405,12 +405,9 @@ export default function BatchDetail() {
           <CardContent>
             {batchStats.monthOverdueCount > 0 ? (
               <>
-                <p className="text-2xl font-bold text-destructive">{batchStats.monthOverdueCount}</p>
+                <p className="text-2xl font-bold text-destructive">{formatCurrency(batchStats.monthOverdueAmount, currency)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  student{batchStats.monthOverdueCount > 1 ? "s" : ""} overdue
-                </p>
-                <p className="text-sm font-semibold text-destructive mt-2">
-                  {formatCurrency(batchStats.monthOverdueAmount, currency)}
+                  {batchStats.monthOverdueCount} student{batchStats.monthOverdueCount > 1 ? "s" : ""} overdue
                 </p>
               </>
             ) : (

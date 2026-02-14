@@ -23,7 +23,7 @@ export type BatchFilterValue = {
 export function getDefaultBatchFilter(): BatchFilterValue {
   const now = new Date();
   return {
-    mode: "monthly",
+    mode: "alltime",
     selectedMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
   };
 }
