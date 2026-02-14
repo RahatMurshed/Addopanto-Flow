@@ -73,6 +73,78 @@ export type Database = {
           },
         ]
       }
+      batches: {
+        Row: {
+          batch_code: string
+          batch_name: string
+          company_id: string
+          course_duration_months: number | null
+          created_at: string
+          created_by: string
+          default_admission_fee: number
+          default_monthly_fee: number
+          description: string | null
+          end_date: string | null
+          id: string
+          max_capacity: number | null
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          batch_code: string
+          batch_name: string
+          company_id: string
+          course_duration_months?: number | null
+          created_at?: string
+          created_by: string
+          default_admission_fee?: number
+          default_monthly_fee?: number
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          max_capacity?: number | null
+          start_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          batch_code?: string
+          batch_name?: string
+          company_id?: string
+          course_duration_months?: number | null
+          created_at?: string
+          created_by?: string
+          default_admission_fee?: number
+          default_monthly_fee?: number
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          max_capacity?: number | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string
@@ -734,6 +806,7 @@ export type Database = {
       students: {
         Row: {
           admission_fee_total: number
+          batch_id: string | null
           billing_start_month: string
           company_id: string
           course_end_month: string | null
@@ -753,6 +826,7 @@ export type Database = {
         }
         Insert: {
           admission_fee_total?: number
+          batch_id?: string | null
           billing_start_month: string
           company_id: string
           course_end_month?: string | null
@@ -772,6 +846,7 @@ export type Database = {
         }
         Update: {
           admission_fee_total?: number
+          batch_id?: string | null
           billing_start_month?: string
           company_id?: string
           course_end_month?: string | null
@@ -790,6 +865,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "students_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "students_company_id_fkey"
             columns: ["company_id"]

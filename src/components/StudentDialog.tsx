@@ -23,6 +23,7 @@ import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
 import { useToast } from "@/hooks/use-toast";
+import { useBatches, type Batch } from "@/hooks/useBatches";
 
 const yyyyMmRegex = /^\d{4}-\d{2}$/;
 
@@ -53,6 +54,7 @@ interface StudentDialogProps {
   onOpenChange: (open: boolean) => void;
   student?: Student | null;
   onSave: (data: StudentInsert) => Promise<Student | void>;
+  defaultBatchId?: string;
 }
 
 const defaultPayment: InitialPaymentData = {
@@ -64,17 +66,19 @@ const defaultPayment: InitialPaymentData = {
   receiptNumber: "",
 };
 
-export default function StudentDialog({ open, onOpenChange, student, onSave }: StudentDialogProps) {
+export default function StudentDialog({ open, onOpenChange, student, onSave, defaultBatchId }: StudentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [savingStep, setSavingStep] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [initialPayment, setInitialPayment] = useState<InitialPaymentData>(defaultPayment);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>(defaultBatchId || "none");
   const isEdit = !!student;
 
   const createPaymentMutation = useCreateStudentPayment();
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   const { toast } = useToast();
+  const { data: batches = [] } = useBatches({ status: "active" });
 
   const now = new Date();
   const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -112,8 +116,9 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
         notes: student?.notes || null,
       });
       setInitialPayment(defaultPayment);
+      setSelectedBatchId(defaultBatchId || (student as any)?.batch_id || "none");
     }
-  }, [open, student, form]);
+  }, [open, student, form, defaultBatchId]);
 
   const hasInitialPayment = !isEdit && (
     (initialPayment.paymentType === "admission" || initialPayment.paymentType === "both") && initialPayment.admissionAmount > 0 ||
@@ -138,7 +143,8 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
         monthly_fee_amount: data.monthly_fee_amount,
         status: data.status,
         notes: data.notes || null,
-      });
+        batch_id: selectedBatchId !== "none" ? selectedBatchId : undefined,
+      } as StudentInsert);
 
       // Record initial payment if configured
       if (hasInitialPayment && result && "id" in result) {
@@ -202,6 +208,31 @@ export default function StudentDialog({ open, onOpenChange, student, onSave }: S
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          {/* Batch Selector */}
+          <div className="space-y-2">
+            <Label>Batch</Label>
+            <Select value={selectedBatchId} onValueChange={(v) => {
+              setSelectedBatchId(v);
+              if (v !== "none") {
+                const batch = batches.find((b) => b.id === v);
+                if (batch && !isEdit) {
+                  if (Number(batch.default_admission_fee) > 0) form.setValue("admission_fee_total", Number(batch.default_admission_fee));
+                  if (Number(batch.default_monthly_fee) > 0) form.setValue("monthly_fee_amount", Number(batch.default_monthly_fee));
+                }
+              }
+            }} disabled={saving}>
+              <SelectTrigger><SelectValue placeholder="Select batch (optional)" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Batch</SelectItem>
+                {batches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.batch_name} ({b.batch_code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
