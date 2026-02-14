@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -94,41 +95,43 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <NavigationBlockerProvider>
-            <Routes>
-              <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-              
-              {/* Company Selection Routes */}
-              <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
-              <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
-              <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <NavigationBlockerProvider>
+              <Routes>
+                <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                
+                {/* Company Selection Routes */}
+                <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
+                <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
+                <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
 
-              {/* Main App Routes */}
-              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
-              <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
-              <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-              <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
-              <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
-              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-              <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </NavigationBlockerProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+                {/* Main App Routes */}
+                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
+                <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+                <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
+                <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
+                <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+                <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NavigationBlockerProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
