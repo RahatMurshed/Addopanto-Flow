@@ -437,16 +437,13 @@ export default function BatchDetail() {
                               const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
                               if (effMonthly === 0) return <span className="text-muted-foreground text-sm">N/A</span>;
                               return (
-                                <div className="space-y-0.5">
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatCurrency(effMonthly, currency)}/{batchTotalMonths || "—"}
-                                  </span>
+                                <div className="flex flex-col gap-0.5">
                                   {sum.monthlyOverdueMonths.length > 0 ? (
-                                    <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>
+                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>
                                   ) : (sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length) > 0 ? (
-                                    <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length} pending</Badge>
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length} pending</Badge>
                                   ) : (
-                                    <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
+                                    <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
                                 </div>
                               );
