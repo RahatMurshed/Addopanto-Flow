@@ -1,55 +1,75 @@
 
 
-# Per-Month Overdue Section for Batches
+# Enhanced Date Filter for Batch Pages
 
 ## Overview
-Add a per-month overdue section to both the Batches list page and the Batch Detail page, replacing the "Completion" card on the detail page with a monthly overdue summary.
+Replace the current `MonthYearPicker` on both Batches and Batch Detail pages with a new `BatchDateFilter` component that supports three modes: **Monthly**, **Custom Range**, and **All Time**.
 
-## Changes
+## New Component: `src/components/BatchDateFilter.tsx`
 
-### 1. Batch Detail Page (`src/pages/BatchDetail.tsx`)
+A compact filter with a mode selector (dropdown or tabs) and contextual inputs:
 
-**Replace the "Completion" card (lines 416-440) with a "Monthly Overdue" card:**
-- Show the number of overdue students and total overdue amount for the selected month (reuses the existing `selectedMonth` state and `MonthYearPicker`)
-- Add a second `MonthYearPicker` inside this card so it has its own independent month filter (separate from the "This Month" card)
-- Display: overdue student count, total overdue amount, and a list of overdue student names for that specific month
-- Color-coded with destructive/red theme to match existing overdue styling
+- **Monthly**: Shows the existing month/year grid picker (like current MonthYearPicker)
+- **Custom Range**: Two calendar date pickers for start and end date
+- **All Time**: No date inputs -- button/option that selects everything
 
-**Computation updates in `batchStats`:**
-- Add `selectedOverdueMonth` state for the new card's independent month picker
-- Compute per-month overdue: iterate through all summaries, check if the selected month appears in `monthlyOverdueMonths` or `monthlyPartialMonths`, and sum up remaining amounts
-- Return `perMonthOverdueCount`, `perMonthOverdueAmount`, and a list of overdue student details for that month
+The component exports a filter value object:
+```text
+type BatchFilterMode = "monthly" | "custom" | "alltime"
+type BatchFilterValue = {
+  mode: BatchFilterMode
+  selectedMonth: string         // "YYYY-MM" (used in monthly mode)
+  startDate?: Date              // for custom range
+  endDate?: Date                // for custom range
+}
+```
 
-### 2. Batches List Page (`src/pages/Batches.tsx`)
+It calls back `onFilterChange(filterValue)` whenever the user changes the mode or picks dates.
 
-**Add a "Per-Month Overdue" section below the summary cards:**
-- Add a shared `MonthYearPicker` at the top (defaults to previous month) so admins can pick any month
-- Show a compact table/list: Batch Name, Overdue Students, Overdue Amount for the selected month
-- Only show batches that have overdue students for that month (hide zero-overdue batches)
-- Include summary totals at the bottom (total overdue students across all batches, total overdue amount)
+## Changes to `src/pages/Batches.tsx`
 
-**Computation updates in `batchAnalytics`:**
-- Add a `selectedOverdueMonth` state
-- Extend the analytics map to include per-month overdue data: for each batch, compute how many students have overdue/partial payments for the selected month and the total remaining amount
-- Add these fields to the existing map: `monthOverdueCount`, `monthOverdueAmount`
+- Replace `selectedMonth` state + `MonthYearPicker` with `filterValue` state + `BatchDateFilter`
+- Update `batchAnalytics` computation:
+  - **Monthly**: current logic (filter by single month)
+  - **Custom range**: sum revenue/pending across all months that fall within the start-end range
+  - **All time**: sum across ALL months (no filtering)
+- Update summary card labels dynamically:
+  - Monthly: "Month Revenue", "Month Pending", "Month Overdue"
+  - Custom: "Range Revenue", "Range Pending", "Range Overdue"
+  - All Time: "Total Revenue", "Total Pending", "Total Overdue"
+- Update batch table Revenue/Pending columns similarly
 
-### 3. UI Layout
+## Changes to `src/pages/BatchDetail.tsx`
 
-**Batch Detail -- new card replaces Completion:**
-- Same card size as the existing "Completion" card in the 5-column grid
-- Header: AlertTriangle icon + MonthYearPicker (small, inline)
-- Body: overdue count (large number, red) + overdue amount
-- If no overdue for that month: show "No overdue" message
+- Replace `selectedMonth` state + `MonthYearPicker` with `filterValue` state + `BatchDateFilter`
+- Update `batchStats` computation:
+  - **Monthly**: current logic
+  - **Custom range**: aggregate collected/pending/overdue across months in range
+  - **All time**: show lifetime totals
+- Update stat card labels dynamically (same pattern as Batches page)
+- Update student table:
+  - **Monthly**: current per-month status columns
+  - **Custom range / All time**: show total paid and total pending across included months; status shows worst-case (overdue if any month is overdue)
 
-**Batches List -- new section:**
-- A Card below the 4 summary cards with header "Monthly Overdue" + MonthYearPicker
-- Inside: a simple table with columns: Batch Name, Overdue Students, Overdue Amount
-- Empty state if no batches have overdue for the selected month
-- Batches in the table are clickable (navigate to batch detail)
+## Helper Logic
+
+A shared utility function determines which months to include:
+```text
+function getIncludedMonths(allMonths: string[], filter: BatchFilterValue): string[]
+  - monthly: return [filter.selectedMonth] if it's in allMonths
+  - custom: return months where the month falls within startDate-endDate
+  - alltime: return all months
+```
+
+Both pages use this to filter their analytics/stats computations.
 
 ## Technical Details
 
-- No new files or dependencies needed
-- Reuses existing `MonthYearPicker`, `computeStudentSummary`, severity styling patterns
-- Both pages independently track their own selected overdue month via local state
-- Per-month overdue calculation: for each student summary, check if the month is in `monthlyOverdueMonths` or `monthlyPartialMonths`, then compute `effectiveMonthlyFee - (monthlyPaymentsByMonth.get(month) || 0)` as the remaining amount
+- **New file**: `src/components/BatchDateFilter.tsx`
+- **Modified files**: `src/pages/Batches.tsx`, `src/pages/BatchDetail.tsx`
+- No new dependencies -- reuses existing Calendar, Popover, Select, MonthYearPicker patterns
+- The mode selector uses a `Select` dropdown with 3 options
+- Monthly mode internally renders MonthYearPicker (or similar inline month grid)
+- Custom range renders two Shadcn Calendar date pickers inside Popovers
+- All Time renders just the "All Time" label with no additional inputs
+
