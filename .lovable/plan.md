@@ -1,86 +1,153 @@
 
 
-# Remaining Fixes for Multi-Company System Hardening
+# GA-LOGO Branding and Theme Overhaul
 
-After a thorough audit, the system is in strong shape. Most critical security, data isolation, and permission enforcement items from previous batches are already implemented. Below are the remaining issues to fix.
+## Overview
 
----
-
-## Fix 1: useCreateRevenue missing company_id filter on expense_accounts query
-
-**File**: `src/hooks/useRevenues.ts` (line 55-58)
-
-The `useCreateRevenue` mutation fetches expense accounts with `.eq("is_active", true)` but does NOT filter by `company_id`. This means allocations could potentially be created against expense accounts from other companies.
-
-**Fix**: Add `.eq("company_id", activeCompanyId)` to the expense_accounts query inside `useCreateRevenue`.
+Rebrand the entire Addopanto Flow application using the uploaded GA-LOGO.png ("Grammar Addopanto") as the primary identity. Extract the orange/amber and deep blue from the logo to create a cohesive color theme across all pages, navigation, buttons, cards, and interactive elements.
 
 ---
 
-## Fix 2: UserManagement console warning (Function components cannot be given refs)
+## Phase 1: Asset Setup and Color System
 
-**File**: `src/pages/UserManagement.tsx` (line 473)
+### 1.1 Copy Logo to Project
+- Copy `user-uploads://GA-LOGO.png` to `src/assets/GA-LOGO.png` for component imports
+- Copy to `public/GA-LOGO.png` for favicon and HTML meta usage
 
-The `AlertDialog` component is receiving a ref but is not wrapped in `forwardRef`. This is the source of the console error visible in logs.
+### 1.2 Update CSS Color Variables (`src/index.css`)
+Replace the current blue-based primary palette with the logo-derived orange/blue theme:
 
-**Fix**: The outer `AlertDialog` at line 473 is likely being passed a ref via the `open` prop pattern incorrectly. The fix is to ensure `AlertDialog` is not being used as a direct child where a ref is expected, or wrap the component properly.
+**Light mode:**
+- `--primary`: Orange/amber (~30 100% 50%) for CTAs, active states, highlights
+- `--ring`: Match primary orange
+- `--sidebar-background`: Deep blue (~217 70% 18%) 
+- `--sidebar-foreground`: White
+- `--sidebar-primary`: Orange for active nav items
+- Keep `--success`, `--warning`, `--destructive` as-is (already good)
 
----
+**Dark mode:**
+- Adjusted shades of orange/blue for dark backgrounds
+- Sidebar stays deep blue (slightly lighter for dark mode)
 
-## Fix 3: RegistrationRequests page still uses legacy RoleGuard
-
-**File**: `src/pages/RegistrationRequests.tsx`
-
-This page uses `RoleGuard` which depends on the global `useRole()` context. Since this is a platform-level page (Cipher-only for global registration approval), it should use `useRole().isCipher` or `useCompany().isCipher` for consistency, plus add an explicit `Navigate` redirect like `UserManagement.tsx` does.
-
-**Fix**: Add explicit `isCipher` check with `Navigate` redirect at the top of the component, matching the pattern in `UserManagement.tsx`.
-
----
-
-## Fix 4: CompanyMembers invite code query hits base `companies` table
-
-**File**: `src/pages/CompanyMembers.tsx` (line 112-121)
-
-The invite code query fetches from `companies` (base table) which has a SELECT policy allowing all authenticated users to read ALL columns (including `join_password`). While this specific query only selects `invite_code`, the base table policy is still overly permissive.
-
-**Status**: The `companies_public` view was created but the base table SELECT policy was not tightened. This means any authenticated user can still query `companies` directly and read `join_password`.
-
-**Fix**: Update the RLS policy on the `companies` base table to restrict SELECT access. Only cipher users and company admins should be able to SELECT from the base table. All other users should use `companies_public`.
-
-**Database migration**:
-```sql
--- Drop the overly permissive policy
-DROP POLICY IF EXISTS "Authenticated users can view companies" ON companies;
-
--- Restricted: only cipher or company admin/member can read base table
-CREATE POLICY "Cipher and admins can view companies"
-  ON companies FOR SELECT
-  USING (
-    is_cipher(auth.uid()) 
-    OR is_company_admin(auth.uid(), id)
-  );
-```
+### 1.3 Update `tailwind.config.ts`
+No structural changes needed -- colors flow through CSS variables automatically.
 
 ---
 
-## Fix 5: Viewer role "View Only" badge missing from UI
+## Phase 2: Logo Placement
 
-**Files**: `src/pages/Revenue.tsx`, `src/pages/Expenses.tsx`, `src/pages/Students.tsx`, `src/pages/Khatas.tsx`
+### 2.1 Sidebar Header (`AppLayout.tsx`)
+- Replace the `Building2` icon fallback and company name area with the GA-LOGO imported from `@/assets/GA-LOGO.png`
+- Logo max-width 140px in expanded sidebar
+- Keep company switcher dropdown functional below/beside the logo
 
-The `isCompanyViewer` flag exists in CompanyContext but is never used in pages to show a "View Only" badge. While action buttons are already hidden via permission checks (`canAddRevenue`, `canEdit`, `canDelete`), there's no visual indicator that the user is in view-only mode.
+### 2.2 Mobile Header (`AppLayout.tsx`)
+- Replace the `TrendingUp` icon + "KhataFlow" text with a smaller GA-LOGO (max-height 32px)
 
-**Fix**: Add a subtle "View Only" badge at the top of each page when `isCompanyViewer` is true.
+### 2.3 Auth Pages (`Auth.tsx`)
+- Replace the blue `TrendingUp` icon and "KhataFlow" text with GA-LOGO centered (max-width 200px)
+- Update all "KhataFlow" text references to "Addopanto Flow" or "Grammar Addopanto"
+
+### 2.4 Company Selection (`CompanySelection.tsx`)
+- Replace `Building2` header icon with GA-LOGO
+
+### 2.5 Registration Success screen
+- Replace icon and "KhataFlow" title with GA-LOGO
+
+### 2.6 Favicon and HTML Meta
+- Update `index.html`: add `<link rel="icon" href="/GA-LOGO.png">`, update `<title>` to "Addopanto Flow"
+- Update OG meta tags with new branding name
 
 ---
 
-## Summary
+## Phase 3: Navigation and Sidebar Polish
 
-| Fix | Type | Priority | Files |
-|-----|------|----------|-------|
-| 1. Missing company_id in useCreateRevenue | Security bug | High | useRevenues.ts |
-| 2. Console ref warning | Bug fix | Medium | UserManagement.tsx |
-| 3. RegistrationRequests route guard | Access control | Medium | RegistrationRequests.tsx |
-| 4. Base companies table SELECT policy | Security | High | Database migration |
-| 5. View Only badge for viewers | UX | Low | Revenue/Expenses/Students/Khatas |
+### 3.1 Desktop Sidebar Styling (`AppLayout.tsx` + `index.css`)
+- Deep blue background via `--sidebar-background`
+- White text for nav items
+- Orange left-border (3px) + orange text for active menu item
+- Smooth hover transitions (0.2s)
 
-**Estimated scope**: 5 files modified, 1 database migration. No breaking changes.
+### 3.2 Mobile Navigation
+- Orange hamburger menu button color
+- Slide-in panel with same blue/orange theme
+
+---
+
+## Phase 4: Button and Interactive Element Polish
+
+### 4.1 Button Enhancements (`button.tsx` + `index.css`)
+- Primary buttons: orange background, white text
+- Hover: slightly darker orange shade (0.2s transition)
+- Active: `scale(0.98)` press effect
+- Disabled: 0.5 opacity
+- All loading buttons already show spinners (existing pattern maintained)
+
+### 4.2 Form Input Focus States
+- Orange focus ring (2px) via `--ring` variable update
+- Already flows through existing Input component styles
+
+### 4.3 Cards
+- Add subtle shadow upgrade via CSS: `shadow-sm hover:shadow-md transition-shadow`
+- Orange accent borders on key metric cards in Dashboard
+
+---
+
+## Phase 5: Page-Specific Polish
+
+### 5.1 Dashboard (`Dashboard.tsx`)
+- Metric card icons use orange accent color
+- Chart colors: keep existing CHART_COLORS but make first color the brand orange
+
+### 5.2 Status Badges
+- Paid/Approved: orange badge
+- Pending: amber
+- Overdue/Rejected: red
+- Inactive: gray
+(Most already exist, just ensure consistency)
+
+### 5.3 Tables
+- Selected row: light orange background
+- Hover: subtle gray
+- Already have sticky headers from existing implementation
+
+### 5.4 Modals/Dialogs
+- Dialog headers with blue background, white text (via CSS override on DialogHeader)
+- Primary action buttons already orange through primary color change
+
+---
+
+## Phase 6: Loading and Misc
+
+### 6.1 App Loading Screen (`App.tsx` or `main.tsx`)
+- Add a simple branded loading screen with GA-LOGO and pulse animation while auth initializes
+
+### 6.2 NotFound Page (`NotFound.tsx`)
+- Add GA-LOGO and brand colors
+
+### 6.3 Toast Notifications
+- Already themed through CSS variables -- orange ring for success toasts will come automatically
+
+---
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `src/assets/GA-LOGO.png` | New - copied from upload |
+| `public/GA-LOGO.png` | New - for favicon/meta |
+| `index.html` | Favicon, title, meta tags |
+| `src/index.css` | Color variables (orange primary, blue sidebar) |
+| `src/components/AppLayout.tsx` | Logo in sidebar + mobile header, nav styling |
+| `src/pages/Auth.tsx` | Logo + branding text |
+| `src/pages/CompanySelection.tsx` | Logo in header |
+| `src/pages/Dashboard.tsx` | Orange accent on metric cards |
+| `src/pages/NotFound.tsx` | Logo + brand colors |
+| `src/App.tsx` | Branded loading screen |
+
+## What Will NOT Change
+- All existing functionality, data flow, API calls, and security remain intact
+- TypeScript types unchanged
+- No new dependencies required
+- Backend/database untouched
 
