@@ -50,7 +50,7 @@ const features = [
   },
   {
     icon: Building2,
-    title: "Multi-Company Support",
+    title: "Multi-Business Support",
     description: "Run multiple institutions from a single account with isolated financials.",
   },
   {
@@ -69,7 +69,7 @@ const steps = [
   {
     number: "01",
     icon: Plus,
-    title: "Create Your Company",
+    title: "Create Your Business",
     description: "Set up your institution in seconds. Configure expense accounts and revenue sources.",
   },
   {

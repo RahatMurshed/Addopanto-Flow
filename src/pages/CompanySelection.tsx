@@ -183,8 +183,8 @@ export default function CompanySelection() {
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
           <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="mx-auto h-14 w-auto object-contain" /></Link>
-          <h1 className="text-2xl font-bold">Select a Company</h1>
-          <p className="text-muted-foreground">Choose a company to continue</p>
+          <h1 className="text-2xl font-bold">Select a Business</h1>
+          <p className="text-muted-foreground">Choose a business to continue</p>
         </div>
 
         {companies.length === 0 ? (
@@ -231,11 +231,11 @@ export default function CompanySelection() {
 
         <div className="flex items-center justify-center gap-3">
           <Button variant="outline" onClick={() => navigate("/companies/join")}>
-            <UserPlus className="mr-2 h-4 w-4" /> Join Company
+            <UserPlus className="mr-2 h-4 w-4" /> Join Business
           </Button>
           {isCipher && (
             <Button onClick={() => navigate("/companies/create")}>
-              <Plus className="mr-2 h-4 w-4" /> Create Company
+              <Plus className="mr-2 h-4 w-4" /> Create Business
             </Button>
           )}
           <Button variant="ghost" onClick={handleLogout}>

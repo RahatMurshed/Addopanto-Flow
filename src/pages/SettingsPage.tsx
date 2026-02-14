@@ -33,7 +33,7 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState("BDT");
   const [fiscalMonth, setFiscalMonth] = useState("1");
 
-  // Company logo state
+  // Business logo state
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [savingLogo, setSavingLogo] = useState(false);
@@ -59,49 +59,59 @@ export default function SettingsPage() {
     }
   }, [roleLoading, isCompanyAdmin, isCipher, navigate]);
 
+  // Initialize business name from active company, currency/fiscal from user_profiles
   useEffect(() => {
     if (!user) return;
+    const bName = activeCompany?.name || "";
     supabase
       .from("user_profiles")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
-          const bName = data.business_name || "";
-          const curr = data.currency;
-          const fiscal = String(data.fiscal_year_start_month);
-          setBusinessName(bName);
-          setCurrency(curr);
-          setFiscalMonth(fiscal);
-          setOriginalValues({
-            businessName: bName,
-            currency: curr,
-            fiscalMonth: fiscal,
-          });
-        }
+        const curr = data?.currency || "BDT";
+        const fiscal = String(data?.fiscal_year_start_month || 1);
+        setBusinessName(bName);
+        setCurrency(curr);
+        setFiscalMonth(fiscal);
+        setOriginalValues({
+          businessName: bName,
+          currency: curr,
+          fiscalMonth: fiscal,
+        });
         setLoading(false);
       });
-  }, [user]);
+  }, [user, activeCompany?.name]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !activeCompanyId) return;
     setSaving(true);
-    const { error } = await supabase
+
+    // Update company name
+    const { error: companyError } = await supabase
+      .from("companies")
+      .update({ name: businessName })
+      .eq("id", activeCompanyId);
+
+    // Update user profile settings (currency, fiscal month)
+    const { error: profileError } = await supabase
       .from("user_profiles")
       .update({
-        business_name: businessName,
         currency,
         fiscal_year_start_month: parseInt(fiscalMonth),
       })
       .eq("user_id", user.id);
+
     setSaving(false);
+    const error = companyError || profileError;
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
       setOriginalValues({ businessName, currency, fiscalMonth });
       await queryClient.invalidateQueries({ queryKey: ["user-profile", user.id] });
+      await queryClient.resetQueries({ queryKey: ["user-companies"] });
+      refetchCompany();
       toast({ title: "Settings saved" });
     }
   };
@@ -136,7 +146,7 @@ export default function SettingsPage() {
       setLogoPreviewUrl(null);
       refetchCompany();
       await queryClient.invalidateQueries({ queryKey: ["user-companies"] });
-      toast({ title: "Company logo updated" });
+      toast({ title: "Business logo updated" });
     } catch (err: any) {
       toast({ title: "Error uploading logo", description: err.message, variant: "destructive" });
     } finally {
@@ -209,11 +219,11 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Company Logo Card */}
+        {/* Business Logo Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Company Logo</CardTitle>
-            <CardDescription>Update the logo for {activeCompany?.name || "your company"}</CardDescription>
+            <CardTitle>Business Logo</CardTitle>
+            <CardDescription>Update the logo for {activeCompany?.name || "your business"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <ImageUpload

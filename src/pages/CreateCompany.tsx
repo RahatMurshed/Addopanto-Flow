@@ -75,7 +75,7 @@ export default function CreateCompany() {
         }
       }
 
-      toast({ title: "Company created!" });
+      toast({ title: "Business created!" });
       navigate("/companies");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -98,8 +98,8 @@ export default function CreateCompany() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Create Company</h1>
-            <p className="text-sm text-muted-foreground">Set up a new company workspace</p>
+            <h1 className="text-2xl font-bold">Create Business</h1>
+            <p className="text-sm text-muted-foreground">Set up a new business workspace</p>
           </div>
         </div>
 
@@ -113,14 +113,14 @@ export default function CreateCompany() {
                   Basic Information
                 </div>
                 <div className="space-y-2">
-                  <Label>Company Name <span className="text-destructive">*</span></Label>
+                  <Label>Business Name <span className="text-destructive">*</span></Label>
                   <Input value={name} onChange={(e) => {
                     const val = e.target.value;
                     setName(val);
                     if (!slugManuallyEdited) {
                       setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
                     }
-                  }} placeholder="My Company" required />
+                  }} placeholder="My Business" required />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5">
@@ -132,9 +132,9 @@ export default function CreateCompany() {
                       setSlugManuallyEdited(true);
                       setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                     }}
-                    placeholder="my-company"
+                    placeholder="my-business"
                   />
-                  <p className="text-xs text-muted-foreground">Users will search this slug to find your company</p>
+                  <p className="text-xs text-muted-foreground">Users will search this slug to find your business</p>
                 </div>
               </div>
 
@@ -144,7 +144,7 @@ export default function CreateCompany() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <ImageIcon className="h-4 w-4" />
-                  Company Logo
+                  Business Logo
                 </div>
                 <ImageUpload
                   value={logoPreview}
@@ -169,7 +169,7 @@ export default function CreateCompany() {
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description of your company..." rows={2} />
+                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description of your business..." rows={2} />
                 </div>
               </div>
 
@@ -184,13 +184,13 @@ export default function CreateCompany() {
                 <div className="space-y-2">
                   <Label>Join Password</Label>
                   <Input value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} placeholder="Set a password for joining..." />
-                  <p className="text-xs text-muted-foreground">Users need this password to request joining your company</p>
+                  <p className="text-xs text-muted-foreground">Users need this password to request joining your business</p>
                 </div>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading || !name}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Company
+                Create Business
               </Button>
             </form>
           </CardContent>
