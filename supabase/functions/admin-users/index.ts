@@ -438,6 +438,17 @@ Deno.serve(async (req) => {
         return json(500, { error: "Failed to fetch roles" });
       }
 
+      // Get all user profiles for full_name
+      const userIds = authUsers.users.map((u) => u.id);
+      const { data: profilesData } = await adminClient
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(
+        profilesData?.map((p) => [p.user_id, p.full_name]) || [],
+      );
+
       // Create a map of user_id to role
       const roleMap = new Map(
         roles?.map((r) => [r.user_id, { role: r.role, created_at: r.created_at }]) ||
@@ -451,6 +462,7 @@ Deno.serve(async (req) => {
           return {
             user_id: authUser.id,
             email: authUser.email || null,
+            full_name: profileMap.get(authUser.id) || null,
             role: (roleInfo?.role || "user") as string,
             created_at: roleInfo?.created_at || authUser.created_at,
           };

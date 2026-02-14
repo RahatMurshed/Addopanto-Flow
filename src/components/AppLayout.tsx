@@ -64,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...baseNavItems,
     ...((isCompanyAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
     ...((isCompanyAdmin || isCipher) ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
-    ...((isCompanyAdmin || isCipher) ? [{ label: "User Management", href: "/users", icon: ShieldCheck }] : []),
+    ...((isCompanyAdmin || isCipher) ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
     ...((isCompanyAdmin || isCipher) ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
   ];
 
