@@ -14,8 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Users, Shield, UserPlus, Search, Check, X, Loader2, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 
 export default function CompanyMembers() {
   const { user } = useAuth();
@@ -73,43 +74,25 @@ export default function CompanyMembers() {
     enabled: members.length > 0,
   });
 
-  // Fetch join requests
-  const { data: joinRequests = [], isLoading: requestsLoading } = useQuery({
-    queryKey: ["company-join-requests", activeCompanyId],
+  // Count pending join requests for badge
+  const { data: pendingJoinCount = 0 } = useQuery({
+    queryKey: ["pending-join-requests-count", activeCompanyId],
     queryFn: async () => {
-      if (!activeCompanyId) return [];
-      const { data, error } = await supabase
+      if (!activeCompanyId) return 0;
+      const { count, error } = await supabase
         .from("company_join_requests")
-        .select("*")
+        .select("*", { count: "exact", head: true })
         .eq("company_id", activeCompanyId)
-        .order("requested_at", { ascending: false });
-      if (error) throw error;
-      return data;
+        .eq("status", "pending");
+      if (error) return 0;
+      return count ?? 0;
     },
     enabled: !!activeCompanyId && canManageMembers,
   });
 
-  // Fetch join request emails
-  const { data: requestProfiles = [] } = useQuery({
-    queryKey: ["request-profiles", joinRequests.map(r => r.user_id)],
-    queryFn: async () => {
-      if (joinRequests.length === 0) return [];
-      const userIds = joinRequests.map(r => r.user_id);
-      const { data } = await supabase
-        .from("user_profiles")
-        .select("user_id, email")
-        .in("user_id", userIds);
-      return data ?? [];
-    },
-    enabled: joinRequests.length > 0,
-  });
-
   const getEmail = (userId: string) => {
-    return profiles.find(p => p.user_id === userId)?.email || 
-           requestProfiles.find(p => p.user_id === userId)?.email || userId;
+    return profiles.find(p => p.user_id === userId)?.email || userId;
   };
-
-  const pendingRequests = joinRequests.filter(r => r.status === "pending");
 
   // Update member mutation
   const updateMemberMutation = useMutation({
@@ -123,52 +106,6 @@ export default function CompanyMembers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
       toast({ title: "Member updated" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  // Approve join request
-  const approveRequestMutation = useMutation({
-    mutationFn: async (requestId: string) => {
-      const req = joinRequests.find(r => r.id === requestId);
-      if (!req || !activeCompanyId) return;
-      
-      // Update request status
-      await supabase
-        .from("company_join_requests")
-        .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
-        .eq("id", requestId);
-
-      // Create membership
-      await supabase
-        .from("company_memberships")
-        .insert({
-          user_id: req.user_id,
-          company_id: activeCompanyId,
-          role: "moderator" as any,
-          status: "active",
-          approved_by: user?.id,
-        });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["company-join-requests", activeCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
-      toast({ title: "Member approved" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  // Reject join request
-  const rejectRequestMutation = useMutation({
-    mutationFn: async (requestId: string) => {
-      await supabase
-        .from("company_join_requests")
-        .update({ status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
-        .eq("id", requestId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["company-join-requests", activeCompanyId] });
-      toast({ title: "Request rejected" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -240,8 +177,8 @@ export default function CompanyMembers() {
           </TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             <UserPlus className="h-4 w-4" /> Requests
-            {pendingRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingRequests.length}</Badge>
+            {pendingJoinCount > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingJoinCount}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="invite" className="gap-2">
@@ -326,46 +263,7 @@ export default function CompanyMembers() {
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Join Requests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {pendingRequests.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No pending requests</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Requested</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingRequests.map((req) => (
-                      <TableRow key={req.id}>
-                        <TableCell className="font-medium">{getEmail(req.user_id)}</TableCell>
-                        <TableCell className="max-w-[200px] truncate text-muted-foreground">{req.message || "—"}</TableCell>
-                        <TableCell>{format(new Date(req.requested_at), "MMM d, yyyy")}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="outline" className="text-emerald-600 gap-1" onClick={() => approveRequestMutation.mutate(req.id)}>
-                              <Check className="h-3 w-3" /> Approve
-                            </Button>
-                            <Button size="sm" variant="outline" className="text-destructive gap-1" onClick={() => rejectRequestMutation.mutate(req.id)}>
-                              <X className="h-3 w-3" /> Reject
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <CompanyJoinRequests />
         </TabsContent>
 
         <TabsContent value="invite" className="space-y-4 mt-4">

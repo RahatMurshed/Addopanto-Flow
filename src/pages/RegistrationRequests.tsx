@@ -38,11 +38,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight, Trash2, Building2 } from "lucide-react";
+import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight, Trash2 } from "lucide-react";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
-import CompanyJoinRequests from "@/components/CompanyJoinRequests";
-import { useCompany } from "@/contexts/CompanyContext";
 
 interface RegistrationRequest {
   id: string;
@@ -73,30 +71,12 @@ interface ApproveDialogData {
 export default function RegistrationRequests() {
   const { session } = useAuth();
   const { toast } = useToast();
-  const { activeCompanyId } = useCompany();
   const queryClient = useQueryClient();
   const [approveDialog, setApproveDialog] = useState<ApproveDialogData | null>(null);
   const [rejectDialog, setRejectDialog] = useState<RegistrationRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [deleteDialog, setDeleteDialog] = useState<RegistrationRequest | null>(null);
   const [acceptFromRejectedDialog, setAcceptFromRejectedDialog] = useState<ApproveDialogData | null>(null);
-  const [activeTab, setActiveTab] = useState("registration");
-
-  // Count pending join requests for badge
-  const { data: pendingJoinCount = 0 } = useQuery({
-    queryKey: ["pending-join-requests-count", activeCompanyId],
-    queryFn: async () => {
-      if (!activeCompanyId) return 0;
-      const { count, error } = await supabase
-        .from("company_join_requests")
-        .select("*", { count: "exact", head: true })
-        .eq("company_id", activeCompanyId)
-        .eq("status", "pending");
-      if (error) return 0;
-      return count ?? 0;
-    },
-    enabled: !!activeCompanyId,
-  });
 
   // Fetch registration requests
   const { data: requests = [], isLoading } = useQuery({
@@ -393,77 +373,52 @@ export default function RegistrationRequests() {
           )}
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="registration" className="gap-2">
-              <UserPlus className="h-4 w-4" />
-              Registration Requests
-              {pendingRequests.length > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingRequests.length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="join-requests" className="gap-2">
-              <Building2 className="h-4 w-4" />
-              Join Requests
-              {pendingJoinCount > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingJoinCount}</Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="registration">
-            <Card>
-              <CardHeader>
-                <CardTitle>Registration Requests</CardTitle>
-                <CardDescription>
-                  Review registration requests from new users. Approved users will be granted Moderator access with configurable permissions.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <Skeleton className="h-9 w-28 rounded-md" />
-                      <Skeleton className="h-9 w-28 rounded-md" />
-                      <Skeleton className="h-9 w-28 rounded-md" />
-                    </div>
-                    <SkeletonTable rows={4} columns={3} />
-                  </div>
-                ) : (
-                  <Tabs defaultValue="pending">
-                    <TabsList>
-                      <TabsTrigger value="pending" className="gap-2">
-                        <Clock className="h-4 w-4" />
-                        Pending ({pendingRequests.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="approved" className="gap-2">
-                        <CheckCircle className="h-4 w-4" />
-                        Approved ({approvedRequests.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="rejected" className="gap-2">
-                        <XCircle className="h-4 w-4" />
-                        Rejected ({rejectedRequests.length})
-                      </TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="pending" className="mt-4">
-                      <PendingTable items={pendingRequests} />
-                    </TabsContent>
-                    <TabsContent value="approved" className="mt-4">
-                      <HistoryTable items={approvedRequests} />
-                    </TabsContent>
-                    <TabsContent value="rejected" className="mt-4">
-                      <RejectedTable items={rejectedRequests} />
-                    </TabsContent>
-                  </Tabs>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="join-requests">
-            <CompanyJoinRequests />
-          </TabsContent>
-        </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle>Registration Requests</CardTitle>
+            <CardDescription>
+              Review registration requests from new users. Approved users will be granted Moderator access with configurable permissions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                  <Skeleton className="h-9 w-28 rounded-md" />
+                </div>
+                <SkeletonTable rows={4} columns={3} />
+              </div>
+            ) : (
+              <Tabs defaultValue="pending">
+                <TabsList>
+                  <TabsTrigger value="pending" className="gap-2">
+                    <Clock className="h-4 w-4" />
+                    Pending ({pendingRequests.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="approved" className="gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Approved ({approvedRequests.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected" className="gap-2">
+                    <XCircle className="h-4 w-4" />
+                    Rejected ({rejectedRequests.length})
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="pending" className="mt-4">
+                  <PendingTable items={pendingRequests} />
+                </TabsContent>
+                <TabsContent value="approved" className="mt-4">
+                  <HistoryTable items={approvedRequests} />
+                </TabsContent>
+                <TabsContent value="rejected" className="mt-4">
+                  <RejectedTable items={rejectedRequests} />
+                </TabsContent>
+              </Tabs>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Approve Dialog (for pending) */}
         <Dialog open={!!approveDialog} onOpenChange={(open) => { if (!open && !approveMutation.isPending) setApproveDialog(null); }}>
