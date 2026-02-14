@@ -36,6 +36,7 @@ export interface StudentInsert {
   monthly_fee_amount?: number;
   status?: "active" | "inactive" | "graduated";
   notes?: string | null;
+  batch_id?: string | null;
 }
 
 export interface StudentFilters {

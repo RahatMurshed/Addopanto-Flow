@@ -31,7 +31,8 @@ const CreateCompany = lazy(() => import("@/pages/CreateCompany"));
 const RegistrationRequests = lazy(() => import("@/pages/RegistrationRequests"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
 const CompanyMembers = lazy(() => import("@/pages/CompanyMembers"));
-
+const Batches = lazy(() => import("@/pages/Batches"));
+const BatchDetail = lazy(() => import("@/pages/BatchDetail"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 2, staleTime: 30_000, refetchOnWindowFocus: true },
@@ -110,6 +111,8 @@ const App = () => (
                   <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                   <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
                   <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
+                  <Route path="/batches" element={<ProtectedRoute><Batches /></ProtectedRoute>} />
+                  <Route path="/batches/:id" element={<ProtectedRoute><BatchDetail /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
