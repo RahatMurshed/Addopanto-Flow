@@ -1,31 +1,26 @@
 
 
-# Three Targeted Fixes
+## Auto-fill Payment Amount
 
-## 1. Default filter mode set to "All Time"
-In `src/components/BatchDateFilter.tsx`, change `getDefaultBatchFilter()` to return `mode: "alltime"` instead of `mode: "monthly"`. This applies to both the Batches list and Batch Detail pages since they both call this function.
+### Current State
+- Monthly payments already auto-calculate when months are selected (lines 113-123), using `student.monthly_fee_amount` minus already paid per month.
+- Admission payments do NOT auto-fill -- the amount starts at 0 and the admin must type it manually.
 
-## 2. Batch Detail page: Overdue card layout swap
-In `src/pages/BatchDetail.tsx` (lines 405-415), swap the order so the overdue **amount** is the large number on top, and the student count is the smaller text below.
+### Changes (single file: `src/components/StudentPaymentDialog.tsx`)
 
-**Before:**
-- Big: student count (e.g., "3")
-- Small: "students overdue"
-- Below: overdue amount
+1. **Auto-fill admission amount on type selection or dialog open**
+   - When payment type is "admission" (either on open or when switched), auto-fill the amount field with the remaining admission balance: `admissionTotal - admissionPaid` (clamped to 0 minimum).
+   - Use the effective admission fee: `student.admission_fee_total || batchDefaultAdmissionFee || 0`.
 
-**After:**
-- Big: overdue amount (e.g., "৳3,000")
-- Small: "3 students overdue"
+2. **Use effective monthly fee for auto-calculation**
+   - The existing monthly auto-calc on line 117 uses `student.monthly_fee_amount` but should fall back to `batchDefaultMonthlyFee` when the student value is 0 (matching the pattern used in the month list on line 241).
 
-## 3. Batches page: Overdue summary card shows money
-In `src/pages/Batches.tsx` (line 250), change the Overdue summary card from showing `totalOverdue` (student count) to showing the total overdue **amount** in currency format. Add student count as smaller secondary text.
-
-**Before:** Shows "3" (number of students)
-**After:** Shows "৳3,000" (overdue amount) with "3 students" below
+3. **Admin can still edit the amount**
+   - The amount field remains editable -- the auto-fill just sets a starting value that the admin can override for partial payments.
 
 ### Technical Details
 
-**Files modified:**
-- `src/components/BatchDateFilter.tsx` — line 26: change `mode: "monthly"` to `mode: "alltime"`
-- `src/pages/Batches.tsx` — lines 245-251: add `totalOverdueAmount` memo, update Overdue card to show currency amount as primary and student count as secondary
-- `src/pages/BatchDetail.tsx` — lines 405-415: swap the overdue amount and student count display order
+- Add a `useEffect` that watches `paymentType`: when it becomes `"admission"` and not editing, set amount to `Math.max(0, effectiveAdmissionTotal - summary.admissionPaid)`.
+- Update the existing monthly `useEffect` to use `const fee = Number(student.monthly_fee_amount) || batchDefaultMonthlyFee || 0` instead of just `student.monthly_fee_amount`.
+- On dialog open (existing reset logic around line 96), if default type is admission, set the initial amount to the remaining admission balance instead of 0.
+
