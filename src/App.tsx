@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { RoleProvider } from "@/contexts/RoleContext"; // Keep for legacy compatibility if needed
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import AppLayout from "@/components/AppLayout";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
@@ -58,6 +59,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function CompanyGuard({ children }: { children: React.ReactNode }) {
   const { isLoading, activeCompany, hasCompanies } = useCompany();
+  useRealtimeSync();
 
   if (isLoading) {
     return (
