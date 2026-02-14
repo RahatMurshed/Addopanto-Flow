@@ -39,11 +39,10 @@ import gaLogo from "@/assets/GA-LOGO.png";
 
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Batches", href: "/batches", icon: Layers },
   { label: "Expense Sources", href: "/khatas", icon: Wallet },
   { label: "Revenue", href: "/revenue", icon: TrendingUp },
   { label: "Expenses", href: "/expenses", icon: Receipt },
-  { label: "Students", href: "/students", icon: GraduationCap },
-  { label: "Batches", href: "/batches", icon: Layers },
   { label: "Reports", href: "/reports", icon: FileText },
 ];
 

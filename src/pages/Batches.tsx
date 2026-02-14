@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useStudents } from "@/hooks/useStudents";
+import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +22,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, Archive } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, Archive, TrendingUp, AlertTriangle, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import BatchDialog from "@/components/BatchDialog";
@@ -32,7 +35,10 @@ export default function Batches() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
   const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useStudents();
+  const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer } = useCompany();
+  const { data: userProfile } = useUserProfile();
+  const currency = userProfile?.currency || "BDT";
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -44,12 +50,25 @@ export default function Batches() {
   const [editBatch, setEditBatch] = useState<Batch | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Count students per batch
-  const studentCountMap = new Map<string, number>();
-  for (const s of allStudents) {
-    const bid = (s as any).batch_id;
-    if (bid) studentCountMap.set(bid, (studentCountMap.get(bid) || 0) + 1);
-  }
+  // Build per-batch analytics
+  const batchAnalytics = useMemo(() => {
+    const map = new Map<string, { studentCount: number; totalCollected: number; totalPending: number; overdueCount: number }>();
+    for (const b of batches) {
+      const students = allStudents.filter((s: any) => s.batch_id === b.id);
+      let totalCollected = 0;
+      let totalPending = 0;
+      let overdueCount = 0;
+      for (const s of students) {
+        const payments = allPayments.filter((p) => p.student_id === s.id);
+        const sum = computeStudentSummary(s, payments);
+        totalCollected += sum.totalPaid;
+        totalPending += sum.totalPending;
+        if (sum.monthlyOverdueMonths.length > 0) overdueCount++;
+      }
+      map.set(b.id, { studentCount: students.length, totalCollected, totalPending, overdueCount });
+    }
+    return map;
+  }, [batches, allStudents, allPayments]);
 
   const pagination = usePagination(batches);
 
@@ -80,7 +99,8 @@ export default function Batches() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    const count = studentCountMap.get(deleteId) || 0;
+    const analytics = batchAnalytics.get(deleteId);
+    const count = analytics?.studentCount || 0;
     if (count > 0) {
       toast({ title: "Cannot delete", description: `This batch has ${count} student(s). Remove or reassign them first.`, variant: "destructive" });
       setDeleteId(null);
@@ -95,9 +115,30 @@ export default function Batches() {
     }
   };
 
-  const activeBatches = batches.filter((b) => b.status === "active").length;
-  const archivedBatches = batches.filter((b) => b.status === "archived").length;
-  const totalStudentsInBatches = Array.from(studentCountMap.values()).reduce((s, c) => s + c, 0);
+  // Summary stats
+  const totalStudentsInBatches = useMemo(() => {
+    let total = 0;
+    for (const a of batchAnalytics.values()) total += a.studentCount;
+    return total;
+  }, [batchAnalytics]);
+
+  const totalRevenue = useMemo(() => {
+    let total = 0;
+    for (const a of batchAnalytics.values()) total += a.totalCollected;
+    return total;
+  }, [batchAnalytics]);
+
+  const totalPendingAll = useMemo(() => {
+    let total = 0;
+    for (const a of batchAnalytics.values()) total += a.totalPending;
+    return total;
+  }, [batchAnalytics]);
+
+  const totalOverdue = useMemo(() => {
+    let total = 0;
+    for (const a of batchAnalytics.values()) total += a.overdueCount;
+    return total;
+  }, [batchAnalytics]);
 
   const statusBadge = (status: string) => {
     switch (status) {
@@ -115,7 +156,7 @@ export default function Batches() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
-        <SkeletonTable rows={5} columns={6} />
+        <SkeletonTable rows={5} columns={8} />
       </div>
     );
   }
@@ -141,31 +182,31 @@ export default function Batches() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Batches</CardTitle>
-            <Layers className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{batches.length}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-            <Layers className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-primary">{activeBatches}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Students in Batches</CardTitle>
-            <Layers className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold">{totalStudentsInBatches}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Archived</CardTitle>
-            <Archive className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{archivedBatches}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRevenue, currency)}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Pending</CardTitle>
+            <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          </CardHeader>
+          <CardContent><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalPendingAll, currency)}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Students</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent><p className="text-2xl font-bold text-destructive">{totalOverdue}</p></CardContent>
         </Card>
       </div>
 
@@ -216,19 +257,22 @@ export default function Batches() {
                       <TableHead className="hidden md:table-cell">Start Date</TableHead>
                       <TableHead className="hidden md:table-cell">End Date</TableHead>
                       <TableHead>Students</TableHead>
+                      <TableHead className="hidden lg:table-cell">Revenue</TableHead>
+                      <TableHead className="hidden lg:table-cell">Pending</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {pagination.paginatedItems.map((b) => {
-                      const count = studentCountMap.get(b.id) || 0;
+                      const analytics = batchAnalytics.get(b.id);
+                      const count = analytics?.studentCount || 0;
                       return (
-                        <TableRow key={b.id}>
+                        <TableRow key={b.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/batches/${b.id}`)}>
                           <TableCell>
-                            <button onClick={() => navigate(`/batches/${b.id}`)} className="font-medium text-primary hover:underline text-left">
+                            <span className="font-medium text-primary hover:underline">
                               {b.batch_name}
-                            </button>
+                            </span>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{b.batch_code}</TableCell>
                           <TableCell className="hidden md:table-cell">{format(new Date(b.start_date), "MMM d, yyyy")}</TableCell>
@@ -238,9 +282,23 @@ export default function Batches() {
                               {count}{b.max_capacity ? `/${b.max_capacity}` : ""}
                             </Badge>
                           </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <span className="font-semibold text-green-600 dark:text-green-400">
+                              {formatCurrency(analytics?.totalCollected || 0, currency)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {(analytics?.totalPending || 0) > 0 ? (
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                {formatCurrency(analytics?.totalPending || 0, currency)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell>{statusBadge(b.status)}</TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/batches/${b.id}`)}>
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -288,14 +346,14 @@ export default function Batches() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Batch</AlertDialogTitle>
             <AlertDialogDescription>
-              {(studentCountMap.get(deleteId || "") || 0) > 0
-                ? `This batch has ${studentCountMap.get(deleteId || "")} student(s). Remove or reassign them before deleting.`
+              {(batchAnalytics.get(deleteId || "")?.studentCount || 0) > 0
+                ? `This batch has ${batchAnalytics.get(deleteId || "")?.studentCount} student(s). Remove or reassign them before deleting.`
                 : "This will permanently delete this batch. This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} disabled={deleteMutation.isPending || (studentCountMap.get(deleteId || "") || 0) > 0} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} disabled={deleteMutation.isPending || (batchAnalytics.get(deleteId || "")?.studentCount || 0) > 0} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>

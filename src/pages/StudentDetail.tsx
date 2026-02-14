@@ -6,6 +6,7 @@ import {
   useStudentPayments, useCreateStudentPayment, useUpdateStudentPayment, useDeleteStudentPayment,
   useMonthlyFeeHistory, computeStudentSummary,
 } from "@/hooks/useStudentPayments";
+import { useBatch } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency } from "@/utils/currencyUtils";
@@ -21,7 +22,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import StudentDialog from "@/components/StudentDialog";
@@ -40,6 +41,8 @@ export default function StudentDetail() {
   const { data: student, isLoading: studentLoading } = useStudent(id);
   const { data: payments = [], isLoading: paymentsLoading } = useStudentPayments(id);
   const { data: feeHistory = [] } = useMonthlyFeeHistory(id);
+  const batchId = (student as any)?.batch_id;
+  const { data: batch } = useBatch(batchId);
 
   const updateMutation = useUpdateStudent();
   const createPaymentMutation = useCreateStudentPayment();
@@ -117,7 +120,7 @@ export default function StudentDetail() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Student not found</p>
-        <Button variant="link" onClick={() => navigate("/students")}>Back to Students</Button>
+        <Button variant="link" onClick={() => navigate("/batches")}>Back to Batches</Button>
       </div>
     );
   }
@@ -136,7 +139,7 @@ export default function StudentDetail() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/students")}><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => batchId ? navigate(`/batches/${batchId}`) : navigate("/batches")}><ArrowLeft className="h-4 w-4" /></Button>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{student.name}</h1>
@@ -155,7 +158,37 @@ export default function StudentDetail() {
         </div>
       </div>
 
-      {/* Three Summary Cards */}
+      {/* Batch Info */}
+      {batch && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex items-start gap-3 pt-6">
+            <Layers className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Button variant="link" className="h-auto p-0 text-sm font-semibold text-primary" onClick={() => navigate(`/batches/${batch.id}`)}>
+                  {batch.batch_name}
+                </Button>
+                <Badge variant="outline" className="text-xs">{batch.batch_code}</Badge>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Admission: {formatCurrency(Number(batch.default_admission_fee), currency)}
+                  <Badge variant="secondary" className="text-[10px] ml-1">From Batch Default</Badge>
+                </span>
+                <span className="flex items-center gap-1">
+                  Monthly: {formatCurrency(Number(batch.default_monthly_fee), currency)}
+                  <Badge variant="secondary" className="text-[10px] ml-1">From Batch Default</Badge>
+                </span>
+                {batch.course_duration_months && (
+                  <span>Duration: {batch.course_duration_months} months</span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-3">
         {/* Card 1: Admission Fee */}
         <Card>
