@@ -62,6 +62,7 @@ interface CompanyContextType {
   canEdit: boolean;
   canDelete: boolean;
   canManageMembers: boolean;
+  canViewMembers: boolean;
 
   // Actions
   switchCompany: (companyId: string) => Promise<void>;
@@ -159,6 +160,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canEdit = isCompanyAdmin;
   const canDelete = isCompanyAdmin;
   const canManageMembers = isCompanyAdmin;
+  const canViewMembers = isCompanyAdmin || isCompanyModerator;
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -203,6 +205,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canEdit,
       canDelete,
       canManageMembers,
+      canViewMembers,
       switchCompany,
       refetch,
     }}>
