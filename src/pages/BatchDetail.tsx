@@ -420,11 +420,11 @@ export default function BatchDetail() {
                               if (effAdm === 0) return <span className="text-muted-foreground text-sm">N/A</span>;
                               return (
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="block text-xs text-muted-foreground">{formatCurrency(effAdm, currency)}</span>
+                                  <span className="block text-xs text-muted-foreground">{sum.admissionStatus === "partial" ? `${formatCurrency(sum.admissionPaid, currency)}/${formatCurrency(effAdm, currency)}` : formatCurrency(effAdm, currency)}</span>
                                   {sum.admissionStatus === "paid" ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                                   ) : sum.admissionStatus === "partial" ? (
-                                    <Badge className="block w-fit bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial ({formatCurrency(sum.admissionPaid, currency)})</Badge>
+                                    <Badge className="block w-fit bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial</Badge>
                                   ) : (
                                     <Badge variant="destructive" className="block w-fit">Pending</Badge>
                                   )}
