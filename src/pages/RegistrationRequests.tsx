@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Navigate } from "react-router-dom";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +72,7 @@ interface ApproveDialogData {
 
 export default function RegistrationRequests() {
   const { session } = useAuth();
+  const { isCipher } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [approveDialog, setApproveDialog] = useState<ApproveDialogData | null>(null);
@@ -357,8 +360,12 @@ export default function RegistrationRequests() {
     </Table>
   );
 
+
+  if (!isCipher) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
-    <RoleGuard roles={["admin", "cipher"]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -519,6 +526,5 @@ export default function RegistrationRequests() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </RoleGuard>
   );
 }

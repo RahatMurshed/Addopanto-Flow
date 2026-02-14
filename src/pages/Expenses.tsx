@@ -14,6 +14,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -65,7 +66,7 @@ export default function Expenses() {
   const currency = userProfile?.currency || "BDT";
   
   // Company-level permissions
-  const { canAddExpense, canEdit, canDelete, canTransfer } = useCompany();
+  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer } = useCompany();
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -216,7 +217,10 @@ export default function Expenses() {
     <div className="space-y-6" id="expenses-content">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+          </div>
           <p className="text-muted-foreground">Record and track your spending by expense source</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

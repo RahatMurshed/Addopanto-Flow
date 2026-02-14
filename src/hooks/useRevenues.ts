@@ -51,11 +51,12 @@ export function useCreateRevenue() {
         .single();
       if (revenueError) throw revenueError;
 
-      // Get active expense accounts
+      // Get active expense accounts for this company
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
         .select("id, allocation_percentage")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("company_id", activeCompanyId);
       if (accountsError) throw accountsError;
 
       // Create allocations for each active account
@@ -125,7 +126,8 @@ export function useUpdateRevenue() {
           const { data: accounts } = await supabase
             .from("expense_accounts")
             .select("id, allocation_percentage")
-            .eq("is_active", true);
+            .eq("is_active", true)
+            .eq("company_id", activeCompanyId!);
 
           if (accounts && accounts.length > 0) {
             const newAllocations = accounts
