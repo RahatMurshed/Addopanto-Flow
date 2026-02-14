@@ -65,12 +65,16 @@ export function useRealtimeSync() {
   useEffect(() => {
     if (!user) return;
 
-    function handleChange(table: string) {
-      // Invalidate caches
+    function handleChange(table: string, payload: any) {
+      // Invalidate caches regardless of who made the change
       const keys = TABLE_INVALIDATION_MAP[table] || [];
       for (const key of keys) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
+
+      // Only show toast for changes made by OTHER users
+      const recordUserId = payload?.new?.user_id ?? payload?.old?.user_id;
+      if (recordUserId && recordUserId === user?.id) return;
 
       // Debounce toast: batch rapid changes into one notification
       pendingTables.current.add(table);
@@ -80,14 +84,14 @@ export function useRealtimeSync() {
 
     const channel = supabase
       .channel("global-sync")
-      .on("postgres_changes", { event: "*", schema: "public", table: "revenues" }, () => handleChange("revenues"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => handleChange("expenses"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "students" }, () => handleChange("students"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_payments" }, () => handleChange("student_payments"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "allocations" }, () => handleChange("allocations"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "expense_accounts" }, () => handleChange("expense_accounts"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "khata_transfers" }, () => handleChange("khata_transfers"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "monthly_fee_history" }, () => handleChange("monthly_fee_history"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "revenues" }, (p) => handleChange("revenues", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, (p) => handleChange("expenses", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "students" }, (p) => handleChange("students", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "student_payments" }, (p) => handleChange("student_payments", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "allocations" }, (p) => handleChange("allocations", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "expense_accounts" }, (p) => handleChange("expense_accounts", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "khata_transfers" }, (p) => handleChange("khata_transfers", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "monthly_fee_history" }, (p) => handleChange("monthly_fee_history", p))
       .subscribe();
 
     return () => {
