@@ -23,9 +23,10 @@ export type KhataTransferInsert = {
 
 export function useKhataTransfers() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["khata_transfers"],
+    queryKey: ["khata_transfers", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase

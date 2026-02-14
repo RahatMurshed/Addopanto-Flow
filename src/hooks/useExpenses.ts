@@ -14,9 +14,10 @@ export type ExpenseWithAccount = Expense & {
 
 export function useExpenses() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["expenses"],
+    queryKey: ["expenses", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
@@ -107,9 +108,10 @@ export type AccountBalance = {
 
 export function useAccountBalances() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["account_balances"],
+    queryKey: ["account_balances", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
 
@@ -171,9 +173,10 @@ export function useAccountBalances() {
 
 export function useExpenseSummary() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["expense_summary"],
+    queryKey: ["expense_summary", activeCompanyId],
     queryFn: async () => {
       if (!user) return { thisMonth: 0, thisYear: 0, total: 0 };
 

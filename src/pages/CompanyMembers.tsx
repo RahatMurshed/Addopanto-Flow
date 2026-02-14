@@ -66,9 +66,11 @@ export default function CompanyMembers() {
     queryKey: ["member-profiles", members.map(m => m.user_id)],
     queryFn: async () => {
       if (members.length === 0) return [];
+      const userIds = members.map(m => m.user_id);
       const { data } = await supabase
         .from("user_profiles")
-        .select("user_id, email");
+        .select("user_id, email")
+        .in("user_id", userIds);
       return data ?? [];
     },
     enabled: members.length > 0,

@@ -17,14 +17,17 @@ export default function CompanySelection() {
   const { data: memberCounts = {} } = useQuery({
     queryKey: ["company-member-counts", companies.map(c => c.id)],
     queryFn: async () => {
+      if (companies.length === 0) return {};
+      const companyIds = companies.map(c => c.id);
+      const { data, error } = await supabase
+        .from("company_memberships")
+        .select("company_id")
+        .in("company_id", companyIds)
+        .eq("status", "active");
+      if (error) throw error;
       const counts: Record<string, number> = {};
-      for (const company of companies) {
-        const { count } = await supabase
-          .from("company_memberships")
-          .select("*", { count: "exact", head: true })
-          .eq("company_id", company.id)
-          .eq("status", "active");
-        counts[company.id] = count ?? 0;
+      for (const row of data ?? []) {
+        counts[row.company_id] = (counts[row.company_id] || 0) + 1;
       }
       return counts;
     },

@@ -14,9 +14,10 @@ export type RevenueWithSource = Revenue & {
 
 export function useRevenues() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["revenues"],
+    queryKey: ["revenues", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
@@ -166,9 +167,10 @@ export function useDeleteRevenue() {
 
 export function useRevenueSummary() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["revenue_summary"],
+    queryKey: ["revenue_summary", activeCompanyId],
     queryFn: async () => {
       if (!user) return { thisMonth: 0, thisYear: 0, total: 0 };
 

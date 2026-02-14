@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('Session validation failed, forcing logout:', error.message);
         await supabase.auth.signOut({ scope: 'local' });
       }
-    }, 5000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [user]);
