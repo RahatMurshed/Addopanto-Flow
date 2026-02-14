@@ -21,6 +21,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from "recharts";
 import { format, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, eachMonthOfInterval, differenceInDays, parseISO, isWithinInterval } from "date-fns";
 import AdvancedDateFilter from "@/components/AdvancedDateFilter";
@@ -42,8 +43,9 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { PermissionGuard } from "@/components/RoleGuard";
 
 const CHART_COLORS = [
-  "#FF8C00", "#10B981", "#3B82F6", "#EF4444", "#8B5CF6",
-  "#EC4899", "#14B8A6", "#F59E0B", "#6366F1", "#84CC16",
+  "hsl(var(--primary))", "hsl(142, 76%, 36%)", "hsl(38, 92%, 50%)", "hsl(262, 83%, 58%)",
+  "hsl(199, 89%, 48%)", "hsl(346, 77%, 49%)", "hsl(24, 94%, 50%)", "hsl(var(--destructive))",
+  "hsl(180, 60%, 40%)", "hsl(290, 60%, 50%)",
 ];
 
 export default function Dashboard() {
@@ -589,12 +591,12 @@ export default function Dashboard() {
                 <AreaChart data={filteredRevenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
@@ -611,25 +613,38 @@ export default function Dashboard() {
                     tickFormatter={formatCompact}
                   />
                   <Tooltip content={<CustomAreaTooltip />} />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value: string) => (
+                      <span className="text-xs text-muted-foreground">{value === "revenue" ? "Revenue" : "Expenses"}</span>
+                    )}
+                  />
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#3B82F6"
+                    name="revenue"
+                    stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     fill="url(#revenueGradient)"
                   />
                   <Area
                     type="monotone"
                     dataKey="expenses"
-                    stroke="#EF4444"
+                    name="expenses"
+                    stroke="hsl(var(--destructive))"
                     strokeWidth={2}
                     fill="url(#expenseGradient)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                No transaction data for selected period
+              <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-muted-foreground">
+                <TrendingUp className="h-8 w-8" />
+                <p>No transaction data for selected period</p>
+                <p className="text-xs">Add revenue or expenses to see trends here</p>
               </div>
             )}
           </CardContent>
@@ -663,20 +678,23 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="mt-4 grid w-full grid-cols-2 gap-2">
-                  {filteredData.expenseBreakdown.slice(0, 6).map((item, index) => (
+                  {filteredData.expenseBreakdown.map((item, index) => (
                     <div key={index} className="flex items-center gap-2 text-sm">
                       <div
                         className="h-3 w-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
                       <span className="truncate text-muted-foreground">{item.name}</span>
+                      <span className="ml-auto text-xs font-medium shrink-0">{formatCompact(item.value)}</span>
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                No expense data for selected period
+              <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-muted-foreground">
+                <PiggyBank className="h-8 w-8" />
+                <p>No expense data for selected period</p>
+                <p className="text-xs">Add expenses to see spending breakdown</p>
               </div>
             )}
           </CardContent>
