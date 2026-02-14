@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { motion } from "framer-motion";
 import {
   TrendingUp,
   Receipt,
@@ -15,6 +16,21 @@ import {
   LineChart,
 } from "lucide-react";
 import gaLogo from "@/assets/GA-LOGO.png";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: "easeOut" as const } },
+};
 
 const features = [
   {
@@ -74,7 +90,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navbar */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg"
+      >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <img src={gaLogo} alt="Addopanto Flow" className="h-9 w-auto" />
@@ -90,26 +111,30 @@ export default function LandingPage() {
             </Button>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       {/* Hero */}
       <section className="relative overflow-hidden py-20 sm:py-28">
-        {/* Decorative gradient blobs */}
         <div className="pointer-events-none absolute -top-32 left-1/2 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]" />
         <div className="pointer-events-none absolute -bottom-40 right-0 h-[400px] w-[500px] rounded-full bg-secondary/10 blur-[100px]" />
 
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <span className="mb-4 inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={staggerContainer}
+          className="relative mx-auto max-w-3xl px-4 text-center sm:px-6"
+        >
+          <motion.span variants={fadeUp} className="mb-4 inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
             Financial Management for Education
-          </span>
-          <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+          </motion.span>
+          <motion.h1 variants={fadeUp} className="mt-4 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
             Smart Revenue Allocation for{" "}
             <span className="text-primary">Educational Institutions</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
+          </motion.h1>
+          <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
             Allocate revenue, track expenses, manage student fees, and generate reports — all from one powerful dashboard built for schools and academies.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          </motion.p>
+          <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button size="lg" className="gap-2 px-8 text-base" asChild>
               <Link to="/auth">
                 Get Started Free <ArrowRight className="h-4 w-4" />
@@ -118,49 +143,75 @@ export default function LandingPage() {
             <Button size="lg" variant="outline" className="px-8 text-base" asChild>
               <a href="#features">Learn More</a>
             </Button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* Features */}
       <section id="features" className="border-t border-border bg-muted/30 py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything You Need</h2>
-            <p className="mt-3 text-muted-foreground">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+            variants={staggerContainer}
+            className="text-center"
+          >
+            <motion.h2 variants={fadeUp} className="text-3xl font-bold tracking-tight sm:text-4xl">Everything You Need</motion.h2>
+            <motion.p variants={fadeUp} className="mt-3 text-muted-foreground">
               A complete financial toolkit designed for educational institutions.
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
 
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            variants={staggerContainer}
+            className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {features.map((f) => (
-              <Card key={f.title} className="group border-border/60 bg-card transition-shadow duration-200 hover:shadow-lg">
-                <CardContent className="flex flex-col gap-3 p-6">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                    <f.icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-lg font-semibold">{f.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{f.description}</p>
-                </CardContent>
-              </Card>
+              <motion.div key={f.title} variants={scaleIn}>
+                <Card className="group h-full border-border/60 bg-card transition-shadow duration-200 hover:shadow-lg">
+                  <CardContent className="flex flex-col gap-3 p-6">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                      <f.icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-lg font-semibold">{f.title}</h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{f.description}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* How It Works */}
       <section className="py-20">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How It Works</h2>
-            <p className="mt-3 text-muted-foreground">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+            variants={staggerContainer}
+            className="text-center"
+          >
+            <motion.h2 variants={fadeUp} className="text-3xl font-bold tracking-tight sm:text-4xl">How It Works</motion.h2>
+            <motion.p variants={fadeUp} className="mt-3 text-muted-foreground">
               Get started in three simple steps.
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
 
-          <div className="mt-14 grid gap-8 sm:grid-cols-3">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            variants={staggerContainer}
+            className="mt-14 grid gap-8 sm:grid-cols-3"
+          >
             {steps.map((s) => (
-              <div key={s.number} className="relative text-center">
+              <motion.div key={s.number} variants={fadeUp} className="relative text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                   <s.icon className="h-6 w-6" />
                 </div>
@@ -169,14 +220,20 @@ export default function LandingPage() {
                 </span>
                 <h3 className="mt-2 text-lg font-semibold">{s.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{s.description}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="border-t border-border bg-secondary py-16">
+      <motion.section
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-80px" }}
+        variants={fadeUp}
+        className="border-t border-border bg-secondary py-16"
+      >
         <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
           <h2 className="text-3xl font-bold tracking-tight text-secondary-foreground sm:text-4xl">
             Start Managing Your Finances Today
@@ -192,7 +249,7 @@ export default function LandingPage() {
             </Button>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Footer */}
       <footer className="border-t border-border py-8">
