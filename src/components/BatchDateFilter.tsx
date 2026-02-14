@@ -62,7 +62,7 @@ export function isMonthIncluded(month: string, filter: BatchFilterValue): boolea
 
 export function getFilterLabel(prefix: string, filter: BatchFilterValue): string {
   switch (filter.mode) {
-    case "monthly": return `Month ${prefix}`;
+    case "monthly": return `Monthly ${prefix}`;
     case "custom": return `Range ${prefix}`;
     case "alltime": return `Total ${prefix}`;
   }
