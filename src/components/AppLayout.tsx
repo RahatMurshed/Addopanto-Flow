@@ -53,6 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isCompanyAdmin,
     isCipher,
     canManageMembers,
+    canViewMembers,
   } = useCompany();
   const pendingCount = usePendingRequestsCount(); // This hook likely needs updating to be company-aware too
   const location = useLocation();
@@ -64,8 +65,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...baseNavItems,
     ...((isCompanyAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
     ...((isCompanyAdmin || isCipher) ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
-    ...((isCompanyAdmin || isCipher) ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
-    ...((isCompanyAdmin || isCipher) ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
+    ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
+    ...(canViewMembers ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
   ];
 
   const handleLogout = async () => {

@@ -30,7 +30,7 @@ import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 
 export default function CompanyMembers() {
   const { user } = useAuth();
-  const { activeCompanyId, activeCompany, canManageMembers, isCipher, isCompanyAdmin } = useCompany();
+  const { activeCompanyId, activeCompany, canManageMembers, canViewMembers, isCipher, isCompanyAdmin } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -46,7 +46,7 @@ export default function CompanyMembers() {
       if (error) throw error;
       return data.map((r) => r.user_id);
     },
-    enabled: !isCipher && canManageMembers,
+    enabled: !isCipher && canViewMembers,
   });
 
   // Fetch members
@@ -62,7 +62,7 @@ export default function CompanyMembers() {
       if (error) throw error;
       return data;
     },
-    enabled: !!activeCompanyId && canManageMembers,
+    enabled: !!activeCompanyId && canViewMembers,
   });
 
   // Filter out cipher members for non-cipher users
@@ -99,7 +99,7 @@ export default function CompanyMembers() {
       if (error) return 0;
       return count ?? 0;
     },
-    enabled: !!activeCompanyId && canManageMembers,
+    enabled: !!activeCompanyId && canViewMembers,
   });
 
   const getEmail = (userId: string) => {
@@ -168,7 +168,7 @@ export default function CompanyMembers() {
     });
   }, [members, search, profiles]);
 
-  if (!canManageMembers) return <Navigate to="/" replace />;
+  if (!canViewMembers) return <Navigate to="/" replace />;
 
   const roleBadge = (role: string) => {
     const colors: Record<string, string> = {

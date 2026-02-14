@@ -113,7 +113,7 @@ export default function UserManagement() {
       return undefined;
     },
     initialPageParam: 1,
-    enabled: canManageUsers && !!session?.access_token,
+    enabled: isCipher && !!session?.access_token,
   });
 
   // Flatten all pages into a single array
@@ -279,7 +279,7 @@ export default function UserManagement() {
     : ["moderator"];
 
   // Redirect if not authorized (after all hooks)
-  if (!canManageUsers) {
+  if (!isCipher) {
     return <Navigate to="/" replace />;
   }
 
@@ -304,7 +304,7 @@ export default function UserManagement() {
         </div>
       </div>
 
-      <RoleGuard roles={["admin", "cipher"]} fallback={
+      <RoleGuard roles={["cipher"]} fallback={
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <ShieldAlert className="h-12 w-12 text-muted-foreground mb-4" />
