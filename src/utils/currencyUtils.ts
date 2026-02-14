@@ -98,9 +98,10 @@ export function formatCurrencyPrecise(amount: number, currencyCode: string = "BD
  * originalAmount is stored in base currency, exchangeRate converts to display currency.
  */
 export function convertAmount(amount: number, exchangeRate: number): number {
-  if (!exchangeRate || exchangeRate <= 0) return amount;
-  // Use precise decimal math to avoid floating point issues
-  return Math.round(amount * exchangeRate * 100) / 100;
+  if (!exchangeRate || exchangeRate <= 0 || exchangeRate === 1) return amount;
+  // exchangeRate means "1 display currency = X base currency (BDT)"
+  // So: displayAmount = baseAmount / exchangeRate
+  return Math.round((amount / exchangeRate) * 100) / 100;
 }
 
 /**
@@ -119,3 +120,4 @@ export function formatConvertedCurrency(
   const converted = convertAmount(amount, exchangeRate);
   return formatCurrency(converted, currencyCode, options);
 }
+

@@ -118,12 +118,12 @@ describe("formatCurrencyPrecise", () => {
 });
 
 describe("convertAmount", () => {
-  it("converts with exchange rate", () => {
-    expect(convertAmount(100, 1.5)).toBe(150);
+  it("converts BDT to USD (12000 BDT / 120 rate = 100 USD)", () => {
+    expect(convertAmount(12000, 120)).toBe(100);
   });
 
-  it("returns original amount for rate of 1", () => {
-    expect(convertAmount(100, 1)).toBe(100);
+  it("returns original amount for rate of 1 (same currency)", () => {
+    expect(convertAmount(1000, 1)).toBe(1000);
   });
 
   it("returns original amount for invalid rate", () => {
@@ -131,13 +131,18 @@ describe("convertAmount", () => {
     expect(convertAmount(100, -1)).toBe(100);
   });
 
-  it("handles decimal precision", () => {
-    // 100 * 0.83 = 83.00
-    expect(convertAmount(100, 0.83)).toBe(83);
+  it("handles decimal exchange rates", () => {
+    // 1000 BDT / 83 rate = 12.05
+    expect(convertAmount(1000, 83)).toBe(12.05);
   });
 
   it("rounds to 2 decimal places", () => {
-    // 100 * 1.333 = 133.30
-    expect(convertAmount(100, 1.333)).toBe(133.3);
+    // 1000 BDT / 120 = 8.33
+    expect(convertAmount(1000, 120)).toBe(8.33);
+  });
+
+  it("converts with fractional rate", () => {
+    // 500 BDT / 1.5 rate = 333.33
+    expect(convertAmount(500, 1.5)).toBe(333.33);
   });
 });
