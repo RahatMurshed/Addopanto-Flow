@@ -424,7 +424,7 @@ export default function BatchDetail() {
                                   {sum.admissionStatus === "paid" ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                                   ) : sum.admissionStatus === "partial" ? (
-                                    <Badge className="block w-fit bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial</Badge>
+                                    <Badge className="block w-fit bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial ({formatCurrency(sum.admissionPaid, currency)})</Badge>
                                   ) : (
                                     <Badge variant="destructive" className="block w-fit">Pending</Badge>
                                   )}
