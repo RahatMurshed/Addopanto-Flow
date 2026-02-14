@@ -541,6 +541,8 @@ export default function BatchDetail() {
                                     <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>
                                   ) : (sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length) > 0 ? (
                                     <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length} pending</Badge>
+                                  ) : sum.monthlyPaidMonths.length > 0 && sum.monthlyPendingMonths.length === 0 && sum.monthlyPartialMonths.length === 0 ? (
+                                    <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
