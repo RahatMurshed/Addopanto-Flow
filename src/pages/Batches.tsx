@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import MonthYearPicker from "@/components/MonthYearPicker";
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useStudents } from "@/hooks/useStudents";
@@ -33,6 +34,11 @@ import type { Batch } from "@/hooks/useBatches";
 export default function Batches() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
+  const [overdueMonth, setOverdueMonth] = useState(() => {
+    const now = new Date();
+    now.setMonth(now.getMonth() - 1);
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useStudents();
   const { data: allPayments = [] } = useStudentPayments();
@@ -52,14 +58,15 @@ export default function Batches() {
 
   // Build per-batch analytics
   const batchAnalytics = useMemo(() => {
-    const map = new Map<string, { studentCount: number; totalCollected: number; totalPending: number; overdueCount: number }>();
+    const map = new Map<string, { studentCount: number; totalCollected: number; totalPending: number; overdueCount: number; monthOverdueCount: number; monthOverdueAmount: number }>();
     for (const b of batches) {
       const students = allStudents.filter((s: any) => s.batch_id === b.id);
       let totalCollected = 0;
       let totalPending = 0;
       let overdueCount = 0;
+      let monthOverdueCount = 0;
+      let monthOverdueAmount = 0;
       for (const s of students) {
-        // Compute batch course start/end months for fallback
         const batchStartDate = new Date(b.start_date);
         const batchCourseStart = `${batchStartDate.getFullYear()}-${String(batchStartDate.getMonth() + 1).padStart(2, "0")}`;
         let batchCourseEnd = "";
@@ -68,10 +75,11 @@ export default function Batches() {
           endDate.setMonth(endDate.getMonth() + b.course_duration_months - 1);
           batchCourseEnd = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}`;
         }
+        const effMonthly = Number(s.monthly_fee_amount) || Number(b.default_monthly_fee) || 0;
         const effectiveStudent = {
           ...s,
           admission_fee_total: Number(s.admission_fee_total) || Number(b.default_admission_fee) || 0,
-          monthly_fee_amount: Number(s.monthly_fee_amount) || Number(b.default_monthly_fee) || 0,
+          monthly_fee_amount: effMonthly,
           course_start_month: s.course_start_month || batchCourseStart || null,
           course_end_month: s.course_end_month || batchCourseEnd || null,
         };
@@ -80,11 +88,16 @@ export default function Batches() {
         totalCollected += sum.totalPaid;
         totalPending += sum.totalPending;
         if (sum.monthlyOverdueMonths.length > 0) overdueCount++;
+        // Per-month overdue for selected overdueMonth
+        if (sum.monthlyOverdueMonths.includes(overdueMonth) || sum.monthlyPartialMonths.includes(overdueMonth)) {
+          monthOverdueCount++;
+          monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(overdueMonth) || 0);
+        }
       }
-      map.set(b.id, { studentCount: students.length, totalCollected, totalPending, overdueCount });
+      map.set(b.id, { studentCount: students.length, totalCollected, totalPending, overdueCount, monthOverdueCount, monthOverdueAmount });
     }
     return map;
-  }, [batches, allStudents, allPayments]);
+  }, [batches, allStudents, allPayments, overdueMonth]);
 
   const pagination = usePagination(batches);
 
@@ -225,6 +238,62 @@ export default function Batches() {
           <CardContent><p className="text-2xl font-bold text-destructive">{totalOverdue}</p></CardContent>
         </Card>
       </div>
+
+      {/* Monthly Overdue Section */}
+      {(() => {
+        const overdueBatches = batches.filter((b) => {
+          const a = batchAnalytics.get(b.id);
+          return a && a.monthOverdueCount > 0;
+        });
+        const totalOverdueStudents = overdueBatches.reduce((t, b) => t + (batchAnalytics.get(b.id)?.monthOverdueCount || 0), 0);
+        const totalOverdueAmt = overdueBatches.reduce((t, b) => t + (batchAnalytics.get(b.id)?.monthOverdueAmount || 0), 0);
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <CardTitle className="text-base">Monthly Overdue</CardTitle>
+              </div>
+              <MonthYearPicker value={overdueMonth} onChange={setOverdueMonth} className="h-8 w-auto text-xs" />
+            </CardHeader>
+            <CardContent>
+              {overdueBatches.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No overdue students for this month.</p>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Batch Name</TableHead>
+                        <TableHead className="text-right">Overdue Students</TableHead>
+                        <TableHead className="text-right">Overdue Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {overdueBatches.map((b) => {
+                        const a = batchAnalytics.get(b.id)!;
+                        return (
+                          <TableRow key={b.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/batches/${b.id}`)}>
+                            <TableCell className="font-medium text-primary hover:underline">{b.batch_name}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="destructive">{a.monthOverdueCount}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-destructive">{formatCurrency(a.monthOverdueAmount, currency)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  <div className="flex justify-end gap-6 pt-3 border-t mt-2 text-sm">
+                    <span className="text-muted-foreground">Total: <span className="font-semibold text-destructive">{totalOverdueStudents} student{totalOverdueStudents !== 1 ? "s" : ""}</span></span>
+                    <span className="text-muted-foreground">Amount: <span className="font-semibold text-destructive">{formatCurrency(totalOverdueAmt, currency)}</span></span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Batches Table */}
       <Card>
