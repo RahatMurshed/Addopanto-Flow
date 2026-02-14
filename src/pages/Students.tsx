@@ -39,7 +39,7 @@ export default function Students() {
     sortOrder: filters.sortOrder,
   });
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyViewer } = useCompany();
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   const navigate = useNavigate();
@@ -159,7 +159,10 @@ export default function Students() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Students</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Students</h1>
+            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+          </div>
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>
         {canAddRevenue && (

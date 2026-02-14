@@ -36,7 +36,7 @@ export default function Khatas() {
   const currency = userProfile?.currency || "BDT";
   
   // Company-level permissions
-  const { canAddExpenseSource, canEdit, canDelete } = useCompany();
+  const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer } = useCompany();
   
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();
@@ -110,7 +110,10 @@ export default function Khatas() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expense Sources</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Expense Sources</h1>
+            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+          </div>
           <p className="text-muted-foreground">Manage your expense categories and allocation percentages</p>
         </div>
         <div className="flex gap-2">

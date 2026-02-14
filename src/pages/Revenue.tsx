@@ -62,7 +62,7 @@ export default function Revenue() {
   const currency = userProfile?.currency || "BDT";
   
   // Company-level permissions
-  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer } = useCompany();
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -208,7 +208,10 @@ export default function Revenue() {
     <div className="space-y-6" id="revenue-content">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
+            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+          </div>
           <p className="text-muted-foreground">Track income and automatically allocate to expense sources</p>
         </div>
         <div className="flex items-center gap-2">
