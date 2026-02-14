@@ -29,7 +29,7 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 2, staleTime: 30_000 },
+    queries: { retry: 2, staleTime: 30_000, refetchOnWindowFocus: true },
     mutations: { retry: 0 },
   },
 });
