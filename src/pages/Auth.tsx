@@ -197,7 +197,7 @@ export default function Auth() {
       if (roleData) {
         // User has a role — they're approved, proceed directly
         setLoading(false);
-        navigate("/");
+        navigate("/companies");
         return;
       }
     }
@@ -224,7 +224,7 @@ export default function Auth() {
 
     // Approved or unknown — proceed
     setLoading(false);
-    navigate("/");
+    navigate("/companies");
   };
 
   const handleSignup = async (e: React.FormEvent) => {
