@@ -89,11 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Logo + Company Switcher */}
         <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-4 py-4">
           <Link to="/">
-            {activeCompany?.logo_url ? (
-              <img src={activeCompany.logo_url} alt={activeCompany.name} className="h-10 w-auto max-w-[140px] object-contain" />
-            ) : (
-              <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
-            )}
+            <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -176,11 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
           <div className="flex items-center gap-2">
             <Link to="/">
-              {activeCompany?.logo_url ? (
-                <img src={activeCompany.logo_url} alt={activeCompany.name} className="h-8 w-auto object-contain" />
-              ) : (
-                <img src={gaLogo} alt="Grammar Addopanto" className="h-8 w-auto object-contain" />
-              )}
+              <img src={gaLogo} alt="Grammar Addopanto" className="h-8 w-auto object-contain" />
             </Link>
             <span className="font-bold truncate max-w-[120px] text-sm">{activeCompany?.name || ""}</span>
           </div>
