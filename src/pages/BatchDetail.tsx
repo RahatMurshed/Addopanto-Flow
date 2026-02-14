@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format, parse } from "date-fns";
-import MonthYearPicker from "@/components/MonthYearPicker";
+import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
 import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
@@ -58,10 +58,7 @@ export default function BatchDetail() {
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
 
   const batchCourseStartMonth = useMemo(() => {
     if (!batch?.start_date) return "";
@@ -169,17 +166,23 @@ export default function BatchDetail() {
         }
       }
 
-      // Selected month stats
+      // Filter-based stats
       const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
-      if (allMonths.includes(selectedMonth)) {
+      const includedMonths = allMonths.filter((m) => isMonthIncluded(m, filterValue));
+
+      for (const m of includedMonths) {
         monthDue += effMonthly;
-        monthCollected += sum.monthlyPaymentsByMonth.get(selectedMonth) || 0;
+        monthCollected += sum.monthlyPaymentsByMonth.get(m) || 0;
       }
 
-      // Monthly overdue for selectedMonth
-      if (sum.monthlyOverdueMonths.includes(selectedMonth) || sum.monthlyPartialMonths.includes(selectedMonth)) {
+      // Overdue for included months
+      const overdueInRange = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
+      const partialInRange = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
+      if (overdueInRange.length > 0 || partialInRange.length > 0) {
         monthOverdueCount++;
-        monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(selectedMonth) || 0);
+        for (const m of [...overdueInRange, ...partialInRange]) {
+          monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(m) || 0);
+        }
       }
     }
 
@@ -197,7 +200,7 @@ export default function BatchDetail() {
       monthDue, monthCollected, monthPercent, monthPending,
       monthOverdueCount, monthOverdueAmount,
     };
-  }, [allSummaries, allBatchStudents, batch, selectedMonth]);
+  }, [allSummaries, allBatchStudents, batch, filterValue]);
 
   const pagination = usePagination(batchStudents);
 
@@ -298,10 +301,10 @@ export default function BatchDetail() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <MonthYearPicker
-            value={selectedMonth}
-            onChange={setSelectedMonth}
+        <div className="flex items-center gap-2 flex-wrap">
+          <BatchDateFilter
+            value={filterValue}
+            onChange={setFilterValue}
             minYear={batch.start_date ? new Date(batch.start_date).getFullYear() : 2020}
             maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
           />
@@ -339,7 +342,7 @@ export default function BatchDetail() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards - unified with selectedMonth */}
+      {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Students */}
         <Card>
@@ -354,12 +357,12 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Month Collected */}
+        {/* Collected */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Month Collected</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Collected", filterValue)}</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -370,17 +373,17 @@ export default function BatchDetail() {
                 <p className="text-xs text-muted-foreground">{batchStats.monthPercent}% of {formatCurrency(batchStats.monthDue, currency)} due</p>
               </>
             ) : (
-              <p className="text-xs text-muted-foreground">No fees due this month</p>
+              <p className="text-xs text-muted-foreground">No fees due for this period</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Month Pending */}
+        {/* Pending */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Month Pending</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Pending", filterValue)}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -391,12 +394,12 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Month Overdue */}
+        {/* Overdue */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-destructive" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Month Overdue</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Overdue", filterValue)}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -411,7 +414,7 @@ export default function BatchDetail() {
                 </p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground py-2">No overdue for this month</p>
+              <p className="text-sm text-muted-foreground py-2">No overdue for this period</p>
             )}
           </CardContent>
         </Card>
@@ -465,8 +468,8 @@ export default function BatchDetail() {
                       <TableHead className="hidden sm:table-cell">Enrolled</TableHead>
                       <TableHead>Admission</TableHead>
                       <TableHead>Monthly Status</TableHead>
-                      <TableHead className="hidden md:table-cell">Month Paid</TableHead>
-                      <TableHead className="hidden md:table-cell">Month Pending</TableHead>
+                      <TableHead className="hidden md:table-cell">{filterValue.mode === "monthly" ? "Month Paid" : filterValue.mode === "custom" ? "Range Paid" : "Total Paid"}</TableHead>
+                      <TableHead className="hidden md:table-cell">{filterValue.mode === "monthly" ? "Month Pending" : filterValue.mode === "custom" ? "Range Pending" : "Total Pending"}</TableHead>
                       <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
                       <TableHead className="w-24">Actions</TableHead>
                     </TableRow>
@@ -475,18 +478,39 @@ export default function BatchDetail() {
                     {pagination.paginatedItems.map((s) => {
                       const sum = studentSummaries.get(s.id);
                       const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
-                      const monthPaid = sum?.monthlyPaymentsByMonth.get(selectedMonth) || 0;
-                      const allMonths = sum ? [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths] : [];
-                      const isMonthApplicable = allMonths.includes(selectedMonth);
-                      const isMonthOverdue = sum?.monthlyOverdueMonths.includes(selectedMonth);
-                      const isMonthPartial = sum?.monthlyPartialMonths.includes(selectedMonth);
-                      const isMonthPaid = sum?.monthlyPaidMonths.includes(selectedMonth);
-                      const isMonthPending = sum?.monthlyPendingMonths.includes(selectedMonth);
-                      const monthRemaining = isMonthApplicable ? Math.max(0, effMonthly - monthPaid) : 0;
+
+                      // Compute filtered paid/pending based on filter mode
+                      let filteredPaid = 0;
+                      let filteredPending = 0;
+                      let worstStatus: "paid" | "pending" | "overdue" | "partial" | "na" = "na";
+
+                      if (sum && effMonthly > 0) {
+                        const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
+                        const includedMonths = allMonths.filter((m) => isMonthIncluded(m, filterValue));
+
+                        for (const m of includedMonths) {
+                          const paid = sum.monthlyPaymentsByMonth.get(m) || 0;
+                          filteredPaid += paid;
+                          filteredPending += Math.max(0, effMonthly - paid);
+                        }
+
+                        if (includedMonths.length > 0) {
+                          const hasOverdue = sum.monthlyOverdueMonths.some((m) => isMonthIncluded(m, filterValue));
+                          const hasPartial = sum.monthlyPartialMonths.some((m) => isMonthIncluded(m, filterValue));
+                          const hasPending = sum.monthlyPendingMonths.some((m) => isMonthIncluded(m, filterValue));
+                          const allPaid = includedMonths.every((m) => sum.monthlyPaidMonths.includes(m));
+
+                          if (hasOverdue) worstStatus = "overdue";
+                          else if (hasPartial) worstStatus = "partial";
+                          else if (hasPending) worstStatus = "pending";
+                          else if (allPaid) worstStatus = "paid";
+                        }
+                      }
 
                       const lastPayment = allPayments
                         .filter((p) => p.student_id === s.id)
                         .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
+
                       return (
                         <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/students/${s.id}`)}>
                           <TableCell>
@@ -521,16 +545,16 @@ export default function BatchDetail() {
                           <TableCell>
                             {sum ? (() => {
                               if (effMonthly === 0) return <span className="text-muted-foreground text-sm">N/A</span>;
-                              if (!isMonthApplicable) return <span className="text-muted-foreground text-sm">N/A</span>;
+                              if (worstStatus === "na") return <span className="text-muted-foreground text-sm">N/A</span>;
                               return (
                                 <div className="flex flex-col gap-0.5">
-                                  {isMonthPaid ? (
+                                  {worstStatus === "paid" ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                                  ) : isMonthOverdue ? (
+                                  ) : worstStatus === "overdue" ? (
                                     <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">Overdue</Badge>
-                                  ) : isMonthPartial ? (
+                                  ) : worstStatus === "partial" ? (
                                     <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Partial</Badge>
-                                  ) : isMonthPending ? (
+                                  ) : worstStatus === "pending" ? (
                                     <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Pending</Badge>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
@@ -540,13 +564,13 @@ export default function BatchDetail() {
                             })() : "—"}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            {isMonthApplicable ? (
-                              <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(monthPaid, currency)}</span>
+                            {worstStatus !== "na" ? (
+                              <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(filteredPaid, currency)}</span>
                             ) : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            {isMonthApplicable && monthRemaining > 0 ? (
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(monthRemaining, currency)}</span>
+                            {worstStatus !== "na" && filteredPending > 0 ? (
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(filteredPending, currency)}</span>
                             ) : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
