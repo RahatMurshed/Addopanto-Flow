@@ -551,20 +551,11 @@ export default function BatchDetail() {
                                   {worstStatus === "paid" ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                                   ) : worstStatus === "overdue" ? (
-                                    <>
-                                      <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">Overdue</Badge>
-                                      {pendingMonthCount > 0 && <span className="text-xs text-muted-foreground">{pendingMonthCount} month{pendingMonthCount !== 1 ? "s" : ""}</span>}
-                                    </>
+                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{pendingMonthCount} Overdue</Badge>
                                   ) : worstStatus === "partial" ? (
-                                    <>
-                                      <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Partial</Badge>
-                                      {pendingMonthCount > 0 && <span className="text-xs text-muted-foreground">{pendingMonthCount} month{pendingMonthCount !== 1 ? "s" : ""}</span>}
-                                    </>
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{pendingMonthCount} Partial</Badge>
                                   ) : worstStatus === "pending" ? (
-                                    <>
-                                      <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Pending</Badge>
-                                      {pendingMonthCount > 0 && <span className="text-xs text-muted-foreground">{pendingMonthCount} month{pendingMonthCount !== 1 ? "s" : ""}</span>}
-                                    </>
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{pendingMonthCount} Pending</Badge>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
