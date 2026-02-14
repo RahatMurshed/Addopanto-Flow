@@ -11,7 +11,7 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import AppLayout from "@/components/AppLayout";
-import gaLogo from "@/assets/GA-LOGO.png";
+
 
 // Lazy-loaded page components for code splitting
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -42,9 +42,18 @@ const queryClient = new QueryClient({
 
 function BrandedLoader() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
-      <img src={gaLogo} alt="Grammar Addopanto" className="h-20 w-auto animate-brand-pulse" />
-      <p className="text-sm text-muted-foreground">Loading...</p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+      <div className="relative flex items-center justify-center">
+        {/* Outer rotating ring */}
+        <div className="absolute h-16 w-16 animate-[spin_2.5s_linear_infinite] rounded-full border-[3px] border-transparent border-t-primary" />
+        {/* Middle pulsing ring */}
+        <div className="absolute h-10 w-10 animate-[spin_1.8s_linear_infinite_reverse] rounded-full border-[3px] border-transparent border-b-secondary" />
+        {/* Inner glowing dot */}
+        <div className="h-3 w-3 animate-[pulse_1.4s_ease-in-out_infinite] rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
+      </div>
+      <p className="mt-6 text-xs font-medium tracking-widest uppercase text-muted-foreground animate-[pulse_2s_ease-in-out_infinite]">
+        Loading
+      </p>
     </div>
   );
 }
