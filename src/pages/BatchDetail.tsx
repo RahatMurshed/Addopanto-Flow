@@ -62,6 +62,11 @@ export default function BatchDetail() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [selectedOverdueMonth, setSelectedOverdueMonth] = useState(() => {
+    const now = new Date();
+    now.setMonth(now.getMonth() - 1);
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const batchCourseStartMonth = useMemo(() => {
     if (!batch?.start_date) return "";
@@ -186,6 +191,19 @@ export default function BatchDetail() {
     const monthlyPercent = totalMonthsDue > 0 ? Math.round((totalMonthsPaid / totalMonthsDue) * 100) : 0;
     const thisMonthPercent = thisMonthDue > 0 ? Math.round((thisMonthCollected / thisMonthDue) * 100) : 0;
 
+    // Per-month overdue for selectedOverdueMonth
+    let perMonthOverdueCount = 0;
+    let perMonthOverdueAmount = 0;
+    for (const [sid, sum] of allSummaries.entries()) {
+      const student = allBatchStudents.find((s) => s.id === sid);
+      if (!student) continue;
+      const effMonthly = Number(student.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+      if (sum.monthlyOverdueMonths.includes(selectedOverdueMonth) || sum.monthlyPartialMonths.includes(selectedOverdueMonth)) {
+        perMonthOverdueCount++;
+        perMonthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(selectedOverdueMonth) || 0);
+      }
+    }
+
     return {
       totalCollected, totalPending,
       admissionCollected, admissionPending,
@@ -194,8 +212,9 @@ export default function BatchDetail() {
       admissionPercent, monthlyPercent,
       thisMonthDue, thisMonthCollected, thisMonthPercent,
       currentMonth,
+      perMonthOverdueCount, perMonthOverdueAmount,
     };
-  }, [allSummaries, allBatchStudents, batch, selectedMonth]);
+  }, [allSummaries, allBatchStudents, batch, selectedMonth, selectedOverdueMonth]);
 
   const pagination = usePagination(batchStudents);
 
@@ -413,29 +432,34 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Completion */}
+        {/* Monthly Overdue */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Completion</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <MonthYearPicker
+                value={selectedOverdueMonth}
+                onChange={setSelectedOverdueMonth}
+                minYear={batch.start_date ? new Date(batch.start_date).getFullYear() : 2020}
+                maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
+                className="h-7 w-auto text-xs font-medium border-0 shadow-none px-1"
+              />
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Admission</span>
-                <span className="font-medium">{batchStats.admissionPercent}%</span>
-              </div>
-              <Progress value={batchStats.admissionPercent} className="h-2" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Monthly</span>
-                <span className="font-medium">{batchStats.monthlyPercent}%</span>
-              </div>
-              <Progress value={batchStats.monthlyPercent} className="h-2" />
-            </div>
+          <CardContent>
+            {batchStats.perMonthOverdueCount > 0 ? (
+              <>
+                <p className="text-2xl font-bold text-destructive">{batchStats.perMonthOverdueCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  student{batchStats.perMonthOverdueCount > 1 ? "s" : ""} overdue
+                </p>
+                <p className="text-sm font-semibold text-destructive mt-2">
+                  {formatCurrency(batchStats.perMonthOverdueAmount, currency)}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground py-2">No overdue for this month</p>
+            )}
           </CardContent>
         </Card>
       </div>
