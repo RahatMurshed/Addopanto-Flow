@@ -4,10 +4,92 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, UserPlus, LogOut, Loader2, Users } from "lucide-react";
+import { Building2, Plus, UserPlus, LogOut, Loader2, Users, Clock, XCircle } from "lucide-react";
 import gaLogo from "@/assets/GA-LOGO.png";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
+function NoCompaniesSection({ isCipher, navigate, signOut }: { isCipher: boolean; navigate: (path: string) => void; signOut: () => Promise<void> }) {
+  const { user } = useAuth();
+
+  const { data: regStatus, isLoading: regLoading } = useQuery({
+    queryKey: ["registration-status", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("registration_requests")
+        .select("status, rejection_reason, banned_until")
+        .eq("user_id", user.id)
+        .order("requested_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id && !isCipher,
+  });
+
+  if (!isCipher && regLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Pending registration
+  if (!isCipher && regStatus?.status === "pending") {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+          <Clock className="h-12 w-12 text-yellow-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Pending Approval</h3>
+          <p className="text-muted-foreground mb-4 max-w-sm">
+            Your account is awaiting admin approval. You'll get access once an administrator reviews your request.
+          </p>
+          <Button variant="ghost" onClick={async () => { await signOut(); navigate("/auth"); }}>
+            <LogOut className="mr-2 h-4 w-4" /> Sign Out
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Rejected / banned
+  if (!isCipher && regStatus?.status === "rejected") {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+          <XCircle className="h-12 w-12 text-destructive mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+          <p className="text-muted-foreground mb-4 max-w-sm">
+            Your registration request was rejected.{regStatus.rejection_reason ? ` Reason: ${regStatus.rejection_reason}` : ""}
+          </p>
+          <Button variant="ghost" onClick={async () => { await signOut(); navigate("/auth"); }}>
+            <LogOut className="mr-2 h-4 w-4" /> Sign Out
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+        <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No Companies</h3>
+        <p className="text-muted-foreground mb-4 max-w-sm">
+          You're not a member of any company yet. Join an existing company or wait for an invitation.
+        </p>
+        <Button onClick={() => navigate("/companies/join")}>
+          <UserPlus className="mr-2 h-4 w-4" /> Join a Company
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CompanySelection() {
   const { signOut } = useAuth();
@@ -74,18 +156,7 @@ export default function CompanySelection() {
         </div>
 
         {companies.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Companies</h3>
-              <p className="text-muted-foreground mb-4 max-w-sm">
-                You're not a member of any company yet. Join an existing company or wait for an invitation.
-              </p>
-              <Button onClick={() => navigate("/companies/join")}>
-                <UserPlus className="mr-2 h-4 w-4" /> Join a Company
-              </Button>
-            </CardContent>
-          </Card>
+          <NoCompaniesSection isCipher={isCipher} navigate={navigate} signOut={signOut} />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {companies.map((company) => (

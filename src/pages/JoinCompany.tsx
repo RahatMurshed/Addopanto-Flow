@@ -9,13 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff } from "lucide-react";
+import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function JoinCompany() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isCipher } = useCompany();
   const [search, setSearch] = useState("");
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [password, setPassword] = useState("");
@@ -89,6 +91,22 @@ export default function JoinCompany() {
       setSelectedCompany(null);
       setPassword("");
       setMessage("");
+    } catch (err: any) {
+      toast({ title: "Failed to join", description: err.message, variant: "destructive" });
+    }
+    setLoading(false);
+  };
+
+  const handleCipherJoin = async (companyId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("company-join", {
+        body: { action: "cipher-join", companyId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Joined successfully!", description: "You have been added as admin." });
+      navigate("/companies");
     } catch (err: any) {
       toast({ title: "Failed to join", description: err.message, variant: "destructive" });
     }
@@ -229,6 +247,19 @@ export default function JoinCompany() {
                           </div>
                           {isPending ? (
                             <span className="text-xs text-yellow-600">Pending</span>
+                          ) : isCipher ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={loading}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCipherJoin(company.id);
+                              }}
+                            >
+                              {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-1 h-3 w-3" />}
+                              Join
+                            </Button>
                           ) : (
                             <KeyRound className="h-4 w-4 text-muted-foreground" />
                           )}

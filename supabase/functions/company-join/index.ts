@@ -378,6 +378,48 @@ Deno.serve(async (req) => {
       return json(200, { success: true });
     }
 
+    if (action === "cipher-join") {
+      const { companyId } = body;
+      if (!companyId) return json(400, { error: "Company ID required" });
+      if (!isCipher) return json(403, { error: "Only super admins can use this action" });
+
+      // Check if already a member
+      const { data: existing } = await adminClient
+        .from("company_memberships")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("company_id", companyId)
+        .maybeSingle();
+
+      if (existing) return json(400, { error: "Already a member of this company" });
+
+      // Auto-join as admin with all permissions
+      const { error: memberError } = await adminClient
+        .from("company_memberships")
+        .insert({
+          user_id: user.id,
+          company_id: companyId,
+          role: "admin",
+          status: "active",
+          can_add_revenue: true,
+          can_add_expense: true,
+          can_add_expense_source: true,
+          can_transfer: true,
+          can_view_reports: true,
+          can_manage_students: true,
+        });
+
+      if (memberError) return json(500, { error: "Failed to join: " + memberError.message });
+
+      // Set as active company
+      await adminClient
+        .from("user_profiles")
+        .update({ active_company_id: companyId })
+        .eq("user_id", user.id);
+
+      return json(200, { success: true });
+    }
+
     return json(400, { error: "Unknown action" });
   } catch (err) {
     console.error("Error:", err);
