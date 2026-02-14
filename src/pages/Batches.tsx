@@ -59,10 +59,21 @@ export default function Batches() {
       let totalPending = 0;
       let overdueCount = 0;
       for (const s of students) {
+        // Compute batch course start/end months for fallback
+        const batchStartDate = new Date(b.start_date);
+        const batchCourseStart = `${batchStartDate.getFullYear()}-${String(batchStartDate.getMonth() + 1).padStart(2, "0")}`;
+        let batchCourseEnd = "";
+        if (b.course_duration_months) {
+          const endDate = new Date(batchStartDate);
+          endDate.setMonth(endDate.getMonth() + b.course_duration_months - 1);
+          batchCourseEnd = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}`;
+        }
         const effectiveStudent = {
           ...s,
           admission_fee_total: Number(s.admission_fee_total) || Number(b.default_admission_fee) || 0,
           monthly_fee_amount: Number(s.monthly_fee_amount) || Number(b.default_monthly_fee) || 0,
+          course_start_month: s.course_start_month || batchCourseStart || null,
+          course_end_month: s.course_end_month || batchCourseEnd || null,
         };
         const payments = allPayments.filter((p) => p.student_id === s.id);
         const sum = computeStudentSummary(effectiveStudent, payments);
