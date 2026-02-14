@@ -1,50 +1,68 @@
 
 
-## Fix Dynamic Currency Conversion System
+## Fix Currency Conversion Calculation
 
-### Problem Identified
-The `companies_public` database view is missing `exchange_rate` and `base_currency` columns. The `CompanyContext` fetches company data from `companies_public`, so `useCompanyCurrency` always gets `undefined` for `exchange_rate` (defaulting to 1) -- meaning no conversion ever happens. Additionally, the `companies` table is not in the realtime publication, so currency changes don't propagate to other tabs.
+### Root Cause
+The conversion formula in `convertAmount()` does `amount * exchangeRate`, but the semantics of `exchange_rate` are ambiguous and incorrect. Currently:
 
-### Plan
+- Amounts are stored in BDT (base currency)
+- If display currency is USD and admin enters "120" (meaning 1 USD = 120 BDT), the system calculates `12000 * 120 = $1,440,000` instead of `12000 / 120 = $100`
+- One company already has `exchange_rate: 145.04` with `currency: BDT`, meaning it would multiply all BDT amounts by 145x
 
-#### 1. Database Migration -- Fix `companies_public` view and add realtime
-- Recreate the `companies_public` view to include `exchange_rate` and `base_currency` columns
-- Add the `companies` table to `supabase_realtime` publication so currency changes propagate across tabs
+### Solution: Clear Exchange Rate Semantics
 
-#### 2. Update `useRealtimeSync` to listen for `companies` changes
-- Add a `companies` entry to `TABLE_INVALIDATION_MAP` that invalidates `["user-companies"]` query keys
-- Subscribe to `postgres_changes` on the `companies` table
-- This ensures when an admin updates currency/exchange rate, all open tabs immediately refetch the company data, which flows through `CompanyContext` into `useCompanyCurrency`, triggering re-renders of all monetary displays
+Define the exchange rate as: **"1 [display currency] = X [base currency (BDT)]"**
 
-#### 3. Fix `StudentPaymentDialog` currency import
-- The dialog imports `formatCurrency` directly from `@/utils/currencyUtils` instead of using `useCompanyCurrency`, so it doesn't apply exchange rate conversion. Update it to accept a formatter function from the parent or use the hook.
+- Admin enters `120` meaning "1 USD = 120 BDT"
+- Conversion formula becomes: `displayAmount = baseAmount / exchangeRate`
+- When base and display currency are the same (BDT), rate must be 1, so `amount / 1 = amount` (correct)
 
-#### 4. Add exchange rate info display
-- Show current exchange rate on the Dashboard header area (e.g., "1 USD = 120 BDT")
-- Show the same info in payment forms so users know the current conversion context
+### Changes
 
-#### 5. Payment form currency handling
-- Payment amounts are entered and stored in base currency (BDT). Display the converted equivalent in the selected currency next to the input for user reference, keeping DB values untouched.
+#### 1. Fix `convertAmount()` in `src/utils/currencyUtils.ts`
+- Change formula from `amount * exchangeRate` to `amount / exchangeRate`
+- Update rounding logic to handle division precision
+- When exchange rate is 1 (same currency), skip conversion entirely for performance
+
+#### 2. Update Settings Page UI in `src/pages/SettingsPage.tsx`
+- Add clear label: "1 [selected currency] = ??? BDT" next to the exchange rate input
+- When currency is BDT, auto-set exchange rate to 1 and disable the input (no conversion needed)
+- Fix the live preview to use the corrected formula
+- Show example: "If 1 USD = 120 BDT, enter 120"
+
+#### 3. Fix `useCompanyCurrency.ts` -- remove `as any` cast
+- The `companies_public` view now includes `exchange_rate`, so the `(activeCompany as any)?.exchange_rate` cast is unnecessary. Access it directly.
+
+#### 4. Update test file `src/utils/__tests__/currencyUtils.test.ts`
+- Update `convertAmount` tests to match the new division-based formula
+- Add test: `convertAmount(12000, 120)` should return `100` (12000 BDT to USD)
+- Add test: `convertAmount(1000, 1)` should return `1000` (same currency)
+
+#### 5. Fix existing data
+- The company with `exchange_rate: 145.04` and `currency: BDT` needs to be corrected to `1` (since base and display are both BDT, no conversion should happen). This will be a data update, not a migration.
 
 ### Technical Details
 
-**Migration SQL:**
+**Updated `convertAmount` function:**
 ```text
--- Recreate companies_public view with missing columns
-CREATE OR REPLACE VIEW public.companies_public AS
-SELECT id, name, slug, description, logo_url, currency,
-       exchange_rate, base_currency,
-       fiscal_year_start_month, created_by, created_at, updated_at
-FROM public.companies;
+function convertAmount(amount: number, exchangeRate: number): number {
+  if (!exchangeRate || exchangeRate <= 0 || exchangeRate === 1) return amount;
+  return Math.round((amount / exchangeRate) * 100) / 100;
+}
+```
 
--- Add companies to realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.companies;
+**Settings page exchange rate label:**
+```text
+"1 {currency} = {exchangeRate} BDT"
+// When currency === "BDT", auto-set to 1 and disable input
 ```
 
 **Files to modify:**
-- `supabase/migrations/` -- new migration for view + realtime
-- `src/hooks/useRealtimeSync.ts` -- add `companies` subscription
-- `src/components/StudentPaymentDialog.tsx` -- use currency hook or accept formatter prop
-- `src/pages/Dashboard.tsx` -- add exchange rate info display
-- `src/contexts/CompanyContext.tsx` -- no changes needed (already reads exchange_rate from company object; it just wasn't in the view)
+- `src/utils/currencyUtils.ts` -- fix `convertAmount` formula
+- `src/utils/__tests__/currencyUtils.test.ts` -- update tests
+- `src/hooks/useCompanyCurrency.ts` -- remove `as any` cast
+- `src/pages/SettingsPage.tsx` -- improve UI labels, auto-set rate for BDT, fix preview
+
+**Data fix (via insert tool):**
+- Update company `2567920a-533b-4b81-bc98-fd82592aad92` to set `exchange_rate = 1` since its currency is BDT
 
