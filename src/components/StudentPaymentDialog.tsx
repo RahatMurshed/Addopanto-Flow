@@ -94,9 +94,11 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         setSelectedMonths(editingPayment.months_covered || []);
       } else {
         const defaultType = summary.admissionStatus !== "paid" ? "admission" : "monthly";
+        const effectiveAdmissionTotal = Number(student.admission_fee_total) || batchDefaultAdmissionFee || 0;
+        const initialAmount = defaultType === "admission" ? Math.max(0, effectiveAdmissionTotal - summary.admissionPaid) : 0;
         form.reset({
           payment_type: defaultType,
-          amount: 0,
+          amount: initialAmount,
           payment_date: format(new Date(), "yyyy-MM-dd"),
           payment_method: "cash",
           receipt_number: null,
@@ -109,12 +111,20 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     }
   }, [open, summary, form, editingPayment]);
 
+  // Auto-fill admission amount when type switches to admission
+  useEffect(() => {
+    if (!isEditing && paymentType === "admission") {
+      const effectiveAdmissionTotal = Number(student.admission_fee_total) || batchDefaultAdmissionFee || 0;
+      form.setValue("amount", Math.max(0, effectiveAdmissionTotal - summary.admissionPaid));
+    }
+  }, [paymentType, isEditing, student.admission_fee_total, batchDefaultAdmissionFee, summary.admissionPaid, form]);
+
   // Auto-calculate amount when months change (only for new payments)
   useEffect(() => {
     if (!isEditing && paymentType === "monthly" && selectedMonths.length > 0) {
       let total = 0;
       for (const m of selectedMonths) {
-        const fee = Number(student.monthly_fee_amount);
+        const fee = Number(student.monthly_fee_amount) || batchDefaultMonthlyFee || 0;
         const alreadyPaid = summary.monthlyPaymentsByMonth?.get(m) || 0;
         total += Math.max(0, fee - alreadyPaid);
       }
