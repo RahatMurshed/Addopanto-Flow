@@ -737,6 +737,7 @@ export type Database = {
           currency: string
           email: string | null
           fiscal_year_start_month: number
+          full_name: string | null
           id: string
           updated_at: string
           user_id: string
@@ -748,6 +749,7 @@ export type Database = {
           currency?: string
           email?: string | null
           fiscal_year_start_month?: number
+          full_name?: string | null
           id?: string
           updated_at?: string
           user_id: string
@@ -759,6 +761,7 @@ export type Database = {
           currency?: string
           email?: string | null
           fiscal_year_start_month?: number
+          full_name?: string | null
           id?: string
           updated_at?: string
           user_id?: string

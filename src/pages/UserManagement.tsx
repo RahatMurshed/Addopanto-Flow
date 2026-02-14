@@ -43,6 +43,7 @@ import { Navigate } from "react-router-dom";
 interface UserWithRole {
   user_id: string;
   email: string | null;
+  full_name: string | null;
   role: AppRole;
   created_at: string;
 }
@@ -127,6 +128,7 @@ export default function UserManagement() {
     return users.filter(
       (u) =>
         u.email?.toLowerCase().includes(query) ||
+        u.full_name?.toLowerCase().includes(query) ||
         u.user_id.toLowerCase().includes(query) ||
         u.role.toLowerCase().includes(query)
     );
@@ -328,7 +330,7 @@ export default function UserManagement() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by email, ID, or role..."
+                  placeholder="Search by name, email, ID, or role..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -362,11 +364,14 @@ export default function UserManagement() {
                           <TableCell>
                             <div>
                               <p className="font-medium">
-                                {u.email || "No email"}
+                                {u.full_name || u.email || "No email"}
                                 {isCurrentUser && (
                                   <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                                 )}
                               </p>
+                              {u.full_name && (
+                                <p className="text-xs text-muted-foreground">{u.email || "No email"}</p>
+                              )}
                               <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                                 {u.user_id}
                               </p>

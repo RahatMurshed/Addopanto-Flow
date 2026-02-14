@@ -79,7 +79,7 @@ export default function CompanyMembers() {
       const userIds = members.map(m => m.user_id);
       const { data } = await supabase
         .from("user_profiles")
-        .select("user_id, email")
+        .select("user_id, email, full_name")
         .in("user_id", userIds);
       return data ?? [];
     },
@@ -104,6 +104,10 @@ export default function CompanyMembers() {
 
   const getEmail = (userId: string) => {
     return profiles.find(p => p.user_id === userId)?.email || userId;
+  };
+
+  const getName = (userId: string) => {
+    return profiles.find(p => p.user_id === userId)?.full_name || null;
   };
 
   // Update member mutation
@@ -230,7 +234,15 @@ export default function CompanyMembers() {
                     return (
                       <TableRow key={member.id}>
                         <TableCell>
-                          <p className="font-medium">{getEmail(member.user_id)}{isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}</p>
+                          <div>
+                            <p className="font-medium">
+                              {getName(member.user_id) || getEmail(member.user_id)}
+                              {isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
+                            </p>
+                            {getName(member.user_id) && (
+                              <p className="text-xs text-muted-foreground">{getEmail(member.user_id)}</p>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {!canModifyMember ? (
