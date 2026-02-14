@@ -119,7 +119,7 @@ export default function CompanySelection() {
 
   const handleSelectCompany = async (companyId: string) => {
     await switchCompany(companyId);
-    navigate("/");
+    navigate("/dashboard");
   };
 
   const handleLogout = async () => {
