@@ -41,7 +41,7 @@ const CHART_COLORS = [
 export default function Reports() {
   const { user } = useAuth();
   const { activeCompany } = useCompany();
-  const { fcp } = useCompanyCurrency();
+  const { fcp, fc } = useCompanyCurrency();
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { data: transfers = [] } = useKhataTransfers();
@@ -51,17 +51,19 @@ export default function Reports() {
     setDateRange(range);
   }, []);
 
+  const activeCompanyId = activeCompany?.id ?? null;
+
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ["reports", user?.id],
+    queryKey: ["reports", user?.id, activeCompanyId],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user || !activeCompanyId) return null;
 
       const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes] = await Promise.all([
-        supabase.from("revenues").select("*"),
-        supabase.from("expenses").select("*"),
-        supabase.from("allocations").select("*"),
-        supabase.from("expense_accounts").select("*"),
-        supabase.from("revenue_sources").select("*"),
+        supabase.from("revenues").select("*").eq("company_id", activeCompanyId),
+        supabase.from("expenses").select("*").eq("company_id", activeCompanyId),
+        supabase.from("allocations").select("*").eq("company_id", activeCompanyId),
+        supabase.from("expense_accounts").select("*").eq("company_id", activeCompanyId),
+        supabase.from("revenue_sources").select("*").eq("company_id", activeCompanyId),
       ]);
 
       if (revenuesRes.error) throw revenuesRes.error;
@@ -78,7 +80,7 @@ export default function Reports() {
         sources: sourcesRes.data || [],
       };
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 
   // Get available years from data
@@ -415,6 +417,36 @@ export default function Reports() {
     return null;
   };
 
+  // Custom tooltip for profit line chart
+  const CustomProfitTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const profit = payload[0].value;
+      return (
+        <div className="rounded-lg border bg-background p-3 shadow-lg">
+          <p className="font-medium">{label}</p>
+          <p className={cn("text-sm font-medium", profit >= 0 ? "text-success" : "text-destructive")}>
+            Profit: {formatCurrency(profit)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Custom pie label renderer
+  const RADIAN = Math.PI / 180;
+  const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+    if (percent < 0.05) return null;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+        {(percent * 100).toFixed(0)}%
+      </text>
+    );
+  };
+
   // Custom tooltip for pie chart (works for any pie chart data)
   const createPieTooltip = (chartData: { name: string; value: number }[]) => {
     return ({ active, payload }: any) => {
@@ -613,7 +645,7 @@ export default function Reports() {
                   <BarChart data={chartBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => fc(value, { compact: true })} />
                     <Tooltip content={<CustomBarTooltip />} />
                     <Legend />
                     <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -621,8 +653,10 @@ export default function Reports() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  No data for selected period
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <BarChart3 className="h-8 w-8" />
+                  <p>No data for selected period</p>
+                  <p className="text-xs">Add revenue or expenses to see trends</p>
                 </div>
               )}
             </div>
@@ -644,8 +678,8 @@ export default function Reports() {
                   <LineChart data={chartBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="monthShort" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
-                    <Tooltip content={<CustomBarTooltip />} />
+                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => fc(value, { compact: true })} />
+                    <Tooltip content={<CustomProfitTooltip />} />
                     <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
                     <Line 
                       type="monotone" 
@@ -659,8 +693,10 @@ export default function Reports() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  No data for selected period
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <TrendingUp className="h-8 w-8" />
+                  <p>No profit data yet</p>
+                  <p className="text-xs">Revenue and expense entries will generate profit trends</p>
                 </div>
               )}
             </div>
@@ -688,6 +724,8 @@ export default function Reports() {
                       outerRadius={100}
                       paddingAngle={2}
                       dataKey="value"
+                      label={renderPieLabel}
+                      labelLine={false}
                     >
                       {revenueBySource.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
@@ -698,13 +736,18 @@ export default function Reports() {
                       layout="vertical" 
                       align="right" 
                       verticalAlign="middle"
-                      formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                      formatter={(value: string) => {
+                        const item = revenueBySource.find(s => s.name === value);
+                        return <span className="text-sm text-foreground">{value} ({item ? fc(item.value, { compact: true }) : ''})</span>;
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  No revenue data for selected period
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <TrendingUp className="h-8 w-8" />
+                  <p>No revenue data for selected period</p>
+                  <p className="text-xs">Add revenue entries to see source breakdown</p>
                 </div>
               )}
             </div>
@@ -732,6 +775,8 @@ export default function Reports() {
                       outerRadius={100}
                       paddingAngle={2}
                       dataKey="value"
+                      label={renderPieLabel}
+                      labelLine={false}
                     >
                       {expenseByKhata.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
@@ -742,13 +787,18 @@ export default function Reports() {
                       layout="vertical" 
                       align="right" 
                       verticalAlign="middle"
-                      formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+                      formatter={(value: string) => {
+                        const item = expenseByKhata.find(k => k.name === value);
+                        return <span className="text-sm text-foreground">{value} ({item ? fc(item.value, { compact: true }) : ''})</span>;
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  No expense data for selected period
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <TrendingDown className="h-8 w-8" />
+                  <p>No expense data for selected period</p>
+                  <p className="text-xs">Add expenses to see distribution by khata</p>
                 </div>
               )}
             </div>
