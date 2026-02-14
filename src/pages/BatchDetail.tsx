@@ -58,6 +58,21 @@ export default function BatchDetail() {
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
 
+  const batchCourseStartMonth = useMemo(() => {
+    if (!batch?.start_date) return "";
+    const d = new Date(batch.start_date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [batch]);
+
+  const batchCourseEndMonth = useMemo(() => {
+    if (!batch?.start_date || !batch?.course_duration_months) return "";
+    const d = new Date(batch.start_date);
+    d.setMonth(d.getMonth() + batch.course_duration_months - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [batch]);
+
+  const batchTotalMonths = batch?.course_duration_months || 0;
+
   const batchStudents = useMemo(() => {
     if (!id) return [];
     let students = allStudents.filter((s: any) => s.batch_id === id);
@@ -74,11 +89,18 @@ export default function BatchDetail() {
   const studentSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
     for (const s of batchStudents) {
+      const effectiveStudent = {
+        ...s,
+        admission_fee_total: Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0,
+        monthly_fee_amount: Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0,
+        course_start_month: s.course_start_month || batchCourseStartMonth || null,
+        course_end_month: s.course_end_month || batchCourseEndMonth || null,
+      };
       const payments = allPayments.filter((p) => p.student_id === s.id);
-      map.set(s.id, computeStudentSummary(s, payments));
+      map.set(s.id, computeStudentSummary(effectiveStudent, payments));
     }
     return map;
-  }, [batchStudents, allPayments]);
+  }, [batchStudents, allPayments, batch, batchCourseStartMonth, batchCourseEndMonth]);
 
   // All students in batch (unfiltered) for summary stats
   const allBatchStudents = useMemo(() => {
@@ -89,11 +111,18 @@ export default function BatchDetail() {
   const allSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
     for (const s of allBatchStudents) {
+      const effectiveStudent = {
+        ...s,
+        admission_fee_total: Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0,
+        monthly_fee_amount: Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0,
+        course_start_month: s.course_start_month || batchCourseStartMonth || null,
+        course_end_month: s.course_end_month || batchCourseEndMonth || null,
+      };
       const payments = allPayments.filter((p) => p.student_id === s.id);
-      map.set(s.id, computeStudentSummary(s, payments));
+      map.set(s.id, computeStudentSummary(effectiveStudent, payments));
     }
     return map;
-  }, [allBatchStudents, allPayments]);
+  }, [allBatchStudents, allPayments, batch, batchCourseStartMonth, batchCourseEndMonth]);
 
   const totalCollected = useMemo(() => {
     let total = 0;
@@ -386,28 +415,41 @@ export default function BatchDetail() {
                             {format(new Date(s.enrollment_date), "MMM d, yyyy")}
                           </TableCell>
                           <TableCell>
-                            {sum && sum.admissionTotal === 0 ? (
-                              <span className="text-muted-foreground text-sm">N/A</span>
-                            ) : sum?.admissionStatus === "paid" ? (
-                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                            ) : sum?.admissionStatus === "partial" ? (
-                              <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial</Badge>
-                            ) : (
-                              <Badge variant="destructive">Pending</Badge>
-                            )}
+                            {sum ? (() => {
+                              const effAdm = Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0;
+                              if (effAdm === 0) return <span className="text-muted-foreground text-sm">N/A</span>;
+                              return (
+                                <div className="space-y-0.5">
+                                  <span className="text-xs text-muted-foreground">{formatCurrency(effAdm, currency)}</span>
+                                  {sum.admissionStatus === "paid" ? (
+                                    <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                                  ) : sum.admissionStatus === "partial" ? (
+                                    <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial</Badge>
+                                  ) : (
+                                    <Badge variant="destructive">Pending</Badge>
+                                  )}
+                                </div>
+                              );
+                            })() : "—"}
                           </TableCell>
                           <TableCell>
-                            {sum && Number(s.monthly_fee_amount) === 0 ? (
-                              <span className="text-muted-foreground text-sm">N/A</span>
-                            ) : sum ? (() => {
-                              const pendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
-                              if (sum.monthlyOverdueMonths.length > 0) {
-                                return <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>;
-                              }
-                              if (pendingMonths > 0) {
-                                return <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{pendingMonths} pending</Badge>;
-                              }
-                              return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>;
+                            {sum ? (() => {
+                              const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+                              if (effMonthly === 0) return <span className="text-muted-foreground text-sm">N/A</span>;
+                              return (
+                                <div className="space-y-0.5">
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatCurrency(effMonthly, currency)}/{batchTotalMonths || "—"}
+                                  </span>
+                                  {sum.monthlyOverdueMonths.length > 0 ? (
+                                    <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>
+                                  ) : (sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length) > 0 ? (
+                                    <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length} pending</Badge>
+                                  ) : (
+                                    <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
+                                  )}
+                                </div>
+                              );
                             })() : "—"}
                           </TableCell>
                           <TableCell className="hidden md:table-cell font-semibold text-green-600 dark:text-green-400">

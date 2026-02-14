@@ -92,8 +92,8 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
     [selectedBatchId, batches]
   );
 
-  // Whether batch is selected in create mode (hide inherited fields)
-  const hasBatchInCreate = !isEdit && !!selectedBatch;
+  // Whether batch is selected (hide inherited fields in both create and edit)
+  const hasBatchSelected = !!selectedBatch;
 
   // Compute course start/end from batch
   const batchCourseStartMonth = useMemo(() => {
@@ -265,7 +265,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
           </div>
 
           {/* Show batch-inherited fees as info badges */}
-          {hasBatchInCreate && (
+          {hasBatchSelected && (
             <div className="rounded-md border bg-muted/50 p-3 space-y-2">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Info className="h-3.5 w-3.5" />
@@ -339,7 +339,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
           </div>
 
           {/* Course Start/End — only show when NO batch selected, or in edit mode */}
-          {(!hasBatchInCreate) && (
+          {(!hasBatchSelected) && (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="course_start_month">Course Start Month</Label>
@@ -355,7 +355,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
           )}
 
           {/* Admission/Monthly Fee — only show when NO batch selected, or in edit mode */}
-          {(!hasBatchInCreate) && (
+          {(!hasBatchSelected) && (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="admission_fee_total">Admission Fee Total</Label>
