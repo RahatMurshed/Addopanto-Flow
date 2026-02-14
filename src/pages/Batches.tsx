@@ -173,9 +173,13 @@ export default function Batches() {
   }, [batchAnalytics]);
 
   const totalOverdue = useMemo(() => {
-    let total = 0;
-    for (const a of batchAnalytics.values()) total += a.monthOverdueCount;
-    return total;
+    let count = 0;
+    let amount = 0;
+    for (const a of batchAnalytics.values()) {
+      count += a.monthOverdueCount;
+      amount += a.monthOverdueAmount;
+    }
+    return { count, amount };
   }, [batchAnalytics]);
 
   const statusBadge = (status: string) => {
@@ -247,7 +251,12 @@ export default function Batches() {
             <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Overdue", filterValue)}</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-destructive">{totalOverdue}</p></CardContent>
+          <CardContent>
+            <p className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdue.amount, currency)}</p>
+            {totalOverdue.count > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">{totalOverdue.count} student{totalOverdue.count !== 1 ? "s" : ""}</p>
+            )}
+          </CardContent>
         </Card>
       </div>
 
