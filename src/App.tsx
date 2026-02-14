@@ -44,14 +44,26 @@ function BrandedLoader() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="relative flex items-center justify-center">
-        {/* Outer rotating ring */}
         <div className="absolute h-16 w-16 animate-[spin_2.5s_linear_infinite] rounded-full border-[3px] border-transparent border-t-primary" />
-        {/* Middle pulsing ring */}
         <div className="absolute h-10 w-10 animate-[spin_1.8s_linear_infinite_reverse] rounded-full border-[3px] border-transparent border-b-secondary" />
-        {/* Inner glowing dot */}
         <div className="h-3 w-3 animate-[pulse_1.4s_ease-in-out_infinite] rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
       </div>
       <p className="mt-6 text-xs font-medium tracking-widest uppercase text-muted-foreground animate-[pulse_2s_ease-in-out_infinite]">
+        Loading
+      </p>
+    </div>
+  );
+}
+
+function ContentLoader() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center py-20">
+      <div className="relative flex items-center justify-center">
+        <div className="absolute h-12 w-12 animate-[spin_2.5s_linear_infinite] rounded-full border-[3px] border-transparent border-t-primary" />
+        <div className="absolute h-7 w-7 animate-[spin_1.8s_linear_infinite_reverse] rounded-full border-[3px] border-transparent border-b-secondary" />
+        <div className="h-2.5 w-2.5 animate-[pulse_1.4s_ease-in-out_infinite] rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]" />
+      </div>
+      <p className="mt-5 text-xs font-medium tracking-widest uppercase text-muted-foreground animate-[pulse_2s_ease-in-out_infinite]">
         Loading
       </p>
     </div>
@@ -77,16 +89,23 @@ function CompanyGuard({ children }: { children: React.ReactNode }) {
   const { isLoading, activeCompany, hasCompanies } = useCompany();
   useRealtimeSync();
 
-  if (isLoading) return <BrandedLoader />;
-
   if (window.location.pathname.startsWith("/companies")) {
+    if (isLoading) return <BrandedLoader />;
     return <>{children}</>;
+  }
+
+  if (isLoading) {
+    return <AppLayout><ContentLoader /></AppLayout>;
   }
 
   if (!hasCompanies) return <Navigate to="/companies" replace />;
   if (!activeCompany) return <Navigate to="/companies" replace />;
 
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <AppLayout>
+      <Suspense fallback={<ContentLoader />}>{children}</Suspense>
+    </AppLayout>
+  );
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
