@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronLeft, ChevronRight, Eye, Search, ClipboardList } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Search, ClipboardList, Plus, Minus, ArrowRight } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuditLog as AuditLogType } from "@/hooks/useAuditLogs";
 
 const TABLE_OPTIONS = [
@@ -67,6 +68,86 @@ function getRecordLabel(log: AuditLogType): string {
   if (typeof data.batch_name === "string") return data.batch_name;
   if (typeof data.description === "string" && (data.description as string).length < 40) return data.description as string;
   return log.record_id.slice(0, 8);
+}
+function formatValue(val: unknown): string {
+  if (val === null || val === undefined) return "null";
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+const HIDDEN_FIELDS = new Set(["id", "user_id", "company_id", "created_at", "updated_at"]);
+
+function DiffView({ oldData, newData }: { oldData: Record<string, unknown>; newData: Record<string, unknown> }) {
+  const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)]));
+  const changed: { key: string; old: unknown; new: unknown }[] = [];
+  const unchanged: { key: string; value: unknown }[] = [];
+
+  for (const key of allKeys) {
+    const oldVal = oldData[key];
+    const newVal = newData[key];
+    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+      changed.push({ key, old: oldVal, new: newVal });
+    } else {
+      unchanged.push({ key, value: oldVal });
+    }
+  }
+
+  return (
+    <Tabs defaultValue="changes" className="w-full">
+      <TabsList className="w-full">
+        <TabsTrigger value="changes" className="flex-1">
+          Changes ({changed.length})
+        </TabsTrigger>
+        <TabsTrigger value="all" className="flex-1">
+          All Fields ({allKeys.length})
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="changes">
+        <ScrollArea className="max-h-80 rounded-md border bg-muted/30 p-3">
+          {changed.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">No field changes detected</p>
+          ) : (
+            <div className="space-y-2">
+              {changed.map(({ key, old: oldVal, new: newVal }) => (
+                <div key={key} className="rounded-md border border-border bg-background p-2">
+                  <p className="font-mono text-xs font-medium text-muted-foreground mb-1">{key}</p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-start gap-2 text-xs rounded px-2 py-1 bg-destructive/10">
+                      <Minus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
+                      <span className="break-all">{formatValue(oldVal)}</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-xs rounded px-2 py-1 bg-emerald-500/10">
+                      <Plus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-500" />
+                      <span className="break-all">{formatValue(newVal)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </TabsContent>
+
+      <TabsContent value="all">
+        <ScrollArea className="max-h-80 rounded-md border bg-muted/30 p-3">
+          <div className="space-y-1">
+            {allKeys.map((key) => {
+              const isChanged = changed.some((c) => c.key === key);
+              const val = newData[key];
+              return (
+                <div key={key} className={`flex gap-2 text-xs py-0.5 px-1 rounded ${isChanged ? "bg-accent" : ""}`}>
+                  {isChanged && <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />}
+                  <span className={`font-mono min-w-[140px] ${isChanged ? "text-primary font-medium" : "text-muted-foreground"}`}>{key}:</span>
+                  <span className="text-foreground break-all">{formatValue(val)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </TabsContent>
+    </Tabs>
+  );
 }
 
 export default function AuditLog() {
@@ -221,38 +302,54 @@ export default function AuditLog() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Audit Detail</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Audit Detail
+              {detail && actionBadge(detail.action)}
+              {detail && tableBadge(detail.table_name)}
+            </DialogTitle>
           </DialogHeader>
           {detail && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Action:</span> {actionBadge(detail.action)}</div>
-                <div><span className="text-muted-foreground">Table:</span> {tableBadge(detail.table_name)}</div>
-                <div><span className="text-muted-foreground">User:</span> {detail.user_email || detail.user_id.slice(0, 8)}</div>
-                <div><span className="text-muted-foreground">Date:</span> {format(new Date(detail.created_at), "MMM dd, yyyy HH:mm:ss")}</div>
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                <div>User: <span className="text-foreground">{detail.user_email || detail.user_id.slice(0, 8)}</span></div>
+                <div>Date: <span className="text-foreground">{format(new Date(detail.created_at), "MMM dd, yyyy HH:mm:ss")}</span></div>
               </div>
-              <div className="space-y-2">
-                {detail.action !== "INSERT" && detail.old_data && (
-                  <div>
-                    <p className="font-medium text-muted-foreground mb-1">Previous Data</p>
-                    <ScrollArea className="h-40 rounded-md border bg-muted/30 p-3">
-                      <pre className="text-xs whitespace-pre-wrap break-all">{JSON.stringify(detail.old_data, null, 2)}</pre>
-                    </ScrollArea>
-                  </div>
-                )}
-                {detail.action !== "DELETE" && detail.new_data && (
-                  <div>
-                    <p className="font-medium text-muted-foreground mb-1">
-                      {detail.action === "INSERT" ? "Created Data" : "Updated Data"}
-                    </p>
-                    <ScrollArea className="h-40 rounded-md border bg-muted/30 p-3">
-                      <pre className="text-xs whitespace-pre-wrap break-all">{JSON.stringify(detail.new_data, null, 2)}</pre>
-                    </ScrollArea>
-                  </div>
-                )}
-              </div>
+
+              {detail.action === "UPDATE" && detail.old_data && detail.new_data ? (
+                <DiffView oldData={detail.old_data} newData={detail.new_data} />
+              ) : detail.action === "INSERT" && detail.new_data ? (
+                <div>
+                  <p className="font-medium mb-1">Created Data</p>
+                  <ScrollArea className="max-h-72 rounded-md border bg-muted/30 p-3">
+                    <div className="space-y-1">
+                      {Object.entries(detail.new_data).map(([key, val]) => (
+                        <div key={key} className="flex gap-2 text-xs py-0.5">
+                          <Plus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-500" />
+                          <span className="font-mono text-muted-foreground min-w-[140px]">{key}:</span>
+                          <span className="text-foreground break-all">{formatValue(val)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              ) : detail.action === "DELETE" && detail.old_data ? (
+                <div>
+                  <p className="font-medium mb-1">Deleted Data</p>
+                  <ScrollArea className="max-h-72 rounded-md border bg-muted/30 p-3">
+                    <div className="space-y-1">
+                      {Object.entries(detail.old_data).map(([key, val]) => (
+                        <div key={key} className="flex gap-2 text-xs py-0.5">
+                          <Minus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
+                          <span className="font-mono text-muted-foreground min-w-[140px]">{key}:</span>
+                          <span className="text-foreground break-all">{formatValue(val)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              ) : null}
             </div>
           )}
         </DialogContent>
