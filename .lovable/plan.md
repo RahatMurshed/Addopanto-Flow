@@ -1,118 +1,92 @@
 
 
-## Fix Backup/Restore, Settings Access, and PDF Export
+## Improve Charts and UX Across Dashboard and Reports
 
-### Issue 1: Backup and Restore Data Problems
+### Critical Bug Found
+The **Reports page query does NOT filter by `company_id`** (lines 59-65 in Reports.tsx). It fetches ALL data across all companies, which is both a data leak and causes incorrect charts. The Dashboard correctly filters by `activeCompanyId`, but Reports does not.
 
-**Root cause:** The backup system was built for single-tenant (user-level) data but the app is now multi-tenant (company-level).
+### Issues Identified
 
-**Current bugs:**
-- Export queries filter by `user_id` instead of `company_id`, so it exports data from ALL companies the user belongs to, not just the active one
-- Backup does not include students, student_payments, monthly_fee_history, or batches -- these tables exist and have data but are completely missing from backup/restore
-- The restore process creates records in the active company, but the exported data might be from a different company
-- The reset warning dialog doesn't mention students/batches being deleted (but the code does delete them)
+1. **Reports page data leak** -- queries `revenues`, `expenses`, `allocations`, `expense_accounts`, and `revenue_sources` without `.eq("company_id", activeCompanyId)`, breaking multi-tenant isolation
+2. **Dashboard Area Chart** -- no legend, users can't tell which color is revenue vs expenses without hovering
+3. **Dashboard Pie Chart** -- legend limited to 6 items (`.slice(0, 6)`), remaining categories invisible; no amounts shown in legend
+4. **Reports Bar Chart** -- Y-axis hardcoded to `k` format (`value / 1000`), breaks for small amounts (e.g., 500 shows as "1k")
+5. **Reports Profit Line Chart** -- uses same tooltip as bar chart (shows "Revenue/Expenses" labels but data is "Profit")
+6. **Reports Pie Charts** -- no percentage labels on the chart itself; the legend uses raw text without amounts
+7. **Charts not using currency conversion** -- Reports page Y-axis formatters don't use `useCompanyCurrency` for conversion
+8. **No empty state guidance** -- charts show "No data" but don't guide users to add data
+9. **Dashboard chart colors** -- hardcoded hex values instead of theme-aware HSL variables (inconsistent in dark mode)
 
-**Fix plan:**
-- Update `exportUserData()` in `src/utils/dataBackupUtils.ts` to accept `companyId` and filter all queries by `company_id` instead of `user_id`
-- Add `students`, `student_payments`, `monthly_fee_history`, and `batches` to the `BackupData` interface and export/import logic
-- Update `useDataManagement.ts` to pass `activeCompanyId` to the export function
-- Update `restoreData()` to handle the new tables (batches first, then students with batch ID mapping, then student_payments and monthly_fee_history with student ID mapping)
-- Update `BackupPreview` to show counts for the new tables
-- Update `RestoreDataDialog` to show the new table counts
-- Update `ResetDataDialog` warning to mention students and batches
-- Bump backup version to "2.0" while keeping backward compatibility with "1.0" backups (the new tables would just be empty arrays)
-- Update `validateBackupData` to accept both version "1.0" and "2.0"
+### Plan
 
-### Issue 2: Settings Page Access Control
+#### 1. Fix Reports page multi-tenant data isolation (CRITICAL)
+- Add `.eq("company_id", activeCompanyId)` to all 5 queries in the Reports page
+- Add `activeCompanyId` to the query key
+- Add `enabled: !!activeCompanyId` guard
 
-**Current state:** The Settings page already redirects non-admin/non-cipher users (lines 60-64 in SettingsPage.tsx), and the nav hides the Settings link for non-admin/cipher users (AppLayout line 71). This is working correctly.
+#### 2. Improve Dashboard Area Chart
+- Add a Legend component below the chart showing Revenue (blue) and Expenses (red)
+- Use theme-aware colors (`hsl(var(--primary))` and `hsl(var(--destructive))`) instead of hardcoded hex
+- Use `useCompanyCurrency` compact formatter for Y-axis tick formatting
 
-**Improvement:** Add a `RoleGuard` wrapper in the route or at the top of the page component for defense-in-depth, showing a proper "Access Denied" message instead of a silent redirect.
+#### 3. Fix Dashboard Pie Chart
+- Remove the `.slice(0, 6)` limit on the legend so all categories show
+- Add amount values next to each legend item
+- Add percentage labels directly on larger pie slices using a custom label renderer
 
-**Fix plan:**
-- Wrap the Settings page content in `SettingsPage.tsx` with the existing redirect logic (keep as-is, it works)
-- No route-level change needed since the redirect is fast and the nav already hides the link
+#### 4. Improve Reports Bar Chart
+- Replace hardcoded `(value / 1000).toFixed(0)}k` Y-axis formatter with the currency compact formatter from `useCompanyCurrency`
+- This automatically handles small and large numbers with proper currency symbol
 
-### Issue 3: PDF Export Quality
+#### 5. Fix Reports Profit Line Chart tooltip
+- Create a dedicated `CustomProfitTooltip` that shows "Profit" label with proper positive/negative coloring instead of reusing the bar chart tooltip
 
-**Current bugs:**
-- All buttons and links inside the export area are hidden, including pagination controls -- this means paginated tables only export the current visible page, not all data
-- The 100ms delay for dark-to-light theme switch may not be enough for recharts to re-render
-- `StudentOverdueSection` uses `formatCurrency` directly (no exchange rate conversion) for both display and PDF
-- High canvas scale (3x) can cause memory issues and slow exports on large pages
-- Charts (recharts) use SVG which html2canvas handles poorly, leading to missing or broken chart visuals in PDFs
+#### 6. Improve Reports Pie Charts
+- Add percentage labels on pie slices (for slices > 5% of total)
+- Show amounts in the legend alongside names
+- Use consistent formatting with currency hook
 
-**Fix plan:**
+#### 7. Add meaningful empty states
+- Replace generic "No data" messages with actionable guidance (e.g., "Add your first revenue entry to see trends here")
+- Include a link/button to the relevant page (Revenue, Expenses)
 
-1. **Improve theme switch timing** in `exportToPDF()`:
-   - Increase the delay from 100ms to 300ms to allow recharts SVGs and CSS transitions to fully reflow
-
-2. **Reduce canvas scale** from 3 to 2:
-   - Still high quality but much less memory usage; prevents crashes on large dashboard pages
-
-3. **Fix `StudentOverdueSection`** to use `useCompanyCurrency` hook instead of direct `formatCurrency` import, so amounts display correctly with exchange rate conversion (affects both screen and PDF)
-
-4. **Add `data-pdf-hide` attribute** to pagination controls across pages so they're properly hidden during PDF export without hiding the actual table content
-
-5. **Improve button hiding logic** in `exportToPDF`:
-   - Only hide elements with `[data-pdf-hide]` attribute instead of ALL buttons -- this prevents hiding column headers or interactive elements that look like buttons but are actually content
-   - Keep hiding `a[href]` links
-
-### Files to modify:
-- `src/utils/dataBackupUtils.ts` -- add company-scoped export, add new tables, version 2.0
-- `src/utils/exportUtils.ts` -- fix PDF export quality (scale, timing, selector logic)
-- `src/hooks/useDataManagement.ts` -- pass companyId to export, handle new tables in restore
-- `src/components/RestoreDataDialog.tsx` -- show new table counts in preview
-- `src/components/ResetDataDialog.tsx` -- update warning text to include students/batches
-- `src/components/StudentOverdueSection.tsx` -- use `useCompanyCurrency` hook
-- `src/pages/Expenses.tsx` -- add `data-pdf-hide` to pagination
-- `src/pages/Revenue.tsx` -- add `data-pdf-hide` to pagination
-- `src/pages/Reports.tsx` -- add `data-pdf-hide` to pagination
-- `src/pages/Dashboard.tsx` -- add `data-pdf-hide` to pagination (if applicable)
+#### 8. Dashboard chart theme consistency
+- Replace hardcoded `#3B82F6` and `#EF4444` with CSS variable references in gradient definitions and area strokes
 
 ### Technical Details
 
-**Updated BackupData interface:**
+**Reports query fix (most critical):**
 ```text
-interface BackupData {
-  version: string;  // "1.0" or "2.0"
-  exportedAt: string;
-  userEmail: string;
-  companyName?: string;  // new in 2.0
-  data: {
-    expense_accounts: any[];
-    revenue_sources: any[];
-    revenues: any[];
-    allocations: any[];
-    expenses: any[];
-    khata_transfers: any[];
-    // New in 2.0:
-    batches: any[];
-    students: any[];
-    student_payments: any[];
-    monthly_fee_history: any[];
-  };
-}
+// Before (line 59-65):
+supabase.from("revenues").select("*")
+
+// After:
+supabase.from("revenues").select("*").eq("company_id", activeCompanyId)
+// Same for expenses, allocations, expense_accounts, revenue_sources
 ```
 
-**Updated exportUserData signature:**
+**Y-axis formatter fix:**
 ```text
-async function exportCompanyData(companyId: string): Promise<BackupData["data"]>
-// All queries use .eq("company_id", companyId) instead of .eq("user_id", userId)
+// Before:
+tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+
+// After:
+tickFormatter={(value) => fc(value, { compact: true })}
 ```
 
-**Restore order for new tables (respecting foreign keys):**
-1. batches (no FK deps within backup)
-2. students (FK to batches via batch_id)
-3. student_payments (FK to students via student_id)
-4. monthly_fee_history (FK to students via student_id)
-
-**Updated PDF export selectors:**
+**Pie chart custom label:**
 ```text
-// Before (too aggressive):
-['button', '[role="button"]', '.action-buttons', '[data-pdf-hide]', 'a[href]']
-
-// After (targeted):
-['[data-pdf-hide]', '.action-buttons']
+const renderCustomLabel = ({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }) => {
+  if (percent < 0.05) return null; // Skip labels for slices < 5%
+  // Position label on the slice
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return <text x={x} y={y} ...>{(percent * 100).toFixed(0)}%</text>;
+};
 ```
+
+**Files to modify:**
+- `src/pages/Reports.tsx` -- fix company_id filtering, improve chart formatters, add profit tooltip, improve pie charts, better empty states
+- `src/pages/Dashboard.tsx` -- add area chart legend, fix pie chart legend limit, theme-aware colors, better empty states, currency-aware Y-axis
 
