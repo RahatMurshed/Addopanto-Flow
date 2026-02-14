@@ -43,6 +43,7 @@ import { format } from "date-fns";
 import { Check, X, Loader2, UserPlus, Clock, CheckCircle, XCircle, Wallet, ArrowLeftRight, Trash2 } from "lucide-react";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/UserAvatar";
 
 interface RegistrationRequest {
   id: string;

@@ -29,6 +29,7 @@ import { Navigate } from "react-router-dom";
 import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export default function CompanyMembers() {
   const { user } = useAuth();
@@ -81,7 +82,7 @@ export default function CompanyMembers() {
       const userIds = members.map(m => m.user_id);
       const { data } = await supabase
         .from("user_profiles")
-        .select("user_id, full_name")
+        .select("user_id, full_name, avatar_url")
         .in("user_id", userIds);
       return data ?? [];
     },
@@ -120,9 +121,8 @@ export default function CompanyMembers() {
     enabled: !!activeCompanyId && canManageMembers,
   });
 
-  const getName = (userId: string) => {
-    return profiles.find(p => p.user_id === userId)?.full_name || null;
-  };
+  const getName = (userId: string) => profiles.find(p => p.user_id === userId)?.full_name || null;
+  const getAvatarUrl = (userId: string) => profiles.find(p => p.user_id === userId)?.avatar_url || null;
 
   // Update member mutation
   const updateMemberMutation = useMutation({
@@ -266,11 +266,18 @@ export default function CompanyMembers() {
                     return (
                       <TableRow key={member.id}>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {getName(member.user_id) || "Unknown Member"}
-                              {isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
-                            </p>
+                          <div className="flex items-center gap-2.5">
+                            <UserAvatar
+                              avatarUrl={getAvatarUrl(member.user_id)}
+                              fullName={getName(member.user_id)}
+                              size="sm"
+                            />
+                            <div>
+                              <p className="font-medium">
+                                {getName(member.user_id) || "Unknown Member"}
+                                {isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
+                              </p>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>

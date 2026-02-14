@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
+import { UserAvatar } from "@/components/UserAvatar";
 
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -87,7 +88,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="hidden w-64 flex-col bg-sidebar md:flex">
         {/* Logo + Company Switcher */}
         <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-4 py-4">
-          <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" /></Link>
+          <Link to="/">
+            {activeCompany?.logo_url ? (
+              <img src={activeCompany.logo_url} alt={activeCompany.name} className="h-10 w-auto max-w-[140px] object-contain" />
+            ) : (
+              <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
+            )}
+          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">
@@ -168,7 +175,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
           <div className="flex items-center gap-2">
-            <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="h-8 w-auto object-contain" /></Link>
+            <Link to="/">
+              {activeCompany?.logo_url ? (
+                <img src={activeCompany.logo_url} alt={activeCompany.name} className="h-8 w-auto object-contain" />
+              ) : (
+                <img src={gaLogo} alt="Grammar Addopanto" className="h-8 w-auto object-contain" />
+              )}
+            </Link>
             <span className="font-bold truncate max-w-[120px] text-sm">{activeCompany?.name || ""}</span>
           </div>
           <div className="flex items-center gap-1">

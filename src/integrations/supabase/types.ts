@@ -891,6 +891,7 @@ export type Database = {
       user_profiles: {
         Row: {
           active_company_id: string | null
+          avatar_url: string | null
           business_name: string | null
           created_at: string
           currency: string
@@ -903,6 +904,7 @@ export type Database = {
         }
         Insert: {
           active_company_id?: string | null
+          avatar_url?: string | null
           business_name?: string | null
           created_at?: string
           currency?: string
@@ -915,6 +917,7 @@ export type Database = {
         }
         Update: {
           active_company_id?: string | null
+          avatar_url?: string | null
           business_name?: string | null
           created_at?: string
           currency?: string

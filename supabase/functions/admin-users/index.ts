@@ -442,11 +442,11 @@ Deno.serve(async (req) => {
       const userIds = authUsers.users.map((u) => u.id);
       const { data: profilesData } = await adminClient
         .from("user_profiles")
-        .select("user_id, full_name")
+        .select("user_id, full_name, avatar_url")
         .in("user_id", userIds);
 
       const profileMap = new Map(
-        profilesData?.map((p) => [p.user_id, p.full_name]) || [],
+        profilesData?.map((p) => [p.user_id, { full_name: p.full_name, avatar_url: p.avatar_url }]) || [],
       );
 
       // Create a map of user_id to role
@@ -462,7 +462,8 @@ Deno.serve(async (req) => {
           return {
             user_id: authUser.id,
             email: authUser.email || null,
-            full_name: profileMap.get(authUser.id) || null,
+            full_name: profileMap.get(authUser.id)?.full_name || null,
+            avatar_url: profileMap.get(authUser.id)?.avatar_url || null,
             role: (roleInfo?.role || "user") as string,
             created_at: roleInfo?.created_at || authUser.created_at,
           };
