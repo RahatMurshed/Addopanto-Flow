@@ -1,31 +1,55 @@
 
 
-# Add Month Picker to "This Month" Card
+# Per-Month Overdue Section for Batches
 
-## What Changes
-The "This Month" card currently always shows the current calendar month. This change adds a small month/year picker so admins can select any month to view collection stats for that specific month.
+## Overview
+Add a per-month overdue section to both the Batches list page and the Batch Detail page, replacing the "Completion" card on the detail page with a monthly overdue summary.
 
-## How It Works
-- Replace the static "This Month" label with a clickable MonthYearPicker (already exists in the project)
-- The selected month drives the calculation instead of `new Date()`
-- Default selection remains the current month
-- Card title updates to show the selected month name (e.g., "January 2026")
+## Changes
+
+### 1. Batch Detail Page (`src/pages/BatchDetail.tsx`)
+
+**Replace the "Completion" card (lines 416-440) with a "Monthly Overdue" card:**
+- Show the number of overdue students and total overdue amount for the selected month (reuses the existing `selectedMonth` state and `MonthYearPicker`)
+- Add a second `MonthYearPicker` inside this card so it has its own independent month filter (separate from the "This Month" card)
+- Display: overdue student count, total overdue amount, and a list of overdue student names for that specific month
+- Color-coded with destructive/red theme to match existing overdue styling
+
+**Computation updates in `batchStats`:**
+- Add `selectedOverdueMonth` state for the new card's independent month picker
+- Compute per-month overdue: iterate through all summaries, check if the selected month appears in `monthlyOverdueMonths` or `monthlyPartialMonths`, and sum up remaining amounts
+- Return `perMonthOverdueCount`, `perMonthOverdueAmount`, and a list of overdue student details for that month
+
+### 2. Batches List Page (`src/pages/Batches.tsx`)
+
+**Add a "Per-Month Overdue" section below the summary cards:**
+- Add a shared `MonthYearPicker` at the top (defaults to previous month) so admins can pick any month
+- Show a compact table/list: Batch Name, Overdue Students, Overdue Amount for the selected month
+- Only show batches that have overdue students for that month (hide zero-overdue batches)
+- Include summary totals at the bottom (total overdue students across all batches, total overdue amount)
+
+**Computation updates in `batchAnalytics`:**
+- Add a `selectedOverdueMonth` state
+- Extend the analytics map to include per-month overdue data: for each batch, compute how many students have overdue/partial payments for the selected month and the total remaining amount
+- Add these fields to the existing map: `monthOverdueCount`, `monthOverdueAmount`
+
+### 3. UI Layout
+
+**Batch Detail -- new card replaces Completion:**
+- Same card size as the existing "Completion" card in the 5-column grid
+- Header: AlertTriangle icon + MonthYearPicker (small, inline)
+- Body: overdue count (large number, red) + overdue amount
+- If no overdue for that month: show "No overdue" message
+
+**Batches List -- new section:**
+- A Card below the 4 summary cards with header "Monthly Overdue" + MonthYearPicker
+- Inside: a simple table with columns: Batch Name, Overdue Students, Overdue Amount
+- Empty state if no batches have overdue for the selected month
+- Batches in the table are clickable (navigate to batch detail)
 
 ## Technical Details
 
-### File: `src/pages/BatchDetail.tsx`
-
-1. **Add state for selected month**
-   - Add a `useState` initialized to the current month in `YYYY-MM` format
-   - Import `MonthYearPicker` component and `format`/`parse` from date-fns
-
-2. **Update `batchStats` computation (lines 140-141)**
-   - Replace `const now = new Date()` and the hardcoded `currentMonth` with the selected month state value
-   - Add the selected month state to the `useMemo` dependency array
-
-3. **Update the "This Month" card UI (lines 385-404)**
-   - Replace the static "This Month" text with a `MonthYearPicker` component
-   - The picker uses the existing `MonthYearPicker` component already built in the project
-   - Constrain min/max year to the batch's start and end date range
-
-### No new files or dependencies needed -- reuses existing `MonthYearPicker` component.
+- No new files or dependencies needed
+- Reuses existing `MonthYearPicker`, `computeStudentSummary`, severity styling patterns
+- Both pages independently track their own selected overdue month via local state
+- Per-month overdue calculation: for each student summary, check if the month is in `monthlyOverdueMonths` or `monthlyPartialMonths`, then compute `effectiveMonthlyFee - (monthlyPaymentsByMonth.get(month) || 0)` as the remaining amount
