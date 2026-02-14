@@ -85,14 +85,16 @@ export default function Dashboard() {
 
       const now = new Date();
 
+      if (!activeCompanyId) return null;
+
       const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes, recentRevenuesRes, recentExpensesRes] = await Promise.all([
-        supabase.from("revenues").select("amount, date"),
-        supabase.from("expenses").select("amount, date, expense_account_id"),
-        supabase.from("allocations").select("amount"),
-        supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active"),
-        supabase.from("revenue_sources").select("id, name"),
-        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").order("created_at", { ascending: false }).limit(50),
-        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").order("created_at", { ascending: false }).limit(50),
+        supabase.from("revenues").select("amount, date").eq("company_id", activeCompanyId),
+        supabase.from("expenses").select("amount, date, expense_account_id").eq("company_id", activeCompanyId),
+        supabase.from("allocations").select("amount").eq("company_id", activeCompanyId),
+        supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active").eq("company_id", activeCompanyId),
+        supabase.from("revenue_sources").select("id, name").eq("company_id", activeCompanyId),
+        supabase.from("revenues").select("id, amount, date, description, source_id, created_at").eq("company_id", activeCompanyId).order("created_at", { ascending: false }).limit(50),
+        supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").eq("company_id", activeCompanyId).order("created_at", { ascending: false }).limit(50),
       ]);
 
       if (revenuesRes.error) throw revenuesRes.error;
@@ -190,7 +192,7 @@ export default function Dashboard() {
         recentTransactions,
       };
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 
   // Calculate filtered data based on date range

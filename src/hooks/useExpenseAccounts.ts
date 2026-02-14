@@ -16,14 +16,16 @@ export function useExpenseAccounts() {
     queryKey: ["expense_accounts", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
+      if (!activeCompanyId) return [];
       const { data, error } = await supabase
         .from("expense_accounts")
         .select("*")
+        .eq("company_id", activeCompanyId)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as ExpenseAccount[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 

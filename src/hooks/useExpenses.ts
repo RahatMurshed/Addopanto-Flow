@@ -20,14 +20,16 @@ export function useExpenses() {
     queryKey: ["expenses", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
+      if (!activeCompanyId) return [];
       const { data, error } = await supabase
         .from("expenses")
         .select("*, expense_accounts(name, color)")
+        .eq("company_id", activeCompanyId)
         .order("date", { ascending: false });
       if (error) throw error;
       return data as ExpenseWithAccount[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 
@@ -118,24 +120,30 @@ export function useAccountBalances() {
     queryFn: async () => {
       if (!user) return [];
 
+      if (!activeCompanyId) return [];
+
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
-        .select("*");
+        .select("*")
+        .eq("company_id", activeCompanyId);
       if (accountsError) throw accountsError;
 
       const { data: allocations, error: allocationsError } = await supabase
         .from("allocations")
-        .select("expense_account_id, amount");
+        .select("expense_account_id, amount")
+        .eq("company_id", activeCompanyId);
       if (allocationsError) throw allocationsError;
 
       const { data: expenses, error: expensesError } = await supabase
         .from("expenses")
-        .select("expense_account_id, amount");
+        .select("expense_account_id, amount")
+        .eq("company_id", activeCompanyId);
       if (expensesError) throw expensesError;
 
       const { data: transfers, error: transfersError } = await supabase
         .from("khata_transfers")
-        .select("from_account_id, to_account_id, amount");
+        .select("from_account_id, to_account_id, amount")
+        .eq("company_id", activeCompanyId);
       if (transfersError) throw transfersError;
 
       const balances: AccountBalance[] = accounts.map((account) => {
@@ -170,7 +178,7 @@ export function useAccountBalances() {
 
       return balances;
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 
@@ -187,9 +195,11 @@ export function useExpenseSummary() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
       const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
 
+      if (!activeCompanyId) return { thisMonth: 0, thisYear: 0, total: 0 };
       const { data, error } = await supabase
         .from("expenses")
-        .select("amount, date");
+        .select("amount, date")
+        .eq("company_id", activeCompanyId);
       if (error) throw error;
 
       const thisMonth = data
@@ -204,6 +214,6 @@ export function useExpenseSummary() {
 
       return { thisMonth, thisYear, total };
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }

@@ -29,14 +29,16 @@ export function useKhataTransfers() {
     queryKey: ["khata_transfers", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
+      if (!activeCompanyId) return [];
       const { data, error } = await supabase
         .from("khata_transfers")
         .select("*")
+        .eq("company_id", activeCompanyId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as KhataTransfer[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 

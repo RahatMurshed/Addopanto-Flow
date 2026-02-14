@@ -37,9 +37,11 @@ export function useStudentPayments(studentId?: string) {
     queryKey: ["student_payments", activeCompanyId, studentId],
     queryFn: async () => {
       if (!user) return [];
+      if (!activeCompanyId) return [];
       let query = supabase
         .from("student_payments")
         .select("*")
+        .eq("company_id", activeCompanyId)
         .order("payment_date", { ascending: false });
       if (studentId) {
         query = query.eq("student_id", studentId);
@@ -48,7 +50,7 @@ export function useStudentPayments(studentId?: string) {
       if (error) throw error;
       return data as StudentPayment[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 

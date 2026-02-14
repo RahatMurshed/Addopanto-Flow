@@ -7,8 +7,6 @@ export interface Company {
   id: string;
   name: string;
   slug: string;
-  join_password: string | null;
-  invite_code: string | null;
   logo_url: string | null;
   description: string | null;
   currency: string;
@@ -125,18 +123,18 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     staleTime: 30 * 1000,
   });
 
-  // Fetch all companies the user is a member of
+  // Fetch all companies the user is a member of (using public view to hide passwords)
   const companyIds = memberships.map((m) => m.company_id);
   const { data: companies = [], isLoading: companiesLoading } = useQuery({
     queryKey: ["user-companies", companyIds],
     queryFn: async () => {
       if (companyIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("companies")
+      const { data, error } = await (supabase
+        .from("companies_public" as any)
         .select("*")
-        .in("id", companyIds);
+        .in("id", companyIds) as any);
       if (error) throw error;
-      return data as Company[];
+      return (data ?? []) as Company[];
     },
     enabled: companyIds.length > 0,
     staleTime: 5 * 60 * 1000,

@@ -14,14 +14,16 @@ export function useRevenueSources() {
     queryKey: ["revenue_sources", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
+      if (!activeCompanyId) return [];
       const { data, error } = await supabase
         .from("revenue_sources")
         .select("*")
+        .eq("company_id", activeCompanyId)
         .order("name");
       if (error) throw error;
       return data as RevenueSource[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 

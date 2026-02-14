@@ -104,6 +104,22 @@ export default function CompanyMembers() {
     enabled: !!activeCompanyId && canViewMembers,
   });
 
+  // Fetch invite code directly (admin-only, not in public view)
+  const { data: companySecrets } = useQuery({
+    queryKey: ["company-secrets", activeCompanyId],
+    queryFn: async () => {
+      if (!activeCompanyId) return null;
+      const { data, error } = await supabase
+        .from("companies")
+        .select("invite_code")
+        .eq("id", activeCompanyId)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!activeCompanyId && canManageMembers,
+  });
+
   const getEmail = (userId: string) => {
     return profiles.find(p => p.user_id === userId)?.email || userId;
   };
@@ -322,14 +338,14 @@ export default function CompanyMembers() {
               <CardDescription>Manage invite codes and join password for this company</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeCompany?.invite_code && (
+              {companySecrets?.invite_code && (
                 <div className="flex items-center gap-3 rounded-lg border p-4">
                   <div className="flex-1">
                     <p className="text-sm text-muted-foreground">Current Invite Code</p>
-                    <p className="font-mono text-lg font-bold">{activeCompany.invite_code}</p>
+                    <p className="font-mono text-lg font-bold">{companySecrets.invite_code}</p>
                   </div>
                   <Button variant="outline" size="icon" onClick={() => {
-                    navigator.clipboard.writeText(activeCompany.invite_code!);
+                    navigator.clipboard.writeText(companySecrets.invite_code!);
                     toast({ title: "Copied!" });
                   }}>
                     <Copy className="h-4 w-4" />
@@ -338,7 +354,7 @@ export default function CompanyMembers() {
               )}
               <Button variant="outline" onClick={() => generateInviteMutation.mutate()} disabled={generateInviteMutation.isPending}>
                 {generateInviteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                {activeCompany?.invite_code ? "Regenerate" : "Generate"} Invite Code
+                {companySecrets?.invite_code ? "Regenerate" : "Generate"} Invite Code
               </Button>
             </CardContent>
           </Card>

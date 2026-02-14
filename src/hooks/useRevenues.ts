@@ -20,14 +20,16 @@ export function useRevenues() {
     queryKey: ["revenues", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
+      if (!activeCompanyId) return [];
       const { data, error } = await supabase
         .from("revenues")
         .select("*, revenue_sources(name)")
+        .eq("company_id", activeCompanyId)
         .order("date", { ascending: false });
       if (error) throw error;
       return data as RevenueWithSource[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 
@@ -184,9 +186,11 @@ export function useRevenueSummary() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
       const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
 
+      if (!activeCompanyId) return { thisMonth: 0, thisYear: 0, total: 0 };
       const { data, error } = await supabase
         .from("revenues")
-        .select("amount, date");
+        .select("amount, date")
+        .eq("company_id", activeCompanyId);
       if (error) throw error;
 
       const thisMonth = data
@@ -201,6 +205,6 @@ export function useRevenueSummary() {
 
       return { thisMonth, thisYear, total };
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }

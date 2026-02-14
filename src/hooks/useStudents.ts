@@ -58,7 +58,8 @@ export function useStudents(filters?: StudentFilters) {
     queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder }],
     queryFn: async () => {
       if (!user) return [];
-      let query = supabase.from("students").select("*");
+      if (!activeCompanyId) return [];
+      let query = supabase.from("students").select("*").eq("company_id", activeCompanyId);
 
       if (status !== "all") {
         query = query.eq("status", status);
@@ -76,7 +77,7 @@ export function useStudents(filters?: StudentFilters) {
       if (error) throw error;
       return data as Student[];
     },
-    enabled: !!user,
+    enabled: !!user && !!activeCompanyId,
   });
 }
 
