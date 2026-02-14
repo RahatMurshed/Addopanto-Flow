@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
-import { RoleProvider } from "@/contexts/RoleContext"; // Keep for legacy compatibility if needed
+import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import AppLayout from "@/components/AppLayout";
@@ -26,7 +26,7 @@ import CreateCompany from "@/pages/CreateCompany";
 import RegistrationRequests from "@/pages/RegistrationRequests";
 import UserManagement from "@/pages/UserManagement";
 import CompanyMembers from "@/pages/CompanyMembers";
-import { Loader2 } from "lucide-react";
+import gaLogo from "@/assets/GA-LOGO.png";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,17 +35,19 @@ const queryClient = new QueryClient({
   },
 });
 
+function BrandedLoader() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+      <img src={gaLogo} alt="Grammar Addopanto" className="h-20 w-auto animate-brand-pulse" />
+      <p className="text-sm text-muted-foreground">Loading...</p>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
+  if (loading) return <BrandedLoader />;
   if (!user) return <Navigate to="/auth" replace />;
 
   return (
@@ -61,42 +63,21 @@ function CompanyGuard({ children }: { children: React.ReactNode }) {
   const { isLoading, activeCompany, hasCompanies } = useCompany();
   useRealtimeSync();
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (isLoading) return <BrandedLoader />;
 
-  // If on company selection pages, allow access
   if (window.location.pathname.startsWith("/companies")) {
     return <>{children}</>;
   }
 
-  // If no companies, redirect to selection/join
-  if (!hasCompanies) {
-    return <Navigate to="/companies" replace />;
-  }
+  if (!hasCompanies) return <Navigate to="/companies" replace />;
+  if (!activeCompany) return <Navigate to="/companies" replace />;
 
-  // If no active company selected, redirect to selection
-  if (!activeCompany) {
-    return <Navigate to="/companies" replace />;
-  }
-
-  // Normal app layout
   return <AppLayout>{children}</AppLayout>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <BrandedLoader />;
   if (user) return <Navigate to="/companies" replace />;
   return <>{children}</>;
 }
@@ -113,12 +94,10 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
                 
-                {/* Company Selection Routes */}
                 <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
                 <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
                 <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
 
-                {/* Main App Routes */}
                 <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
                 <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />

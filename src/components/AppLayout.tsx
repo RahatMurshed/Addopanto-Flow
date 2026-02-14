@@ -34,6 +34,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import gaLogo from "@/assets/GA-LOGO.png";
 
 const baseNavItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -55,12 +56,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     canManageMembers,
     canViewMembers,
   } = useCompany();
-  const pendingCount = usePendingRequestsCount(); // This hook likely needs updating to be company-aware too
+  const pendingCount = usePendingRequestsCount();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Build nav items dynamically based on role
   const navItems = [
     ...baseNavItems,
     ...((isCompanyAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
@@ -82,34 +82,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-col border-r border-border bg-card md:flex">
-        {/* Company Switcher Header */}
-        <div className="flex h-16 items-center border-b border-border px-4">
+      {/* Desktop Sidebar — deep blue */}
+      <aside className="hidden w-64 flex-col bg-sidebar md:flex">
+        {/* Logo + Company Switcher */}
+        <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-4 py-4">
+          <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between px-2 hover:bg-accent/50">
+              <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">
                 <div className="flex items-center gap-2 overflow-hidden">
                   {activeCompany?.logo_url ? (
-                    <img src={activeCompany.logo_url} alt="" className="h-6 w-6 rounded object-cover" />
+                    <img src={activeCompany.logo_url} alt="" className="h-5 w-5 rounded object-cover" />
                   ) : (
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
-                      <Building2 className="h-3.5 w-3.5" />
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sidebar-primary text-sidebar-primary-foreground">
+                      <Building2 className="h-3 w-3" />
                     </div>
                   )}
-                  <span className="truncate font-semibold">{activeCompany?.name || "Select Company"}</span>
+                  <span className="truncate text-sm font-medium">{activeCompany?.name || "Select Company"}</span>
                 </div>
-                <ChevronDown className="h-4 w-4 opacity-50" />
+                <ChevronDown className="h-4 w-4 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuLabel>My Companies</DropdownMenuLabel>
               {companies.map((company) => (
-                <DropdownMenuItem
-                  key={company.id}
-                  onClick={() => handleCompanySwitch(company.id)}
-                  className="gap-2"
-                >
+                <DropdownMenuItem key={company.id} onClick={() => handleCompanySwitch(company.id)} className="gap-2">
                   <Building2 className="h-4 w-4" />
                   <span className="truncate">{company.name}</span>
                   {activeCompany?.id === company.id && <Badge variant="secondary" className="ml-auto text-[10px]">Active</Badge>}
@@ -129,34 +126,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                location.pathname === item.href
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-              {"badge" in item && (item as any).badge > 0 && (
-                <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0.5 min-w-[20px] text-center">
-                  {(item as any).badge}
-                </Badge>
-              )}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "border-l-[3px] border-sidebar-primary bg-sidebar-accent text-sidebar-primary"
+                    : "border-l-[3px] border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+                {"badge" in item && (item as any).badge > 0 && (
+                  <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0.5 min-w-[20px] text-center">
+                    {(item as any).badge}
+                  </Badge>
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="border-t border-border p-3">
+        <div className="border-t border-sidebar-border p-3">
           <div className="mb-2 flex items-center justify-between px-2">
-            <span className="text-xs font-medium text-muted-foreground">Theme</span>
+            <span className="text-xs font-medium text-sidebar-foreground/60">Theme</span>
             <ThemeToggle />
           </div>
-          <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={handleLogout}>
+          <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
             Logout
           </Button>
@@ -167,14 +167,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <TrendingUp className="h-3.5 w-3.5" />
-            </div>
-            <span className="font-bold truncate max-w-[150px]">{activeCompany?.name || "KhataFlow"}</span>
+            <img src={gaLogo} alt="Grammar Addopanto" className="h-8 w-auto object-contain" />
+            <span className="font-bold truncate max-w-[120px] text-sm">{activeCompany?.name || ""}</span>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={() => setMobileOpen(!mobileOpen)}>
+            <Button variant="ghost" size="icon" className="text-primary" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
@@ -183,36 +181,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile Nav Overlay */}
         {mobileOpen && (
           <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)}>
-            <nav className="absolute right-0 top-14 w-64 border-l border-border bg-card p-3 shadow-lg h-[calc(100vh-3.5rem)] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <nav className="absolute right-0 top-14 w-64 bg-sidebar p-3 shadow-lg h-[calc(100vh-3.5rem)] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="mb-4">
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/companies")}>
+                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { navigate("/companies"); setMobileOpen(false); }}>
                   <ArrowLeftRight className="h-4 w-4" /> Switch Company
                 </Button>
               </div>
               <div className="flex-1 space-y-1">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      location.pathname === item.href
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                    {"badge" in item && (item as any).badge > 0 && (
-                      <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0.5 min-w-[20px] text-center">
-                        {(item as any).badge}
-                      </Badge>
-                    )}
-                  </Link>
-                ))}
+                {navItems.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                        isActive
+                          ? "border-l-[3px] border-sidebar-primary bg-sidebar-accent text-sidebar-primary"
+                          : "border-l-[3px] border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                      {"badge" in item && (item as any).badge > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0.5 min-w-[20px] text-center">
+                          {(item as any).badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
-              <Button variant="ghost" className="mt-2 w-full justify-start gap-3 text-muted-foreground" onClick={handleLogout}>
+              <Button variant="ghost" className="mt-2 w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
                 Logout
               </Button>

@@ -17,11 +17,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
 
-    --primary: 217 91% 60%;
+    --primary: 30 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 220 20% 10%;
+    --secondary: 217 70% 25%;
+    --secondary-foreground: 0 0% 100%;
 
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
@@ -40,18 +40,18 @@ All colors MUST be HSL.
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --ring: 30 100% 50%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 217 70% 18%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 30 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 220 20% 10%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 217 50% 25%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 50% 25%;
+    --sidebar-ring: 30 100% 50%;
   }
 
   .dark {
@@ -64,10 +64,10 @@ All colors MUST be HSL.
     --popover: 222 47% 8%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
+    --primary: 30 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 17%;
+    --secondary: 217 50% 22%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217 33% 17%;
@@ -87,16 +87,16 @@ All colors MUST be HSL.
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --ring: 30 100% 50%;
 
-    --sidebar-background: 222 47% 6%;
+    --sidebar-background: 217 60% 12%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 30 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent: 217 40% 20%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-border: 217 40% 20%;
+    --sidebar-ring: 30 100% 50%;
   }
 }
 
@@ -108,6 +108,35 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Button polish */
+@layer components {
+  .btn-press {
+    @apply transition-all duration-200;
+  }
+  .btn-press:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+/* Card hover enhancement */
+@layer components {
+  .card-hover {
+    @apply shadow-sm transition-shadow duration-200;
+  }
+  .card-hover:hover {
+    @apply shadow-md;
+  }
+}
+
+/* Branded loading animation */
+@keyframes brand-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.96); }
+}
+.animate-brand-pulse {
+  animation: brand-pulse 2s ease-in-out infinite;
 }
 
 /* Print styles for PDF export */
@@ -169,7 +198,7 @@ All colors MUST be HSL.
 
   /* Color adjustments for better print visibility */
   .text-primary {
-    color: #2563eb !important;
+    color: #ff8c00 !important;
   }
 
   .text-destructive {
