@@ -241,42 +241,44 @@ export default function Revenue() {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {dateRange?.label || "Selected Period"}
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(filteredTotal, currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
-            {previousRange && (
-              <PercentageChange
-                current={filteredTotal}
-                previous={previousTotal}
-                label={previousRange.label}
-                className="mt-2"
-              />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(allTimeTotal, currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{revenues.length} total entries</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary Cards - hidden for DEO */}
+      {!isDataEntryOperator && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {dateRange?.label || "Selected Period"}
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(filteredTotal, currency)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
+              {previousRange && (
+                <PercentageChange
+                  current={filteredTotal}
+                  previous={previousTotal}
+                  label={previousRange.label}
+                  className="mt-2"
+                />
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{formatCurrency(allTimeTotal, currency)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{revenues.length} total entries</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Revenue by Source for Selected Period */}
-      {filteredBySource.length > 0 && dateRange && (
+      {/* Revenue by Source for Selected Period - hidden for DEO */}
+      {!isDataEntryOperator && filteredBySource.length > 0 && dateRange && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Revenue by Source - {dateRange.label}</CardTitle>
@@ -304,8 +306,8 @@ export default function Revenue() {
         </Card>
       )}
 
-      {/* Allocation Info */}
-      {activeAccounts.length > 0 && (
+      {/* Allocation Info - hidden for DEO */}
+      {!isDataEntryOperator && activeAccounts.length > 0 && (
         <Card>
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground">

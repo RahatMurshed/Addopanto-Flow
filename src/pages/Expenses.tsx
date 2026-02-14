@@ -260,8 +260,8 @@ export default function Expenses() {
         </Alert>
       )}
 
-      {/* Deficit Warnings */}
-      {accountsWithDeficit.length > 0 && (
+      {/* Deficit Warnings - hidden for DEO */}
+      {!isDataEntryOperator && accountsWithDeficit.length > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -275,7 +275,7 @@ export default function Expenses() {
         </Alert>
       )}
 
-      {accountsNearLimit.length > 0 && (
+      {!isDataEntryOperator && accountsNearLimit.length > 0 && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -289,43 +289,45 @@ export default function Expenses() {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {dateRange?.label || "Selected Period"}
-            </CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">{formatCurrency(filteredTotal, currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
-            {previousRange && (
-              <PercentageChange
-                current={filteredTotal}
-                previous={previousTotal}
-                label={previousRange.label}
-                invertColors
-                className="mt-2"
-              />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">{formatCurrency(allTimeTotal, currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{expenses.length} total entries</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary Cards - hidden for DEO */}
+      {!isDataEntryOperator && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {dateRange?.label || "Selected Period"}
+              </CardTitle>
+              <TrendingDown className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-destructive">{formatCurrency(filteredTotal, currency)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
+              {previousRange && (
+                <PercentageChange
+                  current={filteredTotal}
+                  previous={previousTotal}
+                  label={previousRange.label}
+                  invertColors
+                  className="mt-2"
+                />
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle>
+              <TrendingDown className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-destructive">{formatCurrency(allTimeTotal, currency)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{expenses.length} total entries</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Selected Period Breakdown */}
-      {filteredBreakdown.length > 0 && dateRange && (
+      {/* Selected Period Breakdown - hidden for DEO */}
+      {!isDataEntryOperator && filteredBreakdown.length > 0 && dateRange && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Spending by Expense Source - {dateRange.label}</CardTitle>
@@ -356,8 +358,8 @@ export default function Expenses() {
         </Card>
       )}
 
-      {/* Account Balances */}
-      {accounts.length > 0 && (
+      {/* Account Balances - hidden for DEO */}
+      {!isDataEntryOperator && accounts.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Expense Source Balances</CardTitle>
@@ -510,17 +512,19 @@ export default function Expenses() {
         </Card>
       )}
 
-      {/* Transfer History */}
-      <TransferHistoryCard
-        transfers={transfers}
-        accounts={accounts}
-        onDelete={async (id) => {
-          await deleteTransferMutation.mutateAsync(id);
-          toast({ title: "Transfer deleted" });
-        }}
-        isDeleting={deleteTransferMutation.isPending}
-        limit={5}
-      />
+      {/* Transfer History - hidden for DEO */}
+      {!isDataEntryOperator && (
+        <TransferHistoryCard
+          transfers={transfers}
+          accounts={accounts}
+          onDelete={async (id) => {
+            await deleteTransferMutation.mutateAsync(id);
+            toast({ title: "Transfer deleted" });
+          }}
+          isDeleting={deleteTransferMutation.isPending}
+          limit={5}
+        />
+      )}
 
       {/* Create/Edit Dialog */}
       <ExpenseDialog

@@ -34,7 +34,7 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit } = useCompany();
+  const { canAddRevenue, canEdit, isDataEntryOperator, canEditBatch, isLoading: companyLoading } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: batch, isLoading: batchLoading } = useBatch(id);
@@ -56,6 +56,13 @@ export default function BatchDetail() {
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
+  // Redirect DEO without edit permission
+  useEffect(() => {
+    if (!companyLoading && isDataEntryOperator && !canEditBatch) {
+      navigate("/batches", { replace: true });
+    }
+  }, [companyLoading, isDataEntryOperator, canEditBatch, navigate]);
+
   const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
 
   const batchCourseStartMonth = useMemo(() => {

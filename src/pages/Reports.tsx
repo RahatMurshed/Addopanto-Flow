@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,8 +41,16 @@ const CHART_COLORS = [
 
 export default function Reports() {
   const { user } = useAuth();
-  const { activeCompany } = useCompany();
+  const { activeCompany, isDataEntryOperator, isLoading: companyLoading } = useCompany();
   const { fcp, fc } = useCompanyCurrency();
+  const navigate = useNavigate();
+
+  // Redirect DEO away from reports
+  useEffect(() => {
+    if (!companyLoading && isDataEntryOperator) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [companyLoading, isDataEntryOperator, navigate]);
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { data: transfers = [] } = useKhataTransfers();
