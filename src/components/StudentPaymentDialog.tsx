@@ -248,7 +248,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
                           summary.monthlyOverdueMonths.includes(m) && "text-destructive font-medium",
                           isPartial && "text-amber-600 dark:text-amber-400 font-medium"
                         )}>{formatMonth(m)}</span>
-                        {isPartial && (
+                        {remaining > 0 && (
                           <span className="text-[10px] text-muted-foreground">{formatCurrency(remaining)} remaining</span>
                         )}
                       </div>
