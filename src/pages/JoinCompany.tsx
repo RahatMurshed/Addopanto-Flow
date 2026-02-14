@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ export default function JoinCompany() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isCipher } = useCompany();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [password, setPassword] = useState("");
@@ -106,6 +107,9 @@ export default function JoinCompany() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({ title: "Joined successfully!", description: "You have been added as admin." });
+      queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
       navigate("/companies");
     } catch (err: any) {
       toast({ title: "Failed to join", description: err.message, variant: "destructive" });
@@ -126,6 +130,9 @@ export default function JoinCompany() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({ title: "Joined successfully!", description: "You have been added to the company." });
+      queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
       navigate("/companies");
     } catch (err: any) {
       toast({ title: "Failed to join", description: err.message, variant: "destructive" });
