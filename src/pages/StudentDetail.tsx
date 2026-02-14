@@ -54,10 +54,33 @@ export default function StudentDetail() {
   const [editingPayment, setEditingPayment] = useState<typeof payments[0] | null>(null);
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
 
+  const batchCourseStartMonth = useMemo(() => {
+    if (!batch?.start_date) return "";
+    const d = new Date(batch.start_date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [batch]);
+
+  const batchCourseEndMonth = useMemo(() => {
+    if (!batch?.start_date || !batch?.course_duration_months) return "";
+    const d = new Date(batch.start_date);
+    d.setMonth(d.getMonth() + batch.course_duration_months - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [batch]);
+
+  const effectiveAdmissionFee = Number(student?.admission_fee_total) || Number(batch?.default_admission_fee) || 0;
+  const effectiveMonthlyFee = Number(student?.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+
   const summary = useMemo(() => {
     if (!student) return null;
-    return computeStudentSummary(student, payments, feeHistory);
-  }, [student, payments, feeHistory]);
+    const effectiveStudent = {
+      ...student,
+      admission_fee_total: effectiveAdmissionFee,
+      monthly_fee_amount: effectiveMonthlyFee,
+      course_start_month: student.course_start_month || batchCourseStartMonth || null,
+      course_end_month: student.course_end_month || batchCourseEndMonth || null,
+    };
+    return computeStudentSummary(effectiveStudent, payments, feeHistory);
+  }, [student, payments, feeHistory, effectiveAdmissionFee, effectiveMonthlyFee, batchCourseStartMonth, batchCourseEndMonth]);
 
   const handleUpdate = async (data: StudentInsert) => {
     if (!student) return;
@@ -232,7 +255,7 @@ export default function StudentDetail() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {Number(student.monthly_fee_amount) > 0 ? (
+            {effectiveMonthlyFee > 0 ? (
               <>
                 <p className="text-2xl font-bold">{formatCurrency(monthlyTotal, currency)}</p>
                 <div className="flex justify-between text-sm">
@@ -307,14 +330,14 @@ export default function StudentDetail() {
       )}
 
       {/* Monthly Fee Visual Grid & Breakdown */}
-      {Number(student.monthly_fee_amount) > 0 && (
+      {effectiveMonthlyFee > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Monthly Fee Breakdown</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {formatCurrency(Number(student.monthly_fee_amount), currency)}/month
-              {student.course_start_month && ` · From ${student.course_start_month}`}
-              {student.course_end_month && ` to ${student.course_end_month}`}
+              {formatCurrency(effectiveMonthlyFee, currency)}/month
+              {(student.course_start_month || batchCourseStartMonth) && ` · From ${student.course_start_month || batchCourseStartMonth}`}
+              {(student.course_end_month || batchCourseEndMonth) && ` to ${student.course_end_month || batchCourseEndMonth}`}
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -333,7 +356,7 @@ export default function StudentDetail() {
               summary={summary}
               payments={payments}
               feeHistory={feeHistory}
-              monthlyFeeAmount={Number(student.monthly_fee_amount)}
+              monthlyFeeAmount={effectiveMonthlyFee}
               currency={currency}
             />
           </CardContent>
