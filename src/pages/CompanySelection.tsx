@@ -1,14 +1,14 @@
+import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, UserPlus, LogOut, Loader2, Users, Clock, XCircle } from "lucide-react";
+import { Building2, Plus, UserPlus, LogOut, Loader2, Users, Clock, XCircle, ChevronRight } from "lucide-react";
 import gaLogo from "@/assets/GA-LOGO.png";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 function NoCompaniesSection({ isCipher, navigate, signOut }: { isCipher: boolean; navigate: (path: string) => void; signOut: () => Promise<void> }) {
   const { user } = useAuth();
@@ -75,47 +75,79 @@ function NoCompaniesSection({ isCipher, navigate, signOut }: { isCipher: boolean
     );
   }
 
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-        <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No Companies</h3>
-        <p className="text-muted-foreground mb-4 max-w-sm">
-          You're not a member of any company yet. Join an existing company or wait for an invitation.
-        </p>
-        <Button onClick={() => navigate("/companies/join")}>
-          <UserPlus className="mr-2 h-4 w-4" /> Join a Company
-        </Button>
-      </CardContent>
-    </Card>
-  );
+  // Normal no-companies state — auto-redirect handled in parent useEffect
+  return null;
 }
 
 export default function CompanySelection() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const { companies, memberships, switchCompany, isCipher, isLoading } = useCompany();
 
-  // Get member counts for each company
+  // Fetch cipher user IDs for member count filtering
+  const { data: cipherUserIds = [] } = useQuery({
+    queryKey: ["cipher-user-ids-for-counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "cipher");
+      if (error) throw error;
+      return data.map(r => r.user_id);
+    },
+    enabled: !isCipher && companies.length > 0,
+  });
+
+  // Get member counts for each company (filter out ciphers for non-cipher users)
   const { data: memberCounts = {} } = useQuery({
-    queryKey: ["company-member-counts", companies.map(c => c.id)],
+    queryKey: ["company-member-counts", companies.map(c => c.id), cipherUserIds],
     queryFn: async () => {
       if (companies.length === 0) return {};
       const companyIds = companies.map(c => c.id);
       const { data, error } = await supabase
         .from("company_memberships")
-        .select("company_id")
+        .select("company_id, user_id")
         .in("company_id", companyIds)
         .eq("status", "active");
       if (error) throw error;
       const counts: Record<string, number> = {};
       for (const row of data ?? []) {
+        // Filter out cipher users from counts for non-cipher viewers
+        if (!isCipher && cipherUserIds.includes(row.user_id)) continue;
         counts[row.company_id] = (counts[row.company_id] || 0) + 1;
       }
       return counts;
     },
     enabled: companies.length > 0,
   });
+
+  // Check registration status for no-companies redirect logic
+  const { data: regStatus, isLoading: regLoading } = useQuery({
+    queryKey: ["registration-status-redirect", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("registration_requests")
+        .select("status")
+        .eq("user_id", user.id)
+        .order("requested_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id && !isCipher && companies.length === 0 && !isLoading,
+  });
+
+  // Auto-redirect to join page when user has no companies and no pending/rejected status
+  useEffect(() => {
+    if (isLoading || regLoading) return;
+    if (companies.length === 0 && !isCipher) {
+      const status = regStatus?.status;
+      if (!status || (status !== "pending" && status !== "rejected")) {
+        navigate("/companies/join", { replace: true });
+      }
+    }
+  }, [companies.length, isCipher, isLoading, regLoading, regStatus, navigate]);
 
   const handleSelectCompany = async (companyId: string) => {
     await switchCompany(companyId);
@@ -162,7 +194,7 @@ export default function CompanySelection() {
             {companies.map((company) => (
               <Card
                 key={company.id}
-                className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
+                className="group cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
                 onClick={() => handleSelectCompany(company.id)}
               >
                 <CardHeader className="pb-2">
@@ -182,6 +214,7 @@ export default function CompanySelection() {
                         )}
                       </div>
                     </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </CardHeader>
                 <CardContent className="flex items-center justify-between pt-0">

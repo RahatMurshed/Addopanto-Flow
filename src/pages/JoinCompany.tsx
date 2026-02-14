@@ -27,6 +27,7 @@ export default function JoinCompany() {
   const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [joiningCompanyId, setJoiningCompanyId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const { data: allCompanies = [] } = useQuery({
@@ -99,7 +100,7 @@ export default function JoinCompany() {
   };
 
   const handleCipherJoin = async (companyId: string) => {
-    setLoading(true);
+    setJoiningCompanyId(companyId);
     try {
       const { data, error } = await supabase.functions.invoke("company-join", {
         body: { action: "cipher-join", companyId },
@@ -114,7 +115,7 @@ export default function JoinCompany() {
     } catch (err: any) {
       toast({ title: "Failed to join", description: err.message, variant: "destructive" });
     }
-    setLoading(false);
+    setJoiningCompanyId(null);
   };
 
   const handleJoinWithInvite = async () => {
@@ -254,11 +255,13 @@ export default function JoinCompany() {
                 ) : (
                   filteredCompanies.map((company) => {
                     const isPending = pendingRequests.includes(company.id);
+                    const isJoining = joiningCompanyId === company.id;
+                    const anyJoining = joiningCompanyId !== null;
                     return (
                       <Card
                         key={company.id}
                         className={`cursor-pointer transition-all ${isPending ? "opacity-60" : "hover:border-primary/50 hover:shadow-sm"}`}
-                        onClick={() => !isPending && setSelectedCompany(company)}
+                        onClick={() => !isPending && !anyJoining && setSelectedCompany(company)}
                       >
                         <CardContent className="flex items-center justify-between py-4">
                           <div className="flex items-center gap-3">
@@ -284,14 +287,14 @@ export default function JoinCompany() {
                             <Button
                               size="sm"
                               variant="secondary"
-                              disabled={loading}
+                              disabled={anyJoining}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleCipherJoin(company.id);
                               }}
                             >
-                              {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-1 h-3 w-3" />}
-                              Join
+                              {isJoining ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-1 h-3 w-3" />}
+                              {isJoining ? "Joining..." : "Join"}
                             </Button>
                           ) : (
                             <KeyRound className="h-4 w-4 text-muted-foreground" />
