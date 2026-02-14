@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudents, useCreateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
-import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ export default function Students() {
     sortOrder: filters.sortOrder,
   });
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete } = useRole();
+  const { canAddRevenue, canEdit, canDelete } = useCompany();
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   const navigate = useNavigate();

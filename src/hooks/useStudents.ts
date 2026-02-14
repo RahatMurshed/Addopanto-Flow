@@ -110,7 +110,11 @@ export function useCreateStudent() {
       if (!activeCompanyId) throw new Error("No active company");
       const { data, error } = await supabase
         .from("students")
-        .insert({ ...student, user_id: user.id, company_id: activeCompanyId } as any)
+        .insert({
+          ...student,
+          user_id: user.id,
+          company_id: activeCompanyId,
+        })
         .select()
         .single();
       if (error) throw error;
@@ -123,7 +127,7 @@ export function useCreateStudent() {
           effective_from: student.billing_start_month,
           user_id: user.id,
           company_id: activeCompanyId,
-        } as any);
+        });
       }
 
       return data as Student;
@@ -141,7 +145,7 @@ export function useUpdateStudent() {
     mutationFn: async ({ id, ...updates }: Partial<StudentInsert> & { id: string }) => {
       const { data, error } = await supabase
         .from("students")
-        .update(updates as any)
+        .update(updates)
         .eq("id", id)
         .select()
         .single();

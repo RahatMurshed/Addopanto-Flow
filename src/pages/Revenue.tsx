@@ -10,7 +10,7 @@ import {
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,8 +61,8 @@ export default function Revenue() {
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   
-  // Role-based permissions
-  const { canAddRevenue, canEdit, canDelete, isModerator } = useRole();
+  // Company-level permissions
+  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator } = useCompany();
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();

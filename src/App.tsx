@@ -27,7 +27,12 @@ import UserManagement from "@/pages/UserManagement";
 import CompanyMembers from "@/pages/CompanyMembers";
 import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 2, staleTime: 30_000 },
+    mutations: { retry: 0 },
+  },
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
