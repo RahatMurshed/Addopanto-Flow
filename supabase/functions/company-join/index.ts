@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +14,77 @@ const json = (status: number, body: unknown) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+// --- Zod schemas per action ---
+
+const uuidField = z.string().uuid("Invalid ID format");
+
+const permissionsSchema = z.object({
+  can_add_revenue: z.boolean().optional().default(false),
+  can_add_expense: z.boolean().optional().default(false),
+  can_add_expense_source: z.boolean().optional().default(false),
+  can_transfer: z.boolean().optional().default(false),
+  can_view_reports: z.boolean().optional().default(false),
+  can_manage_students: z.boolean().optional().default(false),
+}).optional();
+
+const createCompanySchema = z.object({
+  action: z.literal("create-company"),
+  name: z.string().trim().min(1, "Name required").max(100, "Name too long"),
+  slug: z.string().trim().min(1, "Slug required").max(50, "Slug too long")
+    .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens only"),
+  description: z.string().max(500, "Description too long").optional().nullable(),
+  joinPassword: z.string().max(100, "Password too long").optional().nullable(),
+  currency: z.string().max(10, "Currency code too long").optional(),
+});
+
+const joinWithPasswordSchema = z.object({
+  action: z.literal("join-with-password"),
+  companyId: uuidField,
+  password: z.string().min(1, "Password required").max(100, "Password too long"),
+  message: z.string().max(500, "Message too long").optional().nullable(),
+});
+
+const joinWithInviteSchema = z.object({
+  action: z.literal("join-with-invite"),
+  inviteCode: z.string().trim().min(1, "Invite code required").max(12, "Invite code too long"),
+});
+
+const generateInviteSchema = z.object({
+  action: z.literal("generate-invite"),
+  companyId: uuidField,
+});
+
+const approveJoinSchema = z.object({
+  action: z.literal("approve-join-request"),
+  requestId: uuidField,
+  companyId: uuidField,
+  permissions: permissionsSchema,
+});
+
+const rejectJoinSchema = z.object({
+  action: z.literal("reject-join-request"),
+  requestId: uuidField,
+  companyId: uuidField,
+  reason: z.string().max(500, "Reason too long").optional().nullable(),
+});
+
+const acceptRejectedSchema = z.object({
+  action: z.literal("accept-rejected-join-request"),
+  requestId: uuidField,
+  companyId: uuidField,
+  targetUserId: uuidField,
+  permissions: permissionsSchema,
+});
+
+const cipherJoinSchema = z.object({
+  action: z.literal("cipher-join"),
+  companyId: uuidField,
+});
+
+const actionSchema = z.object({
+  action: z.string().min(1, "Action required").max(50, "Action too long"),
+}).passthrough();
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -38,8 +110,15 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const body = await req.json();
-    const { action } = body;
+    const rawBody = await req.json().catch(() => null);
+    
+    // Validate base action field first
+    const baseCheck = actionSchema.safeParse(rawBody);
+    if (!baseCheck.success) {
+      return json(400, { error: baseCheck.error.issues[0]?.message || "Invalid input" });
+    }
+
+    const { action } = baseCheck.data;
 
     // Check if user is cipher
     const { data: cipherCheck } = await adminClient
@@ -65,10 +144,11 @@ Deno.serve(async (req) => {
     if (action === "create-company") {
       if (!isCipher) return json(403, { error: "Only super admins can create companies" });
 
-      const { name, slug, description, joinPassword, currency } = body;
-      if (!name || !slug) return json(400, { error: "Name and slug required" });
+      const parsed = createCompanySchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
 
-      // Hash the password before storing
+      const { name, slug, description, joinPassword, currency } = parsed.data;
+
       const hashedPassword = joinPassword ? await bcrypt.hash(joinPassword) : null;
 
       const { data: company, error: createError } = await adminClient
@@ -89,7 +169,6 @@ Deno.serve(async (req) => {
         return json(500, { error: createError.message });
       }
 
-      // Add creator as admin
       await adminClient
         .from("company_memberships")
         .insert({
@@ -109,8 +188,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "join-with-password") {
-      const { companyId, password, message } = body;
-      if (!companyId || !password) return json(400, { error: "Company ID and password required" });
+      const parsed = joinWithPasswordSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { companyId, password, message } = parsed.data;
 
       // Check if banned from this company
       const { data: banCheck } = await adminClient
@@ -137,12 +218,10 @@ Deno.serve(async (req) => {
 
       if (!company || !company.join_password) return json(400, { error: "Company does not accept password joins" });
       
-      // Compare with bcrypt - support both hashed and legacy plaintext passwords
       let passwordValid = false;
       try {
         passwordValid = await bcrypt.compare(password, company.join_password);
       } catch {
-        // Fallback: direct comparison for legacy plaintext passwords
         passwordValid = company.join_password === password;
       }
       if (!passwordValid) return json(400, { error: "Incorrect password" });
@@ -168,7 +247,6 @@ Deno.serve(async (req) => {
 
       if (existingReq) return json(400, { error: "Join request already pending" });
 
-      // Create join request
       await adminClient
         .from("company_join_requests")
         .insert({
@@ -181,10 +259,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === "join-with-invite") {
-      const { inviteCode } = body;
-      if (!inviteCode) return json(400, { error: "Invite code required" });
+      const parsed = joinWithInviteSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
 
-      // Find company with this invite code
+      const { inviteCode } = parsed.data;
+
       const { data: company } = await adminClient
         .from("companies")
         .select("id")
@@ -193,7 +272,6 @@ Deno.serve(async (req) => {
 
       if (!company) return json(400, { error: "Invalid invite code" });
 
-      // Check if already a member
       const { data: existing } = await adminClient
         .from("company_memberships")
         .select("id")
@@ -203,7 +281,6 @@ Deno.serve(async (req) => {
 
       if (existing) return json(400, { error: "Already a member" });
 
-      // Auto-join as viewer
       await adminClient
         .from("company_memberships")
         .insert({
@@ -213,7 +290,6 @@ Deno.serve(async (req) => {
           status: "active",
         });
 
-      // Set as active company
       await adminClient
         .from("user_profiles")
         .update({ active_company_id: company.id })
@@ -223,8 +299,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "generate-invite") {
-      const { companyId } = body;
-      if (!companyId) return json(400, { error: "Company ID required" });
+      const parsed = generateInviteSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { companyId } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
@@ -241,12 +319,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "approve-join-request") {
-      const { requestId, companyId, permissions } = body;
-      if (!requestId || !companyId) return json(400, { error: "Request ID and company ID required" });
+      const parsed = approveJoinSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { requestId, companyId, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
-      // Get the join request
       const { data: joinReq, error: reqError } = await adminClient
         .from("company_join_requests")
         .select("*")
@@ -257,9 +336,8 @@ Deno.serve(async (req) => {
 
       if (reqError || !joinReq) return json(400, { error: "Join request not found or already processed" });
 
-      const perms = permissions || {};
+      const p = perms || {};
 
-      // Update request status
       const { error: updateError } = await adminClient
         .from("company_join_requests")
         .update({
@@ -271,7 +349,6 @@ Deno.serve(async (req) => {
 
       if (updateError) return json(500, { error: "Failed to update request" });
 
-      // Create membership with permissions
       const { error: memberError } = await adminClient
         .from("company_memberships")
         .insert({
@@ -280,12 +357,12 @@ Deno.serve(async (req) => {
           role: "moderator",
           status: "active",
           approved_by: user.id,
-          can_add_revenue: perms.can_add_revenue ?? false,
-          can_add_expense: perms.can_add_expense ?? false,
-          can_add_expense_source: perms.can_add_expense_source ?? false,
-          can_transfer: perms.can_transfer ?? false,
-          can_view_reports: perms.can_view_reports ?? false,
-          can_manage_students: perms.can_manage_students ?? false,
+          can_add_revenue: p.can_add_revenue ?? false,
+          can_add_expense: p.can_add_expense ?? false,
+          can_add_expense_source: p.can_add_expense_source ?? false,
+          can_transfer: p.can_transfer ?? false,
+          can_view_reports: p.can_view_reports ?? false,
+          can_manage_students: p.can_manage_students ?? false,
         });
 
       if (memberError) return json(500, { error: "Failed to create membership: " + memberError.message });
@@ -294,12 +371,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "reject-join-request") {
-      const { requestId, companyId, reason } = body;
-      if (!requestId || !companyId) return json(400, { error: "Request ID and company ID required" });
+      const parsed = rejectJoinSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { requestId, companyId, reason } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
-      // Get the join request
       const { data: joinReq, error: reqError } = await adminClient
         .from("company_join_requests")
         .select("*")
@@ -310,7 +388,6 @@ Deno.serve(async (req) => {
 
       if (reqError || !joinReq) return json(400, { error: "Join request not found or already processed" });
 
-      // Update with rejection + 1-day ban
       const bannedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const { error: updateError } = await adminClient
         .from("company_join_requests")
@@ -325,7 +402,6 @@ Deno.serve(async (req) => {
 
       if (updateError) return json(500, { error: "Failed to update request" });
 
-      // Force logout the rejected user
       try {
         await adminClient.auth.admin.signOut(joinReq.user_id, "global");
       } catch (_e) { /* non-fatal */ }
@@ -334,14 +410,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === "accept-rejected-join-request") {
-      const { requestId, companyId, permissions } = body;
-      if (!requestId || !companyId) return json(400, { error: "Request ID and company ID required" });
+      const parsed = acceptRejectedSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { requestId, companyId, targetUserId, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
-      const perms = permissions || {};
+      const p = perms || {};
 
-      // Update request: approved, clear ban
       const { error: updateError } = await adminClient
         .from("company_join_requests")
         .update({
@@ -356,21 +433,20 @@ Deno.serve(async (req) => {
 
       if (updateError) return json(500, { error: "Failed to update request" });
 
-      // Create membership
       const { error: memberError } = await adminClient
         .from("company_memberships")
         .insert({
-          user_id: body.targetUserId,
+          user_id: targetUserId,
           company_id: companyId,
           role: "moderator",
           status: "active",
           approved_by: user.id,
-          can_add_revenue: perms.can_add_revenue ?? false,
-          can_add_expense: perms.can_add_expense ?? false,
-          can_add_expense_source: perms.can_add_expense_source ?? false,
-          can_transfer: perms.can_transfer ?? false,
-          can_view_reports: perms.can_view_reports ?? false,
-          can_manage_students: perms.can_manage_students ?? false,
+          can_add_revenue: p.can_add_revenue ?? false,
+          can_add_expense: p.can_add_expense ?? false,
+          can_add_expense_source: p.can_add_expense_source ?? false,
+          can_transfer: p.can_transfer ?? false,
+          can_view_reports: p.can_view_reports ?? false,
+          can_manage_students: p.can_manage_students ?? false,
         });
 
       if (memberError) return json(500, { error: "Failed to create membership: " + memberError.message });
@@ -379,11 +455,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "cipher-join") {
-      const { companyId } = body;
-      if (!companyId) return json(400, { error: "Company ID required" });
+      const parsed = cipherJoinSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { companyId } = parsed.data;
       if (!isCipher) return json(403, { error: "Only super admins can use this action" });
 
-      // Check if already a member
       const { data: existing } = await adminClient
         .from("company_memberships")
         .select("id")
@@ -393,7 +470,6 @@ Deno.serve(async (req) => {
 
       if (existing) return json(400, { error: "Already a member of this company" });
 
-      // Auto-join as admin with all permissions
       const { error: memberError } = await adminClient
         .from("company_memberships")
         .insert({
@@ -411,7 +487,6 @@ Deno.serve(async (req) => {
 
       if (memberError) return json(500, { error: "Failed to join: " + memberError.message });
 
-      // Set as active company
       await adminClient
         .from("user_profiles")
         .update({ active_company_id: companyId })

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,16 +14,24 @@ function jsonResponse(status: number, body: unknown) {
   });
 }
 
+const checkBanSchema = z.object({
+  email: z.string().trim().email("Invalid email format").max(255, "Email too long"),
+});
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { email } = await req.json();
-    if (!email || typeof email !== "string") {
-      return jsonResponse(400, { error: "Missing email" });
+    const rawBody = await req.json().catch(() => null);
+    const parsed = checkBanSchema.safeParse(rawBody);
+
+    if (!parsed.success) {
+      return jsonResponse(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
     }
+
+    const { email } = parsed.data;
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
