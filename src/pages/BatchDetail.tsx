@@ -480,6 +480,7 @@ export default function BatchDetail() {
                       let filteredPaid = 0;
                       let filteredPending = 0;
                       let worstStatus: "paid" | "pending" | "overdue" | "partial" | "na" = "na";
+                      let pendingMonthCount = 0;
 
                       if (sum && effMonthly > 0) {
                         const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
@@ -492,15 +493,17 @@ export default function BatchDetail() {
                         }
 
                         if (includedMonths.length > 0) {
-                          const hasOverdue = sum.monthlyOverdueMonths.some((m) => isMonthIncluded(m, filterValue));
-                          const hasPartial = sum.monthlyPartialMonths.some((m) => isMonthIncluded(m, filterValue));
-                          const hasPending = sum.monthlyPendingMonths.some((m) => isMonthIncluded(m, filterValue));
+                          const overdueMonths = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
+                          const partialMonths = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
+                          const pendingMonths = sum.monthlyPendingMonths.filter((m) => isMonthIncluded(m, filterValue));
                           const allPaid = includedMonths.every((m) => sum.monthlyPaidMonths.includes(m));
 
-                          if (hasOverdue) worstStatus = "overdue";
-                          else if (hasPartial) worstStatus = "partial";
-                          else if (hasPending) worstStatus = "pending";
+                          if (overdueMonths.length > 0) worstStatus = "overdue";
+                          else if (partialMonths.length > 0) worstStatus = "partial";
+                          else if (pendingMonths.length > 0) worstStatus = "pending";
                           else if (allPaid) worstStatus = "paid";
+
+                          pendingMonthCount = pendingMonths.length + overdueMonths.length + partialMonths.length;
                         }
                       }
 
@@ -548,11 +551,20 @@ export default function BatchDetail() {
                                   {worstStatus === "paid" ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
                                   ) : worstStatus === "overdue" ? (
-                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">Overdue</Badge>
+                                    <>
+                                      <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">Overdue</Badge>
+                                      {pendingMonthCount > 0 && <span className="text-xs text-muted-foreground">{pendingMonthCount} month{pendingMonthCount !== 1 ? "s" : ""}</span>}
+                                    </>
                                   ) : worstStatus === "partial" ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Partial</Badge>
+                                    <>
+                                      <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Partial</Badge>
+                                      {pendingMonthCount > 0 && <span className="text-xs text-muted-foreground">{pendingMonthCount} month{pendingMonthCount !== 1 ? "s" : ""}</span>}
+                                    </>
                                   ) : worstStatus === "pending" ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Pending</Badge>
+                                    <>
+                                      <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Pending</Badge>
+                                      {pendingMonthCount > 0 && <span className="text-xs text-muted-foreground">{pendingMonthCount} month{pendingMonthCount !== 1 ? "s" : ""}</span>}
+                                    </>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
