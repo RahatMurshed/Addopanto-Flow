@@ -64,7 +64,7 @@ export default function Expenses() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany } = useCompany();
+  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany, isDataEntryOperator, canEditExpense, canDeleteExpense } = useCompany();
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -430,7 +430,7 @@ export default function Expenses() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Expense Source</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
-                    {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
+                    {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && <TableHead className="w-24">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -458,10 +458,10 @@ export default function Expenses() {
                       <TableCell className="hidden max-w-xs truncate md:table-cell">
                         {exp.description || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      {(canEdit || canDelete) && (
+                      {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && (
                         <TableCell>
                           <div className="flex gap-1">
-                            {canEdit && (
+                            {(canEdit || canEditExpense) && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -474,7 +474,7 @@ export default function Expenses() {
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             )}
-                            {canDelete && (
+                            {(canDelete || canDeleteExpense) && (
                               <Button
                                 variant="ghost"
                                 size="icon"

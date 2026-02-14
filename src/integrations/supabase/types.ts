@@ -253,9 +253,22 @@ export type Database = {
       company_memberships: {
         Row: {
           approved_by: string | null
+          can_add_batch: boolean
           can_add_expense: boolean
           can_add_expense_source: boolean
+          can_add_payment: boolean
           can_add_revenue: boolean
+          can_add_student: boolean
+          can_delete_batch: boolean
+          can_delete_expense: boolean
+          can_delete_payment: boolean
+          can_delete_revenue: boolean
+          can_delete_student: boolean
+          can_edit_batch: boolean
+          can_edit_expense: boolean
+          can_edit_payment: boolean
+          can_edit_revenue: boolean
+          can_edit_student: boolean
           can_manage_students: boolean
           can_transfer: boolean
           can_view_reports: boolean
@@ -268,9 +281,22 @@ export type Database = {
         }
         Insert: {
           approved_by?: string | null
+          can_add_batch?: boolean
           can_add_expense?: boolean
           can_add_expense_source?: boolean
+          can_add_payment?: boolean
           can_add_revenue?: boolean
+          can_add_student?: boolean
+          can_delete_batch?: boolean
+          can_delete_expense?: boolean
+          can_delete_payment?: boolean
+          can_delete_revenue?: boolean
+          can_delete_student?: boolean
+          can_edit_batch?: boolean
+          can_edit_expense?: boolean
+          can_edit_payment?: boolean
+          can_edit_revenue?: boolean
+          can_edit_student?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
           can_view_reports?: boolean
@@ -283,9 +309,22 @@ export type Database = {
         }
         Update: {
           approved_by?: string | null
+          can_add_batch?: boolean
           can_add_expense?: boolean
           can_add_expense_source?: boolean
+          can_add_payment?: boolean
           can_add_revenue?: boolean
+          can_add_student?: boolean
+          can_delete_batch?: boolean
+          can_delete_expense?: boolean
+          can_delete_payment?: boolean
+          can_delete_revenue?: boolean
+          can_delete_student?: boolean
+          can_edit_batch?: boolean
+          can_edit_expense?: boolean
+          can_edit_payment?: boolean
+          can_edit_revenue?: boolean
+          can_edit_student?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
           can_view_reports?: boolean
@@ -1078,6 +1117,10 @@ export type Database = {
       can_edit_delete: { Args: { _user_id: string }; Returns: boolean }
       can_transfer: { Args: { _user_id: string }; Returns: boolean }
       can_view_user: { Args: { _target_user_id: string }; Returns: boolean }
+      company_can_add_batch: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       company_can_add_expense: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -1086,11 +1129,59 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      company_can_add_payment: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       company_can_add_revenue: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      company_can_add_student: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_delete_batch: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_delete_expense: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_delete_payment: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_delete_revenue: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_delete_student: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_edit_batch: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       company_can_edit_delete: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_edit_expense: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_edit_payment: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_edit_revenue: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_edit_student: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
@@ -1126,7 +1217,7 @@ export type Database = {
     }
     Enums: {
       app_role: "cipher" | "admin" | "moderator" | "user"
-      company_role: "admin" | "moderator" | "viewer"
+      company_role: "admin" | "moderator" | "viewer" | "data_entry_operator"
       student_status: "active" | "inactive" | "graduated"
     }
     CompositeTypes: {
@@ -1256,7 +1347,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["cipher", "admin", "moderator", "user"],
-      company_role: ["admin", "moderator", "viewer"],
+      company_role: ["admin", "moderator", "viewer", "data_entry_operator"],
       student_status: ["active", "inactive", "graduated"],
     },
   },

@@ -40,11 +40,6 @@ import { UserAvatar } from "@/components/UserAvatar";
 
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Batches", href: "/batches", icon: Layers },
-  { label: "Expense Sources", href: "/khatas", icon: Wallet },
-  { label: "Revenue", href: "/revenue", icon: TrendingUp },
-  { label: "Expenses", href: "/expenses", icon: Receipt },
-  { label: "Reports", href: "/reports", icon: FileText },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -57,18 +52,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isCipher,
     canManageMembers,
     canViewMembers,
+    isDataEntryOperator,
+    canAddStudent, canEditStudent, canDeleteStudent,
+    canAddBatch, canEditBatch, canDeleteBatch,
+    canAddRevenue, canEditRevenue, canDeleteRevenue,
+    canAddExpense, canEditExpense, canDeleteExpense,
+    canAddExpenseSource,
   } = useCompany();
   const pendingCount = usePendingRequestsCount();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Build nav items dynamically based on role
+  const showStudents = !isDataEntryOperator || canAddStudent || canEditStudent || canDeleteStudent;
+  const showBatches = !isDataEntryOperator || canAddBatch || canEditBatch || canDeleteBatch;
+  const showRevenue = !isDataEntryOperator || canAddRevenue || canEditRevenue || canDeleteRevenue;
+  const showExpenses = !isDataEntryOperator || canAddExpense || canEditExpense || canDeleteExpense;
+  const showKhatas = !isDataEntryOperator || canAddExpenseSource;
+  const showReports = !isDataEntryOperator;
+
   const navItems = [
     ...baseNavItems,
-    ...((isCompanyAdmin || isCipher) ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
-    ...(canViewMembers ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
+    ...(showBatches ? [{ label: "Batches", href: "/batches", icon: Layers }] : []),
+    ...(showStudents ? [{ label: "Students", href: "/students", icon: GraduationCap }] : []),
+    ...(showKhatas ? [{ label: "Expense Sources", href: "/khatas", icon: Wallet }] : []),
+    ...(showRevenue ? [{ label: "Revenue", href: "/revenue", icon: TrendingUp }] : []),
+    ...(showExpenses ? [{ label: "Expenses", href: "/expenses", icon: Receipt }] : []),
+    ...(showReports ? [{ label: "Reports", href: "/reports", icon: FileText }] : []),
+    ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
+    ...(canViewMembers && !isDataEntryOperator ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
     ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
-    ...((isCompanyAdmin || isCipher) ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
+    ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
   ];
 
   const handleLogout = async () => {
@@ -91,42 +106,51 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/">
             <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
           </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">
-                <div className="flex items-center gap-2 overflow-hidden">
-                  {activeCompany?.logo_url ? (
-                    <img src={activeCompany.logo_url} alt="" className="h-5 w-5 rounded object-cover" />
-                  ) : (
-                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sidebar-primary text-sidebar-primary-foreground">
-                      <Building2 className="h-3 w-3" />
-                    </div>
-                  )}
-                  <span className="truncate text-sm font-medium">{activeCompany?.name || "Select Business"}</span>
-                </div>
-                <ChevronDown className="h-4 w-4 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>My Businesses</DropdownMenuLabel>
-              {companies.map((company) => (
-                <DropdownMenuItem key={company.id} onClick={() => handleCompanySwitch(company.id)} className="gap-2">
-                  <Building2 className="h-4 w-4" />
-                  <span className="truncate">{company.name}</span>
-                  {activeCompany?.id === company.id && <Badge variant="secondary" className="ml-auto text-[10px]">Active</Badge>}
+          {!isDataEntryOperator ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    {activeCompany?.logo_url ? (
+                      <img src={activeCompany.logo_url} alt="" className="h-5 w-5 rounded object-cover" />
+                    ) : (
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sidebar-primary text-sidebar-primary-foreground">
+                        <Building2 className="h-3 w-3" />
+                      </div>
+                    )}
+                    <span className="truncate text-sm font-medium">{activeCompany?.name || "Select Business"}</span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>My Businesses</DropdownMenuLabel>
+                {companies.map((company) => (
+                  <DropdownMenuItem key={company.id} onClick={() => handleCompanySwitch(company.id)} className="gap-2">
+                    <Building2 className="h-4 w-4" />
+                    <span className="truncate">{company.name}</span>
+                    {activeCompany?.id === company.id && <Badge variant="secondary" className="ml-auto text-[10px]">Active</Badge>}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/companies/join")} className="gap-2 text-muted-foreground">
+                  <Plus className="h-4 w-4" /> Join another business
                 </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/companies/join")} className="gap-2 text-muted-foreground">
-                <Plus className="h-4 w-4" /> Join another business
-              </DropdownMenuItem>
-              {isCipher && (
-                <DropdownMenuItem onClick={() => navigate("/companies/create")} className="gap-2 text-muted-foreground">
-                  <Plus className="h-4 w-4" /> Create new business
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {isCipher && (
+                  <DropdownMenuItem onClick={() => navigate("/companies/create")} className="gap-2 text-muted-foreground">
+                    <Plus className="h-4 w-4" /> Create new business
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sidebar-primary text-sidebar-primary-foreground">
+                <Building2 className="h-3 w-3" />
+              </div>
+              <span className="truncate text-sm font-medium text-sidebar-foreground">{activeCompany?.name || "Business"}</span>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 space-y-1 p-3">

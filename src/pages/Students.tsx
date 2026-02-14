@@ -38,7 +38,7 @@ export default function Students() {
     sortOrder: filters.sortOrder,
   });
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -153,6 +153,11 @@ export default function Students() {
     );
   }
 
+  const effectiveCanAdd = canAddRevenue || canAddStudent;
+  const effectiveCanEdit = canEdit || canEditStudent;
+  const effectiveCanDelete = canDelete || canDeleteStudent;
+  const effectiveCanPayment = canAddRevenue || canAddPayment;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -160,50 +165,53 @@ export default function Students() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Students</h1>
             {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Data Entry</Badge>}
           </div>
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>
-        {canAddRevenue && (
+        {effectiveCanAdd && (
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add Student
           </Button>
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{totalStudents}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-            <GraduationCap className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-primary">{activeStudents}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Admission</CardTitle>
-            <CreditCard className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-yellow-600">{pendingAdmission}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Monthly</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-destructive">{overdueStudents}</p></CardContent>
-        </Card>
-      </div>
+      {/* Summary Cards - hidden for DEO */}
+      {!isDataEntryOperator && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold">{totalStudents}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+              <GraduationCap className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-primary">{activeStudents}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Admission</CardTitle>
+              <CreditCard className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-yellow-600">{pendingAdmission}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Monthly</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-destructive">{overdueStudents}</p></CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Monthly Overdue Section */}
-      {students.length > 0 && (
+      {/* Monthly Overdue Section - hidden for DEO */}
+      {!isDataEntryOperator && students.length > 0 && (
         <StudentOverdueSection
           students={students}
           studentSummaries={studentSummaries}
@@ -218,7 +226,7 @@ export default function Students() {
             <div className="mb-4 rounded-full bg-muted p-4"><GraduationCap className="h-8 w-8 text-muted-foreground" /></div>
             <h3 className="mb-2 text-lg font-semibold">No students yet</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">Add your first student to start tracking admission fees and monthly tuition payments.</p>
-            {canAddRevenue && <Button onClick={() => setDialogOpen(true)}>Add Student</Button>}
+            {effectiveCanAdd && <Button onClick={() => setDialogOpen(true)}>Add Student</Button>}
           </CardContent>
         </Card>
       ) : (
@@ -255,10 +263,10 @@ export default function Students() {
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Student ID</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Admission</TableHead>
-                      <TableHead>Monthly</TableHead>
-                      <TableHead className="hidden md:table-cell">Total Paid</TableHead>
-                      <TableHead className="hidden md:table-cell">Total Pending</TableHead>
+                      {!isDataEntryOperator && <TableHead>Admission</TableHead>}
+                      {!isDataEntryOperator && <TableHead>Monthly</TableHead>}
+                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">Total Paid</TableHead>}
+                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">Total Pending</TableHead>}
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -272,50 +280,60 @@ export default function Students() {
                           <TableCell>
                             <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">{s.status}</Badge>
                           </TableCell>
-                          <TableCell>
-                            {sum.admissionTotal === 0 ? (
-                              <span className="text-muted-foreground text-sm">N/A</span>
-                            ) : sum.admissionStatus === "paid" ? (
-                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                            ) : sum.admissionStatus === "partial" ? (
-                              <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
-                                {formatCurrency(sum.admissionPaid, currency)}/{formatCurrency(sum.admissionTotal, currency)}
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive">Pending</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {Number(s.monthly_fee_amount) === 0 ? (
-                              <span className="text-muted-foreground text-sm">N/A</span>
-                            ) : (() => {
-                              const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
-                              return totalPendingMonths > 0 ? (
-                                <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{totalPendingMonths} months pending</Badge>
-                              ) : sum.monthlyPaidMonths.length > 0 ? (
+                          {!isDataEntryOperator && (
+                            <TableCell>
+                              {sum.admissionTotal === 0 ? (
+                                <span className="text-muted-foreground text-sm">N/A</span>
+                              ) : sum.admissionStatus === "paid" ? (
                                 <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                              ) : sum.admissionStatus === "partial" ? (
+                                <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
+                                  {formatCurrency(sum.admissionPaid, currency)}/{formatCurrency(sum.admissionTotal, currency)}
+                                </Badge>
                               ) : (
-                                <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell font-semibold text-primary">
-                            {formatCurrency(sum.totalPaid, currency)}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell font-semibold text-destructive">
-                            {sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
-                          </TableCell>
+                                <Badge variant="destructive">Pending</Badge>
+                              )}
+                            </TableCell>
+                          )}
+                          {!isDataEntryOperator && (
+                            <TableCell>
+                              {Number(s.monthly_fee_amount) === 0 ? (
+                                <span className="text-muted-foreground text-sm">N/A</span>
+                              ) : (() => {
+                                const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
+                                return totalPendingMonths > 0 ? (
+                                  <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{totalPendingMonths} months pending</Badge>
+                                ) : sum.monthlyPaidMonths.length > 0 ? (
+                                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                                ) : (
+                                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
+                                );
+                              })()}
+                            </TableCell>
+                          )}
+                          {!isDataEntryOperator && (
+                            <TableCell className="hidden md:table-cell font-semibold text-primary">
+                              {formatCurrency(sum.totalPaid, currency)}
+                            </TableCell>
+                          )}
+                          {!isDataEntryOperator && (
+                            <TableCell className="hidden md:table-cell font-semibold text-destructive">
+                              {sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {canAddRevenue && (
+                              {!isDataEntryOperator && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {effectiveCanPayment && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
                                   <CreditCard className="h-4 w-4" />
                                 </Button>
                               )}
-                              {canDelete && (
+                              {effectiveCanDelete && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(s.id)}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

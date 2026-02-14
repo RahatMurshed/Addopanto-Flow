@@ -22,13 +22,27 @@ export interface CompanyMembership {
   id: string;
   user_id: string;
   company_id: string;
-  role: "admin" | "moderator" | "viewer";
+  role: "admin" | "moderator" | "viewer" | "data_entry_operator";
   can_add_revenue: boolean;
   can_add_expense: boolean;
   can_add_expense_source: boolean;
   can_transfer: boolean;
   can_view_reports: boolean;
   can_manage_students: boolean;
+  // Granular DEO permissions
+  can_add_student: boolean;
+  can_edit_student: boolean;
+  can_delete_student: boolean;
+  can_add_payment: boolean;
+  can_edit_payment: boolean;
+  can_delete_payment: boolean;
+  can_add_batch: boolean;
+  can_edit_batch: boolean;
+  can_delete_batch: boolean;
+  can_edit_revenue: boolean;
+  can_delete_revenue: boolean;
+  can_edit_expense: boolean;
+  can_delete_expense: boolean;
   status: string;
   joined_at: string;
   approved_by: string | null;
@@ -51,6 +65,7 @@ interface CompanyContextType {
   isCompanyAdmin: boolean;
   isCompanyModerator: boolean;
   isCompanyViewer: boolean;
+  isDataEntryOperator: boolean;
 
   // Granular permissions (admin always has all)
   canAddRevenue: boolean;
@@ -63,6 +78,21 @@ interface CompanyContextType {
   canDelete: boolean;
   canManageMembers: boolean;
   canViewMembers: boolean;
+
+  // Granular DEO permissions
+  canAddStudent: boolean;
+  canEditStudent: boolean;
+  canDeleteStudent: boolean;
+  canAddPayment: boolean;
+  canEditPayment: boolean;
+  canDeletePayment: boolean;
+  canAddBatch: boolean;
+  canEditBatch: boolean;
+  canDeleteBatch: boolean;
+  canEditRevenue: boolean;
+  canDeleteRevenue: boolean;
+  canEditExpense: boolean;
+  canDeleteExpense: boolean;
 
   // Actions
   switchCompany: (companyId: string) => Promise<void>;
@@ -149,8 +179,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
   const isCompanyModerator = membership?.role === "moderator";
   const isCompanyViewer = membership?.role === "viewer";
+  const isDataEntryOperator = membership?.role === "data_entry_operator";
 
-  // Permissions: admin and cipher get everything
+  // Existing permissions: admin and cipher get everything
   const canAddRevenue = isCompanyAdmin || (membership?.can_add_revenue ?? false);
   const canAddExpense = isCompanyAdmin || (membership?.can_add_expense ?? false);
   const canAddExpenseSource = isCompanyAdmin || (membership?.can_add_expense_source ?? false);
@@ -161,6 +192,21 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canDelete = isCompanyAdmin;
   const canManageMembers = isCompanyAdmin;
   const canViewMembers = isCompanyAdmin || isCompanyModerator;
+
+  // Granular DEO permissions (admin/cipher always have all)
+  const canAddStudent = isCompanyAdmin || (membership?.can_add_student ?? false);
+  const canEditStudent = isCompanyAdmin || (membership?.can_edit_student ?? false);
+  const canDeleteStudent = isCompanyAdmin || (membership?.can_delete_student ?? false);
+  const canAddPayment = isCompanyAdmin || (membership?.can_add_payment ?? false);
+  const canEditPayment = isCompanyAdmin || (membership?.can_edit_payment ?? false);
+  const canDeletePayment = isCompanyAdmin || (membership?.can_delete_payment ?? false);
+  const canAddBatch = isCompanyAdmin || (membership?.can_add_batch ?? false);
+  const canEditBatch = isCompanyAdmin || (membership?.can_edit_batch ?? false);
+  const canDeleteBatch = isCompanyAdmin || (membership?.can_delete_batch ?? false);
+  const canEditRevenue = isCompanyAdmin || (membership?.can_edit_revenue ?? false);
+  const canDeleteRevenue = isCompanyAdmin || (membership?.can_delete_revenue ?? false);
+  const canEditExpense = isCompanyAdmin || (membership?.can_edit_expense ?? false);
+  const canDeleteExpense = isCompanyAdmin || (membership?.can_delete_expense ?? false);
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -209,6 +255,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       isCompanyAdmin,
       isCompanyModerator,
       isCompanyViewer,
+      isDataEntryOperator,
       canAddRevenue,
       canAddExpense,
       canAddExpenseSource,
@@ -219,6 +266,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canDelete,
       canManageMembers,
       canViewMembers,
+      canAddStudent,
+      canEditStudent,
+      canDeleteStudent,
+      canAddPayment,
+      canEditPayment,
+      canDeletePayment,
+      canAddBatch,
+      canEditBatch,
+      canDeleteBatch,
+      canEditRevenue,
+      canDeleteRevenue,
+      canEditExpense,
+      canDeleteExpense,
       switchCompany,
       refetch,
     }}>

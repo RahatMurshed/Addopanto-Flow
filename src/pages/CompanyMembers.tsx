@@ -30,6 +30,7 @@ import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
+import { OperatorPermissionMatrix } from "@/components/OperatorPermissionMatrix";
 
 export default function CompanyMembers() {
   const { user } = useAuth();
@@ -201,8 +202,10 @@ export default function CompanyMembers() {
       admin: "bg-primary/15 text-primary border-primary/30",
       moderator: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
       viewer: "bg-muted text-muted-foreground",
+      data_entry_operator: "bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30",
     };
-    return <Badge className={colors[role] || ""}>{role}</Badge>;
+    const labels: Record<string, string> = { data_entry_operator: "Data Entry Operator" };
+    return <Badge className={colors[role] || ""}>{labels[role] || role}</Badge>;
   };
 
   return (
@@ -297,6 +300,7 @@ export default function CompanyMembers() {
                                 {isCipher && <SelectItem value="admin">Admin</SelectItem>}
                                 <SelectItem value="moderator">Moderator</SelectItem>
                                 <SelectItem value="viewer">Viewer</SelectItem>
+                                <SelectItem value="data_entry_operator">Data Entry Operator</SelectItem>
                               </SelectContent>
                             </Select>
                             )}
@@ -323,7 +327,21 @@ export default function CompanyMembers() {
                             )}
                           </TableCell>
                         )}
-                      </TableRow>
+                        {/* Show DEO Permission Matrix */}
+                        {member.role === "data_entry_operator" && canManageMembers && canModifyMember && (
+                          <tr key={`${member.id}-perms`}>
+                            <td colSpan={10} className="p-3 border-t-0">
+                              <OperatorPermissionMatrix
+                                member={member as any}
+                                disabled={!canModifyMember}
+                                onPermissionChange={(key, value) =>
+                                  updateMemberMutation.mutate({ memberId: member.id, updates: { [key]: value } })
+                                }
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     );
                   })}
                 </TableBody>
