@@ -1,35 +1,84 @@
 
 
-# Global Data Synchronization Fix
+# Add User Name to Signup, Members, and User Management
 
-## Problem
-When you edit a student's admission fee, monthly fee, or delete a student on the Student Detail page, the Dashboard, Revenue, Reports, and Student List pages don't update. The `useUpdateStudent` and `useDeleteStudent` hooks only invalidate `["students"]` but miss all financial query keys that depend on student data.
+## Overview
 
-## What Changes
+Currently the app only collects email and password during signup. This plan adds a **full name** field to the registration flow and displays it across the Members and User Management pages. It also addresses the placement of the User Management page.
 
-### 1. Fix `useUpdateStudent` in `src/hooks/useStudents.ts`
-When a student's admission fee or monthly fee changes, it affects payment summaries, revenue calculations, and dashboard metrics. Add full financial cache invalidation:
-- `student_payments`, `revenues`, `allocations`, `account_balances`
-- `dashboard`, `reports`, `revenue_summary`, `expense_summary`
-- `monthly_fee_history`
+---
 
-### 2. Fix `useDeleteStudent` in `src/hooks/useStudents.ts`
-Deleting a student cascades to delete their payments and linked revenues. Add invalidation for:
-- `revenues`, `allocations`, `account_balances`
-- `dashboard`, `reports`, `revenue_summary`, `expense_summary`
+## Part 1: Add Name to Signup
 
-### 3. Fix `useCreateStudent` in `src/hooks/useStudents.ts`
-Creating a student with a monthly fee inserts into `monthly_fee_history`. Add invalidation for:
-- `monthly_fee_history`, `dashboard`, `reports`
+### Database Change
+- Add a `full_name` text column (nullable) to the `user_profiles` table
+- Update the `handle_new_user()` trigger to accept and store the name from `auth.users.raw_user_meta_data`
 
-### 4. Enable `refetchOnWindowFocus` for multi-user sync
-The global QueryClient in `src/App.tsx` already has `staleTime: 30_000`. Ensure `refetchOnWindowFocus: true` (it's the default, but we'll make it explicit) so when Admin B switches back to the tab, stale data automatically refreshes.
+### Signup Form Changes (Auth.tsx)
+- Add a "Full Name" input field above the email field in the Sign Up tab
+- Pass the name as `user_metadata` in the `signUp` call:
+  ```text
+  supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
+  ```
+- The trigger will read `NEW.raw_user_meta_data->>'full_name'` and store it in `user_profiles`
+- Google OAuth users will have their name extracted from the Google profile automatically
+
+### AuthContext Update
+- Update the `signUp` function signature to accept an optional `fullName` parameter
+- Pass it through as `options.data.full_name`
+
+---
+
+## Part 2: Display Name in Members Page (CompanyMembers.tsx)
+
+- Update the member profiles query to also fetch `full_name` from `user_profiles`
+- Show the name as the primary identifier in the Member column, with email below it in smaller text
+- Fall back to email if no name is set
+
+---
+
+## Part 3: Display Name in User Management Page
+
+### Edge Function Update (admin-users/index.ts)
+- When listing users in the GET handler, also fetch `full_name` from `user_profiles` and include it in the response
+- Alternatively, read the name from `auth.users.user_metadata.full_name`
+
+### UI Update (UserManagement.tsx)
+- Show the user's name as the primary label in the User column, with email below
+- Update the search to also filter by name
+
+---
+
+## Part 4: User Management Page Placement
+
+The current separation is actually well-designed for your system:
+
+- **User Management** (global, platform-level): Manages platform roles (Cipher, Admin, Moderator). Only visible to platform Admins and Ciphers. This controls *who can do what across the entire platform*.
+- **Members** (company-scoped): Manages workspace membership and per-company permissions. This controls *who can do what within a specific company*.
+
+**Recommendation**: Keep them separate. They serve different purposes in the dual-layer role hierarchy. The User Management page is for platform governance, while Members is for day-to-day company operations. Moving User Management into a company dashboard would blur these responsibilities and could create confusion about scope.
+
+One small improvement: rename the sidebar label from "User Management" to "Platform Users" to make the distinction clearer.
+
+---
 
 ## Technical Details
 
-All changes are in two files:
-- `src/hooks/useStudents.ts` -- add missing invalidation calls to all 3 mutation `onSuccess` callbacks
-- `src/App.tsx` -- explicitly set `refetchOnWindowFocus: true` in QueryClient defaults
+### Migration SQL
+```text
+ALTER TABLE public.user_profiles ADD COLUMN full_name text;
 
-No new files, no schema changes, no new dependencies.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+  -- Updated to read full_name from raw_user_meta_data
+  -- and store it in user_profiles.full_name
+```
+
+### Files to Create/Modify
+1. **New migration** -- add `full_name` column and update trigger
+2. **src/contexts/AuthContext.tsx** -- update `signUp` to accept and pass `fullName`
+3. **src/pages/Auth.tsx** -- add name input field to signup form
+4. **src/pages/CompanyMembers.tsx** -- fetch and display `full_name`
+5. **src/pages/UserManagement.tsx** -- display name in user table, update search
+6. **supabase/functions/admin-users/index.ts** -- include `full_name` in GET response
+7. **src/components/AppLayout.tsx** -- rename "User Management" to "Platform Users" (optional)
 
