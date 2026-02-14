@@ -1,65 +1,82 @@
 
 
-# Fix Join Loading, UI Redesign, Cipher Invisibility, and Login Redirect
+# Fix Student Detail Page: Use Batch Defaults as Fallback
 
-## 1. Fix Join Button Loading State (JoinCompany.tsx)
+## Problem
 
-**Problem**: A single `loading` boolean is shared across all company cards. When a cipher clicks "Join" on one company, every card's button shows a spinner.
+When a student is linked to a batch, their `admission_fee_total` and `monthly_fee_amount` in the database may be 0 (either from creation before the auto-fill feature, or a race condition during creation). The Student Detail page relies solely on these student-level fields, causing:
 
-**Fix**: Replace the single `loading` state with a `joiningCompanyId` state (`string | null`) that tracks which specific company is being joined. Only the card with a matching ID shows the spinner; others remain interactive.
+1. **"No admission fee set"** -- even though the batch has a 2,500 default
+2. **"No monthly fee set"** -- even though the batch has a 1,250 default
+3. **Overall Total shows 0** -- because expected total is calculated from 0 fees
+4. **0% complete** -- despite having a 2,500 admission payment recorded
+5. **Monthly Fee Breakdown section hidden** -- because `student.monthly_fee_amount` is 0
 
-## 2. Login Redirect Fix (Auth.tsx)
+## Solution
 
-**Problem**: After login, users are redirected to `/companies`. But if the user has no companies, they should land on the Join Company page instead of seeing the "No Companies" screen with a redundant "Join a Company" button.
+### 1. StudentDetail.tsx -- Use batch defaults as fallback
 
-**Fix**: After successful login, navigate to `/companies`. In `CompanySelection.tsx`, when the user has zero companies and is not a cipher, automatically redirect to `/companies/join` instead of showing the `NoCompaniesSection`. Keep the `NoCompaniesSection` only for pending/rejected registration states.
+When computing the summary and rendering cards, create "effective" fee values that fall back to batch defaults when the student's own values are 0:
 
-## 3. UI Redesign for Company Pages
+```text
+effectiveAdmissionFee = student.admission_fee_total > 0 
+  ? student.admission_fee_total 
+  : batch?.default_admission_fee ?? 0
 
-Based on the screenshots, the current design is functional but plain. The redesign will polish the Company Selection, Join Company, and Create Company pages with:
+effectiveMonthlyFee = student.monthly_fee_amount > 0 
+  ? student.monthly_fee_amount 
+  : batch?.default_monthly_fee ?? 0
+```
 
-### Company Selection Page
-- Add a subtle gradient or pattern background behind the header
-- Improve company cards with a more prominent hover effect, a right-arrow indicator, and better spacing
-- Style the action buttons in a cleaner row with better visual hierarchy (primary for Join, outline for Create, ghost for Sign Out)
-- Add a welcome message with the user's name if available
+Pass these effective values to `computeStudentSummary` instead of the raw student object. Also use effective values for the Monthly Tuition card check and the Monthly Fee Breakdown visibility.
 
-### Join Company Page
-- Improve the tab section with larger icons and better spacing
-- Add a "No results" illustration when search returns nothing
-- Better card hover states with smooth transitions
+### 2. Fix computeStudentSummary call
 
-### Create Company Page
-- Minor polish -- already in good shape from previous updates
+Replace the direct `student` object with a modified version that uses effective fees:
 
-## 4. Cipher Invisibility System
+```typescript
+const effectiveStudent = {
+  ...student,
+  admission_fee_total: effectiveAdmissionFee,
+  monthly_fee_amount: effectiveMonthlyFee,
+  course_start_month: student.course_start_month || batchCourseStartMonth,
+  course_end_month: student.course_end_month || batchCourseEndMonth,
+};
+```
 
-**Current state**: `CompanyMembers.tsx` already fetches cipher user IDs and filters them out for non-cipher users (lines 41-74). This is working correctly.
+Also derive `batchCourseStartMonth` and `batchCourseEndMonth` (same logic as StudentDialog) so the monthly breakdown correctly spans the batch's duration.
 
-**Enhancements needed**:
-- **Member count exclusion**: In `CompanySelection.tsx`, the member count query fetches all active memberships. Filter out cipher users from the count for non-cipher users so the displayed number matches what they see on the Members page.
-- **Cipher self-badge**: When a cipher views the Members page, show a special "Cipher" badge next to their own name (visible only to cipher users) to indicate elevated privileges.
-- **Members page count**: The Members tab header shows `Members (X)` -- this already uses the filtered `members` array, so it correctly excludes ciphers for non-cipher users. No change needed.
+### 3. Update all UI references
 
-## Technical Changes
+- Admission Fee card: use `effectiveAdmissionFee` instead of `summary.admissionTotal` check
+- Monthly Tuition card: use `effectiveMonthlyFee` instead of `student.monthly_fee_amount`
+- Monthly Fee Breakdown section: use `effectiveMonthlyFee` for visibility and display
+- Overall Total: automatically correct since summary uses effective values
 
 ### Files to Modify
 
-**`src/pages/JoinCompany.tsx`**
-- Replace `const [loading, setLoading] = useState(false)` with `const [joiningCompanyId, setJoiningCompanyId] = useState<string | null>(null)`
-- Update `handleCipherJoin` to set `joiningCompanyId` to the specific company ID
-- Update the button's disabled/spinner check to compare against `joiningCompanyId === company.id`
-- Keep `loading` for password join and invite flows (those are single-action contexts)
+- **`src/pages/StudentDetail.tsx`** -- Add effective fee computation, derive batch course months, pass effective student to summary, update card rendering conditions
 
-**`src/pages/CompanySelection.tsx`**
-- When `companies.length === 0` and user is not pending/rejected/cipher, auto-redirect to `/companies/join`
-- Add cipher filtering to member count query (fetch cipher IDs, subtract from counts for non-cipher users)
-- Add cipher self-indicator badge in `getRoleBadge`
-- Visual polish: better card styling, hover effects, action button layout
+### Technical Details
 
-**`src/pages/CompanyMembers.tsx`**
-- Add cipher badge: When `isCipher` is true and the member row is the current user, show a "Cipher" badge with a distinct color (e.g., purple/indigo) alongside any company role badge
+Add before the `summary` useMemo:
 
-**`src/pages/CreateCompany.tsx`**
-- Minor visual improvements only
+```typescript
+const batchCourseStartMonth = useMemo(() => {
+  if (!batch?.start_date) return "";
+  const d = new Date(batch.start_date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}, [batch]);
 
+const batchCourseEndMonth = useMemo(() => {
+  if (!batch?.start_date || !batch?.course_duration_months) return "";
+  const d = new Date(batch.start_date);
+  d.setMonth(d.getMonth() + batch.course_duration_months - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}, [batch]);
+
+const effectiveAdmissionFee = Number(student?.admission_fee_total) || Number(batch?.default_admission_fee) || 0;
+const effectiveMonthlyFee = Number(student?.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+```
+
+Then in the summary useMemo, pass a modified student object with these effective values and the batch-derived course months as fallback.
