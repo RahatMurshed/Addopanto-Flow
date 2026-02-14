@@ -95,7 +95,7 @@ function RegistrationSuccess() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto mb-2 h-16 w-auto object-contain" />
-          <CardTitle className="text-2xl">Addopanto Flow</CardTitle>
+          <CardTitle className="text-2xl sr-only">Addopanto Flow</CardTitle>
           <CardDescription className="mt-2">Registration Submitted</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -326,7 +326,7 @@ export default function Auth() {
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-2">
           <img src={gaLogo} alt="Grammar Addopanto" className="h-16 w-auto object-contain" />
-          <h1 className="text-2xl font-bold tracking-tight">Addopanto Flow</h1>
+          <h1 className="sr-only">Addopanto Flow</h1>
           <p className="text-sm text-muted-foreground">Smart revenue allocation for your institution</p>
         </div>
 
