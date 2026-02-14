@@ -57,6 +57,7 @@ interface StudentDialogProps {
   student?: Student | null;
   onSave: (data: StudentInsert) => Promise<Student | void>;
   defaultBatchId?: string;
+  lockedBatch?: boolean;
 }
 
 const defaultPayment: InitialPaymentData = {
@@ -68,7 +69,7 @@ const defaultPayment: InitialPaymentData = {
   receiptNumber: "",
 };
 
-export default function StudentDialog({ open, onOpenChange, student, onSave, defaultBatchId }: StudentDialogProps) {
+export default function StudentDialog({ open, onOpenChange, student, onSave, defaultBatchId, lockedBatch }: StudentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [savingStep, setSavingStep] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -250,7 +251,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
               setSelectedBatchId(v);
               // Reset initial payment when batch changes
               if (!isEdit) setInitialPayment(defaultPayment);
-            }} disabled={saving}>
+            }} disabled={saving || lockedBatch}>
               <SelectTrigger><SelectValue placeholder="Select batch (optional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No Batch</SelectItem>

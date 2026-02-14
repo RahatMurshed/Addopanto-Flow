@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
@@ -10,18 +10,21 @@ import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import BatchDialog from "@/components/BatchDialog";
 import StudentDialog from "@/components/StudentDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import { useCreateStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
+import { usePagination } from "@/hooks/usePagination";
+import TablePagination from "@/components/TablePagination";
 
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
@@ -43,11 +46,20 @@ export default function BatchDetail() {
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [studentSearch, setStudentSearch] = useState("");
 
   const batchStudents = useMemo(() => {
     if (!id) return [];
-    return allStudents.filter((s: any) => s.batch_id === id);
-  }, [allStudents, id]);
+    let students = allStudents.filter((s: any) => s.batch_id === id);
+    if (studentSearch.trim()) {
+      const q = studentSearch.toLowerCase();
+      students = students.filter((s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.student_id_number && s.student_id_number.toLowerCase().includes(q))
+      );
+    }
+    return students;
+  }, [allStudents, id, studentSearch]);
 
   const studentSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
@@ -58,21 +70,50 @@ export default function BatchDetail() {
     return map;
   }, [batchStudents, allPayments]);
 
+  // All students in batch (unfiltered) for summary stats
+  const allBatchStudents = useMemo(() => {
+    if (!id) return [];
+    return allStudents.filter((s: any) => s.batch_id === id);
+  }, [allStudents, id]);
+
+  const allSummaries = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
+    for (const s of allBatchStudents) {
+      const payments = allPayments.filter((p) => p.student_id === s.id);
+      map.set(s.id, computeStudentSummary(s, payments));
+    }
+    return map;
+  }, [allBatchStudents, allPayments]);
+
   const totalCollected = useMemo(() => {
     let total = 0;
-    for (const sum of studentSummaries.values()) total += sum.totalPaid;
+    for (const sum of allSummaries.values()) total += sum.totalPaid;
     return total;
-  }, [studentSummaries]);
+  }, [allSummaries]);
 
   const totalPending = useMemo(() => {
     let total = 0;
-    for (const sum of studentSummaries.values()) total += sum.totalPending;
+    for (const sum of allSummaries.values()) total += sum.totalPending;
     return total;
-  }, [studentSummaries]);
+  }, [allSummaries]);
+
+  const overdueCount = useMemo(() => {
+    let count = 0;
+    for (const sum of allSummaries.values()) {
+      if (sum.monthlyOverdueMonths.length > 0) count++;
+    }
+    return count;
+  }, [allSummaries]);
 
   const completionPercent = totalCollected + totalPending > 0
     ? Math.round((totalCollected / (totalCollected + totalPending)) * 100)
     : 0;
+
+  const pagination = usePagination(batchStudents);
+
+  useEffect(() => {
+    pagination.goToPage(1);
+  }, [studentSearch]);
 
   const handleUpdate = async (data: BatchInsert) => {
     if (!batch) return;
@@ -144,9 +185,38 @@ export default function BatchDetail() {
         </div>
         <div className="flex gap-2">
           {canEdit && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
-          {canAddRevenue && <Button onClick={() => setStudentDialogOpen(true)}>Add Student to Batch</Button>}
+          {canAddRevenue && <Button onClick={() => setStudentDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Student</Button>}
         </div>
       </div>
+
+      {/* Batch Info Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {batch.description && (
+              <div className="sm:col-span-2 lg:col-span-4">
+                <p className="text-sm text-muted-foreground">{batch.description}</p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Course Duration</p>
+              <p className="text-sm font-semibold">{batch.course_duration_months ? `${batch.course_duration_months} months` : "—"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Default Admission Fee</p>
+              <p className="text-sm font-semibold">{formatCurrency(Number(batch.default_admission_fee), currency)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Default Monthly Fee</p>
+              <p className="text-sm font-semibold">{formatCurrency(Number(batch.default_monthly_fee), currency)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Capacity</p>
+              <p className="text-sm font-semibold">{allBatchStudents.length}{batch.max_capacity ? ` / ${batch.max_capacity}` : ""} students</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -158,7 +228,7 @@ export default function BatchDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{batchStudents.length}{batch.max_capacity ? `/${batch.max_capacity}` : ""}</p>
+            <p className="text-2xl font-bold">{allBatchStudents.length}</p>
           </CardContent>
         </Card>
         <Card>
@@ -197,83 +267,156 @@ export default function BatchDetail() {
         </Card>
       </div>
 
-      {/* Batch Info */}
-      {batch.description && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm">{batch.description}</p>
+      {/* Overdue Alert */}
+      {overdueCount > 0 && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 pt-6">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+            <p className="text-sm font-medium text-destructive">
+              {overdueCount} student{overdueCount > 1 ? "s" : ""} with overdue payments in this batch
+            </p>
           </CardContent>
         </Card>
       )}
 
       {/* Students Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Enrolled Students</CardTitle>
             <span className="text-sm text-muted-foreground">{batchStudents.length} students</span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search students in this batch..."
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {studentSearch && (
+              <button onClick={() => setStudentSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           {batchStudents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="text-muted-foreground">No students in this batch yet.</p>
-              {canAddRevenue && <Button variant="link" onClick={() => setStudentDialogOpen(true)}>Add Student</Button>}
+              {studentSearch ? (
+                <>
+                  <Search className="h-8 w-8 text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No students match your search.</p>
+                  <Button variant="link" onClick={() => setStudentSearch("")}>Clear search</Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground">No students in this batch yet.</p>
+                  {canAddRevenue && <Button variant="link" onClick={() => setStudentDialogOpen(true)}>Add Student</Button>}
+                </>
+              )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Student ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden md:table-cell">Total Paid</TableHead>
-                    <TableHead className="hidden md:table-cell">Total Pending</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {batchStudents.map((s) => {
-                    const sum = studentSummaries.get(s.id);
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">{s.name}</TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">{s.student_id_number || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">{s.status}</Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell font-semibold text-primary">
-                          {sum ? formatCurrency(sum.totalPaid, currency) : "—"}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell font-semibold text-destructive">
-                          {sum && sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {canAddRevenue && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
-                                <CreditCard className="h-4 w-4" />
-                              </Button>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">Enrolled</TableHead>
+                      <TableHead>Admission</TableHead>
+                      <TableHead>Monthly</TableHead>
+                      <TableHead className="hidden md:table-cell">Total Paid</TableHead>
+                      <TableHead className="hidden md:table-cell">Total Pending</TableHead>
+                      <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
+                      <TableHead className="w-24">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagination.paginatedItems.map((s) => {
+                      const sum = studentSummaries.get(s.id);
+                      const lastPayment = allPayments
+                        .filter((p) => p.student_id === s.id)
+                        .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
+                      return (
+                        <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/students/${s.id}`)}>
+                          <TableCell>
+                            <div>
+                              <span className="font-medium text-primary">{s.name}</span>
+                              {s.student_id_number && <p className="text-xs text-muted-foreground">{s.student_id_number}</p>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm">
+                            {format(new Date(s.enrollment_date), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell>
+                            {sum && sum.admissionTotal === 0 ? (
+                              <span className="text-muted-foreground text-sm">N/A</span>
+                            ) : sum?.admissionStatus === "paid" ? (
+                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                            ) : sum?.admissionStatus === "partial" ? (
+                              <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">Partial</Badge>
+                            ) : (
+                              <Badge variant="destructive">Pending</Badge>
                             )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                          </TableCell>
+                          <TableCell>
+                            {sum && Number(s.monthly_fee_amount) === 0 ? (
+                              <span className="text-muted-foreground text-sm">N/A</span>
+                            ) : sum ? (() => {
+                              const pendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
+                              if (sum.monthlyOverdueMonths.length > 0) {
+                                return <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>;
+                              }
+                              if (pendingMonths > 0) {
+                                return <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{pendingMonths} pending</Badge>;
+                              }
+                              return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>;
+                            })() : "—"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell font-semibold text-green-600 dark:text-green-400">
+                            {sum ? formatCurrency(sum.totalPaid, currency) : "—"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell font-semibold text-orange-600 dark:text-orange-400">
+                            {sum && sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                            {lastPayment ? format(new Date(lastPayment.payment_date), "MMM d, yyyy") : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {canAddRevenue && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
+                                  <CreditCard className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={pagination.currentPage} totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems} startIndex={pagination.startIndex}
+                endIndex={pagination.endIndex} itemsPerPage={pagination.itemsPerPage}
+                onPageChange={pagination.goToPage} onItemsPerPageChange={pagination.setItemsPerPage}
+                canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev}
+              />
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Dialogs */}
       <BatchDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} batch={batch} onSave={handleUpdate} />
-      <StudentDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} onSave={handleCreateStudent} defaultBatchId={id} />
+      <StudentDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} onSave={handleCreateStudent} defaultBatchId={id} lockedBatch />
 
       {selectedStudent && (
         <StudentPaymentDialog
