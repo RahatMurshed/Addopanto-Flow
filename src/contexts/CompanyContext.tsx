@@ -10,6 +10,8 @@ export interface Company {
   logo_url: string | null;
   description: string | null;
   currency: string;
+  exchange_rate: number;
+  base_currency: string;
   fiscal_year_start_month: number;
   created_by: string;
   created_at: string;

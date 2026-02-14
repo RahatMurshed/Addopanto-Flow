@@ -8,8 +8,7 @@ import {
 } from "@/hooks/useStudentPayments";
 import { useBatch } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +34,7 @@ export default function StudentDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { canAddRevenue, canEdit, canDelete } = useCompany();
-  const { data: userProfile } = useUserProfile();
-  const currency = userProfile?.currency || "BDT";
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: student, isLoading: studentLoading } = useStudent(id);
   const { data: payments = [], isLoading: paymentsLoading } = useStudentPayments(id);

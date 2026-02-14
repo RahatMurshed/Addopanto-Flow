@@ -7,9 +7,8 @@ import {
   useCreateDefaultAccounts,
   type ExpenseAccount,
 } from "@/hooks/useExpenseAccounts";
-import { useUserProfile } from "@/hooks/useUserProfile";
 import { useCompany } from "@/contexts/CompanyContext";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +31,7 @@ import KhataDialog from "@/components/KhataDialog";
 
 export default function Khatas() {
   const { data: accounts = [], isLoading } = useExpenseAccounts();
-  const { data: userProfile } = useUserProfile();
-  const currency = userProfile?.currency || "BDT";
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
   const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer } = useCompany();

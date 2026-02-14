@@ -147,10 +147,12 @@ export type Database = {
       }
       companies: {
         Row: {
+          base_currency: string
           created_at: string
           created_by: string
           currency: string
           description: string | null
+          exchange_rate: number
           fiscal_year_start_month: number
           id: string
           invite_code: string | null
@@ -161,10 +163,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          base_currency?: string
           created_at?: string
           created_by: string
           currency?: string
           description?: string | null
+          exchange_rate?: number
           fiscal_year_start_month?: number
           id?: string
           invite_code?: string | null
@@ -175,10 +179,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          base_currency?: string
           created_at?: string
           created_by?: string
           currency?: string
           description?: string | null
+          exchange_rate?: number
           fiscal_year_start_month?: number
           id?: string
           invite_code?: string | null
@@ -300,6 +306,54 @@ export type Database = {
           },
           {
             foreignKeyName: "company_memberships_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      currency_change_logs: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          company_id: string
+          id: string
+          new_currency: string
+          new_exchange_rate: number
+          old_currency: string
+          old_exchange_rate: number
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          company_id: string
+          id?: string
+          new_currency: string
+          new_exchange_rate: number
+          old_currency: string
+          old_exchange_rate: number
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          company_id?: string
+          id?: string
+          new_currency?: string
+          new_exchange_rate?: number
+          old_currency?: string
+          old_exchange_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "currency_change_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "currency_change_logs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_public"

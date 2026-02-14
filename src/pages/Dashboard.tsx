@@ -35,8 +35,7 @@ import PercentageChange from "@/components/PercentageChange";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useAccountBalances, useCreateExpense } from "@/hooks/useExpenses";
 import { useCreateRevenue } from "@/hooks/useRevenues";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import { formatCurrency as formatCurrencyUtil, formatCurrencyPrecise } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -49,9 +48,8 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { activeCompanyId } = useCompany();
-  const { data: userProfile } = useUserProfile();
-  const currency = userProfile?.currency || "BDT";
+  const { activeCompanyId, activeCompany } = useCompany();
+  const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("monthly");
@@ -323,7 +321,7 @@ export default function Dashboard() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label, userProfile?.business_name || undefined);
+    await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label, activeCompany?.name || undefined);
   };
 
   // Define data object before any conditional returns (required for hooks)
@@ -345,12 +343,10 @@ export default function Dashboard() {
   // Pagination for recent transactions (must be called before conditional returns)
   const transactionsPagination = usePagination(data.recentTransactions);
 
-  const formatCurrency = (amount: number) => {
-    return formatCurrencyPrecise(amount, currency);
-  };
+  const formatCurrency = formatCurrencyPreciseFn;
 
   const formatCompact = (value: number) => {
-    return formatCurrencyUtil(value, currency, { compact: true });
+    return formatCurrencyFn(value, { compact: true });
   };
 
   if (isLoading) {

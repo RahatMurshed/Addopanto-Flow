@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getCurrencySymbol, formatCurrency, formatCurrencyPrecise } from "../currencyUtils";
+import { getCurrencySymbol, formatCurrency, formatCurrencyPrecise, convertAmount, getCurrencyInfo, SUPPORTED_CURRENCIES } from "../currencyUtils";
 
 describe("getCurrencySymbol", () => {
   it("returns ৳ for BDT", () => {
@@ -18,8 +18,38 @@ describe("getCurrencySymbol", () => {
     expect(getCurrencySymbol("GBP")).toBe("£");
   });
 
+  it("returns ₹ for INR", () => {
+    expect(getCurrencySymbol("INR")).toBe("₹");
+  });
+
   it("returns code itself for unknown currency", () => {
-    expect(getCurrencySymbol("JPY")).toBe("JPY");
+    expect(getCurrencySymbol("XYZ")).toBe("XYZ");
+  });
+});
+
+describe("getCurrencyInfo", () => {
+  it("returns full info for known currency", () => {
+    const info = getCurrencyInfo("USD");
+    expect(info.code).toBe("USD");
+    expect(info.symbol).toBe("$");
+    expect(info.name).toBe("US Dollar");
+    expect(info.decimals).toBe(2);
+  });
+
+  it("returns 0 decimals for JPY", () => {
+    expect(getCurrencyInfo("JPY").decimals).toBe(0);
+  });
+
+  it("returns fallback for unknown currency", () => {
+    const info = getCurrencyInfo("XYZ");
+    expect(info.symbol).toBe("XYZ");
+    expect(info.decimals).toBe(2);
+  });
+});
+
+describe("SUPPORTED_CURRENCIES", () => {
+  it("contains at least 10 currencies", () => {
+    expect(SUPPORTED_CURRENCIES.length).toBeGreaterThanOrEqual(10);
   });
 });
 
@@ -80,5 +110,34 @@ describe("formatCurrencyPrecise", () => {
 
   it("formats zero precisely", () => {
     expect(formatCurrencyPrecise(0, "EUR")).toBe("€0.00");
+  });
+
+  it("formats JPY without decimals", () => {
+    expect(formatCurrencyPrecise(1000, "JPY")).toBe("¥1,000");
+  });
+});
+
+describe("convertAmount", () => {
+  it("converts with exchange rate", () => {
+    expect(convertAmount(100, 1.5)).toBe(150);
+  });
+
+  it("returns original amount for rate of 1", () => {
+    expect(convertAmount(100, 1)).toBe(100);
+  });
+
+  it("returns original amount for invalid rate", () => {
+    expect(convertAmount(100, 0)).toBe(100);
+    expect(convertAmount(100, -1)).toBe(100);
+  });
+
+  it("handles decimal precision", () => {
+    // 100 * 0.83 = 83.00
+    expect(convertAmount(100, 0.83)).toBe(83);
+  });
+
+  it("rounds to 2 decimal places", () => {
+    // 100 * 1.333 = 133.30
+    expect(convertAmount(100, 1.333)).toBe(133.3);
   });
 });

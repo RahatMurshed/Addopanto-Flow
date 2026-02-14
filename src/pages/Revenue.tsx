@@ -9,9 +9,8 @@ import {
 } from "@/hooks/useRevenues";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
-import { useUserProfile } from "@/hooks/useUserProfile";
 import { useCompany } from "@/contexts/CompanyContext";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,11 +57,10 @@ export default function Revenue() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
-  const { data: userProfile } = useUserProfile();
-  const currency = userProfile?.currency || "BDT";
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany } = useCompany();
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -146,7 +144,7 @@ export default function Revenue() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("revenue-content", "revenue", "Revenue Report", dateRange.label, userProfile?.business_name || undefined);
+    await exportToPDF("revenue-content", "revenue", "Revenue Report", dateRange.label, activeCompany?.name || undefined);
   };
 
   const handleCreate = async (data: { amount: number; date: string; source_id: string | null; description: string | null }) => {
