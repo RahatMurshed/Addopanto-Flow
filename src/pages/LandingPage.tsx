@@ -99,7 +99,6 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <img src={gaLogo} alt="Addopanto Flow" className="h-9 w-auto" />
-            <span className="text-lg font-bold tracking-tight">Addopanto Flow</span>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -256,7 +255,6 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 sm:flex-row sm:justify-between sm:px-6">
           <div className="flex items-center gap-2">
             <img src={gaLogo} alt="Addopanto Flow" className="h-7 w-auto" />
-            <span className="text-sm font-semibold">Addopanto Flow</span>
           </div>
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} Grammar Addopanto. All rights reserved.
