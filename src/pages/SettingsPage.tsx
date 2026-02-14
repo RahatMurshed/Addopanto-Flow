@@ -211,7 +211,7 @@ export default function SettingsPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Currency</Label>
-                  <Select value={currency} onValueChange={setCurrency} disabled={saving}>
+                  <Select value={currency} onValueChange={(val) => { setCurrency(val); if (val === "BDT") setExchangeRate("1"); }} disabled={saving}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {SUPPORTED_CURRENCIES.map(c => (
