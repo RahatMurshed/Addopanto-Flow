@@ -24,19 +24,27 @@
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <style>
-      #initial-loader{display:flex;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:#09090b;font-family:system-ui,sans-serif}
-      #initial-loader img{height:5rem;width:auto;animation:pulse 2s ease-in-out infinite}
-      #initial-loader p{font-size:.875rem;color:#a1a1aa}
-      @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(.97)}}
-      @media(prefers-color-scheme:light){#initial-loader{background:#fff}#initial-loader p{color:#71717a}}
+      #initial-loader{display:flex;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;background:#09090b;font-family:system-ui,sans-serif}
+      .loader-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:64px;height:64px}
+      .ring-outer{position:absolute;width:64px;height:64px;border-radius:50%;border:3px solid transparent;border-top-color:#ff8c00;animation:spin 2.5s linear infinite}
+      .ring-inner{position:absolute;width:40px;height:40px;border-radius:50%;border:3px solid transparent;border-bottom-color:#1e3a8a;animation:spin 1.8s linear infinite reverse}
+      .dot{width:12px;height:12px;border-radius:50%;background:#ff8c00;box-shadow:0 0 12px rgba(255,140,0,.6);animation:pulse 1.4s ease-in-out infinite}
+      #initial-loader p{margin-top:1.5rem;font-size:.75rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#a1a1aa;animation:pulse 2s ease-in-out infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}
+      @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.92)}}
+      @media(prefers-color-scheme:light){#initial-loader{background:#fafbfd}#initial-loader p{color:#71717a}}
     </style>
   </head>
 
   <body>
     <div id="root">
       <div id="initial-loader">
-        <img src="/GA-LOGO.png" alt="Grammar Addopanto" width="80" height="80" />
-        <p>Loading...</p>
+        <div class="loader-wrap">
+          <div class="ring-outer"></div>
+          <div class="ring-inner"></div>
+          <div class="dot"></div>
+        </div>
+        <p>Loading</p>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
