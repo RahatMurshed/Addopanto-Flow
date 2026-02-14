@@ -61,6 +61,7 @@ export function useCreateKhataTransfer() {
       queryClient.invalidateQueries({ queryKey: ["khata_transfers"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
@@ -77,6 +78,7 @@ export function useDeleteKhataTransfer() {
       queryClient.invalidateQueries({ queryKey: ["khata_transfers"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
