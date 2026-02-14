@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -267,7 +267,8 @@ export default function CompanyMembers() {
                     // Permissions switches: admins always have all perms, only modifiable if canModifyMember
                     const permsDisabled = !canModifyMember || memberIsAdmin;
                     return (
-                      <TableRow key={member.id}>
+                      <React.Fragment key={member.id}>
+                      <TableRow>
                         <TableCell>
                           <div className="flex items-center gap-2.5">
                             <UserAvatar
@@ -327,21 +328,21 @@ export default function CompanyMembers() {
                             )}
                           </TableCell>
                         )}
-                        {/* Show DEO Permission Matrix */}
-                        {member.role === "data_entry_operator" && canManageMembers && canModifyMember && (
-                          <tr key={`${member.id}-perms`}>
-                            <td colSpan={10} className="p-3 border-t-0">
-                              <OperatorPermissionMatrix
-                                member={member as any}
-                                disabled={!canModifyMember}
-                                onPermissionChange={(key, value) =>
-                                  updateMemberMutation.mutate({ memberId: member.id, updates: { [key]: value } })
-                                }
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      </>
+                      </TableRow>
+                      {member.role === "data_entry_operator" && canManageMembers && canModifyMember && (
+                        <TableRow>
+                          <TableCell colSpan={10} className="p-3 border-t-0">
+                            <OperatorPermissionMatrix
+                              member={member as any}
+                              disabled={!canModifyMember}
+                              onPermissionChange={(key, value) =>
+                                updateMemberMutation.mutate({ memberId: member.id, updates: { [key]: value } })
+                              }
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>
