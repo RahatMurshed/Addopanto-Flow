@@ -81,7 +81,7 @@ export default function CompanyMembers() {
       const userIds = members.map(m => m.user_id);
       const { data } = await supabase
         .from("user_profiles")
-        .select("user_id, email, full_name")
+        .select("user_id, full_name")
         .in("user_id", userIds);
       return data ?? [];
     },
@@ -119,10 +119,6 @@ export default function CompanyMembers() {
     },
     enabled: !!activeCompanyId && canManageMembers,
   });
-
-  const getEmail = (userId: string) => {
-    return profiles.find(p => p.user_id === userId)?.email || userId;
-  };
 
   const getName = (userId: string) => {
     return profiles.find(p => p.user_id === userId)?.full_name || null;
@@ -181,8 +177,8 @@ export default function CompanyMembers() {
     if (!search.trim()) return members;
     const q = search.toLowerCase();
     return members.filter(m => {
-      const email = getEmail(m.user_id);
-      return email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
+      const name = getName(m.user_id) || "";
+      return name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
     });
   }, [members, search, profiles]);
 
@@ -272,12 +268,9 @@ export default function CompanyMembers() {
                         <TableCell>
                           <div>
                             <p className="font-medium">
-                              {getName(member.user_id) || getEmail(member.user_id)}
+                              {getName(member.user_id) || "Unknown Member"}
                               {isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
                             </p>
-                            {getName(member.user_id) && (
-                              <p className="text-xs text-muted-foreground">{getEmail(member.user_id)}</p>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell>
