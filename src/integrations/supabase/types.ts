@@ -549,6 +549,7 @@ export type Database = {
           description: string | null
           id: string
           source_id: string | null
+          student_payment_id: string | null
           updated_at: string
           user_id: string
         }
@@ -560,6 +561,7 @@ export type Database = {
           description?: string | null
           id?: string
           source_id?: string | null
+          student_payment_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -571,6 +573,7 @@ export type Database = {
           description?: string | null
           id?: string
           source_id?: string | null
+          student_payment_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -587,6 +590,13 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "revenue_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_student_payment_id_fkey"
+            columns: ["student_payment_id"]
+            isOneToOne: false
+            referencedRelation: "student_payments"
             referencedColumns: ["id"]
           },
         ]
