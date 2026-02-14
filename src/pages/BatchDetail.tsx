@@ -124,29 +124,74 @@ export default function BatchDetail() {
     return map;
   }, [allBatchStudents, allPayments, batch, batchCourseStartMonth, batchCourseEndMonth]);
 
-  const totalCollected = useMemo(() => {
-    let total = 0;
-    for (const sum of allSummaries.values()) total += sum.totalPaid;
-    return total;
-  }, [allSummaries]);
+  const batchStats = useMemo(() => {
+    let totalCollected = 0;
+    let totalPending = 0;
+    let admissionCollected = 0;
+    let admissionPending = 0;
+    let monthlyCollected = 0;
+    let monthlyPending = 0;
+    let overdueAmount = 0;
+    let overdueStudentCount = 0;
+    let admissionFullyPaidCount = 0;
+    let totalMonthsDue = 0;
+    let totalMonthsPaid = 0;
 
-  const totalPending = useMemo(() => {
-    let total = 0;
-    for (const sum of allSummaries.values()) total += sum.totalPending;
-    return total;
-  }, [allSummaries]);
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    let thisMonthDue = 0;
+    let thisMonthCollected = 0;
 
-  const overdueCount = useMemo(() => {
-    let count = 0;
-    for (const sum of allSummaries.values()) {
-      if (sum.monthlyOverdueMonths.length > 0) count++;
+    for (const [sid, sum] of allSummaries.entries()) {
+      const student = allBatchStudents.find((s) => s.id === sid);
+      if (!student) continue;
+
+      const effAdm = Number(student.admission_fee_total) || Number(batch?.default_admission_fee) || 0;
+      const effMonthly = Number(student.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+
+      totalCollected += sum.totalPaid;
+      totalPending += sum.totalPending;
+      admissionCollected += sum.admissionPaid;
+      admissionPending += Math.max(0, effAdm - sum.admissionPaid);
+      monthlyCollected += sum.monthlyPaidTotal;
+      monthlyPending += sum.monthlyPendingTotal;
+
+      if (sum.admissionStatus === "paid") admissionFullyPaidCount++;
+
+      const allMonthsCount = sum.monthlyPaidMonths.length + sum.monthlyPartialMonths.length + sum.monthlyOverdueMonths.length + sum.monthlyPendingMonths.length;
+      totalMonthsDue += allMonthsCount;
+      totalMonthsPaid += sum.monthlyPaidMonths.length;
+
+      if (sum.monthlyOverdueMonths.length > 0) {
+        overdueStudentCount++;
+        for (const m of sum.monthlyOverdueMonths) {
+          overdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(m) || 0);
+        }
+      }
+
+      // This month stats
+      const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
+      if (allMonths.includes(currentMonth)) {
+        thisMonthDue += effMonthly;
+        thisMonthCollected += sum.monthlyPaymentsByMonth.get(currentMonth) || 0;
+      }
     }
-    return count;
-  }, [allSummaries]);
 
-  const completionPercent = totalCollected + totalPending > 0
-    ? Math.round((totalCollected / (totalCollected + totalPending)) * 100)
-    : 0;
+    const studentCount = allBatchStudents.length;
+    const admissionPercent = studentCount > 0 ? Math.round((admissionFullyPaidCount / studentCount) * 100) : 0;
+    const monthlyPercent = totalMonthsDue > 0 ? Math.round((totalMonthsPaid / totalMonthsDue) * 100) : 0;
+    const thisMonthPercent = thisMonthDue > 0 ? Math.round((thisMonthCollected / thisMonthDue) * 100) : 0;
+
+    return {
+      totalCollected, totalPending,
+      admissionCollected, admissionPending,
+      monthlyCollected, monthlyPending,
+      overdueAmount, overdueStudentCount,
+      admissionPercent, monthlyPercent,
+      thisMonthDue, thisMonthCollected, thisMonthPercent,
+      currentMonth,
+    };
+  }, [allSummaries, allBatchStudents, batch]);
 
   const pagination = usePagination(batchStudents);
 
@@ -283,7 +328,8 @@ export default function BatchDetail() {
       </Card>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Students */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -292,9 +338,11 @@ export default function BatchDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{allBatchStudents.length}</p>
+            <p className="text-2xl font-bold">{allBatchStudents.length}{batch.max_capacity ? <span className="text-base font-normal text-muted-foreground">/{batch.max_capacity}</span> : ""}</p>
           </CardContent>
         </Card>
+
+        {/* Collected */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -303,9 +351,14 @@ export default function BatchDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalCollected, currency)}</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(batchStats.totalCollected, currency)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Admission: {formatCurrency(batchStats.admissionCollected, currency)} · Monthly: {formatCurrency(batchStats.monthlyCollected, currency)}
+            </p>
           </CardContent>
         </Card>
+
+        {/* Pending + Overdue */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -314,9 +367,43 @@ export default function BatchDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalPending, currency)}</p>
+            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(batchStats.totalPending, currency)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Admission: {formatCurrency(batchStats.admissionPending, currency)} · Monthly: {formatCurrency(batchStats.monthlyPending, currency)}
+            </p>
+            {batchStats.overdueStudentCount > 0 && (
+              <div className="flex items-center gap-1 mt-2">
+                <AlertTriangle className="h-3 w-3 text-destructive" />
+                <span className="text-xs font-medium text-destructive">
+                  {formatCurrency(batchStats.overdueAmount, currency)} overdue ({batchStats.overdueStudentCount} student{batchStats.overdueStudentCount > 1 ? "s" : ""})
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* This Month */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-2xl font-bold">{formatCurrency(batchStats.thisMonthCollected, currency)}</p>
+            {batchStats.thisMonthDue > 0 ? (
+              <>
+                <Progress value={batchStats.thisMonthPercent} className="h-2" />
+                <p className="text-xs text-muted-foreground">{batchStats.thisMonthPercent}% of {formatCurrency(batchStats.thisMonthDue, currency)} due</p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">No fees due this month</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Completion */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -324,24 +411,24 @@ export default function BatchDetail() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Completion</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-2xl font-bold">{completionPercent}%</p>
-            <Progress value={completionPercent} className="h-2" />
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Admission</span>
+                <span className="font-medium">{batchStats.admissionPercent}%</span>
+              </div>
+              <Progress value={batchStats.admissionPercent} className="h-2" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Monthly</span>
+                <span className="font-medium">{batchStats.monthlyPercent}%</span>
+              </div>
+              <Progress value={batchStats.monthlyPercent} className="h-2" />
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Overdue Alert */}
-      {overdueCount > 0 && (
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-            <p className="text-sm font-medium text-destructive">
-              {overdueCount} student{overdueCount > 1 ? "s" : ""} with overdue payments in this batch
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Students Table */}
       <Card>
