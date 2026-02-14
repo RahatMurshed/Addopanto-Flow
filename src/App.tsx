@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -10,23 +11,25 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import AppLayout from "@/components/AppLayout";
-import Auth from "@/pages/Auth";
-import Dashboard from "@/pages/Dashboard";
-import Khatas from "@/pages/Khatas";
-import Revenue from "@/pages/Revenue";
-import Expenses from "@/pages/Expenses";
-import Reports from "@/pages/Reports";
-import SettingsPage from "@/pages/SettingsPage";
-import NotFound from "@/pages/NotFound";
-import Students from "@/pages/Students";
-import StudentDetail from "@/pages/StudentDetail";
-import CompanySelection from "@/pages/CompanySelection";
-import JoinCompany from "@/pages/JoinCompany";
-import CreateCompany from "@/pages/CreateCompany";
-import RegistrationRequests from "@/pages/RegistrationRequests";
-import UserManagement from "@/pages/UserManagement";
-import CompanyMembers from "@/pages/CompanyMembers";
 import gaLogo from "@/assets/GA-LOGO.png";
+
+// Lazy-loaded page components for code splitting
+const Auth = lazy(() => import("@/pages/Auth"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Khatas = lazy(() => import("@/pages/Khatas"));
+const Revenue = lazy(() => import("@/pages/Revenue"));
+const Expenses = lazy(() => import("@/pages/Expenses"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Students = lazy(() => import("@/pages/Students"));
+const StudentDetail = lazy(() => import("@/pages/StudentDetail"));
+const CompanySelection = lazy(() => import("@/pages/CompanySelection"));
+const JoinCompany = lazy(() => import("@/pages/JoinCompany"));
+const CreateCompany = lazy(() => import("@/pages/CreateCompany"));
+const RegistrationRequests = lazy(() => import("@/pages/RegistrationRequests"));
+const UserManagement = lazy(() => import("@/pages/UserManagement"));
+const CompanyMembers = lazy(() => import("@/pages/CompanyMembers"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,27 +94,29 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <NavigationBlockerProvider>
-              <Routes>
-                <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-                
-                <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
-                <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
-                <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
+              <Suspense fallback={<BrandedLoader />}>
+                <Routes>
+                  <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                  
+                  <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
+                  <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
+                  <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
 
-                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
-                <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
-                <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-                <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
-                <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
-                <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-                <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+                  <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
+                  <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
+                  <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                  <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+                  <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                  <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
+                  <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+                  <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+                  
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
             </NavigationBlockerProvider>
           </AuthProvider>
         </BrowserRouter>
