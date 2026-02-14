@@ -237,7 +237,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
                 {unpaidMonths.map((m) => {
                   const isPartial = summary.monthlyPartialMonths?.includes(m);
                   const alreadyPaid = summary.monthlyPaymentsByMonth?.get(m) || 0;
-                  const fee = Number(student.monthly_fee_amount);
+                  const fee = Number(student.monthly_fee_amount) || batchDefaultMonthlyFee || 0;
                   const remaining = fee - alreadyPaid;
                   return (
                     <label key={m} className="flex items-center gap-2 text-sm cursor-pointer">
