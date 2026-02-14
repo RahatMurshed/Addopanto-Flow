@@ -517,6 +517,8 @@ export default function StudentDetail() {
         onSave={handlePayment}
         editingPayment={editingPayment}
         onUpdate={handleUpdatePayment}
+        batchDefaultAdmissionFee={Number(batch?.default_admission_fee) || 0}
+        batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
       />
 
       {/* Delete Payment Confirmation */}
