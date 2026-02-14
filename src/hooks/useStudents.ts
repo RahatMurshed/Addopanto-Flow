@@ -52,8 +52,10 @@ export function useStudents(filters?: StudentFilters) {
   const sortBy = filters?.sortBy || "name";
   const sortOrder = (filters?.sortOrder || "asc") === "asc";
 
+  const { activeCompanyId } = useCompany();
+
   return useQuery({
-    queryKey: ["students", { search, status, sortBy, sortOrder }],
+    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder }],
     queryFn: async () => {
       if (!user) return [];
       let query = supabase.from("students").select("*");
@@ -63,7 +65,9 @@ export function useStudents(filters?: StudentFilters) {
       }
 
       if (search) {
-        query = query.or(`name.ilike.%${search}%,student_id_number.ilike.%${search}%`);
+        // Escape special LIKE pattern characters to prevent pattern injection
+        const sanitized = search.replace(/[%_\\]/g, '\\$&');
+        query = query.or(`name.ilike.%${sanitized}%,student_id_number.ilike.%${sanitized}%`);
       }
 
       query = query.order(sortBy, { ascending: sortOrder });

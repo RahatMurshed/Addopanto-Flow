@@ -10,9 +10,10 @@ export type ExpenseAccountUpdate = TablesUpdate<"expense_accounts">;
 
 export function useExpenseAccounts() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["expense_accounts"],
+    queryKey: ["expense_accounts", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase

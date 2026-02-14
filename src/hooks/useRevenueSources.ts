@@ -8,9 +8,10 @@ export type RevenueSource = Tables<"revenue_sources">;
 
 export function useRevenueSources() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["revenue_sources"],
+    queryKey: ["revenue_sources", activeCompanyId],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase

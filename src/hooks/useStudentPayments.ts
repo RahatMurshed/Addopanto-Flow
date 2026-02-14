@@ -31,9 +31,10 @@ export interface StudentPaymentInsert {
 
 export function useStudentPayments(studentId?: string) {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["student_payments", studentId],
+    queryKey: ["student_payments", activeCompanyId, studentId],
     queryFn: async () => {
       if (!user) return [];
       let query = supabase
@@ -104,15 +105,19 @@ export function useCreateStudentPayment() {
       });
       if (revError) console.error("Failed to create revenue entry:", revError);
 
-      // Also create allocations for the revenue
-      const { data: lastRevenue } = await supabase
+      // Also create allocations for the revenue using the inserted revenue's ID
+      const { data: insertedRevenue } = await supabase
         .from("revenues")
         .select("id")
+        .eq("user_id", user.id)
+        .eq("company_id", activeCompanyId)
+        .eq("amount", paymentData.amount)
+        .eq("date", paymentData.payment_date)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
-      if (lastRevenue) {
+      if (insertedRevenue) {
         const { data: accounts } = await supabase
           .from("expense_accounts")
           .select("id, allocation_percentage")
@@ -124,7 +129,7 @@ export function useCreateStudentPayment() {
             .map((acc) => ({
               user_id: user.id,
               company_id: activeCompanyId,
-              revenue_id: lastRevenue.id,
+              revenue_id: insertedRevenue.id,
               expense_account_id: acc.id,
               amount: (paymentData.amount * acc.allocation_percentage) / 100,
             }));
