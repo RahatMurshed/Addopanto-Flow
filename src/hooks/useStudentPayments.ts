@@ -67,7 +67,7 @@ export function useCreateStudentPayment() {
       // the linked revenue entry and allocations
       const { data, error } = await supabase
         .from("student_payments")
-        .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId } as any)
+        .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId })
         .select()
         .single();
       if (error) throw error;
@@ -91,7 +91,7 @@ export function useUpdateStudentPayment() {
     mutationFn: async ({ id, ...data }: Partial<StudentPaymentInsert> & { id: string }) => {
       const { data: updated, error } = await supabase
         .from("student_payments")
-        .update(data as any)
+        .update(data)
         .eq("id", id)
         .select()
         .single();

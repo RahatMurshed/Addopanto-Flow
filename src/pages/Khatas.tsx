@@ -8,7 +8,7 @@ import {
   type ExpenseAccount,
 } from "@/hooks/useExpenseAccounts";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +35,8 @@ export default function Khatas() {
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   
-  // Role-based permissions
-  const { canAddExpenseSource, canEdit, canDelete } = useRole();
+  // Company-level permissions
+  const { canAddExpenseSource, canEdit, canDelete } = useCompany();
   
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();

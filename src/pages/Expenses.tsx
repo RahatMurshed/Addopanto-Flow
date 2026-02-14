@@ -10,7 +10,7 @@ import {
 } from "@/hooks/useExpenses";
 import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,8 +64,8 @@ export default function Expenses() {
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   
-  // Role-based permissions
-  const { canAddExpense, canEdit, canDelete, canTransfer } = useRole();
+  // Company-level permissions
+  const { canAddExpense, canEdit, canDelete, canTransfer } = useCompany();
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();

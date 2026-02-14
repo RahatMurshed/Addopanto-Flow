@@ -6,7 +6,7 @@ import {
   useStudentPayments, useCreateStudentPayment, useUpdateStudentPayment, useDeleteStudentPayment,
   useMonthlyFeeHistory, computeStudentSummary,
 } from "@/hooks/useStudentPayments";
-import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency } from "@/utils/currencyUtils";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete } = useRole();
+  const { canAddRevenue, canEdit, canDelete } = useCompany();
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
 
