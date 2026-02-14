@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudent, useUpdateStudent, type StudentInsert } from "@/hooks/useStudents";
@@ -33,7 +33,7 @@ export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isDataEntryOperator, canEditStudent, isLoading: companyLoading } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: student, isLoading: studentLoading } = useStudent(id);
@@ -51,6 +51,13 @@ export default function StudentDetail() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<typeof payments[0] | null>(null);
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
+
+  // Redirect DEO without edit permission
+  useEffect(() => {
+    if (!companyLoading && isDataEntryOperator && !canEditStudent) {
+      navigate("/students", { replace: true });
+    }
+  }, [companyLoading, isDataEntryOperator, canEditStudent, navigate]);
 
   const batchCourseStartMonth = useMemo(() => {
     if (!batch?.start_date) return "";
