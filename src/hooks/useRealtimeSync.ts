@@ -30,6 +30,7 @@ const TABLE_INVALIDATION_MAP: Record<string, string[]> = {
   khata_transfers: ["khata_transfers", "account_balances", "dashboard", "reports"],
   monthly_fee_history: ["monthly_fee_history", "students", "dashboard", "reports"],
   batches: ["batches", "students", "dashboard"],
+  companies: ["user-companies", "dashboard", "reports"],
 };
 
 const TABLE_LABELS: Record<string, string> = {
@@ -42,6 +43,7 @@ const TABLE_LABELS: Record<string, string> = {
   khata_transfers: "Transfers",
   monthly_fee_history: "Fee history",
   batches: "Batches",
+  companies: "Company settings",
 };
 
 export function useRealtimeSync() {
@@ -95,6 +97,7 @@ export function useRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "khata_transfers" }, (p) => handleChange("khata_transfers", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "monthly_fee_history" }, (p) => handleChange("monthly_fee_history", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "batches" }, (p) => handleChange("batches", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "companies" }, (p) => handleChange("companies", p))
       .subscribe();
 
     return () => {
