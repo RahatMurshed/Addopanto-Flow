@@ -110,6 +110,10 @@ export function RestoreDataDialog({ open, onOpenChange }: RestoreDataDialogProps
                 <li>• {preview.allocationsCount} allocations</li>
                 <li>• {preview.expensesCount} expenses</li>
                 <li>• {preview.khataTransfersCount} khata transfers</li>
+                {preview.batchesCount > 0 && <li>• {preview.batchesCount} batches</li>}
+                {preview.studentsCount > 0 && <li>• {preview.studentsCount} students</li>}
+                {preview.studentPaymentsCount > 0 && <li>• {preview.studentPaymentsCount} student payments</li>}
+                {preview.monthlyFeeHistoryCount > 0 && <li>• {preview.monthlyFeeHistoryCount} fee history records</li>}
               </ul>
             </div>
 

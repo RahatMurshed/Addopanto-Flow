@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
-  exportUserData,
+  exportCompanyData,
   downloadBackup,
   parseBackupFile,
   BackupData,
@@ -15,7 +15,7 @@ import {
 
 export function useDataManagement() {
   const { user } = useAuth();
-  const { activeCompanyId } = useCompany();
+  const { activeCompanyId, activeCompany } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -24,14 +24,12 @@ export function useDataManagement() {
   const [isResetting, setIsResetting] = useState(false);
 
   const exportData = async () => {
-    if (!user) return;
+    if (!user || !activeCompanyId) return;
     setIsExporting(true);
     try {
-      // Export functions need update to filter by company, but for now user-level export is fine
-      // Ideally, exportUserData should be updated to accept companyId
-      const data = await exportUserData(user.id);
-      downloadBackup(data, user.email || "unknown");
-      toast({ title: "Backup downloaded", description: "Your data has been exported successfully." });
+      const data = await exportCompanyData(activeCompanyId);
+      downloadBackup(data, user.email || "unknown", activeCompany?.name || undefined);
+      toast({ title: "Backup downloaded", description: "Your company data has been exported successfully." });
     } catch (error: any) {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
     } finally {
@@ -88,6 +86,28 @@ export function useDataManagement() {
         }).select("id").single();
         if (error) throw error;
         sourceIdMap.set(source.id, data.id);
+      }
+
+      // Create ID mapping for batches
+      const batchIdMap = new Map<string, string>();
+      for (const batch of (backup.data.batches || [])) {
+        const { data, error } = await supabase.from("batches").insert({
+          user_id: userId,
+          company_id: companyId,
+          created_by: userId,
+          batch_name: batch.batch_name,
+          batch_code: batch.batch_code,
+          description: batch.description,
+          start_date: batch.start_date,
+          end_date: batch.end_date,
+          status: batch.status,
+          default_monthly_fee: batch.default_monthly_fee,
+          default_admission_fee: batch.default_admission_fee,
+          course_duration_months: batch.course_duration_months,
+          max_capacity: batch.max_capacity,
+        }).select("id").single();
+        if (error) throw error;
+        batchIdMap.set(batch.id, data.id);
       }
 
       // Create ID mapping for revenues
@@ -155,6 +175,66 @@ export function useDataManagement() {
         }
       }
 
+      // Create ID mapping for students (depends on batches)
+      const studentIdMap = new Map<string, string>();
+      for (const student of (backup.data.students || [])) {
+        const mappedBatchId = student.batch_id ? batchIdMap.get(student.batch_id) : null;
+        const { data, error } = await supabase.from("students").insert({
+          user_id: userId,
+          company_id: companyId,
+          name: student.name,
+          student_id_number: student.student_id_number,
+          email: student.email,
+          phone: student.phone,
+          status: student.status,
+          enrollment_date: student.enrollment_date,
+          billing_start_month: student.billing_start_month,
+          course_start_month: student.course_start_month,
+          course_end_month: student.course_end_month,
+          monthly_fee_amount: student.monthly_fee_amount,
+          admission_fee_total: student.admission_fee_total,
+          notes: student.notes,
+          batch_id: mappedBatchId,
+        }).select("id").single();
+        if (error) throw error;
+        studentIdMap.set(student.id, data.id);
+      }
+
+      // Insert student_payments with mapped student IDs
+      for (const payment of (backup.data.student_payments || [])) {
+        const mappedStudentId = studentIdMap.get(payment.student_id);
+        if (mappedStudentId) {
+          const { error } = await supabase.from("student_payments").insert({
+            user_id: userId,
+            company_id: companyId,
+            student_id: mappedStudentId,
+            amount: payment.amount,
+            payment_date: payment.payment_date,
+            payment_type: payment.payment_type,
+            payment_method: payment.payment_method,
+            months_covered: payment.months_covered,
+            description: payment.description,
+            receipt_number: payment.receipt_number,
+          });
+          if (error) throw error;
+        }
+      }
+
+      // Insert monthly_fee_history with mapped student IDs
+      for (const history of (backup.data.monthly_fee_history || [])) {
+        const mappedStudentId = studentIdMap.get(history.student_id);
+        if (mappedStudentId) {
+          const { error } = await supabase.from("monthly_fee_history").insert({
+            user_id: userId,
+            company_id: companyId,
+            student_id: mappedStudentId,
+            monthly_amount: history.monthly_amount,
+            effective_from: history.effective_from,
+          });
+          if (error) throw error;
+        }
+      }
+
       await queryClient.invalidateQueries();
       toast({ title: "Data restored", description: "Your backup has been restored to the current company." });
       return true;
@@ -179,10 +259,9 @@ export function useDataManagement() {
         return false;
       }
 
-      const userId = user.id;
       const companyId = activeCompanyId;
 
-      // Delete data scoped to company
+      // Delete data scoped to company (order matters for FK constraints)
       await supabase.from("allocations").delete().eq("company_id", companyId);
       await supabase.from("khata_transfers").delete().eq("company_id", companyId);
       await supabase.from("expenses").delete().eq("company_id", companyId);
@@ -192,6 +271,7 @@ export function useDataManagement() {
       await supabase.from("student_payments").delete().eq("company_id", companyId);
       await supabase.from("monthly_fee_history").delete().eq("company_id", companyId);
       await supabase.from("students").delete().eq("company_id", companyId);
+      await supabase.from("batches").delete().eq("company_id", companyId);
 
       await queryClient.invalidateQueries();
       toast({ title: "Data reset complete", description: "All company data has been deleted." });

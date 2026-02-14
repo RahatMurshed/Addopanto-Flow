@@ -156,11 +156,8 @@ export async function exportToPDF(
   // Hide action buttons for clean PDF output
   const hiddenElements: HTMLElement[] = [];
   const actionSelectors = [
-    'button',
-    '[role="button"]',
-    '.action-buttons',
     '[data-pdf-hide]',
-    'a[href]',
+    '.action-buttons',
   ];
   
   actionSelectors.forEach((selector) => {
@@ -178,12 +175,12 @@ export async function exportToPDF(
     if (wasDarkMode) {
       htmlElement.classList.remove("dark");
       // Wait for styles to reflow
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     // Capture with higher scale for better quality
     const canvas = await html2canvas(element, {
-      scale: 3,
+      scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",

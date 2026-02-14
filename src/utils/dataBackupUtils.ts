@@ -4,6 +4,7 @@ export interface BackupData {
   version: string;
   exportedAt: string;
   userEmail: string;
+  companyName?: string;
   data: {
     expense_accounts: any[];
     revenue_sources: any[];
@@ -11,6 +12,10 @@ export interface BackupData {
     allocations: any[];
     expenses: any[];
     khata_transfers: any[];
+    batches: any[];
+    students: any[];
+    student_payments: any[];
+    monthly_fee_history: any[];
   };
 }
 
@@ -21,11 +26,16 @@ export interface BackupPreview {
   allocationsCount: number;
   expensesCount: number;
   khataTransfersCount: number;
+  batchesCount: number;
+  studentsCount: number;
+  studentPaymentsCount: number;
+  monthlyFeeHistoryCount: number;
   exportedAt: string;
   userEmail: string;
+  companyName?: string;
 }
 
-export async function exportUserData(userId: string): Promise<BackupData["data"]> {
+export async function exportCompanyData(companyId: string): Promise<BackupData["data"]> {
   const [
     expenseAccountsRes,
     revenueSourcesRes,
@@ -33,13 +43,21 @@ export async function exportUserData(userId: string): Promise<BackupData["data"]
     allocationsRes,
     expensesRes,
     khataTransfersRes,
+    batchesRes,
+    studentsRes,
+    studentPaymentsRes,
+    monthlyFeeHistoryRes,
   ] = await Promise.all([
-    supabase.from("expense_accounts").select("*").eq("user_id", userId),
-    supabase.from("revenue_sources").select("*").eq("user_id", userId),
-    supabase.from("revenues").select("*").eq("user_id", userId),
-    supabase.from("allocations").select("*").eq("user_id", userId),
-    supabase.from("expenses").select("*").eq("user_id", userId),
-    supabase.from("khata_transfers").select("*").eq("user_id", userId),
+    supabase.from("expense_accounts").select("*").eq("company_id", companyId),
+    supabase.from("revenue_sources").select("*").eq("company_id", companyId),
+    supabase.from("revenues").select("*").eq("company_id", companyId),
+    supabase.from("allocations").select("*").eq("company_id", companyId),
+    supabase.from("expenses").select("*").eq("company_id", companyId),
+    supabase.from("khata_transfers").select("*").eq("company_id", companyId),
+    supabase.from("batches").select("*").eq("company_id", companyId),
+    supabase.from("students").select("*").eq("company_id", companyId),
+    supabase.from("student_payments").select("*").eq("company_id", companyId),
+    supabase.from("monthly_fee_history").select("*").eq("company_id", companyId),
   ]);
 
   return {
@@ -49,14 +67,24 @@ export async function exportUserData(userId: string): Promise<BackupData["data"]
     allocations: allocationsRes.data || [],
     expenses: expensesRes.data || [],
     khata_transfers: khataTransfersRes.data || [],
+    batches: batchesRes.data || [],
+    students: studentsRes.data || [],
+    student_payments: studentPaymentsRes.data || [],
+    monthly_fee_history: monthlyFeeHistoryRes.data || [],
   };
 }
 
-export function downloadBackup(data: BackupData["data"], userEmail: string): void {
+/** @deprecated Use exportCompanyData instead */
+export async function exportUserData(userId: string): Promise<BackupData["data"]> {
+  return exportCompanyData(userId);
+}
+
+export function downloadBackup(data: BackupData["data"], userEmail: string, companyName?: string): void {
   const backup: BackupData = {
-    version: "1.0",
+    version: "2.0",
     exportedAt: new Date().toISOString(),
     userEmail,
+    companyName,
     data,
   };
 
@@ -88,6 +116,13 @@ export function parseBackupFile(file: File): Promise<BackupData> {
           reject(new Error(validation.error));
           return;
         }
+        // Normalize v1.0 backups to include empty arrays for new tables
+        if (parsed.version === "1.0") {
+          parsed.data.batches = parsed.data.batches || [];
+          parsed.data.students = parsed.data.students || [];
+          parsed.data.student_payments = parsed.data.student_payments || [];
+          parsed.data.monthly_fee_history = parsed.data.monthly_fee_history || [];
+        }
         resolve(parsed as BackupData);
       } catch (err) {
         reject(new Error("Invalid JSON file"));
@@ -103,7 +138,7 @@ export function validateBackupData(data: any): { valid: boolean; error?: string 
     return { valid: false, error: "Invalid backup format" };
   }
 
-  if (!data.version || data.version !== "1.0") {
+  if (!data.version || (data.version !== "1.0" && data.version !== "2.0")) {
     return { valid: false, error: "Unsupported backup version" };
   }
 
@@ -141,7 +176,12 @@ export function getBackupPreview(backup: BackupData): BackupPreview {
     allocationsCount: backup.data.allocations.length,
     expensesCount: backup.data.expenses.length,
     khataTransfersCount: backup.data.khata_transfers.length,
+    batchesCount: (backup.data.batches || []).length,
+    studentsCount: (backup.data.students || []).length,
+    studentPaymentsCount: (backup.data.student_payments || []).length,
+    monthlyFeeHistoryCount: (backup.data.monthly_fee_history || []).length,
     exportedAt: backup.exportedAt,
     userEmail: backup.userEmail,
+    companyName: backup.companyName,
   };
 }

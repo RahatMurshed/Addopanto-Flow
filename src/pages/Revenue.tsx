@@ -412,18 +412,20 @@ export default function Revenue() {
                 </TableBody>
               </Table>
             </div>
-            <TablePagination
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems}
-              startIndex={pagination.startIndex}
-              endIndex={pagination.endIndex}
-              itemsPerPage={pagination.itemsPerPage}
-              onPageChange={pagination.goToPage}
-              onItemsPerPageChange={pagination.setItemsPerPage}
-              canGoNext={pagination.canGoNext}
-              canGoPrev={pagination.canGoPrev}
-            />
+            <div data-pdf-hide>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                startIndex={pagination.startIndex}
+                endIndex={pagination.endIndex}
+                itemsPerPage={pagination.itemsPerPage}
+                onPageChange={pagination.goToPage}
+                onItemsPerPageChange={pagination.setItemsPerPage}
+                canGoNext={pagination.canGoNext}
+                canGoPrev={pagination.canGoPrev}
+              />
+            </div>
           </CardContent>
         </Card>
       )}

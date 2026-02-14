@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, Users, DollarSign, Clock } from "lucide-react";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { exportToPDF } from "@/utils/exportUtils";
 import ExportButtons from "@/components/ExportButtons";
 import MonthYearPicker from "@/components/MonthYearPicker";
@@ -61,10 +61,11 @@ function formatMonthLabel(month: string): string {
 interface Props {
   students: Student[];
   studentSummaries: Map<string, StudentSummary>;
-  currency: string;
+  currency?: string;
 }
 
-export default function StudentOverdueSection({ students, studentSummaries, currency }: Props) {
+export default function StudentOverdueSection({ students, studentSummaries }: Props) {
+  const { fc: formatCurrency } = useCompanyCurrency();
   const navigate = useNavigate();
 
   // Default to previous month
@@ -196,7 +197,7 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
               <DollarSign className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdueAmount, currency)}</p>
+              <p className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdueAmount)}</p>
             </CardContent>
           </Card>
           <Card className="border-destructive/30">
@@ -247,9 +248,9 @@ export default function StudentOverdueSection({ students, studentSummaries, curr
                       </button>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{r.studentIdNumber || "—"}</TableCell>
-                    <TableCell>{formatCurrency(r.monthlyFee, currency)}</TableCell>
-                    <TableCell>{formatCurrency(r.amountPaid, currency)}</TableCell>
-                    <TableCell className="font-semibold text-destructive">{formatCurrency(r.amountRemaining, currency)}</TableCell>
+                    <TableCell>{formatCurrency(r.monthlyFee)}</TableCell>
+                    <TableCell>{formatCurrency(r.amountPaid)}</TableCell>
+                    <TableCell className="font-semibold text-destructive">{formatCurrency(r.amountRemaining)}</TableCell>
                     <TableCell>{r.overdueMonthLabel}</TableCell>
                     <TableCell className="font-semibold">{r.daysOverdue}</TableCell>
                     <TableCell>

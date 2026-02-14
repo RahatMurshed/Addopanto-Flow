@@ -767,18 +767,20 @@ export default function Dashboard() {
                   ))}
                 </TableBody>
               </Table>
-              <TablePagination
-                currentPage={transactionsPagination.currentPage}
-                totalPages={transactionsPagination.totalPages}
-                totalItems={transactionsPagination.totalItems}
-                startIndex={transactionsPagination.startIndex}
-                endIndex={transactionsPagination.endIndex}
-                itemsPerPage={transactionsPagination.itemsPerPage}
-                onPageChange={transactionsPagination.goToPage}
-                onItemsPerPageChange={transactionsPagination.setItemsPerPage}
-                canGoNext={transactionsPagination.canGoNext}
-                canGoPrev={transactionsPagination.canGoPrev}
-              />
+              <div data-pdf-hide>
+                <TablePagination
+                  currentPage={transactionsPagination.currentPage}
+                  totalPages={transactionsPagination.totalPages}
+                  totalItems={transactionsPagination.totalItems}
+                  startIndex={transactionsPagination.startIndex}
+                  endIndex={transactionsPagination.endIndex}
+                  itemsPerPage={transactionsPagination.itemsPerPage}
+                  onPageChange={transactionsPagination.goToPage}
+                  onItemsPerPageChange={transactionsPagination.setItemsPerPage}
+                  canGoNext={transactionsPagination.canGoNext}
+                  canGoPrev={transactionsPagination.canGoPrev}
+                />
+              </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">

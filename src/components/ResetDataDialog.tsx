@@ -110,6 +110,8 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
                 <li>• All expense sources</li>
                 <li>• All expense source transfers</li>
                 <li>• All revenue sources</li>
+                <li>• All batches and students</li>
+                <li>• All student payments and fee history</li>
               </ul>
               <p className="mt-3 text-sm">
                 <strong>Your profile settings will be preserved.</strong>
