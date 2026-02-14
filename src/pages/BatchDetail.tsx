@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
+import MonthYearPicker from "@/components/MonthYearPicker";
 import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
@@ -57,6 +58,10 @@ export default function BatchDetail() {
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const batchCourseStartMonth = useMemo(() => {
     if (!batch?.start_date) return "";
@@ -137,8 +142,7 @@ export default function BatchDetail() {
     let totalMonthsDue = 0;
     let totalMonthsPaid = 0;
 
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const currentMonth = selectedMonth;
     let thisMonthDue = 0;
     let thisMonthCollected = 0;
 
@@ -191,7 +195,7 @@ export default function BatchDetail() {
       thisMonthDue, thisMonthCollected, thisMonthPercent,
       currentMonth,
     };
-  }, [allSummaries, allBatchStudents, batch]);
+  }, [allSummaries, allBatchStudents, batch, selectedMonth]);
 
   const pagination = usePagination(batchStudents);
 
@@ -382,12 +386,18 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* This Month */}
+        {/* Selected Month */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
+              <MonthYearPicker
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+                minYear={batch.start_date ? new Date(batch.start_date).getFullYear() : 2020}
+                maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
+                className="h-7 w-auto text-xs font-medium border-0 shadow-none px-1"
+              />
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
