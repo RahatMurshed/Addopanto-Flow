@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import MonthYearPicker from "@/components/MonthYearPicker";
+import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useStudents } from "@/hooks/useStudents";
@@ -34,10 +34,7 @@ import type { Batch } from "@/hooks/useBatches";
 export default function Batches() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
   const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useStudents();
   const { data: allPayments = [] } = useStudentPayments();
@@ -55,7 +52,7 @@ export default function Batches() {
   const [editBatch, setEditBatch] = useState<Batch | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Build per-batch analytics for the selected month
+  // Build per-batch analytics based on filter
   const batchAnalytics = useMemo(() => {
     const map = new Map<string, { studentCount: number; monthRevenue: number; monthPending: number; overdueCount: number; monthOverdueCount: number; monthOverdueAmount: number }>();
     for (const b of batches) {
@@ -85,26 +82,32 @@ export default function Batches() {
         const payments = allPayments.filter((p) => p.student_id === s.id);
         const sum = computeStudentSummary(effectiveStudent, payments);
 
-        // Per-month revenue: what was paid for selectedMonth
         const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
-        if (allMonths.includes(selectedMonth)) {
-          const paid = sum.monthlyPaymentsByMonth.get(selectedMonth) || 0;
+        // Filter months based on current filter
+        const includedMonths = allMonths.filter((m) => isMonthIncluded(m, filterValue));
+
+        for (const m of includedMonths) {
+          const paid = sum.monthlyPaymentsByMonth.get(m) || 0;
           monthRevenue += paid;
           monthPending += Math.max(0, effMonthly - paid);
         }
 
         if (sum.monthlyOverdueMonths.length > 0) overdueCount++;
 
-        // Overdue for selected month
-        if (sum.monthlyOverdueMonths.includes(selectedMonth) || sum.monthlyPartialMonths.includes(selectedMonth)) {
+        // Overdue for included months
+        const overdueInRange = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
+        const partialInRange = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
+        if (overdueInRange.length > 0 || partialInRange.length > 0) {
           monthOverdueCount++;
-          monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(selectedMonth) || 0);
+          for (const m of [...overdueInRange, ...partialInRange]) {
+            monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(m) || 0);
+          }
         }
       }
       map.set(b.id, { studentCount: students.length, monthRevenue, monthPending, overdueCount, monthOverdueCount, monthOverdueAmount });
     }
     return map;
-  }, [batches, allStudents, allPayments, selectedMonth]);
+  }, [batches, allStudents, allPayments, filterValue]);
 
   const pagination = usePagination(batches);
 
@@ -151,7 +154,6 @@ export default function Batches() {
     }
   };
 
-  // Summary stats for selectedMonth
   const totalStudentsInBatches = useMemo(() => {
     let total = 0;
     for (const a of batchAnalytics.values()) total += a.studentCount;
@@ -207,8 +209,8 @@ export default function Batches() {
           </div>
           <p className="text-muted-foreground">Manage student batches and track batch-level analytics</p>
         </div>
-        <div className="flex items-center gap-2">
-          <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <BatchDateFilter value={filterValue} onChange={setFilterValue} />
           {canAddRevenue && (
             <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" /> Create Batch
@@ -228,28 +230,28 @@ export default function Batches() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Month Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Revenue", filterValue)}</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRevenue, currency)}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Month Pending</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Pending", filterValue)}</CardTitle>
             <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalPendingAll, currency)}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Month Overdue</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Overdue", filterValue)}</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold text-destructive">{totalOverdue}</p></CardContent>
         </Card>
       </div>
 
-      {/* Monthly Overdue Section */}
+      {/* Overdue Section */}
       {(() => {
         const overdueBatches = batches.filter((b) => {
           const a = batchAnalytics.get(b.id);
@@ -262,12 +264,12 @@ export default function Batches() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
-                <CardTitle className="text-base">Monthly Overdue</CardTitle>
+                <CardTitle className="text-base">{getFilterLabel("Overdue", filterValue)}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               {overdueBatches.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No overdue students for this month.</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">No overdue students for this period.</p>
               ) : (
                 <>
                   <Table>
