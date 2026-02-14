@@ -164,15 +164,28 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const switchCompany = useCallback(async (companyId: string) => {
     if (!user?.id) return;
-    await supabase
+
+    // Client-side validation: ensure user is a member (defense in depth)
+    const isMember = memberships.some(m => m.company_id === companyId && m.status === "active");
+    if (!isMember && !isCipher) {
+      console.error("Cannot switch to company: not a member");
+      return;
+    }
+
+    const { error } = await supabase
       .from("user_profiles")
       .update({ active_company_id: companyId })
       .eq("user_id", user.id);
 
+    if (error) {
+      console.error("Failed to switch company:", error.message);
+      return;
+    }
+
     // Invalidate everything to reload with new company scope
     queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
     queryClient.invalidateQueries();
-  }, [user?.id, queryClient]);
+  }, [user?.id, memberships, isCipher, queryClient]);
 
   const refetch = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
