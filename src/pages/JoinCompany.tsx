@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket } from "lucide-react";
+import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function JoinCompany() {
@@ -22,6 +22,7 @@ export default function JoinCompany() {
   const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { data: allCompanies = [] } = useQuery({
     queryKey: ["all-companies"],
@@ -157,12 +158,26 @@ export default function JoinCompany() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Company Password</Label>
-                    <Input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter company password"
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter company password"
+                        disabled={loading}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Message (optional)</Label>
@@ -171,10 +186,11 @@ export default function JoinCompany() {
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="Tell the admin why you want to join..."
                       rows={2}
+                      disabled={loading}
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setSelectedCompany(null)}>Cancel</Button>
+                    <Button variant="outline" onClick={() => setSelectedCompany(null)} disabled={loading}>Cancel</Button>
                     <Button onClick={handleJoinWithPassword} disabled={loading || !password}>
                       {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Send Join Request
