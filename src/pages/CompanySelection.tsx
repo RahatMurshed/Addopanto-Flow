@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, UserPlus, LogOut, Loader2, Users } from "lucide-react";
+import gaLogo from "@/assets/GA-LOGO.png";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -67,9 +68,7 @@ export default function CompanySelection() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Building2 className="h-7 w-7" />
-          </div>
+          <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto h-14 w-auto object-contain" />
           <h1 className="text-2xl font-bold">Select a Company</h1>
           <p className="text-muted-foreground">Choose a company to continue</p>
         </div>

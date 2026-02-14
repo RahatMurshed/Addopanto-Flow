@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, TrendingUp, CheckCircle, ShieldAlert, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, ShieldAlert, XCircle } from "lucide-react";
+import gaLogo from "@/assets/GA-LOGO.png";
 import { formatDistanceToNow } from "date-fns";
 
 interface BanInfo {
@@ -93,10 +94,8 @@ function RegistrationSuccess() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-            <CheckCircle className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">KhataFlow</CardTitle>
+          <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto mb-2 h-16 w-auto object-contain" />
+          <CardTitle className="text-2xl">Addopanto Flow</CardTitle>
           <CardDescription className="mt-2">Registration Submitted</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -326,11 +325,9 @@ export default function Auth() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <TrendingUp className="h-6 w-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">KhataFlow</h1>
-          <p className="text-sm text-muted-foreground">Smart revenue allocation for your business</p>
+          <img src={gaLogo} alt="Grammar Addopanto" className="h-16 w-auto object-contain" />
+          <h1 className="text-2xl font-bold tracking-tight">Addopanto Flow</h1>
+          <p className="text-sm text-muted-foreground">Smart revenue allocation for your institution</p>
         </div>
 
         {banInfo?.banned && <BanMessage banInfo={banInfo} />}
