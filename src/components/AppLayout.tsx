@@ -33,6 +33,7 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   Layers,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -82,6 +83,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(showReports ? [{ label: "Reports", href: "/reports", icon: FileText }] : []),
     ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
     ...(canViewMembers && !isDataEntryOperator ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
+    ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Audit Log", href: "/audit-log", icon: ClipboardList }] : []),
     ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
     ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
   ];
