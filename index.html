@@ -7,6 +7,7 @@
     <meta name="description" content="Smart financial management app for educational institutions. Automatically allocate revenue, track expenses, and see real-time profit." />
     <meta name="author" content="Grammar Addopanto" />
     <link rel="icon" href="/GA-LOGO.png" type="image/png" />
+    <link rel="preload" href="/GA-LOGO.png" as="image" type="image/png" />
 
     <link rel="preconnect" href="https://cdn.gpteng.co" crossorigin />
     <link rel="dns-prefetch" href="https://cdn.gpteng.co" />
@@ -21,10 +22,23 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <style>
+      #initial-loader{display:flex;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:#09090b;font-family:system-ui,sans-serif}
+      #initial-loader img{height:5rem;width:auto;animation:pulse 2s ease-in-out infinite}
+      #initial-loader p{font-size:.875rem;color:#a1a1aa}
+      @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(.97)}}
+      @media(prefers-color-scheme:light){#initial-loader{background:#fff}#initial-loader p{color:#71717a}}
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="initial-loader">
+        <img src="/GA-LOGO.png" alt="Grammar Addopanto" width="80" height="80" />
+        <p>Loading...</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
