@@ -48,7 +48,7 @@ export default function CompanyMembers() {
       if (error) throw error;
       return data.map((r) => r.user_id);
     },
-    enabled: !isCipher && canViewMembers,
+    enabled: canViewMembers,
   });
 
   // Fetch members
@@ -274,9 +274,13 @@ export default function CompanyMembers() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {!canModifyMember ? (
-                            roleBadge(member.role)
-                          ) : (
+                          <div className="flex items-center gap-1.5">
+                            {isCipher && cipherUserIds.includes(member.user_id) && (
+                              <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30">Cipher</Badge>
+                            )}
+                            {!canModifyMember ? (
+                              roleBadge(member.role)
+                            ) : (
                             <Select
                               value={member.role}
                               onValueChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { role: v } })}
@@ -288,7 +292,8 @@ export default function CompanyMembers() {
                                 <SelectItem value="viewer">Viewer</SelectItem>
                               </SelectContent>
                             </Select>
-                          )}
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                           {format(new Date(member.joined_at), "MMM d, yyyy")}
