@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import type { AppRole } from "@/hooks/useUserRole";
 
 interface RoleGuardProps {
@@ -57,17 +58,17 @@ export function RoleGuard({
 }
 
 /**
- * PermissionGuard - Conditionally renders based on specific permissions
+ * PermissionGuard - Conditionally renders based on company-scoped permissions
  */
 interface PermissionGuardProps {
   children: ReactNode;
-  permission: "canAddRevenue" | "canAddExpense" | "canAddExpenseSource" | "canTransfer" | "canViewReports" | "canEdit" | "canDelete" | "canManageUsers";
+  permission: "canAddRevenue" | "canAddExpense" | "canAddExpenseSource" | "canTransfer" | "canViewReports" | "canEdit" | "canDelete" | "canManageMembers" | "canManageStudents";
   fallback?: ReactNode;
 }
 
 export function PermissionGuard({ children, permission, fallback = null }: PermissionGuardProps) {
-  const roleContext = useRole();
-  const hasPermission = roleContext[permission];
+  const companyContext = useCompany();
+  const hasPermission = companyContext[permission as keyof typeof companyContext];
 
   if (!hasPermission) {
     return <>{fallback}</>;

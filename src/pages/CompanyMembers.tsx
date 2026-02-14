@@ -27,6 +27,8 @@ import { format } from "date-fns";
 import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import CompanyJoinRequests from "@/components/CompanyJoinRequests";
+import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CompanyMembers() {
   const { user } = useAuth();
@@ -170,6 +172,18 @@ export default function CompanyMembers() {
 
   if (!canViewMembers) return <Navigate to="/" replace />;
 
+  if (membersLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <SkeletonTable rows={5} columns={7} />
+      </div>
+    );
+  }
+
   const roleBadge = (role: string) => {
     const colors: Record<string, string> = {
       admin: "bg-primary/15 text-primary border-primary/30",
@@ -191,15 +205,19 @@ export default function CompanyMembers() {
           <TabsTrigger value="members" className="gap-2">
             <Users className="h-4 w-4" /> Members ({members.length})
           </TabsTrigger>
-          <TabsTrigger value="requests" className="gap-2">
-            <UserPlus className="h-4 w-4" /> Requests
-            {pendingJoinCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingJoinCount}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="invite" className="gap-2">
-            <Shield className="h-4 w-4" /> Invite
-          </TabsTrigger>
+          {canManageMembers && (
+            <TabsTrigger value="requests" className="gap-2">
+              <UserPlus className="h-4 w-4" /> Requests
+              {pendingJoinCount > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{pendingJoinCount}</Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canManageMembers && (
+            <TabsTrigger value="invite" className="gap-2">
+              <Shield className="h-4 w-4" /> Invite
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="members" className="space-y-4 mt-4">
@@ -215,12 +233,14 @@ export default function CompanyMembers() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead className="hidden md:table-cell">Joined</TableHead>
                     <TableHead className="hidden md:table-cell">Revenue</TableHead>
                     <TableHead className="hidden md:table-cell">Expense</TableHead>
+                    <TableHead className="hidden lg:table-cell">Exp. Sources</TableHead>
                     <TableHead className="hidden md:table-cell">Transfer</TableHead>
                     <TableHead className="hidden md:table-cell">Reports</TableHead>
                     <TableHead className="hidden lg:table-cell">Students</TableHead>
-                    <TableHead>Actions</TableHead>
+                    {canManageMembers && <TableHead>Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -261,8 +281,11 @@ export default function CompanyMembers() {
                             </Select>
                           )}
                         </TableCell>
-                        {["can_add_revenue", "can_add_expense", "can_transfer", "can_view_reports", "can_manage_students"].map((perm) => (
-                          <TableCell key={perm} className={perm === "can_manage_students" ? "hidden lg:table-cell" : "hidden md:table-cell"}>
+                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                          {format(new Date(member.joined_at), "MMM d, yyyy")}
+                        </TableCell>
+                        {["can_add_revenue", "can_add_expense", "can_add_expense_source", "can_transfer", "can_view_reports", "can_manage_students"].map((perm) => (
+                          <TableCell key={perm} className={["can_add_expense_source", "can_manage_students"].includes(perm) ? "hidden lg:table-cell" : "hidden md:table-cell"}>
                             <Switch
                               checked={memberIsAdmin || member[perm as keyof typeof member] as boolean}
                               disabled={permsDisabled}
@@ -270,13 +293,15 @@ export default function CompanyMembers() {
                             />
                           </TableCell>
                         ))}
-                        <TableCell>
-                          {canModifyMember && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setRemovingMemberId(member.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </TableCell>
+                        {canManageMembers && (
+                          <TableCell>
+                            {canModifyMember && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setRemovingMemberId(member.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}

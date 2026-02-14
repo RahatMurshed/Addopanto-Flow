@@ -78,7 +78,7 @@ export default function CompanyJoinRequests() {
       if (userIds.length === 0) return [];
       const { data } = await supabase
         .from("user_profiles")
-        .select("user_id, email")
+        .select("user_id, email, full_name")
         .in("user_id", userIds);
       return data ?? [];
     },
@@ -87,6 +87,9 @@ export default function CompanyJoinRequests() {
 
   const getEmail = (userId: string) =>
     requestProfiles.find((p) => p.user_id === userId)?.email || userId.slice(0, 8) + "...";
+
+  const getName = (userId: string) =>
+    requestProfiles.find((p) => p.user_id === userId)?.full_name || null;
 
   const pendingRequests = joinRequests.filter((r) => r.status === "pending");
   const rejectedRequests = joinRequests.filter((r) => r.status === "rejected");
@@ -315,7 +318,12 @@ export default function CompanyJoinRequests() {
                     ) : (
                       pendingRequests.map((request) => (
                         <TableRow key={request.id}>
-                          <TableCell className="font-medium">{getEmail(request.user_id)}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{getName(request.user_id) || getEmail(request.user_id)}</p>
+                              {getName(request.user_id) && <p className="text-xs text-muted-foreground">{getEmail(request.user_id)}</p>}
+                            </div>
+                          </TableCell>
                           <TableCell className="max-w-[200px] truncate text-muted-foreground">
                             {request.message || "—"}
                           </TableCell>
@@ -370,7 +378,12 @@ export default function CompanyJoinRequests() {
                         const isBanned = request.banned_until && new Date(request.banned_until) > new Date();
                         return (
                           <TableRow key={request.id}>
-                            <TableCell className="font-medium">{getEmail(request.user_id)}</TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{getName(request.user_id) || getEmail(request.user_id)}</p>
+                                {getName(request.user_id) && <p className="text-xs text-muted-foreground">{getEmail(request.user_id)}</p>}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               {request.reviewed_at ? format(new Date(request.reviewed_at), "MMM d, yyyy h:mm a") : "-"}
                             </TableCell>

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRole } from "@/contexts/RoleContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading, hasNoRole, isModerator, isCipher, isAdmin } = useRole();
+  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isCompanyViewer, isCompanyModerator } = useCompany();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -46,12 +46,12 @@ export default function SettingsPage() {
 
   const blocker = useUnsavedChanges(isDirty);
 
-  // Redirect moderators away from settings
+  // Redirect non-admin users away from settings
   useEffect(() => {
-    if (!roleLoading && isModerator) {
+    if (!roleLoading && !isCompanyAdmin && !isCipher) {
       navigate("/", { replace: true });
     }
-  }, [roleLoading, isModerator, navigate]);
+  }, [roleLoading, isCompanyAdmin, isCipher, navigate]);
 
   useEffect(() => {
     if (!user) return;

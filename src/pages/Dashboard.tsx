@@ -39,6 +39,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency as formatCurrencyUtil, formatCurrencyPrecise } from "@/utils/currencyUtils";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
+import { useCompany } from "@/contexts/CompanyContext";
 import { PermissionGuard } from "@/components/RoleGuard";
 
 const CHART_COLORS = [
@@ -48,6 +49,7 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const { data: userProfile } = useUserProfile();
   const currency = userProfile?.currency || "BDT";
   
@@ -77,7 +79,7 @@ export default function Dashboard() {
   }, []);
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["dashboard", user?.id],
+    queryKey: ["dashboard", user?.id, activeCompanyId],
     queryFn: async () => {
       if (!user) return null;
 
