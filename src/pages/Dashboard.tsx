@@ -702,7 +702,7 @@ export default function Dashboard() {
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Expense Source</TableHead>
-                    <TableHead>Source</TableHead>
+                    <TableHead>Revenue Source</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
