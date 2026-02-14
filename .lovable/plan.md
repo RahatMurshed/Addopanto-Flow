@@ -1,106 +1,86 @@
 
-# End-to-End Multi-Company System Audit Results & Remaining Fixes
 
-## Audit Summary
+# Remaining Fixes for Multi-Company System Hardening
 
-After reviewing the full codebase, database schema, RLS policies, and live data, the system is largely well-implemented. Below are the specific issues found and fixes needed.
+After a thorough audit, the system is in strong shape. Most critical security, data isolation, and permission enforcement items from previous batches are already implemented. Below are the remaining issues to fix.
 
 ---
 
-## Issues Found & Fixes Required
+## Fix 1: useCreateRevenue missing company_id filter on expense_accounts query
 
-### 1. Data Isolation Gap: RLS filters data by company, but queries don't explicitly filter
+**File**: `src/hooks/useRevenues.ts` (line 55-58)
 
-**Problem**: The Supabase RLS policies on `revenues`, `expenses`, `students`, etc. check `company_id = get_active_company_id(auth.uid())`, which correctly filters at the database level. However, the frontend queries in `useRevenues`, `useExpenses`, `useAccountBalances`, and `useRevenueSources` do NOT include `.eq("company_id", activeCompanyId)` in their queries. This means:
-- RLS handles isolation correctly at the DB level (safe)
-- But if RLS were ever misconfigured or bypassed, there would be no application-level filtering
-- More importantly, if a user switches companies quickly, stale cached data from the old company could briefly appear before new queries complete
+The `useCreateRevenue` mutation fetches expense accounts with `.eq("is_active", true)` but does NOT filter by `company_id`. This means allocations could potentially be created against expense accounts from other companies.
 
-**Fix**: Add explicit `.eq("company_id", activeCompanyId)` filter to all financial queries as defense-in-depth. This is a best practice even though RLS handles it.
+**Fix**: Add `.eq("company_id", activeCompanyId)` to the expense_accounts query inside `useCreateRevenue`.
 
-**Files**: `src/hooks/useRevenues.ts`, `src/hooks/useExpenses.ts`, `src/hooks/useRevenueSources.ts`, `src/hooks/useExpenseAccounts.ts`, `src/hooks/useKhataTransfers.ts`, `src/hooks/useStudentPayments.ts`
+---
 
-### 2. Dashboard queries missing company_id filter in SQL
+## Fix 2: UserManagement console warning (Function components cannot be given refs)
 
-**Problem**: `src/pages/Dashboard.tsx` (lines 88-96) fetches revenues, expenses, allocations, accounts, and sources without any `.eq("company_id", ...)` filter. While the query key includes `activeCompanyId` (which was recently fixed), the actual Supabase queries rely entirely on RLS. Adding explicit filtering would improve performance by reducing data transfer when switching companies.
+**File**: `src/pages/UserManagement.tsx` (line 473)
 
-**Fix**: Add `.eq("company_id", activeCompanyId)` to each query inside the Dashboard's `queryFn`, and add an `enabled: !!activeCompanyId` guard.
+The `AlertDialog` component is receiving a ref but is not wrapped in `forwardRef`. This is the source of the console error visible in logs.
 
-**File**: `src/pages/Dashboard.tsx`
+**Fix**: The outer `AlertDialog` at line 473 is likely being passed a ref via the `open` prop pattern incorrectly. The fix is to ensure `AlertDialog` is not being used as a direct child where a ref is expected, or wrap the component properly.
 
-### 3. Companies table exposes `join_password` in plaintext via SELECT
+---
 
-**Problem**: The `companies` table has an RLS policy allowing all authenticated users to SELECT all columns (`USING (true)`). This means the `join_password` column is readable by every logged-in user, defeating its purpose. Users could simply query the companies table to read passwords.
+## Fix 3: RegistrationRequests page still uses legacy RoleGuard
 
-**Fix**: Create a database view (`companies_public`) that excludes `join_password` and `invite_code`, and update the frontend to query the view instead. Alternatively, restrict the base table SELECT policy to exclude those columns (views are the standard approach).
+**File**: `src/pages/RegistrationRequests.tsx`
 
-**Database change**: Create view + update RLS on base table
-**Files**: `src/pages/JoinCompany.tsx` (change `from("companies")` to `from("companies_public")`), `src/contexts/CompanyContext.tsx`
+This page uses `RoleGuard` which depends on the global `useRole()` context. Since this is a platform-level page (Cipher-only for global registration approval), it should use `useRole().isCipher` or `useCompany().isCipher` for consistency, plus add an explicit `Navigate` redirect like `UserManagement.tsx` does.
 
-### 4. Registration Requests page uses legacy global role system
+**Fix**: Add explicit `isCipher` check with `Navigate` redirect at the top of the component, matching the pattern in `UserManagement.tsx`.
 
-**Problem**: `src/pages/RegistrationRequests.tsx` likely uses the global `useRole()` context for access control. This should also be available to company admins (for platform-level registration requests managed by Cipher only). Need to verify this page is Cipher-only as intended.
+---
 
-**File**: `src/pages/RegistrationRequests.tsx` -- verify and align with company context
+## Fix 4: CompanyMembers invite code query hits base `companies` table
 
-### 5. Viewer role has no UI restrictions
+**File**: `src/pages/CompanyMembers.tsx` (line 112-121)
 
-**Problem**: The viewer user (`hi@hi.com`, role: viewer in Default Company) has `can_add_revenue: true`, `can_add_expense: false`, etc. in the `company_memberships` table, but the code doesn't enforce viewer-specific UI restrictions like disabled forms or "View Only" badges. The `isCompanyViewer` flag exists in `CompanyContext` but is never used in any page component.
+The invite code query fetches from `companies` (base table) which has a SELECT policy allowing all authenticated users to read ALL columns (including `join_password`). While this specific query only selects `invite_code`, the base table policy is still overly permissive.
 
-**Fix**: Add conditional UI checks on pages like Revenue, Expenses, Students to disable add/edit/delete buttons when the user is a viewer or lacks specific permissions. Use `PermissionGuard` more broadly.
+**Status**: The `companies_public` view was created but the base table SELECT policy was not tightened. This means any authenticated user can still query `companies` directly and read `join_password`.
+
+**Fix**: Update the RLS policy on the `companies` base table to restrict SELECT access. Only cipher users and company admins should be able to SELECT from the base table. All other users should use `companies_public`.
+
+**Database migration**:
+```sql
+-- Drop the overly permissive policy
+DROP POLICY IF EXISTS "Authenticated users can view companies" ON companies;
+
+-- Restricted: only cipher or company admin/member can read base table
+CREATE POLICY "Cipher and admins can view companies"
+  ON companies FOR SELECT
+  USING (
+    is_cipher(auth.uid()) 
+    OR is_company_admin(auth.uid(), id)
+  );
+```
+
+---
+
+## Fix 5: Viewer role "View Only" badge missing from UI
 
 **Files**: `src/pages/Revenue.tsx`, `src/pages/Expenses.tsx`, `src/pages/Students.tsx`, `src/pages/Khatas.tsx`
 
-### 6. Company password stored in plaintext
+The `isCompanyViewer` flag exists in CompanyContext but is never used in pages to show a "View Only" badge. While action buttons are already hidden via permission checks (`canAddRevenue`, `canEdit`, `canDelete`), there's no visual indicator that the user is in view-only mode.
 
-**Problem**: The `companies.join_password` column stores the password as plaintext. The `company-join` edge function compares passwords directly. This is a security risk.
-
-**Fix**: Hash passwords using bcrypt in the edge function when creating/updating companies, and compare using bcrypt verify during join. This requires updating the `company-join` edge function and the company creation flow.
-
-**Files**: `supabase/functions/company-join/index.ts`, `src/pages/CreateCompany.tsx`
+**Fix**: Add a subtle "View Only" badge at the top of each page when `isCompanyViewer` is true.
 
 ---
 
-## What's Working Correctly
+## Summary
 
-- **Role hierarchy**: Cipher > Admin > Moderator > Viewer is properly enforced
-- **Navigation**: Platform Users link only shows for Cipher; Members link shows for admins/moderators
-- **Route guards**: UserManagement redirects non-Cipher; CompanyMembers redirects non-viewers
-- **Company switching**: Works with proper cache invalidation
-- **Permission toggles**: Members page correctly shows/hides toggles based on role
-- **Join request flow**: Approve/reject with permission assignment works
-- **Skeleton loaders**: Present on Dashboard, Members, and Join Requests pages
-- **Query keys**: Most financial hooks include `activeCompanyId` in query keys
-- **RLS policies**: Properly use `SECURITY DEFINER` functions to avoid recursion
-- **Moderator read-only**: Members page hides Requests/Invite tabs for moderators
-- **Database indexes**: Performance indexes are in place
+| Fix | Type | Priority | Files |
+|-----|------|----------|-------|
+| 1. Missing company_id in useCreateRevenue | Security bug | High | useRevenues.ts |
+| 2. Console ref warning | Bug fix | Medium | UserManagement.tsx |
+| 3. RegistrationRequests route guard | Access control | Medium | RegistrationRequests.tsx |
+| 4. Base companies table SELECT policy | Security | High | Database migration |
+| 5. View Only badge for viewers | UX | Low | Revenue/Expenses/Students/Khatas |
 
----
+**Estimated scope**: 5 files modified, 1 database migration. No breaking changes.
 
-## Implementation Plan
-
-### Batch A: Security Fixes (Critical)
-
-1. **Create `companies_public` view** excluding `join_password` and `invite_code`
-2. **Update base table SELECT policy** to deny direct access (or be more restrictive)
-3. **Update frontend queries** to use the view
-4. **Hash company passwords** in the edge function
-
-### Batch B: Defense-in-Depth Query Hardening
-
-1. Add `.eq("company_id", activeCompanyId)` to all financial query hooks
-2. Add the same filter to Dashboard queries
-3. Add `enabled: !!activeCompanyId` guards where missing
-
-### Batch C: Permission Enforcement in UI
-
-1. Use `PermissionGuard` on Revenue, Expenses, Students, Khatas pages to hide add/edit/delete buttons
-2. Add "View Only" indicator for viewers
-3. Verify RegistrationRequests page access control
-
-### Technical Details
-
-- **Estimated files to modify**: 10-12
-- **Database migrations**: 1 (create view, update policy)
-- **Edge function updates**: 1 (password hashing)
-- **No breaking changes**: All changes are additive or tightening
