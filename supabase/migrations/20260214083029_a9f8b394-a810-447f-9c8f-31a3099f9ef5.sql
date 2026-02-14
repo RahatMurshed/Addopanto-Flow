@@ -1,0 +1,9 @@
+-- Enable realtime for financial tables
+ALTER PUBLICATION supabase_realtime ADD TABLE public.revenues;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.expenses;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.students;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.student_payments;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.allocations;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.expense_accounts;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.khata_transfers;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.monthly_fee_history;
