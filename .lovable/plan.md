@@ -1,90 +1,69 @@
 
 
-# Fix Plan: Cipher Auto-Join, Invite Code Generation, and Login Flow
+# Landing Page for Addopanto Flow
 
-## Issues Found
+## Overview
 
-1. **Cipher cannot join companies without verification** -- There is no "auto-join" mechanism for cipher users. They must enter a password or invite code like everyone else. The edge function needs a new action to let cipher users join any company directly as admin.
+Create a professional, conversion-focused landing page that visitors see when they open the app URL. Authenticated users will be redirected to the dashboard as before. The page will use the existing orange/blue brand palette and support both light and dark themes.
 
-2. **Invite code not appearing after generation** -- When generating an invite code, the success handler invalidates the wrong cache key (`user-companies` instead of `company-secrets`), so the UI never refreshes to show the newly generated code.
+## Routing Changes
 
-3. **Google OAuth login bypasses registration status check** -- After Google sign-in, the app redirects to `/companies` without checking if the user's registration request is still pending. This means pending/rejected users authenticated via Google may see the company selection page instead of a proper status message.
+**File: `src/App.tsx`**
 
----
+- Add a new lazy-loaded `LandingPage` component
+- Change the `/` route from `ProtectedRoute > Dashboard` to a new `LandingOrDashboard` component that:
+  - Shows the landing page if the user is NOT logged in
+  - Redirects to `/dashboard` if the user IS logged in
+- Add a new `/dashboard` route pointing to `ProtectedRoute > Dashboard`
+- Update the `ProtectedRoute` redirect (when no user) from `/auth` to `/` so unauthenticated users see the landing page instead of the auth page directly
 
-## Planned Changes
+## New Landing Page
 
-### 1. Edge Function: Add `cipher-join` Action
-**File:** `supabase/functions/company-join/index.ts`
+**File: `src/pages/LandingPage.tsx`**
 
-Add a new action `cipher-join` that:
-- Verifies the user has the `cipher` role
-- Checks if they are already a member of the target company
-- If not, auto-inserts a `company_memberships` record with role `admin` and all permissions enabled
-- Sets the company as their active company
-- Returns success immediately (no password, no invite code, no approval needed)
+A single-page component with these sections:
 
-### 2. Frontend: Let Cipher Join Directly from Company List
-**File:** `src/pages/JoinCompany.tsx`
+1. **Navbar** -- Logo, product name, theme toggle, "Login" and "Get Started" buttons linking to `/auth`
+2. **Hero Section** -- Bold headline ("Smart Revenue Allocation for Educational Institutions"), subtitle explaining the value, two CTA buttons ("Get Started" and "Learn More"), and a decorative gradient accent using the brand orange/blue
+3. **Features Grid** -- 6 feature cards highlighting:
+   - Revenue Allocation
+   - Expense Tracking
+   - Student Management
+   - Multi-Company Support
+   - Real-time Reports
+   - Team Collaboration
+4. **How It Works** -- 3-step visual flow (Create Company -> Add Revenue/Expenses -> Track Profit)
+5. **CTA Section** -- Final call-to-action with "Start Managing Your Finances" and a button to `/auth`
+6. **Footer** -- Logo, copyright, minimal links
 
-- Detect if the current user is a cipher (via `useCompany().isCipher`)
-- For cipher users, show a "Join as Admin" button on each company card instead of requiring a password
-- Clicking it calls the new `cipher-join` edge function action
-- On success, navigate to `/companies`
+## Theme Support
 
-### 3. Fix Invite Code Cache Invalidation
-**File:** `src/pages/CompanyMembers.tsx`
-
-- In `generateInviteMutation.onSuccess`, change the invalidated query key from `["user-companies"]` to `["company-secrets", activeCompanyId]` so the invite code display refreshes immediately after generation
-
-### 4. Fix Google OAuth Registration Status Check
-**File:** `src/App.tsx` (CompanyGuard)
-
-- In the `CompanyGuard` component (which runs after authentication), add a registration status check for users who have no company memberships and are not cipher
-- If the user's `registration_requests` status is `pending`, redirect to a pending approval message instead of showing "No Companies"
-- If the status is `rejected`, sign them out
-
-Alternatively, this can be handled in `CompanySelection.tsx` by checking registration status when `companies.length === 0` and the user is not cipher.
-
----
+- Uses existing CSS variables (`--background`, `--foreground`, `--primary`, `--secondary`, etc.) so light/dark mode works automatically
+- The navbar includes the existing `ThemeToggle` component
+- No new CSS variables needed
 
 ## Technical Details
 
-### Edge Function Change (cipher-join)
-```text
-New action block in company-join/index.ts:
+### Files to Create
+- `src/pages/LandingPage.tsx` -- The full landing page component
 
-if (action === "cipher-join") {
-  - Verify isCipher, return 403 if not
-  - Check existing membership, return 400 if already a member
-  - Insert membership with role=admin, all permissions=true
-  - Update user_profiles.active_company_id
-  - Return success
-}
+### Files to Modify
+- `src/App.tsx` -- Add landing page route, add `/dashboard` route, update redirect logic
+
+### Dependencies
+- No new dependencies needed
+- Uses existing lucide-react icons, Button, Card components, and ThemeToggle
+
+### Navigation Flow
+```text
+Unauthenticated user visits "/" --> LandingPage
+User clicks "Get Started"       --> /auth (login/signup)
+Authenticated user visits "/"   --> redirected to /dashboard
+All existing internal nav links  --> updated from "/" to "/dashboard" where needed
 ```
 
-### Cache Fix (one-line change)
-```text
-CompanyMembers.tsx line 170:
-  Change: queryClient.invalidateQueries({ queryKey: ["user-companies"] })
-  To:     queryClient.invalidateQueries({ queryKey: ["company-secrets", activeCompanyId] })
-```
-
-### JoinCompany.tsx UI Change
-```text
-- Import useCompany and get isCipher
-- For cipher users: show a direct "Join" button per company
-- On click: invoke company-join with action "cipher-join"
-- On success: navigate to /companies
-```
-
-### Registration Status Guard
-```text
-CompanySelection.tsx:
-- When companies.length === 0 and !isCipher:
-  - Query registration_requests for the current user
-  - If status is "pending", show a "Pending Approval" message
-  - If status is "rejected", sign out
-  - Otherwise show the normal "No Companies" UI with Join button
-```
+### Internal Link Updates
+- `AppLayout.tsx`: Dashboard nav link href stays `/` (since authenticated users get redirected to `/dashboard` anyway) -- actually needs to change to `/dashboard`
+- `Auth.tsx`: Post-login navigate stays `/` which will redirect to `/dashboard`
+- No other files reference the dashboard route directly besides the nav
 
