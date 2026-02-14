@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -94,7 +94,7 @@ function RegistrationSuccess() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto mb-2 h-16 w-auto object-contain" />
+          <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="mx-auto mb-2 h-16 w-auto object-contain" /></Link>
           <CardTitle className="text-2xl sr-only">Addopanto Flow</CardTitle>
           <CardDescription className="mt-2">Registration Submitted</CardDescription>
         </CardHeader>
@@ -325,7 +325,7 @@ export default function Auth() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-2">
-          <img src={gaLogo} alt="Grammar Addopanto" className="h-16 w-auto object-contain" />
+          <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="h-16 w-auto object-contain" /></Link>
           <h1 className="sr-only">Addopanto Flow</h1>
           <p className="text-sm text-muted-foreground">Smart revenue allocation for your institution</p>
         </div>

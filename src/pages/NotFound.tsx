@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import gaLogo from "@/assets/GA-LOGO.png";
 
@@ -12,7 +12,7 @@ const NotFound = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted">
       <div className="text-center space-y-4">
-        <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto h-16 w-auto object-contain" />
+        <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="mx-auto h-16 w-auto object-contain" /></Link>
         <h1 className="text-4xl font-bold">404</h1>
         <p className="text-xl text-muted-foreground">Oops! Page not found</p>
         <a href="/" className="inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">

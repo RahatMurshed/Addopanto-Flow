@@ -97,9 +97,9 @@ export default function LandingPage() {
         className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg"
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             <img src={gaLogo} alt="Addopanto Flow" className="h-9 w-auto" />
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button variant="ghost" size="sm" asChild>
@@ -253,9 +253,9 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 sm:flex-row sm:justify-between sm:px-6">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <img src={gaLogo} alt="Addopanto Flow" className="h-7 w-auto" />
-          </div>
+          </Link>
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} Grammar Addopanto. All rights reserved.
           </p>
