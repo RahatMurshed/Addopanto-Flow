@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
 import { DataManagementSection } from "@/components/DataManagementSection";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { ImageUpload } from "@/components/ImageUpload";
+import { SUPPORTED_CURRENCIES, formatCurrency } from "@/utils/currencyUtils";
 
 const months = [
   "January", "February", "March", "April", "May", "June",
@@ -23,7 +24,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isCompanyViewer, isCompanyModerator, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
+  const { isLoading: roleLoading, isCompanyAdmin, isCipher, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [businessName, setBusinessName] = useState("");
   const [currency, setCurrency] = useState("BDT");
+  const [exchangeRate, setExchangeRate] = useState("1");
   const [fiscalMonth, setFiscalMonth] = useState("1");
 
   // Business logo state
@@ -42,12 +44,14 @@ export default function SettingsPage() {
   const [originalValues, setOriginalValues] = useState({
     businessName: "",
     currency: "BDT",
+    exchangeRate: "1",
     fiscalMonth: "1",
   });
 
   const isDirty =
     businessName !== originalValues.businessName ||
     currency !== originalValues.currency ||
+    exchangeRate !== originalValues.exchangeRate ||
     fiscalMonth !== originalValues.fiscalMonth;
 
   const blocker = useUnsavedChanges(isDirty);
@@ -59,42 +63,60 @@ export default function SettingsPage() {
     }
   }, [roleLoading, isCompanyAdmin, isCipher, navigate]);
 
-  // Initialize business name from active company, currency/fiscal from user_profiles
+  // Initialize from active company
   useEffect(() => {
-    if (!user) return;
-    const bName = activeCompany?.name || "";
-    supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        const curr = data?.currency || "BDT";
-        const fiscal = String(data?.fiscal_year_start_month || 1);
-        setBusinessName(bName);
-        setCurrency(curr);
-        setFiscalMonth(fiscal);
-        setOriginalValues({
-          businessName: bName,
-          currency: curr,
-          fiscalMonth: fiscal,
-        });
-        setLoading(false);
-      });
-  }, [user, activeCompany?.name]);
+    if (!user || !activeCompany) return;
+    const bName = activeCompany.name || "";
+    const curr = activeCompany.currency || "BDT";
+    const rate = String((activeCompany as any).exchange_rate ?? 1);
+    const fiscal = String(activeCompany.fiscal_year_start_month || 1);
+    
+    setBusinessName(bName);
+    setCurrency(curr);
+    setExchangeRate(rate);
+    setFiscalMonth(fiscal);
+    setOriginalValues({ businessName: bName, currency: curr, exchangeRate: rate, fiscalMonth: fiscal });
+    setLoading(false);
+  }, [user, activeCompany]);
+
+  const exchangeRateNum = parseFloat(exchangeRate) || 0;
+  const isExchangeRateValid = exchangeRateNum > 0;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !activeCompanyId) return;
+    if (!isExchangeRateValid) {
+      toast({ title: "Invalid exchange rate", description: "Exchange rate must be a positive number", variant: "destructive" });
+      return;
+    }
     setSaving(true);
 
-    // Update company name
+    const currencyChanged = currency !== originalValues.currency || exchangeRate !== originalValues.exchangeRate;
+
+    // Update company: name, currency, exchange_rate, fiscal_year_start_month
     const { error: companyError } = await supabase
       .from("companies")
-      .update({ name: businessName })
+      .update({
+        name: businessName,
+        currency,
+        exchange_rate: exchangeRateNum,
+        fiscal_year_start_month: parseInt(fiscalMonth),
+      } as any)
       .eq("id", activeCompanyId);
 
-    // Update user profile settings (currency, fiscal month)
+    if (!companyError && currencyChanged) {
+      // Insert audit log
+      await supabase.from("currency_change_logs" as any).insert({
+        company_id: activeCompanyId,
+        changed_by: user.id,
+        old_currency: originalValues.currency,
+        new_currency: currency,
+        old_exchange_rate: parseFloat(originalValues.exchangeRate) || 1,
+        new_exchange_rate: exchangeRateNum,
+      });
+    }
+
+    // Sync currency to user profile too for backwards compat
     const { error: profileError } = await supabase
       .from("user_profiles")
       .update({
@@ -108,7 +130,7 @@ export default function SettingsPage() {
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
-      setOriginalValues({ businessName, currency, fiscalMonth });
+      setOriginalValues({ businessName, currency, exchangeRate, fiscalMonth });
       await queryClient.invalidateQueries({ queryKey: ["user-profile", user.id] });
       await queryClient.resetQueries({ queryKey: ["user-companies"] });
       refetchCompany();
@@ -192,10 +214,11 @@ export default function SettingsPage() {
                   <Select value={currency} onValueChange={setCurrency} disabled={saving}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="BDT">BDT (৳)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      {SUPPORTED_CURRENCIES.map(c => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.code} ({c.symbol}) — {c.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -211,7 +234,53 @@ export default function SettingsPage() {
                   </Select>
                 </div>
               </div>
-              <Button type="submit" disabled={saving}>
+
+              {/* Exchange Rate */}
+              <div className="space-y-2">
+                <Label htmlFor="exchange-rate">Exchange Rate</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="exchange-rate"
+                    type="number"
+                    step="0.0001"
+                    min="0.0001"
+                    value={exchangeRate}
+                    onChange={(e) => setExchangeRate(e.target.value)}
+                    disabled={saving}
+                    className={!isExchangeRateValid && exchangeRate !== "" ? "border-destructive" : ""}
+                  />
+                </div>
+                {!isExchangeRateValid && exchangeRate !== "" && (
+                  <p className="text-xs text-destructive">Exchange rate must be a positive number</p>
+                )}
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Rate relative to your stored amounts. Use 1 if amounts are already in {currency}.
+                </p>
+              </div>
+
+              {/* Live Preview */}
+              <Card className="bg-muted/50 border-dashed">
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Live Preview</p>
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">100</p>
+                      <p className="font-semibold">{formatCurrency(100 * exchangeRateNum, currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">1,000</p>
+                      <p className="font-semibold">{formatCurrency(1000 * exchangeRateNum, currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">50,000</p>
+                      <p className="font-semibold">{formatCurrency(50000 * exchangeRateNum, currency)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Button type="submit" disabled={saving || !isExchangeRateValid}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {saving ? "Saving..." : "Save Changes"}
               </Button>

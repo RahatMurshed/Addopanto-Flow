@@ -21,11 +21,11 @@ import { CalendarIcon, Loader2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
 import { useToast } from "@/hooks/use-toast";
 import { useBatches, type Batch } from "@/hooks/useBatches";
-import { formatCurrency } from "@/utils/currencyUtils";
+
 
 const yyyyMmRegex = /^\d{4}-\d{2}$/;
 
@@ -78,8 +78,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
   const isEdit = !!student;
 
   const createPaymentMutation = useCreateStudentPayment();
-  const { data: userProfile } = useUserProfile();
-  const currency = userProfile?.currency || "BDT";
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const { toast } = useToast();
   const { data: batches = [] } = useBatches({ status: "active" });
 

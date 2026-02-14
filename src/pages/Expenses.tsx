@@ -9,9 +9,8 @@ import {
   type ExpenseWithAccount,
 } from "@/hooks/useExpenses";
 import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
-import { useUserProfile } from "@/hooks/useUserProfile";
 import { useCompany } from "@/contexts/CompanyContext";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,11 +61,10 @@ export default function Expenses() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
-  const { data: userProfile } = useUserProfile();
-  const currency = userProfile?.currency || "BDT";
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer } = useCompany();
+  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany } = useCompany();
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -154,7 +152,7 @@ export default function Expenses() {
 
   const handleExportPDF = async () => {
     if (!dateRange) return;
-    await exportToPDF("expenses-content", "expenses", "Expenses Report", dateRange.label, userProfile?.business_name || undefined);
+    await exportToPDF("expenses-content", "expenses", "Expenses Report", dateRange.label, activeCompany?.name || undefined);
   };
 
   const handleCreate = async (data: {
