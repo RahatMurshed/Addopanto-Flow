@@ -23,7 +23,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, Archive, TrendingUp, AlertTriangle, Users } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, TrendingUp, AlertTriangle, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import BatchDialog from "@/components/BatchDialog";
@@ -34,9 +34,8 @@ import type { Batch } from "@/hooks/useBatches";
 export default function Batches() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
-  const [overdueMonth, setOverdueMonth] = useState(() => {
+  const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
-    now.setMonth(now.getMonth() - 1);
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
@@ -56,13 +55,13 @@ export default function Batches() {
   const [editBatch, setEditBatch] = useState<Batch | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Build per-batch analytics
+  // Build per-batch analytics for the selected month
   const batchAnalytics = useMemo(() => {
-    const map = new Map<string, { studentCount: number; totalCollected: number; totalPending: number; overdueCount: number; monthOverdueCount: number; monthOverdueAmount: number }>();
+    const map = new Map<string, { studentCount: number; monthRevenue: number; monthPending: number; overdueCount: number; monthOverdueCount: number; monthOverdueAmount: number }>();
     for (const b of batches) {
       const students = allStudents.filter((s: any) => s.batch_id === b.id);
-      let totalCollected = 0;
-      let totalPending = 0;
+      let monthRevenue = 0;
+      let monthPending = 0;
       let overdueCount = 0;
       let monthOverdueCount = 0;
       let monthOverdueAmount = 0;
@@ -85,19 +84,27 @@ export default function Batches() {
         };
         const payments = allPayments.filter((p) => p.student_id === s.id);
         const sum = computeStudentSummary(effectiveStudent, payments);
-        totalCollected += sum.totalPaid;
-        totalPending += sum.totalPending;
+
+        // Per-month revenue: what was paid for selectedMonth
+        const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
+        if (allMonths.includes(selectedMonth)) {
+          const paid = sum.monthlyPaymentsByMonth.get(selectedMonth) || 0;
+          monthRevenue += paid;
+          monthPending += Math.max(0, effMonthly - paid);
+        }
+
         if (sum.monthlyOverdueMonths.length > 0) overdueCount++;
-        // Per-month overdue for selected overdueMonth
-        if (sum.monthlyOverdueMonths.includes(overdueMonth) || sum.monthlyPartialMonths.includes(overdueMonth)) {
+
+        // Overdue for selected month
+        if (sum.monthlyOverdueMonths.includes(selectedMonth) || sum.monthlyPartialMonths.includes(selectedMonth)) {
           monthOverdueCount++;
-          monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(overdueMonth) || 0);
+          monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(selectedMonth) || 0);
         }
       }
-      map.set(b.id, { studentCount: students.length, totalCollected, totalPending, overdueCount, monthOverdueCount, monthOverdueAmount });
+      map.set(b.id, { studentCount: students.length, monthRevenue, monthPending, overdueCount, monthOverdueCount, monthOverdueAmount });
     }
     return map;
-  }, [batches, allStudents, allPayments, overdueMonth]);
+  }, [batches, allStudents, allPayments, selectedMonth]);
 
   const pagination = usePagination(batches);
 
@@ -144,7 +151,7 @@ export default function Batches() {
     }
   };
 
-  // Summary stats
+  // Summary stats for selectedMonth
   const totalStudentsInBatches = useMemo(() => {
     let total = 0;
     for (const a of batchAnalytics.values()) total += a.studentCount;
@@ -153,19 +160,19 @@ export default function Batches() {
 
   const totalRevenue = useMemo(() => {
     let total = 0;
-    for (const a of batchAnalytics.values()) total += a.totalCollected;
+    for (const a of batchAnalytics.values()) total += a.monthRevenue;
     return total;
   }, [batchAnalytics]);
 
   const totalPendingAll = useMemo(() => {
     let total = 0;
-    for (const a of batchAnalytics.values()) total += a.totalPending;
+    for (const a of batchAnalytics.values()) total += a.monthPending;
     return total;
   }, [batchAnalytics]);
 
   const totalOverdue = useMemo(() => {
     let total = 0;
-    for (const a of batchAnalytics.values()) total += a.overdueCount;
+    for (const a of batchAnalytics.values()) total += a.monthOverdueCount;
     return total;
   }, [batchAnalytics]);
 
@@ -200,11 +207,14 @@ export default function Batches() {
           </div>
           <p className="text-muted-foreground">Manage student batches and track batch-level analytics</p>
         </div>
-        {canAddRevenue && (
-          <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Create Batch
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} />
+          {canAddRevenue && (
+            <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" /> Create Batch
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -218,21 +228,21 @@ export default function Batches() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Month Revenue</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRevenue, currency)}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Pending</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Month Pending</CardTitle>
             <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalPendingAll, currency)}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Students</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Month Overdue</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent><p className="text-2xl font-bold text-destructive">{totalOverdue}</p></CardContent>
@@ -254,7 +264,6 @@ export default function Batches() {
                 <AlertTriangle className="h-4 w-4 text-destructive" />
                 <CardTitle className="text-base">Monthly Overdue</CardTitle>
               </div>
-              <MonthYearPicker value={overdueMonth} onChange={setOverdueMonth} className="h-8 w-auto text-xs" />
             </CardHeader>
             <CardContent>
               {overdueBatches.length === 0 ? (
@@ -369,13 +378,13 @@ export default function Batches() {
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
                             <span className="font-semibold text-green-600 dark:text-green-400">
-                              {formatCurrency(analytics?.totalCollected || 0, currency)}
+                              {formatCurrency(analytics?.monthRevenue || 0, currency)}
                             </span>
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
-                            {(analytics?.totalPending || 0) > 0 ? (
+                            {(analytics?.monthPending || 0) > 0 ? (
                               <span className="font-semibold text-orange-600 dark:text-orange-400">
-                                {formatCurrency(analytics?.totalPending || 0, currency)}
+                                {formatCurrency(analytics?.monthPending || 0, currency)}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">—</span>

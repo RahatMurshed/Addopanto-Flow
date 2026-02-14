@@ -62,11 +62,6 @@ export default function BatchDetail() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [selectedOverdueMonth, setSelectedOverdueMonth] = useState(() => {
-    const now = new Date();
-    now.setMonth(now.getMonth() - 1);
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
 
   const batchCourseStartMonth = useMemo(() => {
     if (!batch?.start_date) return "";
@@ -112,7 +107,6 @@ export default function BatchDetail() {
     return map;
   }, [batchStudents, allPayments, batch, batchCourseStartMonth, batchCourseEndMonth]);
 
-  // All students in batch (unfiltered) for summary stats
   const allBatchStudents = useMemo(() => {
     if (!id) return [];
     return allStudents.filter((s: any) => s.batch_id === id);
@@ -139,17 +133,16 @@ export default function BatchDetail() {
     let totalPending = 0;
     let admissionCollected = 0;
     let admissionPending = 0;
-    let monthlyCollected = 0;
-    let monthlyPending = 0;
     let overdueAmount = 0;
     let overdueStudentCount = 0;
     let admissionFullyPaidCount = 0;
     let totalMonthsDue = 0;
     let totalMonthsPaid = 0;
 
-    const currentMonth = selectedMonth;
-    let thisMonthDue = 0;
-    let thisMonthCollected = 0;
+    let monthDue = 0;
+    let monthCollected = 0;
+    let monthOverdueCount = 0;
+    let monthOverdueAmount = 0;
 
     for (const [sid, sum] of allSummaries.entries()) {
       const student = allBatchStudents.find((s) => s.id === sid);
@@ -162,8 +155,6 @@ export default function BatchDetail() {
       totalPending += sum.totalPending;
       admissionCollected += sum.admissionPaid;
       admissionPending += Math.max(0, effAdm - sum.admissionPaid);
-      monthlyCollected += sum.monthlyPaidTotal;
-      monthlyPending += sum.monthlyPendingTotal;
 
       if (sum.admissionStatus === "paid") admissionFullyPaidCount++;
 
@@ -178,43 +169,35 @@ export default function BatchDetail() {
         }
       }
 
-      // This month stats
+      // Selected month stats
       const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
-      if (allMonths.includes(currentMonth)) {
-        thisMonthDue += effMonthly;
-        thisMonthCollected += sum.monthlyPaymentsByMonth.get(currentMonth) || 0;
+      if (allMonths.includes(selectedMonth)) {
+        monthDue += effMonthly;
+        monthCollected += sum.monthlyPaymentsByMonth.get(selectedMonth) || 0;
+      }
+
+      // Monthly overdue for selectedMonth
+      if (sum.monthlyOverdueMonths.includes(selectedMonth) || sum.monthlyPartialMonths.includes(selectedMonth)) {
+        monthOverdueCount++;
+        monthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(selectedMonth) || 0);
       }
     }
 
     const studentCount = allBatchStudents.length;
     const admissionPercent = studentCount > 0 ? Math.round((admissionFullyPaidCount / studentCount) * 100) : 0;
     const monthlyPercent = totalMonthsDue > 0 ? Math.round((totalMonthsPaid / totalMonthsDue) * 100) : 0;
-    const thisMonthPercent = thisMonthDue > 0 ? Math.round((thisMonthCollected / thisMonthDue) * 100) : 0;
-
-    // Per-month overdue for selectedOverdueMonth
-    let perMonthOverdueCount = 0;
-    let perMonthOverdueAmount = 0;
-    for (const [sid, sum] of allSummaries.entries()) {
-      const student = allBatchStudents.find((s) => s.id === sid);
-      if (!student) continue;
-      const effMonthly = Number(student.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
-      if (sum.monthlyOverdueMonths.includes(selectedOverdueMonth) || sum.monthlyPartialMonths.includes(selectedOverdueMonth)) {
-        perMonthOverdueCount++;
-        perMonthOverdueAmount += effMonthly - (sum.monthlyPaymentsByMonth.get(selectedOverdueMonth) || 0);
-      }
-    }
+    const monthPercent = monthDue > 0 ? Math.round((monthCollected / monthDue) * 100) : 0;
+    const monthPending = Math.max(0, monthDue - monthCollected);
 
     return {
       totalCollected, totalPending,
       admissionCollected, admissionPending,
-      monthlyCollected, monthlyPending,
       overdueAmount, overdueStudentCount,
       admissionPercent, monthlyPercent,
-      thisMonthDue, thisMonthCollected, thisMonthPercent,
-      currentMonth,
-      perMonthOverdueCount, perMonthOverdueAmount,
+      monthDue, monthCollected, monthPercent, monthPending,
+      monthOverdueCount, monthOverdueAmount,
     };
-  }, [allSummaries, allBatchStudents, batch, selectedMonth, selectedOverdueMonth]);
+  }, [allSummaries, allBatchStudents, batch, selectedMonth]);
 
   const pagination = usePagination(batchStudents);
 
@@ -315,7 +298,13 @@ export default function BatchDetail() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <MonthYearPicker
+            value={selectedMonth}
+            onChange={setSelectedMonth}
+            minYear={batch.start_date ? new Date(batch.start_date).getFullYear() : 2020}
+            maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
+          />
           {canEdit && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
           {canAddRevenue && <Button onClick={() => setStudentDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Student</Button>}
         </div>
@@ -350,8 +339,8 @@ export default function BatchDetail() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Stats Cards - unified with selectedMonth */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Students */}
         <Card>
           <CardHeader className="pb-2">
@@ -365,66 +354,20 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Collected */}
+        {/* Month Collected */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Collected</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(batchStats.totalCollected, currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Admission: {formatCurrency(batchStats.admissionCollected, currency)} · Monthly: {formatCurrency(batchStats.monthlyCollected, currency)}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Pending + Overdue */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(batchStats.totalPending, currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Admission: {formatCurrency(batchStats.admissionPending, currency)} · Monthly: {formatCurrency(batchStats.monthlyPending, currency)}
-            </p>
-            {batchStats.overdueStudentCount > 0 && (
-              <div className="flex items-center gap-1 mt-2">
-                <AlertTriangle className="h-3 w-3 text-destructive" />
-                <span className="text-xs font-medium text-destructive">
-                  {formatCurrency(batchStats.overdueAmount, currency)} overdue ({batchStats.overdueStudentCount} student{batchStats.overdueStudentCount > 1 ? "s" : ""})
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Selected Month */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-primary" />
-              <MonthYearPicker
-                value={selectedMonth}
-                onChange={setSelectedMonth}
-                minYear={batch.start_date ? new Date(batch.start_date).getFullYear() : 2020}
-                maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
-                className="h-7 w-auto text-xs font-medium border-0 shadow-none px-1"
-              />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Month Collected</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-2xl font-bold">{formatCurrency(batchStats.thisMonthCollected, currency)}</p>
-            {batchStats.thisMonthDue > 0 ? (
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(batchStats.monthCollected, currency)}</p>
+            {batchStats.monthDue > 0 ? (
               <>
-                <Progress value={batchStats.thisMonthPercent} className="h-2" />
-                <p className="text-xs text-muted-foreground">{batchStats.thisMonthPercent}% of {formatCurrency(batchStats.thisMonthDue, currency)} due</p>
+                <Progress value={batchStats.monthPercent} className="h-2" />
+                <p className="text-xs text-muted-foreground">{batchStats.monthPercent}% of {formatCurrency(batchStats.monthDue, currency)} due</p>
               </>
             ) : (
               <p className="text-xs text-muted-foreground">No fees due this month</p>
@@ -432,29 +375,39 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Monthly Overdue */}
+        {/* Month Pending */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Month Pending</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(batchStats.monthPending, currency)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Admission pending: {formatCurrency(batchStats.admissionPending, currency)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Month Overdue */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-destructive" />
-              <MonthYearPicker
-                value={selectedOverdueMonth}
-                onChange={setSelectedOverdueMonth}
-                minYear={batch.start_date ? new Date(batch.start_date).getFullYear() : 2020}
-                maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
-                className="h-7 w-auto text-xs font-medium border-0 shadow-none px-1"
-              />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Month Overdue</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            {batchStats.perMonthOverdueCount > 0 ? (
+            {batchStats.monthOverdueCount > 0 ? (
               <>
-                <p className="text-2xl font-bold text-destructive">{batchStats.perMonthOverdueCount}</p>
+                <p className="text-2xl font-bold text-destructive">{batchStats.monthOverdueCount}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  student{batchStats.perMonthOverdueCount > 1 ? "s" : ""} overdue
+                  student{batchStats.monthOverdueCount > 1 ? "s" : ""} overdue
                 </p>
                 <p className="text-sm font-semibold text-destructive mt-2">
-                  {formatCurrency(batchStats.perMonthOverdueAmount, currency)}
+                  {formatCurrency(batchStats.monthOverdueAmount, currency)}
                 </p>
               </>
             ) : (
@@ -511,9 +464,9 @@ export default function BatchDetail() {
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Enrolled</TableHead>
                       <TableHead>Admission</TableHead>
-                      <TableHead>Monthly</TableHead>
-                      <TableHead className="hidden md:table-cell">Total Paid</TableHead>
-                      <TableHead className="hidden md:table-cell">Total Pending</TableHead>
+                      <TableHead>Monthly Status</TableHead>
+                      <TableHead className="hidden md:table-cell">Month Paid</TableHead>
+                      <TableHead className="hidden md:table-cell">Month Pending</TableHead>
                       <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
                       <TableHead className="w-24">Actions</TableHead>
                     </TableRow>
@@ -521,6 +474,16 @@ export default function BatchDetail() {
                   <TableBody>
                     {pagination.paginatedItems.map((s) => {
                       const sum = studentSummaries.get(s.id);
+                      const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+                      const monthPaid = sum?.monthlyPaymentsByMonth.get(selectedMonth) || 0;
+                      const allMonths = sum ? [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths] : [];
+                      const isMonthApplicable = allMonths.includes(selectedMonth);
+                      const isMonthOverdue = sum?.monthlyOverdueMonths.includes(selectedMonth);
+                      const isMonthPartial = sum?.monthlyPartialMonths.includes(selectedMonth);
+                      const isMonthPaid = sum?.monthlyPaidMonths.includes(selectedMonth);
+                      const isMonthPending = sum?.monthlyPendingMonths.includes(selectedMonth);
+                      const monthRemaining = isMonthApplicable ? Math.max(0, effMonthly - monthPaid) : 0;
+
                       const lastPayment = allPayments
                         .filter((p) => p.student_id === s.id)
                         .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
@@ -557,16 +520,18 @@ export default function BatchDetail() {
                           </TableCell>
                           <TableCell>
                             {sum ? (() => {
-                              const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
                               if (effMonthly === 0) return <span className="text-muted-foreground text-sm">N/A</span>;
+                              if (!isMonthApplicable) return <span className="text-muted-foreground text-sm">N/A</span>;
                               return (
                                 <div className="flex flex-col gap-0.5">
-                                  {sum.monthlyOverdueMonths.length > 0 ? (
-                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{sum.monthlyOverdueMonths.length} overdue</Badge>
-                                  ) : (sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length) > 0 ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{sum.monthlyPendingMonths.length + sum.monthlyPartialMonths.length} pending</Badge>
-                                  ) : sum.monthlyPaidMonths.length > 0 && sum.monthlyPendingMonths.length === 0 && sum.monthlyPartialMonths.length === 0 ? (
+                                  {isMonthPaid ? (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
+                                  ) : isMonthOverdue ? (
+                                    <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">Overdue</Badge>
+                                  ) : isMonthPartial ? (
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Partial</Badge>
+                                  ) : isMonthPending ? (
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Pending</Badge>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
@@ -574,11 +539,15 @@ export default function BatchDetail() {
                               );
                             })() : "—"}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell font-semibold text-green-600 dark:text-green-400">
-                            {sum ? formatCurrency(sum.totalPaid, currency) : "—"}
+                          <TableCell className="hidden md:table-cell">
+                            {isMonthApplicable ? (
+                              <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(monthPaid, currency)}</span>
+                            ) : <span className="text-muted-foreground">—</span>}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell font-semibold text-orange-600 dark:text-orange-400">
-                            {sum && sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
+                          <TableCell className="hidden md:table-cell">
+                            {isMonthApplicable && monthRemaining > 0 ? (
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(monthRemaining, currency)}</span>
+                            ) : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                             {lastPayment ? format(new Date(lastPayment.payment_date), "MMM d, yyyy") : "—"}
