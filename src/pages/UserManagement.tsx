@@ -39,11 +39,13 @@ import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown } from "lucide
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Navigate } from "react-router-dom";
+import { UserAvatar } from "@/components/UserAvatar";
 
 interface UserWithRole {
   user_id: string;
   email: string | null;
   full_name: string | null;
+  avatar_url: string | null;
   role: AppRole;
   created_at: string;
 }
@@ -362,19 +364,27 @@ export default function UserManagement() {
                       return (
                         <TableRow key={u.user_id}>
                           <TableCell>
-                            <div>
-                              <p className="font-medium">
-                                {u.full_name || u.email || "No email"}
-                                {isCurrentUser && (
-                                  <span className="ml-2 text-xs text-muted-foreground">(you)</span>
+                            <div className="flex items-center gap-2.5">
+                              <UserAvatar
+                                avatarUrl={u.avatar_url}
+                                fullName={u.full_name}
+                                email={u.email}
+                                size="sm"
+                              />
+                              <div>
+                                <p className="font-medium">
+                                  {u.full_name || u.email || "No email"}
+                                  {isCurrentUser && (
+                                    <span className="ml-2 text-xs text-muted-foreground">(you)</span>
+                                  )}
+                                </p>
+                                {u.full_name && (
+                                  <p className="text-xs text-muted-foreground">{u.email || "No email"}</p>
                                 )}
-                              </p>
-                              {u.full_name && (
-                                <p className="text-xs text-muted-foreground">{u.email || "No email"}</p>
-                              )}
-                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                {u.user_id}
-                              </p>
+                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                  {u.user_id}
+                                </p>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>

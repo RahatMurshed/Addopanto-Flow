@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Building2, Link2, FileText, KeyRound } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, Link2, FileText, KeyRound, ImageIcon } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import gaLogo from "@/assets/GA-LOGO.png";
+import { ImageUpload } from "@/components/ImageUpload";
 
 export default function CreateCompany() {
   const { user } = useAuth();
@@ -26,8 +27,20 @@ export default function CreateCompany() {
   const [description, setDescription] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [currency, setCurrency] = useState("BDT");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   if (!isCipher) return <Navigate to="/companies" replace />;
+
+  const uploadLogo = async (companyId: string): Promise<string | null> => {
+    if (!logoFile) return null;
+    const ext = logoFile.name.split(".").pop();
+    const path = `${companyId}/logo.${ext}`;
+    const { error } = await supabase.storage.from("company-logos").upload(path, logoFile, { upsert: true });
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("company-logos").getPublicUrl(path);
+    return urlData.publicUrl;
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +61,19 @@ export default function CreateCompany() {
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Upload logo if selected
+      if (logoFile && data?.company?.id) {
+        try {
+          const logoUrl = await uploadLogo(data.company.id);
+          if (logoUrl) {
+            await supabase.from("companies").update({ logo_url: logoUrl }).eq("id", data.company.id);
+          }
+        } catch (logoErr) {
+          console.error("Logo upload failed:", logoErr);
+          // Non-fatal: company was still created
+        }
+      }
 
       toast({ title: "Company created!" });
       navigate("/companies");
@@ -110,6 +136,27 @@ export default function CreateCompany() {
                   />
                   <p className="text-xs text-muted-foreground">Users will search this slug to find your company</p>
                 </div>
+              </div>
+
+              <Separator />
+
+              {/* Logo Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <ImageIcon className="h-4 w-4" />
+                  Company Logo
+                </div>
+                <ImageUpload
+                  value={logoPreview}
+                  onChange={(url) => {
+                    setLogoPreview(url);
+                    if (!url) setLogoFile(null);
+                  }}
+                  onFileSelect={(file) => setLogoFile(file)}
+                  label="Upload Logo"
+                  variant="logo"
+                  disabled={loading}
+                />
               </div>
 
               <Separator />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,6 +138,9 @@ export default function Auth() {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [rejectionInfo, setRejectionInfo] = useState<{ reason: string | null } | null>(null);
 
@@ -255,7 +258,7 @@ export default function Auth() {
       return;
     }
 
-    const { error } = await signUp(signupEmail, signupPassword, signupName.trim() || undefined);
+    const { error, data: signUpData } = await signUp(signupEmail, signupPassword, signupName.trim() || undefined);
     if (error) {
       const msg = error.message || "";
       if (msg.toLowerCase().includes("temporarily blocked") || msg.toLowerCase().includes("banned")) {
@@ -265,6 +268,20 @@ export default function Auth() {
       }
       setLoading(false);
     } else {
+      // Upload avatar if selected
+      if (avatarFile && signUpData?.user?.id) {
+        try {
+          const ext = avatarFile.name.split(".").pop();
+          const path = `${signUpData.user.id}/avatar.${ext}`;
+          await supabase.storage.from("user-avatars").upload(path, avatarFile, { upsert: true });
+          const { data: urlData } = supabase.storage.from("user-avatars").getPublicUrl(path);
+          if (urlData?.publicUrl) {
+            await supabase.from("user_profiles").update({ avatar_url: urlData.publicUrl }).eq("user_id", signUpData.user.id);
+          }
+        } catch (avatarErr) {
+          console.error("Avatar upload failed:", avatarErr);
+        }
+      }
       // Persist flag before signOut — component may unmount due to PublicRoute redirect
       sessionStorage.setItem("registration_success", "true");
       // Immediately sign out — user must wait for admin approval
@@ -426,6 +443,47 @@ export default function Auth() {
                 </div>
 
                 <form onSubmit={handleSignup} className="space-y-4">
+                  {/* Profile Picture */}
+                  <div className="space-y-2">
+                    <Label>Profile Picture</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-primary/10 flex items-center justify-center">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-lg font-medium text-primary">
+                            {signupName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <Button type="button" variant="outline" size="sm" onClick={() => avatarInputRef.current?.click()} disabled={loading || googleLoading}>
+                          {avatarPreview ? "Change" : "Upload"}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">PNG, JPG or WebP. Max 2MB.</p>
+                      </div>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept=".png,.jpg,.jpeg,.webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+                            toast({ title: "Invalid file type", description: "Only PNG, JPG, and WebP allowed", variant: "destructive" });
+                            return;
+                          }
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast({ title: "File too large", description: "Max 2MB allowed", variant: "destructive" });
+                            return;
+                          }
+                          setAvatarFile(file);
+                          setAvatarPreview(URL.createObjectURL(file));
+                        }}
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Full Name</Label>
                     <Input id="signup-name" type="text" placeholder="Your full name" value={signupName} onChange={(e) => setSignupName(e.target.value)} disabled={loading || googleLoading} />
