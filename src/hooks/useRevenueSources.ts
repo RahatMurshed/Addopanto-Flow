@@ -44,6 +44,8 @@ export function useCreateRevenueSource() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["revenue_sources"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }

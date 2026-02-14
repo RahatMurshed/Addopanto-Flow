@@ -46,6 +46,9 @@ export function useCreateExpenseAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
@@ -66,6 +69,9 @@ export function useUpdateExpenseAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
@@ -80,6 +86,9 @@ export function useDeleteExpenseAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense_accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
