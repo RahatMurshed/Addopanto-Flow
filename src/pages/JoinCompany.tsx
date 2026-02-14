@@ -130,7 +130,7 @@ export default function JoinCompany() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast({ title: "Joined successfully!", description: "You have been added to the company." });
+      toast({ title: "Joined successfully!", description: "You have been added to the business." });
       queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["user-companies"] });
       queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
@@ -156,8 +156,8 @@ export default function JoinCompany() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Join a Company</h1>
-            <p className="text-sm text-muted-foreground">Browse companies or use an invite code to join</p>
+            <h1 className="text-2xl font-bold">Join a Business</h1>
+            <p className="text-sm text-muted-foreground">Browse businesses or use an invite code to join</p>
           </div>
         </div>
 
@@ -201,13 +201,13 @@ export default function JoinCompany() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Company Password</Label>
+                    <Label>Business Password</Label>
                     <div className="relative">
                       <Input
                         type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter company password"
+                        placeholder="Enter business password"
                         disabled={loading}
                         className="pr-10"
                       />
@@ -222,7 +222,7 @@ export default function JoinCompany() {
                         {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Ask the company admin for the join password</p>
+                    <p className="text-xs text-muted-foreground">Ask the business admin for the join password</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Message <span className="text-muted-foreground font-normal">(optional)</span></Label>
@@ -249,7 +249,7 @@ export default function JoinCompany() {
                   <Card>
                     <CardContent className="py-8 text-center">
                       <Building2 className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-                      <p className="text-muted-foreground">No companies found</p>
+                      <p className="text-muted-foreground">No businesses found</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -331,11 +331,11 @@ export default function JoinCompany() {
                     maxLength={12}
                     className="font-mono text-center tracking-widest text-lg"
                   />
-                  <p className="text-xs text-muted-foreground">The code is case-insensitive and provided by the company admin</p>
+                  <p className="text-xs text-muted-foreground">The code is case-insensitive and provided by the business admin</p>
                 </div>
                 <Button onClick={handleJoinWithInvite} disabled={loading || !inviteCode} className="w-full">
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Join Company
+                  Join Business
                 </Button>
               </CardContent>
             </Card>

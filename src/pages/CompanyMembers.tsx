@@ -208,7 +208,7 @@ export default function CompanyMembers() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Company Members</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Business Members</h1>
         <p className="text-muted-foreground">Manage members, permissions, and join requests</p>
       </div>
 
@@ -340,7 +340,7 @@ export default function CompanyMembers() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Invite Settings</CardTitle>
-              <CardDescription>Manage invite codes and join password for this company</CardDescription>
+              <CardDescription>Manage invite codes and join password for this business</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {companySecrets?.invite_code && (
@@ -372,7 +372,7 @@ export default function CompanyMembers() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove member?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will revoke their access to this company. They can request to join again later.
+              This will revoke their access to this business. They can request to join again later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

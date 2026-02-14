@@ -127,7 +127,7 @@ export default function CompanyJoinRequests() {
       });
     },
     onSuccess: () => {
-      toast({ title: "Join request approved", description: "User has been added to the company as a Moderator." });
+      toast({ title: "Join request approved", description: "User has been added to the business as a Moderator." });
       queryClient.invalidateQueries({ queryKey: ["company-join-requests-admin", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["pending-join-requests-count"] });
@@ -179,7 +179,7 @@ export default function CompanyJoinRequests() {
       });
     },
     onSuccess: () => {
-      toast({ title: "User accepted", description: "Rejected user has been added to the company." });
+      toast({ title: "User accepted", description: "Rejected user has been added to the business." });
       queryClient.invalidateQueries({ queryKey: ["company-join-requests-admin", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
       setAcceptRejectedDialog(null);
@@ -263,7 +263,7 @@ export default function CompanyJoinRequests() {
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
-          Select a company to view join requests.
+          Select a business to view join requests.
         </CardContent>
       </Card>
     );
@@ -273,7 +273,7 @@ export default function CompanyJoinRequests() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Company Join Requests</CardTitle>
+          <CardTitle>Business Join Requests</CardTitle>
           <CardDescription>
             Review join requests for <span className="font-medium">{activeCompany?.name}</span>. Approved users will be added as Moderators with configurable permissions.
           </CardDescription>

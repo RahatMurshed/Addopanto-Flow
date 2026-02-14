@@ -102,13 +102,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <Building2 className="h-3 w-3" />
                     </div>
                   )}
-                  <span className="truncate text-sm font-medium">{activeCompany?.name || "Select Company"}</span>
+                  <span className="truncate text-sm font-medium">{activeCompany?.name || "Select Business"}</span>
                 </div>
                 <ChevronDown className="h-4 w-4 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>My Companies</DropdownMenuLabel>
+              <DropdownMenuLabel>My Businesses</DropdownMenuLabel>
               {companies.map((company) => (
                 <DropdownMenuItem key={company.id} onClick={() => handleCompanySwitch(company.id)} className="gap-2">
                   <Building2 className="h-4 w-4" />
@@ -118,11 +118,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/companies/join")} className="gap-2 text-muted-foreground">
-                <Plus className="h-4 w-4" /> Join another company
+                <Plus className="h-4 w-4" /> Join another business
               </DropdownMenuItem>
               {isCipher && (
                 <DropdownMenuItem onClick={() => navigate("/companies/create")} className="gap-2 text-muted-foreground">
-                  <Plus className="h-4 w-4" /> Create new company
+                  <Plus className="h-4 w-4" /> Create new business
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -190,7 +190,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <nav className="absolute right-0 top-14 w-64 bg-sidebar p-3 shadow-lg h-[calc(100vh-3.5rem)] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="mb-4">
                 <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { navigate("/companies"); setMobileOpen(false); }}>
-                  <ArrowLeftRight className="h-4 w-4" /> Switch Company
+                  <ArrowLeftRight className="h-4 w-4" /> Switch Business
                 </Button>
               </div>
               <div className="flex-1 space-y-1">
