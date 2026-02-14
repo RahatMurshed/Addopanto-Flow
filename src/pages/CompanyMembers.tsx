@@ -167,7 +167,7 @@ export default function CompanyMembers() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["company-secrets", activeCompanyId] });
       toast({ title: "Invite code generated", description: data?.inviteCode });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
