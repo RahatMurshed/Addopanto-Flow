@@ -24,7 +24,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading, isCompanyAdmin, isCipher, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
+  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isDataEntryOperator, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -56,10 +56,10 @@ export default function SettingsPage() {
 
   const blocker = useUnsavedChanges(isDirty);
 
-  // Redirect non-admin users away from settings
+  // Redirect non-admin users (including DEOs) away from settings
   useEffect(() => {
     if (!roleLoading && !isCompanyAdmin && !isCipher) {
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [roleLoading, isCompanyAdmin, isCipher, navigate]);
 

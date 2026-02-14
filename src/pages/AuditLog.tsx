@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuditLog as AuditLogType } from "@/hooks/useAuditLogs";
 
 const TABLE_OPTIONS = [
-  { value: "", label: "All Tables" },
+  { value: "all", label: "All Tables" },
   { value: "students", label: "Students" },
   { value: "student_payments", label: "Student Payments" },
   { value: "batches", label: "Batches" },
@@ -27,7 +27,7 @@ const TABLE_OPTIONS = [
 ];
 
 const ACTION_OPTIONS = [
-  { value: "", label: "All Actions" },
+  { value: "all", label: "All Actions" },
   { value: "INSERT", label: "Created" },
   { value: "UPDATE", label: "Updated" },
   { value: "DELETE", label: "Deleted" },
@@ -154,8 +154,8 @@ export default function AuditLog() {
   const navigate = useNavigate();
   const { isCompanyAdmin, isCipher, isLoading: companyLoading } = useCompany();
 
-  const [tableFilter, setTableFilter] = useState("");
-  const [actionFilter, setActionFilter] = useState("");
+  const [tableFilter, setTableFilter] = useState("all");
+  const [actionFilter, setActionFilter] = useState("all");
   const [emailSearch, setEmailSearch] = useState("");
   const [page, setPage] = useState(0);
   const [detail, setDetail] = useState<AuditLogType | null>(null);
@@ -167,8 +167,8 @@ export default function AuditLog() {
   }, [companyLoading, isCompanyAdmin, isCipher, navigate]);
 
   const { data: result, isLoading } = useAuditLogs({
-    table_name: tableFilter,
-    action: actionFilter,
+    table_name: tableFilter === "all" ? "" : tableFilter,
+    action: actionFilter === "all" ? "" : actionFilter,
     user_email: emailSearch,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
