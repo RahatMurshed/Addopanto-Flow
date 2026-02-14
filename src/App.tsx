@@ -15,6 +15,7 @@ import gaLogo from "@/assets/GA-LOGO.png";
 
 // Lazy-loaded page components for code splitting
 const Auth = lazy(() => import("@/pages/Auth"));
+const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Khatas = lazy(() => import("@/pages/Khatas"));
 const Revenue = lazy(() => import("@/pages/Revenue"));
@@ -51,7 +52,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) return <BrandedLoader />;
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) return <Navigate to="/" replace />;
 
   return (
     <CompanyProvider>
@@ -96,13 +97,14 @@ const App = () => (
             <NavigationBlockerProvider>
               <Suspense fallback={<BrandedLoader />}>
                 <Routes>
+                  <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
                   <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
                   
                   <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
                   <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
                   <Route path="/companies/create" element={<ProtectedRoute><CreateCompany /></ProtectedRoute>} />
 
-                  <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
                   <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
                   <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />

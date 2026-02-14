@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
 
 const baseNavItems = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Expense Sources", href: "/khatas", icon: Wallet },
   { label: "Revenue", href: "/revenue", icon: TrendingUp },
   { label: "Expenses", href: "/expenses", icon: Receipt },
@@ -77,7 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handleCompanySwitch = async (companyId: string) => {
     await switchCompany(companyId);
     setMobileOpen(false);
-    navigate("/");
+    navigate("/dashboard");
   };
 
   return (
