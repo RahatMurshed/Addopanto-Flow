@@ -101,18 +101,6 @@ export function ImageUpload({
               <Upload className="mr-1.5 h-3.5 w-3.5" />
               {displayUrl ? "Change" : label}
             </Button>
-            {displayUrl && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleRemove}
-                disabled={disabled}
-                className="text-destructive hover:text-destructive"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
           </div>
           <p className="text-xs text-muted-foreground">PNG, JPG or WebP. Max 2MB.</p>
         </div>
