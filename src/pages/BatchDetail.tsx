@@ -16,12 +16,16 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import BatchDialog from "@/components/BatchDialog";
 import StudentDialog from "@/components/StudentDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
-import { useCreateStudent, type StudentInsert } from "@/hooks/useStudents";
+import { useCreateStudent, useUpdateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
@@ -40,12 +44,18 @@ export default function BatchDetail() {
 
   const updateMutation = useUpdateBatch();
   const createStudentMutation = useCreateStudent();
+  const updateStudentMutation = useUpdateStudent();
+  const deleteStudentMutation = useDeleteStudent();
   const createPaymentMutation = useCreateStudentPayment();
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [editStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
 
   const batchStudents = useMemo(() => {
@@ -144,6 +154,31 @@ export default function BatchDetail() {
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
+    }
+  };
+
+  const handleUpdateStudent = async (data: StudentInsert) => {
+    if (!editingStudent) return;
+    try {
+      await updateStudentMutation.mutateAsync({ id: editingStudent.id, ...data });
+      toast({ title: "Student updated" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!deleteStudentId) return;
+    setDeleting(true);
+    try {
+      await deleteStudentMutation.mutateAsync(deleteStudentId);
+      toast({ title: "Student deleted" });
+      setDeleteStudentId(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -389,9 +424,19 @@ export default function BatchDetail() {
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingStudent(s); setEditStudentDialogOpen(true); }}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                               {canAddRevenue && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
                                   <CreditCard className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteStudentId(s.id)}>
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               )}
                             </div>
@@ -417,6 +462,14 @@ export default function BatchDetail() {
       {/* Dialogs */}
       <BatchDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} batch={batch} onSave={handleUpdate} />
       <StudentDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} onSave={handleCreateStudent} defaultBatchId={id} lockedBatch />
+      <StudentDialog
+        open={editStudentDialogOpen}
+        onOpenChange={(o) => { setEditStudentDialogOpen(o); if (!o) setEditingStudent(null); }}
+        student={editingStudent}
+        onSave={handleUpdateStudent}
+        defaultBatchId={id}
+        lockedBatch
+      />
 
       {selectedStudent && (
         <StudentPaymentDialog
@@ -427,6 +480,28 @@ export default function BatchDetail() {
           onSave={handlePayment}
         />
       )}
+
+      {/* Delete Student Confirmation */}
+      <AlertDialog open={!!deleteStudentId} onOpenChange={(o) => { if (!o) setDeleteStudentId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Student</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this student and all their payment records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteStudent(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
