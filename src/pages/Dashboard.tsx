@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers } from "lucide-react";
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,10 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { activeCompanyId, activeCompany } = useCompany();
+  const {
+    activeCompanyId, activeCompany, isDataEntryOperator,
+    canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense,
+  } = useCompany();
   const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
@@ -427,6 +430,55 @@ export default function Dashboard() {
     }
     return null;
   };
+
+  // Data Entry Operator: show quick actions only
+  if (isDataEntryOperator) {
+    const quickActions = [
+      { label: "Add Student", icon: GraduationCap, allowed: canAddStudent, desc: "Create a new student profile" },
+      { label: "Record Payment", icon: CreditCard, allowed: canAddPayment, desc: "Record a student payment" },
+      { label: "Create Batch", icon: Layers, allowed: canAddBatch, desc: "Create a new batch" },
+      { label: "Add Revenue", icon: TrendingUp, allowed: canAddRevenue, desc: "Record a revenue entry" },
+      { label: "Add Expense", icon: Receipt, allowed: canAddExpense, desc: "Record an expense" },
+    ].filter((a) => a.allowed);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Quick actions for data entry</p>
+        </div>
+        {quickActions.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-4 rounded-full bg-muted p-4">
+                <Wallet className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold">No permissions assigned</h3>
+              <p className="max-w-sm text-muted-foreground">
+                Your admin hasn't assigned any permissions yet. Please contact your business administrator.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {quickActions.map((action) => (
+              <Card key={action.label} className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30">
+                <CardContent className="flex items-center gap-4 p-6">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <action.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{action.label}</p>
+                    <p className="text-sm text-muted-foreground">{action.desc}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" id="dashboard-content">

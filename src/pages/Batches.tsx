@@ -37,7 +37,7 @@ export default function Batches() {
   const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useStudents();
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -201,6 +201,10 @@ export default function Batches() {
     );
   }
 
+  const effectiveCanAdd = canAddRevenue || canAddBatch;
+  const effectiveCanEdit = canEdit || canEditBatch;
+  const effectiveCanDelete = canDelete || canDeleteBatch;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -208,12 +212,13 @@ export default function Batches() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Batches</h1>
             {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Data Entry</Badge>}
           </div>
           <p className="text-muted-foreground">Manage student batches and track batch-level analytics</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <BatchDateFilter value={filterValue} onChange={setFilterValue} />
-          {canAddRevenue && (
+          {!isDataEntryOperator && <BatchDateFilter value={filterValue} onChange={setFilterValue} />}
+          {effectiveCanAdd && (
             <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" /> Create Batch
             </Button>
@@ -221,45 +226,47 @@ export default function Batches() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{totalStudentsInBatches}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Revenue", filterValue)}</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRevenue, currency)}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Pending", filterValue)}</CardTitle>
-            <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalPendingAll, currency)}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Overdue", filterValue)}</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdue.amount, currency)}</p>
-            {totalOverdue.count > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">{totalOverdue.count} student{totalOverdue.count !== 1 ? "s" : ""}</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary Cards - hidden for DEO */}
+      {!isDataEntryOperator && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold">{totalStudentsInBatches}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Revenue", filterValue)}</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRevenue, currency)}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Pending", filterValue)}</CardTitle>
+              <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalPendingAll, currency)}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{getFilterLabel("Overdue", filterValue)}</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdue.amount, currency)}</p>
+              {totalOverdue.count > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">{totalOverdue.count} student{totalOverdue.count !== 1 ? "s" : ""}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Overdue Section */}
-      {(() => {
+      {/* Overdue Section - hidden for DEO */}
+      {!isDataEntryOperator && (() => {
         const overdueBatches = batches.filter((b) => {
           const a = batchAnalytics.get(b.id);
           return a && a.monthOverdueCount > 0;
@@ -347,7 +354,7 @@ export default function Batches() {
               <div className="mb-4 rounded-full bg-muted p-4"><Layers className="h-8 w-8 text-muted-foreground" /></div>
               <h3 className="mb-2 text-lg font-semibold">No batches yet</h3>
               <p className="mb-4 max-w-sm text-muted-foreground">Create your first batch to organize students.</p>
-              {canAddRevenue && <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>Create Batch</Button>}
+              {effectiveCanAdd && <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>Create Batch</Button>}
             </div>
           ) : (
             <>
@@ -357,11 +364,11 @@ export default function Batches() {
                     <TableRow>
                       <TableHead>Batch Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Code</TableHead>
-                      <TableHead className="hidden md:table-cell">Start Date</TableHead>
-                      <TableHead className="hidden md:table-cell">End Date</TableHead>
+                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">Start Date</TableHead>}
+                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">End Date</TableHead>}
                       <TableHead>Students</TableHead>
-                      <TableHead className="hidden lg:table-cell">Revenue</TableHead>
-                      <TableHead className="hidden lg:table-cell">Pending</TableHead>
+                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
+                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Pending</TableHead>}
                       <TableHead>Status</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
@@ -378,39 +385,45 @@ export default function Batches() {
                             </span>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{b.batch_code}</TableCell>
-                          <TableCell className="hidden md:table-cell">{format(new Date(b.start_date), "MMM d, yyyy")}</TableCell>
-                          <TableCell className="hidden md:table-cell">{b.end_date ? format(new Date(b.end_date), "MMM d, yyyy") : "—"}</TableCell>
+                          {!isDataEntryOperator && <TableCell className="hidden md:table-cell">{format(new Date(b.start_date), "MMM d, yyyy")}</TableCell>}
+                          {!isDataEntryOperator && <TableCell className="hidden md:table-cell">{b.end_date ? format(new Date(b.end_date), "MMM d, yyyy") : "—"}</TableCell>}
                           <TableCell>
                             <Badge variant="secondary">
                               {count}{b.max_capacity ? `/${b.max_capacity}` : ""}
                             </Badge>
                           </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            <span className="font-semibold text-green-600 dark:text-green-400">
-                              {formatCurrency(analytics?.monthRevenue || 0, currency)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {(analytics?.monthPending || 0) > 0 ? (
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">
-                                {formatCurrency(analytics?.monthPending || 0, currency)}
+                          {!isDataEntryOperator && (
+                            <TableCell className="hidden lg:table-cell">
+                              <span className="font-semibold text-green-600 dark:text-green-400">
+                                {formatCurrency(analytics?.monthRevenue || 0, currency)}
                               </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
+                            </TableCell>
+                          )}
+                          {!isDataEntryOperator && (
+                            <TableCell className="hidden lg:table-cell">
+                              {(analytics?.monthPending || 0) > 0 ? (
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                  {formatCurrency(analytics?.monthPending || 0, currency)}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>{statusBadge(b.status)}</TableCell>
                           <TableCell>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/batches/${b.id}`)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {canEdit && (
+                              {!isDataEntryOperator && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/batches/${b.id}`)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {effectiveCanEdit && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditBatch(b); setDialogOpen(true); }}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {canDelete && (
+                              {effectiveCanDelete && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(b.id)}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

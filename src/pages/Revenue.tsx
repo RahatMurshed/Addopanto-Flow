@@ -60,7 +60,7 @@ export default function Revenue() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany, isDataEntryOperator, canEditRevenue, canDeleteRevenue } = useCompany();
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -356,7 +356,7 @@ export default function Revenue() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
-                    {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
+                    {((canEdit || canEditRevenue) || (canDelete || canDeleteRevenue)) && <TableHead className="w-24">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -378,10 +378,10 @@ export default function Revenue() {
                       <TableCell className="hidden max-w-xs truncate md:table-cell">
                         {rev.description || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      {(canEdit || canDelete) && (
+                      {((canEdit || canEditRevenue) || (canDelete || canDeleteRevenue)) && (
                         <TableCell>
                           <div className="flex gap-1">
-                            {canEdit && (
+                            {(canEdit || canEditRevenue) && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -394,7 +394,7 @@ export default function Revenue() {
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             )}
-                            {canDelete && (
+                            {(canDelete || canDeleteRevenue) && (
                               <Button
                                 variant="ghost"
                                 size="icon"

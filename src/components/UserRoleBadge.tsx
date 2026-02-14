@@ -37,6 +37,15 @@ const roleConfig: Record<AppRole | "pending", { label: string; className: string
   },
 };
 
+// Company-level role config (separate from platform roles)
+const companyRoleConfig: Record<string, { label: string; className: string; icon: typeof Shield }> = {
+  data_entry_operator: {
+    label: "Data Entry Operator",
+    className: "bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0",
+    icon: User,
+  },
+};
+
 export function UserRoleBadge({ role, size = "md", showIcon = true }: UserRoleBadgeProps) {
   // Handle null role (pending users)
   const configKey = role ?? "pending";
