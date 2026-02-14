@@ -464,7 +464,7 @@ export default function BatchDetail() {
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Enrolled</TableHead>
                       <TableHead>Admission</TableHead>
-                      <TableHead>Monthly Status</TableHead>
+                      <TableHead>Monthly</TableHead>
                       <TableHead className="hidden md:table-cell">{filterValue.mode === "monthly" ? "Month Paid" : filterValue.mode === "custom" ? "Range Paid" : "Total Paid"}</TableHead>
                       <TableHead className="hidden md:table-cell">{filterValue.mode === "monthly" ? "Month Pending" : filterValue.mode === "custom" ? "Range Pending" : "Total Pending"}</TableHead>
                       <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
