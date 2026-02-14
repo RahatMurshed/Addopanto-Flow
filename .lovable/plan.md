@@ -1,94 +1,84 @@
 
 
-# Hide Batch-Inherited Fields in Edit Form and Enhance Batch Details Table
+# Enhance Batch Detail Summary Section
 
-## Problem
+## Current State
+The batch detail page has 4 summary cards: Students, Collected, Pending, and Completion (payment collection %). While useful, several additional insights would help batch administrators make quicker decisions.
 
-1. The **Edit Student** form still shows Course Start/End Month, Admission Fee, and Monthly Fee fields when a batch is selected (screenshot confirms this). These should be hidden since they're inherited from the batch.
-2. The **Batch Details enrolled students table** shows "N/A" for Admission and Monthly columns instead of showing the batch's actual fee values and format.
-3. The `computeStudentSummary` in BatchDetail doesn't use batch defaults as fallback (same bug fixed in StudentDetail but not here).
+## Proposed Enhancements
 
-## Changes
+### 1. Admission vs Monthly Breakdown (Replace or Enhance Existing Cards)
+Split the Collected and Pending cards to show a quick breakdown:
+- **Collected card**: Add a small subtitle showing "Admission: X | Monthly: Y"
+- **Pending card**: Same breakdown so admins know whether the gap is in admission fees or monthly fees
 
-### 1. StudentDialog.tsx - Hide inherited fields in edit mode too
+### 2. Add "Overdue" Stat to Summary Cards
+Currently there's an overdue alert banner below the cards, but adding a dedicated **Overdue Amount** card (or merging it into the grid) gives immediate visibility:
+- Show the total overdue amount in red
+- Show number of students with overdue payments
+- This replaces the separate alert banner, keeping all stats in one row
 
-Currently the condition `hasBatchInCreate = !isEdit && !!selectedBatch` only hides fields for new students. Change the hiding logic to apply whenever a batch is selected, regardless of create/edit mode:
+### 3. Add "This Month" Collection Card
+Show how much has been collected for the current month specifically:
+- "This Month: X/Y collected" with a mini progress bar
+- Helps track current month's collection drive
 
-- Replace `hasBatchInCreate` with `hasBatchSelected = !!selectedBatch`
-- Use `hasBatchSelected` for hiding course start/end and fee fields
-- Show the "Inherited from batch" info panel in edit mode too when batch is selected
-- Keep the auto-sync of fees only in create mode (edit mode just hides the fields visually)
+### 4. Enhance Completion Card with Dual Progress
+Show two progress bars instead of one:
+- **Admission completion** (e.g., 75% of students fully paid admission)
+- **Monthly completion** (e.g., 40% of due months paid)
+- This gives a clearer picture than a single blended percentage
 
-### 2. BatchDetail.tsx - Use effective fees from batch for student summaries
+### 5. Add Expected Revenue Card
+Show the total expected revenue for the batch based on batch defaults:
+- Formula: (students x admission_fee) + (students x monthly_fee x duration_months)
+- Gives a clear revenue target for the batch
 
-Apply the same fallback logic from StudentDetail: when computing `studentSummaries` and `allSummaries`, create an effective student object using batch defaults when student fees are 0:
+## Recommended Combination
+To avoid clutter, I recommend this 5-card layout (expanding from 4 to 5, or keeping 4 with enhanced content):
 
-```typescript
-const effectiveStudent = {
-  ...s,
-  admission_fee_total: Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0,
-  monthly_fee_amount: Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0,
-  course_start_month: s.course_start_month || batchCourseStartMonth || null,
-  course_end_month: s.course_end_month || batchCourseEndMonth || null,
-};
-```
-
-### 3. BatchDetail.tsx - Enhance enrolled students table columns
-
-Update the table to show:
-
-- **Admission Fee** column: Show the batch's `default_admission_fee` value with paid/pending badge
-- **Monthly Fees** column: Show format "fee/total_months" (e.g., "1,250/4") with status badge
-- **Total Pending** column: Show each student's combined admission + monthly pending amount
-- Update the Admission column to use effective fee instead of checking `sum.admissionTotal === 0`
-- Update the Monthly column to use effective fee instead of checking `s.monthly_fee_amount === 0`
-
-### 4. BatchDetail.tsx - Compute batch course months
-
-Add `batchCourseStartMonth` and `batchCourseEndMonth` memos (same as StudentDetail) for use in effective student calculations.
-
-## Files to Modify
-
-- **`src/components/StudentDialog.tsx`** - Change field hiding condition from `hasBatchInCreate` to `hasBatchSelected` (applies to both create and edit)
-- **`src/pages/BatchDetail.tsx`** - Add batch course month calculations, use effective fees in summaries, enhance table columns
+| Card | Content |
+|------|---------|
+| Students | Count + capacity (existing) |
+| Collected | Total collected + admission/monthly split below |
+| Pending | Total pending + overdue amount highlighted in red |
+| This Month | Current month collection with mini progress |
+| Completion | Dual progress bars for admission % and monthly % |
 
 ## Technical Details
 
-### StudentDialog.tsx changes (lines 96, 268, 342, 358)
+### Files to Modify
+- **`src/pages/BatchDetail.tsx`** - Update summary cards section (lines 286-332)
 
-Replace:
-```typescript
-const hasBatchInCreate = !isEdit && !!selectedBatch;
-```
-With:
-```typescript
-const hasBatchSelected = !!selectedBatch;
-```
+### Key Computations to Add
 
-Update all references from `hasBatchInCreate` to `hasBatchSelected`. Keep the auto-sync useEffect gated on `!isEdit` so editing doesn't overwrite student data.
+```text
+// Admission breakdown
+admissionCollected = sum of all admissionPaid
+admissionPending = sum of all (effAdmission - admissionPaid)
 
-### BatchDetail.tsx changes
+// Monthly breakdown  
+monthlyCollected = sum of all monthlyPaid
+monthlyPending = sum of all (monthlyTotal - monthlyPaid)
 
-Add after line 59:
-```typescript
-const batchCourseStartMonth = useMemo(() => {
-  if (!batch?.start_date) return "";
-  const d = new Date(batch.start_date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}, [batch]);
+// Overdue amount
+overdueAmount = sum of overdue months' fees across all students
 
-const batchCourseEndMonth = useMemo(() => {
-  if (!batch?.start_date || !batch?.course_duration_months) return "";
-  const d = new Date(batch.start_date);
-  d.setMonth(d.getMonth() + batch.course_duration_months - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}, [batch]);
+// This month stats
+currentMonthDue = students with current month in their range
+currentMonthPaid = students who paid current month
+
+// Completion split
+admissionCompletion% = students with admission fully paid / total students
+monthlyCompletion% = total months paid / total months due (across all students)
 ```
 
-Update both `studentSummaries` and `allSummaries` to use effective student objects with batch fee fallbacks.
+### Layout Change
+- Grid changes from `lg:grid-cols-4` to `lg:grid-cols-5` (or stays at 4 with richer card content)
+- Each card gets a secondary line of smaller text for the breakdown
+- Completion card gets two `<Progress>` bars with labels
 
-Update table columns:
-- Admission: Show batch fee value, badge for paid/partial/pending status
-- Monthly: Show "fee/months" format (e.g., "1,250/4"), badge for overdue/pending/current
-- Total Pending: Always visible, show combined pending amount
+### Overdue Alert Banner
+- Remove the standalone overdue alert card (lines 335-344)
+- Integrate overdue count and amount into the Pending card with red text
 
