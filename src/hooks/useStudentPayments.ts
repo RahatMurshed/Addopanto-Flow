@@ -63,82 +63,14 @@ export function useCreateStudentPayment() {
       if (!activeCompanyId) throw new Error("No active company");
       const { studentName, ...paymentData } = payment;
 
-      // Insert student payment
+      // Insert student payment — the database trigger automatically creates
+      // the linked revenue entry and allocations
       const { data, error } = await supabase
         .from("student_payments")
         .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId } as any)
         .select()
         .single();
       if (error) throw error;
-
-      // Also insert into revenues table for integration
-      let sourceId: string | null = null;
-      const { data: sources } = await supabase
-        .from("revenue_sources")
-        .select("id")
-        .eq("name", "Student Fees")
-        .limit(1);
-
-      if (sources && sources.length > 0) {
-        sourceId = sources[0].id;
-      } else {
-        const { data: newSource } = await supabase
-          .from("revenue_sources")
-          .insert({ name: "Student Fees", user_id: user.id, company_id: activeCompanyId })
-          .select("id")
-          .single();
-        if (newSource) sourceId = newSource.id;
-      }
-
-      const desc = paymentData.payment_type === "admission"
-        ? `Admission fee - ${studentName || "Student"}`
-        : `Monthly tuition (${(paymentData.months_covered || []).join(", ")}) - ${studentName || "Student"}`;
-
-      // Insert revenue entry
-      const { error: revError } = await supabase.from("revenues").insert({
-        amount: paymentData.amount,
-        date: paymentData.payment_date,
-        source_id: sourceId,
-        description: desc,
-        user_id: user.id,
-        company_id: activeCompanyId,
-      });
-      if (revError) console.error("Failed to create revenue entry:", revError);
-
-      // Also create allocations for the revenue using the inserted revenue's ID
-      const { data: insertedRevenue } = await supabase
-        .from("revenues")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("company_id", activeCompanyId)
-        .eq("amount", paymentData.amount)
-        .eq("date", paymentData.payment_date)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (insertedRevenue) {
-        const { data: accounts } = await supabase
-          .from("expense_accounts")
-          .select("id, allocation_percentage")
-          .eq("is_active", true);
-
-        if (accounts && accounts.length > 0) {
-          const allocations = accounts
-            .filter((acc) => acc.allocation_percentage > 0)
-            .map((acc) => ({
-              user_id: user.id,
-              company_id: activeCompanyId,
-              revenue_id: insertedRevenue.id,
-              expense_account_id: acc.id,
-              amount: (paymentData.amount * acc.allocation_percentage) / 100,
-            }));
-
-          if (allocations.length > 0) {
-            await supabase.from("allocations").insert(allocations);
-          }
-        }
-      }
 
       return data as StudentPayment;
     },
@@ -147,6 +79,7 @@ export function useCreateStudentPayment() {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
     },
   });
 }
@@ -169,6 +102,8 @@ export function useUpdateStudentPayment() {
       queryClient.invalidateQueries({ queryKey: ["student_payments"] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
     },
   });
 }
@@ -184,6 +119,9 @@ export function useDeleteStudentPayment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["student_payments"] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["revenues"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
     },
   });
 }
