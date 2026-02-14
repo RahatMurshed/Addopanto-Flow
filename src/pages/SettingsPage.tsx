@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { DataManagementSection } from "@/components/DataManagementSection";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
+import { ImageUpload } from "@/components/ImageUpload";
 
 const months = [
   "January", "February", "March", "April", "May", "June",
@@ -22,7 +23,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isCompanyViewer, isCompanyModerator } = useCompany();
+  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isCompanyViewer, isCompanyModerator, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -31,6 +32,11 @@ export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("");
   const [currency, setCurrency] = useState("BDT");
   const [fiscalMonth, setFiscalMonth] = useState("1");
+
+  // Company logo state
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState({
@@ -94,15 +100,47 @@ export default function SettingsPage() {
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
-      // Update original values after successful save
-      setOriginalValues({
-        businessName,
-        currency,
-        fiscalMonth,
-      });
-      // Invalidate the user profile cache so all pages get the updated settings
+      setOriginalValues({ businessName, currency, fiscalMonth });
       await queryClient.invalidateQueries({ queryKey: ["user-profile", user.id] });
       toast({ title: "Settings saved" });
+    }
+  };
+
+  const handleLogoSave = async () => {
+    if (!logoFile || !activeCompanyId || !user) return;
+    setSavingLogo(true);
+    try {
+      const ext = logoFile.name.split(".").pop()?.toLowerCase() || "png";
+      const filePath = `${activeCompanyId}/logo.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("company-logos")
+        .upload(filePath, logoFile, { upsert: true, contentType: logoFile.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("company-logos")
+        .getPublicUrl(filePath);
+
+      const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: updateError } = await supabase
+        .from("companies")
+        .update({ logo_url: logoUrl })
+        .eq("id", activeCompanyId);
+
+      if (updateError) throw updateError;
+
+      setLogoFile(null);
+      setLogoPreviewUrl(null);
+      refetchCompany();
+      await queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+      toast({ title: "Company logo updated" });
+    } catch (err: any) {
+      toast({ title: "Error uploading logo", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingLogo(false);
     }
   };
 
@@ -168,6 +206,39 @@ export default function SettingsPage() {
                 {saving ? "Saving..." : "Save Changes"}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Company Logo Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Company Logo</CardTitle>
+            <CardDescription>Update the logo for {activeCompany?.name || "your company"}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ImageUpload
+              value={activeCompany?.logo_url}
+              onChange={(url) => {
+                if (!url) {
+                  setLogoFile(null);
+                  setLogoPreviewUrl(null);
+                }
+              }}
+              onFileSelect={(file) => {
+                setLogoFile(file);
+                setLogoPreviewUrl(URL.createObjectURL(file));
+              }}
+              variant="logo"
+              label="Upload Logo"
+              fallbackText={activeCompany?.name || ""}
+              disabled={savingLogo}
+            />
+            {logoFile && (
+              <Button onClick={handleLogoSave} disabled={savingLogo} size="sm">
+                {savingLogo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {savingLogo ? "Uploading..." : "Save Logo"}
+              </Button>
+            )}
           </CardContent>
         </Card>
 
