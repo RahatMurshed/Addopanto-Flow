@@ -12,6 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2 } from "lucide-react";
@@ -24,7 +34,7 @@ export default function CompanyMembers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   // Fetch cipher user IDs (only needed for non-cipher users to filter them out)
   const { data: cipherUserIds = [] } = useQuery({
     queryKey: ["cipher-user-ids"],
@@ -250,7 +260,7 @@ export default function CompanyMembers() {
                         ))}
                         <TableCell>
                           {canModifyMember && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMemberMutation.mutate(member.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setRemovingMemberId(member.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
@@ -297,6 +307,39 @@ export default function CompanyMembers() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Remove Member Confirmation */}
+      <AlertDialog open={!!removingMemberId} onOpenChange={(open) => { if (!open && !removeMemberMutation.isPending) setRemovingMemberId(null); }}>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (removeMemberMutation.isPending) e.preventDefault(); }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will revoke their access to this company. They can request to join again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeMemberMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={removeMemberMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (removingMemberId) {
+                  removeMemberMutation.mutate(removingMemberId, {
+                    onSuccess: () => setRemovingMemberId(null),
+                  });
+                }
+              }}
+            >
+              {removeMemberMutation.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</>
+              ) : (
+                "Remove"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
