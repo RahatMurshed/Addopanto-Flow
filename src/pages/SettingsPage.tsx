@@ -237,7 +237,9 @@ export default function SettingsPage() {
 
               {/* Exchange Rate */}
               <div className="space-y-2">
-                <Label htmlFor="exchange-rate">Exchange Rate</Label>
+                <Label htmlFor="exchange-rate">
+                  Exchange Rate {currency !== "BDT" && <span className="text-muted-foreground font-normal">— 1 {currency} = ? BDT</span>}
+                </Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="exchange-rate"
@@ -246,7 +248,7 @@ export default function SettingsPage() {
                     min="0.0001"
                     value={exchangeRate}
                     onChange={(e) => setExchangeRate(e.target.value)}
-                    disabled={saving}
+                    disabled={saving || currency === "BDT"}
                     className={!isExchangeRateValid && exchangeRate !== "" ? "border-destructive" : ""}
                   />
                 </div>
@@ -255,26 +257,28 @@ export default function SettingsPage() {
                 )}
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Info className="h-3 w-3" />
-                  Rate relative to your stored amounts. Use 1 if amounts are already in {currency}.
+                  {currency === "BDT"
+                    ? "Base currency — no conversion needed."
+                    : `Enter how many BDT equal 1 ${currency}. E.g. if 1 USD = 120 BDT, enter 120.`}
                 </p>
               </div>
 
               {/* Live Preview */}
               <Card className="bg-muted/50 border-dashed">
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Live Preview</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Live Preview (BDT → {currency})</p>
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     <div>
-                      <p className="text-muted-foreground text-xs">100</p>
-                      <p className="font-semibold">{formatCurrency(100 * exchangeRateNum, currency)}</p>
+                      <p className="text-muted-foreground text-xs">৳100</p>
+                      <p className="font-semibold">{formatCurrency(isExchangeRateValid ? 100 / exchangeRateNum : 100, currency)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-xs">1,000</p>
-                      <p className="font-semibold">{formatCurrency(1000 * exchangeRateNum, currency)}</p>
+                      <p className="text-muted-foreground text-xs">৳1,000</p>
+                      <p className="font-semibold">{formatCurrency(isExchangeRateValid ? 1000 / exchangeRateNum : 1000, currency)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-xs">50,000</p>
-                      <p className="font-semibold">{formatCurrency(50000 * exchangeRateNum, currency)}</p>
+                      <p className="text-muted-foreground text-xs">৳50,000</p>
+                      <p className="font-semibold">{formatCurrency(isExchangeRateValid ? 50000 / exchangeRateNum : 50000, currency)}</p>
                     </div>
                   </div>
                 </CardContent>

@@ -18,7 +18,7 @@ export function useCompanyCurrency() {
   const { activeCompany } = useCompany();
 
   const currencyCode = activeCompany?.currency || "BDT";
-  const exchangeRate = (activeCompany as any)?.exchange_rate ?? 1;
+  const exchangeRate = activeCompany?.exchange_rate ?? 1;
   const symbol = getCurrencySymbol(currencyCode);
 
   /** Format amount with conversion + currency symbol. 
