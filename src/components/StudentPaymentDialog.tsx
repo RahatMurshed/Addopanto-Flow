@@ -40,12 +40,15 @@ interface StudentPaymentDialogProps {
   onSave: (data: StudentPaymentInsert & { studentName?: string }) => Promise<void>;
   editingPayment?: StudentPayment | null;
   onUpdate?: (data: Partial<StudentPaymentInsert> & { id: string }) => Promise<void>;
+  batchDefaultAdmissionFee?: number;
+  batchDefaultMonthlyFee?: number;
 }
 
-export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate }: StudentPaymentDialogProps) {
+export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee }: StudentPaymentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [feeError, setFeeError] = useState<string | null>(null);
 
   const isEditing = !!editingPayment;
 
@@ -99,7 +102,9 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           description: null,
         });
         setSelectedMonths([]);
+        setFeeError(null);
       }
+      setFeeError(null);
     }
   }, [open, summary, form, editingPayment]);
 
@@ -120,9 +125,45 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     setSelectedMonths((prev) =>
       prev.includes(month) ? prev.filter((m) => m !== month) : [...prev, month]
     );
+    setFeeError(null);
   };
 
   const handleSubmit = async (data: PaymentFormData) => {
+    setFeeError(null);
+
+    // Validate against batch fee limits
+    if (data.payment_type === "admission" && batchDefaultAdmissionFee && batchDefaultAdmissionFee > 0) {
+      const maxAdmission = batchDefaultAdmissionFee;
+      // For editing, allow up to max; for new, allow up to remaining
+      const alreadyPaid = isEditing
+        ? summary.admissionPaid - Number(editingPayment?.amount || 0)
+        : summary.admissionPaid;
+      const maxAllowed = Math.max(0, maxAdmission - alreadyPaid);
+      if (data.amount > maxAllowed) {
+        setFeeError(`Admission fee cannot exceed ${maxAllowed.toLocaleString()}. Batch default: ${maxAdmission.toLocaleString()}, Already paid: ${alreadyPaid.toLocaleString()}.`);
+        return;
+      }
+    }
+
+    if (data.payment_type === "monthly" && batchDefaultMonthlyFee && batchDefaultMonthlyFee > 0 && selectedMonths.length > 0) {
+      const fee = batchDefaultMonthlyFee;
+      for (const m of selectedMonths) {
+        const alreadyPaidForMonth = isEditing
+          ? Math.max(0, (summary.monthlyPaymentsByMonth?.get(m) || 0) - (editingPayment?.months_covered?.includes(m) ? Number(editingPayment.amount) / (editingPayment.months_covered?.length || 1) : 0))
+          : (summary.monthlyPaymentsByMonth?.get(m) || 0);
+        const maxForMonth = Math.max(0, fee - alreadyPaidForMonth);
+        const perMonthAmount = data.amount / selectedMonths.length;
+        if (perMonthAmount > maxForMonth) {
+          const formatMonth = (mo: string) => {
+            const [y, mon] = mo.split("-");
+            return new Date(Number(y), Number(mon) - 1).toLocaleDateString("en", { month: "short", year: "numeric" });
+          };
+          setFeeError(`Payment exceeds limit for ${formatMonth(m)}. Max per month: ${fee.toLocaleString()}, Already paid: ${alreadyPaidForMonth.toLocaleString()}, Remaining: ${maxForMonth.toLocaleString()}.`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       if (isEditing && onUpdate) {
@@ -174,7 +215,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Payment Type</Label>
-            <Select value={paymentType} onValueChange={(v) => { form.setValue("payment_type", v as any); setSelectedMonths([]); }} disabled={saving}>
+            <Select value={paymentType} onValueChange={(v) => { form.setValue("payment_type", v as any); setSelectedMonths([]); setFeeError(null); }} disabled={saving}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="admission">Admission Fee</SelectItem>
@@ -230,6 +271,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
             <Label htmlFor="amount">Amount</Label>
             <Input id="amount" type="number" step="0.01" min="0.01" disabled={saving} {...form.register("amount", { valueAsNumber: true })} />
             {form.formState.errors.amount && <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>}
+            {feeError && <p className="text-sm text-destructive font-medium">{feeError}</p>}
           </div>
 
           <div className="space-y-2">
