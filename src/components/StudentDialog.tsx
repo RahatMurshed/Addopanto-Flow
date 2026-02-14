@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +16,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Loader2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
@@ -24,6 +25,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
 import { useToast } from "@/hooks/use-toast";
 import { useBatches, type Batch } from "@/hooks/useBatches";
+import { formatCurrency } from "@/utils/currencyUtils";
 
 const yyyyMmRegex = /^\d{4}-\d{2}$/;
 
@@ -83,6 +85,29 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
   const now = new Date();
   const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
+  // Get selected batch details
+  const selectedBatch = useMemo(
+    () => (selectedBatchId !== "none" ? batches.find((b) => b.id === selectedBatchId) : null),
+    [selectedBatchId, batches]
+  );
+
+  // Whether batch is selected in create mode (hide inherited fields)
+  const hasBatchInCreate = !isEdit && !!selectedBatch;
+
+  // Compute course start/end from batch
+  const batchCourseStartMonth = useMemo(() => {
+    if (!selectedBatch) return "";
+    const d = new Date(selectedBatch.start_date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [selectedBatch]);
+
+  const batchCourseEndMonth = useMemo(() => {
+    if (!selectedBatch || !selectedBatch.course_duration_months) return "";
+    const d = new Date(selectedBatch.start_date);
+    d.setMonth(d.getMonth() + selectedBatch.course_duration_months - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [selectedBatch]);
+
   const form = useForm<StudentFormData>({
     resolver: zodResolver(studentSchema),
     defaultValues: {
@@ -119,6 +144,16 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
       setSelectedBatchId(defaultBatchId || (student as any)?.batch_id || "none");
     }
   }, [open, student, form, defaultBatchId]);
+
+  // Auto-set fees and course months when batch changes in create mode
+  useEffect(() => {
+    if (!isEdit && selectedBatch) {
+      form.setValue("admission_fee_total", Number(selectedBatch.default_admission_fee));
+      form.setValue("monthly_fee_amount", Number(selectedBatch.default_monthly_fee));
+      if (batchCourseStartMonth) form.setValue("course_start_month", batchCourseStartMonth);
+      if (batchCourseEndMonth) form.setValue("course_end_month", batchCourseEndMonth);
+    }
+  }, [selectedBatch, isEdit, batchCourseStartMonth, batchCourseEndMonth, form]);
 
   const hasInitialPayment = !isEdit && (
     (initialPayment.paymentType === "admission" || initialPayment.paymentType === "both") && initialPayment.admissionAmount > 0 ||
@@ -213,13 +248,8 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
             <Label>Batch</Label>
             <Select value={selectedBatchId} onValueChange={(v) => {
               setSelectedBatchId(v);
-              if (v !== "none") {
-                const batch = batches.find((b) => b.id === v);
-                if (batch && !isEdit) {
-                  if (Number(batch.default_admission_fee) > 0) form.setValue("admission_fee_total", Number(batch.default_admission_fee));
-                  if (Number(batch.default_monthly_fee) > 0) form.setValue("monthly_fee_amount", Number(batch.default_monthly_fee));
-                }
-              }
+              // Reset initial payment when batch changes
+              if (!isEdit) setInitialPayment(defaultPayment);
             }} disabled={saving}>
               <SelectTrigger><SelectValue placeholder="Select batch (optional)" /></SelectTrigger>
               <SelectContent>
@@ -232,6 +262,34 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
               </SelectContent>
             </Select>
           </div>
+
+          {/* Show batch-inherited fees as info badges */}
+          {hasBatchInCreate && (
+            <div className="rounded-md border bg-muted/50 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Info className="h-3.5 w-3.5" />
+                Inherited from batch
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  Admission: {formatCurrency(Number(selectedBatch!.default_admission_fee), currency)}
+                </Badge>
+                <Badge variant="secondary">
+                  Monthly: {formatCurrency(Number(selectedBatch!.default_monthly_fee), currency)}
+                </Badge>
+                {selectedBatch!.course_duration_months && (
+                  <Badge variant="secondary">
+                    Duration: {selectedBatch!.course_duration_months} months
+                  </Badge>
+                )}
+                {batchCourseStartMonth && (
+                  <Badge variant="outline">
+                    {batchCourseStartMonth} → {batchCourseEndMonth || "—"}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -279,29 +337,35 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="course_start_month">Course Start Month</Label>
-              <Input id="course_start_month" placeholder="YYYY-MM" disabled={saving} {...form.register("course_start_month")} />
-              {form.formState.errors.course_start_month && <p className="text-sm text-destructive">{form.formState.errors.course_start_month.message}</p>}
+          {/* Course Start/End — only show when NO batch selected, or in edit mode */}
+          {(!hasBatchInCreate) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="course_start_month">Course Start Month</Label>
+                <Input id="course_start_month" placeholder="YYYY-MM" disabled={saving} {...form.register("course_start_month")} />
+                {form.formState.errors.course_start_month && <p className="text-sm text-destructive">{form.formState.errors.course_start_month.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="course_end_month">Course End Month</Label>
+                <Input id="course_end_month" placeholder="YYYY-MM" disabled={saving} {...form.register("course_end_month")} />
+                {form.formState.errors.course_end_month && <p className="text-sm text-destructive">{form.formState.errors.course_end_month.message}</p>}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="course_end_month">Course End Month</Label>
-              <Input id="course_end_month" placeholder="YYYY-MM" disabled={saving} {...form.register("course_end_month")} />
-              {form.formState.errors.course_end_month && <p className="text-sm text-destructive">{form.formState.errors.course_end_month.message}</p>}
-            </div>
-          </div>
+          )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="admission_fee_total">Admission Fee Total</Label>
-              <Input id="admission_fee_total" type="number" step="0.01" min="0" disabled={saving} {...form.register("admission_fee_total", { valueAsNumber: true })} />
+          {/* Admission/Monthly Fee — only show when NO batch selected, or in edit mode */}
+          {(!hasBatchInCreate) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="admission_fee_total">Admission Fee Total</Label>
+                <Input id="admission_fee_total" type="number" step="0.01" min="0" disabled={saving} {...form.register("admission_fee_total", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="monthly_fee_amount">Monthly Fee Amount</Label>
+                <Input id="monthly_fee_amount" type="number" step="0.01" min="0" disabled={saving} {...form.register("monthly_fee_amount", { valueAsNumber: true })} />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="monthly_fee_amount">Monthly Fee Amount</Label>
-              <Input id="monthly_fee_amount" type="number" step="0.01" min="0" disabled={saving} {...form.register("monthly_fee_amount", { valueAsNumber: true })} />
-            </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label>Status</Label>
