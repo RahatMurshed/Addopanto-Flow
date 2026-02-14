@@ -18,7 +18,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import type { Student } from "@/hooks/useStudents";
 import type { StudentPayment, StudentPaymentInsert, StudentSummary } from "@/hooks/useStudentPayments";
 
@@ -50,6 +50,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [feeError, setFeeError] = useState<string | null>(null);
+  const { fc: formatCurrency } = useCompanyCurrency();
 
   const isEditing = !!editingPayment;
 

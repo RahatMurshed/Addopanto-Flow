@@ -1027,10 +1027,12 @@ export type Database = {
     Views: {
       companies_public: {
         Row: {
+          base_currency: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
           description: string | null
+          exchange_rate: number | null
           fiscal_year_start_month: number | null
           id: string | null
           logo_url: string | null
@@ -1039,10 +1041,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          base_currency?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          exchange_rate?: number | null
           fiscal_year_start_month?: number | null
           id?: string | null
           logo_url?: string | null
@@ -1051,10 +1055,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          base_currency?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          exchange_rate?: number | null
           fiscal_year_start_month?: number | null
           id?: string | null
           logo_url?: string | null
