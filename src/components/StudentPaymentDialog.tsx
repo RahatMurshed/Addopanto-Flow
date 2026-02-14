@@ -238,7 +238,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
                   const isPartial = summary.monthlyPartialMonths?.includes(m);
                   const alreadyPaid = summary.monthlyPaymentsByMonth?.get(m) || 0;
                   const fee = Number(student.monthly_fee_amount) || batchDefaultMonthlyFee || 0;
-                  const remaining = fee - alreadyPaid;
+                  const remaining = Math.max(0, fee - alreadyPaid);
                   return (
                     <label key={m} className="flex items-center gap-2 text-sm cursor-pointer">
                       <Checkbox checked={selectedMonths.includes(m)} onCheckedChange={() => toggleMonth(m)} />
