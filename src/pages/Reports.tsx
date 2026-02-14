@@ -817,19 +817,21 @@ export default function Reports() {
                   </TableBody>
                 </Table>
               </div>
-              <TablePagination
-                currentPage={monthlyPagination.currentPage}
-                totalPages={monthlyPagination.totalPages}
-                totalItems={monthlyPagination.totalItems}
-                startIndex={monthlyPagination.startIndex}
-                endIndex={monthlyPagination.endIndex}
-                itemsPerPage={monthlyPagination.itemsPerPage}
-                onPageChange={monthlyPagination.goToPage}
-                onItemsPerPageChange={monthlyPagination.setItemsPerPage}
-                canGoNext={monthlyPagination.canGoNext}
-                canGoPrev={monthlyPagination.canGoPrev}
-                itemsPerPageOptions={[6, 12]}
-              />
+              <div data-pdf-hide>
+                <TablePagination
+                  currentPage={monthlyPagination.currentPage}
+                  totalPages={monthlyPagination.totalPages}
+                  totalItems={monthlyPagination.totalItems}
+                  startIndex={monthlyPagination.startIndex}
+                  endIndex={monthlyPagination.endIndex}
+                  itemsPerPage={monthlyPagination.itemsPerPage}
+                  onPageChange={monthlyPagination.goToPage}
+                  onItemsPerPageChange={monthlyPagination.setItemsPerPage}
+                  canGoNext={monthlyPagination.canGoNext}
+                  canGoPrev={monthlyPagination.canGoPrev}
+                  itemsPerPageOptions={[6, 12]}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

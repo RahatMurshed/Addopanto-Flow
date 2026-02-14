@@ -12,6 +12,10 @@ const validBackup: BackupData = {
     allocations: [],
     expenses: [{ id: "3", amount: 100 }],
     khata_transfers: [],
+    batches: [],
+    students: [],
+    student_payments: [],
+    monthly_fee_history: [],
   },
 };
 
@@ -32,7 +36,7 @@ describe("validateBackupData", () => {
   });
 
   it("rejects wrong version", () => {
-    const result = validateBackupData({ ...validBackup, version: "2.0" });
+    const result = validateBackupData({ ...validBackup, version: "3.0" });
     expect(result.valid).toBe(false);
     expect(result.error).toBe("Unsupported backup version");
   });
@@ -104,6 +108,10 @@ describe("getBackupPreview", () => {
         allocations: [],
         expenses: [],
         khata_transfers: [],
+        batches: [],
+        students: [],
+        student_payments: [],
+        monthly_fee_history: [],
       },
     };
     const preview = getBackupPreview(emptyBackup);
