@@ -22,10 +22,10 @@ export function ThemeToggle() {
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="icon"
       onClick={toggleTheme}
-      className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground"
+      className="h-9 w-9"
       aria-label="Toggle theme"
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
