@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronLeft, ChevronRight, Eye, Search, ClipboardList, Plus, Minus, ArrowRight } from "lucide-react";
+import { Eye, Search, ClipboardList, Plus, Minus, ArrowRight } from "lucide-react";
+import TablePagination from "@/components/TablePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuditLog as AuditLogType } from "@/hooks/useAuditLogs";
 
@@ -36,7 +37,7 @@ const ACTION_OPTIONS = [
   { value: "DELETE", label: "Deleted" },
 ];
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 function actionBadge(action: string) {
   switch (action) {
@@ -161,6 +162,7 @@ export default function AuditLog() {
   const [actionFilter, setActionFilter] = useState("all");
   const [emailSearch, setEmailSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [detail, setDetail] = useState<AuditLogType | null>(null);
 
   useEffect(() => {
@@ -173,13 +175,15 @@ export default function AuditLog() {
     table_name: tableFilter === "all" ? "" : tableFilter,
     action: actionFilter === "all" ? "" : actionFilter,
     user_email: emailSearch,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
 
   const logs = result?.data ?? [];
   const totalCount = result?.count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const startIndex = page * pageSize + 1;
+  const endIndex = Math.min((page + 1) * pageSize, totalCount);
 
   // Fetch user profiles for avatar display
   const logUserIds = useMemo(() => [...new Set(logs.map(l => l.user_id))], [logs]);
@@ -310,19 +314,18 @@ export default function AuditLog() {
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-muted-foreground">
-                  Page {page + 1} of {totalPages}
-                </p>
-                <div className="flex gap-1">
-                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+              <TablePagination
+                currentPage={page + 1}
+                totalPages={totalPages}
+                totalItems={totalCount}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                itemsPerPage={pageSize}
+                onPageChange={(p) => setPage(p - 1)}
+                onItemsPerPageChange={(size) => { setPageSize(size); setPage(0); }}
+                canGoNext={page < totalPages - 1}
+                canGoPrev={page > 0}
+              />
             </>
           )}
         </CardContent>

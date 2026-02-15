@@ -2,9 +2,7 @@ import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowRight, ArrowLeftRight, Trash2, Loader2, CalendarIcon, X } from "lucide-react";
+import { ArrowRight, ArrowLeftRight, Trash2, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,13 +13,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState, useMemo, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import type { KhataTransfer } from "@/hooks/useKhataTransfers";
 import type { AccountBalance } from "@/hooks/useExpenses";
-import type { DateRange } from "react-day-picker";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
+import AdvancedDateFilter from "@/components/AdvancedDateFilter";
+import type { DateRange, FilterType, FilterValue } from "@/utils/dateRangeUtils";
 
 interface TransferHistoryCardProps {
   transfers: KhataTransfer[];
@@ -43,21 +41,25 @@ export default function TransferHistoryCard({
   limit,
 }: TransferHistoryCardProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [filterDateRange, setFilterDateRange] = useState<DateRange | null>(null);
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name || "Unknown";
   const getAccountColor = (id: string) => accounts.find((a) => a.id === id)?.color || "#888";
 
+  const handleFilterChange = useCallback((range: DateRange, _filterType: FilterType, _filterValue: FilterValue) => {
+    setFilterDateRange(range);
+  }, []);
+
   const filteredTransfers = useMemo(() => {
-    if (!dateRange?.from) return transfers;
+    if (!filterDateRange) return transfers;
     
     return transfers.filter((transfer) => {
       const transferDate = new Date(transfer.created_at);
-      const start = startOfDay(dateRange.from!);
-      const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from!);
+      const start = startOfDay(filterDateRange.start);
+      const end = endOfDay(filterDateRange.end);
       return isWithinInterval(transferDate, { start, end });
     });
-  }, [transfers, dateRange]);
+  }, [transfers, filterDateRange]);
 
   // Pagination for filtered transfers
   const pagination = usePagination(filteredTransfers);
@@ -65,7 +67,7 @@ export default function TransferHistoryCard({
   // Reset page when date range changes
   useEffect(() => {
     pagination.resetPage();
-  }, [dateRange]);
+  }, [filterDateRange]);
 
   const displayTransfers = limit 
     ? filteredTransfers.slice(0, limit) 
@@ -75,10 +77,6 @@ export default function TransferHistoryCard({
     if (!deleteId || !onDelete) return;
     await onDelete(deleteId);
     setDeleteId(null);
-  };
-
-  const clearDateFilter = () => {
-    setDateRange(undefined);
   };
 
   const totalAmount = filteredTransfers.reduce((sum, t) => sum + Number(t.amount), 0);
@@ -119,58 +117,16 @@ export default function TransferHistoryCard({
           </CardTitle>
           
           {showDateFilter && (
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      !dateRange && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange?.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d, yyyy")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "MMM d, yyyy")
-                      )
-                    ) : (
-                      <span>Filter by date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-              {dateRange && (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearDateFilter}>
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+            <AdvancedDateFilter
+              onFilterChange={handleFilterChange}
+              defaultFilterType="monthly"
+            />
           )}
         </CardHeader>
         <CardContent>
           {filteredTransfers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <p className="text-muted-foreground">No transfers found in this date range</p>
-              <Button variant="link" onClick={clearDateFilter} className="mt-2">
-                Clear filter
-              </Button>
             </div>
           ) : (
             <>
@@ -258,7 +214,6 @@ export default function TransferHistoryCard({
                 <div className="mt-4 flex items-center justify-between border-t pt-4 text-sm">
                   <span className="text-muted-foreground">
                     {filteredTransfers.length} transfer{filteredTransfers.length !== 1 ? "s" : ""}
-                    {dateRange?.from && " in selected range"}
                   </span>
                   <span className="font-semibold">
                     Total: ৳{totalAmount.toLocaleString()}
