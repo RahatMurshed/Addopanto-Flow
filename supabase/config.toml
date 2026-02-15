@@ -2,3 +2,6 @@ project_id = "zrmhhnepzbwbihdshwcm"
 
 [functions.check-ban]
 verify_jwt = false
+
+[functions.reset-company-data]
+verify_jwt = false
