@@ -8,6 +8,7 @@ import {
   useCreateDefaultAccounts,
   type ExpenseAccount,
 } from "@/hooks/useExpenseAccounts";
+import { useAccountBalances } from "@/hooks/useExpenses";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,11 @@ import KhataDialog from "@/components/KhataDialog";
 export default function Khatas() {
   const navigate = useNavigate();
   const { data: accounts = [], isLoading } = useExpenseAccounts();
+  const { data: balances = [] } = useAccountBalances();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
+
+  // Balance lookup map
+  const balanceMap = new Map(balances.map((b) => [b.id, b]));
   
   // Company-level permissions
   const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer, isDataEntryOperator } = useCompany();
@@ -189,8 +194,12 @@ export default function Khatas() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => (
-            <Card key={account.id} className={!account.is_active ? "opacity-60" : ""}>
+          {accounts.map((account) => {
+            const bal = balanceMap.get(account.id);
+            const balance = bal?.balance ?? 0;
+            const isDeficit = balance < 0;
+            return (
+            <Card key={account.id} className={`${!account.is_active ? "opacity-60" : ""} ${isDeficit && account.is_active ? "border-destructive/40" : ""}`}>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div className="flex items-center gap-2">
                   <div
@@ -244,9 +253,28 @@ export default function Khatas() {
                     )}
                   </div>
                 </div>
+                {bal && (
+                  <div className="mt-3 border-t pt-3 space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Allocated</span>
+                      <span>{formatCurrency(bal.total_allocated, currency)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Spent</span>
+                      <span>{formatCurrency(bal.total_spent, currency)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>Balance</span>
+                      <span className={isDeficit ? "text-destructive" : "text-green-600 dark:text-green-400"}>
+                        {formatCurrency(balance, currency)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -278,6 +306,23 @@ export default function Khatas() {
                 </div>
               ))}
             </div>
+            {balances.length > 0 && (() => {
+              const totals = balances.reduce(
+                (acc, b) => ({
+                  allocated: acc.allocated + b.total_allocated,
+                  spent: acc.spent + b.total_spent,
+                  balance: acc.balance + b.balance,
+                }),
+                { allocated: 0, spent: 0, balance: 0 }
+              );
+              return (
+                <div className="mt-3 border-t pt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                  <div><span className="text-muted-foreground">Total Allocated: </span><span className="font-medium">{formatCurrency(totals.allocated, currency)}</span></div>
+                  <div><span className="text-muted-foreground">Total Spent: </span><span className="font-medium">{formatCurrency(totals.spent, currency)}</span></div>
+                  <div><span className="text-muted-foreground">Net Balance: </span><span className={`font-semibold ${totals.balance < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>{formatCurrency(totals.balance, currency)}</span></div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
