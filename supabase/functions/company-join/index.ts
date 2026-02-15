@@ -82,6 +82,12 @@ const cipherJoinSchema = z.object({
   companyId: uuidField,
 });
 
+const changePasswordSchema = z.object({
+  action: z.literal("change-join-password"),
+  companyId: uuidField,
+  newPassword: z.string().min(1, "Password required").max(100, "Password too long"),
+});
+
 const actionSchema = z.object({
   action: z.string().min(1, "Action required").max(50, "Action too long"),
 }).passthrough();
@@ -491,6 +497,26 @@ Deno.serve(async (req) => {
         .from("user_profiles")
         .update({ active_company_id: companyId })
         .eq("user_id", user.id);
+
+      return json(200, { success: true });
+    }
+
+    if (action === "change-join-password") {
+      const parsed = changePasswordSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { companyId, newPassword } = parsed.data;
+
+      if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
+
+      const hashedPassword = await bcrypt.hash(newPassword);
+
+      const { error: updateError } = await adminClient
+        .from("companies")
+        .update({ join_password: hashedPassword })
+        .eq("id", companyId);
+
+      if (updateError) return json(500, { error: "Failed to update password" });
 
       return json(200, { success: true });
     }
