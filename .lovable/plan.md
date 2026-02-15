@@ -1,53 +1,177 @@
 
 
-## Company Password Change + Show Join Message to Admins
+# Remove Platform Approval + Company Creation Requests
 
-### 1. Company Password Change on Settings Page
+## Overview
 
-Add a new "Security" card to `src/pages/SettingsPage.tsx` that allows admins/ciphers to change the business join password.
+This plan covers two features (auto-logout was skipped per your choice):
 
-Since the password is stored as a bcrypt hash (handled in the `company-join` edge function), we need a new edge function action `change-join-password` to hash the new password server-side before saving.
+1. **Remove platform-level user approval** -- users sign up and immediately get access to browse/join companies
+2. **Company creation request system** -- any user can request creating a company, Cipher reviews and approves
 
-**Edge Function Changes** (`supabase/functions/company-join/index.ts`):
-- Add a new Zod schema `changePasswordSchema` for action `"change-join-password"` with fields: `companyId` (uuid), `newPassword` (string, min 1, max 100)
-- Add handler that verifies the user is admin/cipher of the company, hashes the new password with bcrypt, and updates `companies.join_password`
+---
 
-**Settings Page Changes** (`src/pages/SettingsPage.tsx`):
-- Add a new Card section titled "Join Password" below the Business Logo card
-- Contains a password input field with show/hide toggle for entering a new join password
-- A "Change Password" button with loading state
-- Calls the new `change-join-password` edge function action
-- Shows success/error toast
+## Feature 1: Remove Platform-Level User Approval
 
-### 2. Show Join Message More Prominently to Admins
+### What Changes
 
-Currently the message column in the join requests table is truncated to 200px. The fix:
+Currently, when a user signs up, a `registration_requests` record is created with status "pending", they are immediately signed out, and must wait for Cipher/Admin approval before they can log in. This entire flow gets removed.
 
-**`src/components/CompanyJoinRequests.tsx`**:
-- In the pending requests table, expand the message column -- remove the `max-w-[200px] truncate` constraint
-- Show the full message text with proper word wrapping
-- If message is long, show it in a tooltip or expandable row rather than truncating
-- Style the message to be more noticeable (not just muted foreground) when present, so admins clearly see what the user wrote
+### Auth Page (`src/pages/Auth.tsx`)
 
-### Technical Details
+- **Remove** the ban check, pending check, and rejection check during login (`checkBan`, `BanMessage`, `PendingMessage`, `RejectionMessage`)
+- **Remove** the `RegistrationSuccess` component showing "Awaiting Admin Approval"
+- **Remove** the post-signup `signOut()` call -- user stays logged in after signup
+- After signup, navigate directly to `/companies` instead of showing waiting screen
+- Keep password validation, avatar upload, Google/Apple OAuth, and password reset as-is
 
-**New Zod schema in edge function:**
-```typescript
-const changePasswordSchema = z.object({
-  action: z.literal("change-join-password"),
-  companyId: uuidField,
-  newPassword: z.string().min(1, "Password required").max(100, "Password too long"),
-});
+### Auth Context (`src/contexts/AuthContext.tsx`)
+
+- **Remove** the periodic session validation that checks `registration_requests` status and force-logs out pending/rejected users (lines ~62-100)
+- Keep the `user_roles` deletion listener for company-level user removal
+
+### Registration Status Hook and Page
+
+- **Delete** `src/hooks/useRegistrationStatus.ts` -- no longer needed
+- **Delete** `src/pages/PendingApproval.tsx` -- no longer needed
+
+### Pending Requests Count (`src/hooks/usePendingRequestsCount.ts`)
+
+- **Remove** this hook entirely since platform-level registration requests are gone
+- Update `AppLayout.tsx` to remove the pending badge from the "Requests" nav item (it now refers to company join requests only)
+
+### Company Selection Page (`src/pages/CompanySelection.tsx`)
+
+- **Remove** the `NoCompaniesSection` component that shows "Pending Approval" or "Access Denied" based on `registration_requests`
+- When user has no companies, show a simple message with "Join a Business" and "Request to Create Business" buttons
+- Remove the registration status queries
+
+### Registration Requests Page (`src/pages/RegistrationRequests.tsx`)
+
+- **Replace entirely** -- this page currently shows platform-level registration requests
+- Rename to show only **Company Join Requests** for the active company (which is already handled by `CompanyJoinRequests.tsx` on the Members page)
+- Alternatively, redirect `/requests` to the Members page Join Requests tab, or repurpose for Company Creation Requests (see Feature 2)
+
+### Edge Functions
+
+- **`check-ban`** edge function: can be simplified or removed (only needed for company-level bans now, which are handled in `company-join`)
+- **`admin-users`** edge function: Remove `approve`, `reject`, `accept-rejected`, `permanent-delete` actions related to `registration_requests`. Keep the `delete` action and user listing for the Platform Users page.
+
+### Database
+
+- The `registration_requests` table can remain for now (no data migration needed), but new signups will no longer create records in it
+- The signup trigger that creates registration_requests records needs to be removed or modified
+
+### User Roles
+
+- On signup, insert a `user_roles` record with role `user` immediately (so they can access the app)
+- This replaces the current flow where roles are only assigned after admin approval
+
+### Navigation Updates (`src/components/AppLayout.tsx`)
+
+- Remove the "Requests" nav item for platform-level registration requests
+- Keep the Members page with its Join Requests tab for company-level requests
+- Add "Company Requests" nav item for Cipher (see Feature 2)
+
+---
+
+## Feature 2: Company Creation Request System
+
+### New Database Table
+
+```text
+company_creation_requests
+  id                 uuid      PK, default gen_random_uuid()
+  user_id            uuid      NOT NULL (references auth.users)
+  company_name       text      NOT NULL
+  company_slug       text      NOT NULL
+  description        text      nullable
+  logo_url           text      nullable
+  industry           text      nullable
+  estimated_students integer   nullable
+  contact_email      text      nullable
+  contact_phone      text      nullable
+  reason             text      nullable
+  status             text      NOT NULL, default 'pending'
+  rejection_reason   text      nullable
+  reviewed_by        uuid      nullable
+  reviewed_at        timestamptz nullable
+  created_at         timestamptz NOT NULL, default now()
 ```
 
-**New handler logic:**
-- Verify user is cipher or company admin
-- Hash `newPassword` with bcrypt
-- Update `companies.join_password` where `id = companyId`
-- Return success
+RLS policies:
+- Users can INSERT their own requests (`user_id = auth.uid()`)
+- Users can SELECT their own requests
+- Cipher can SELECT all requests
+- Cipher can UPDATE requests (approve/reject)
 
-**Files to modify:**
-- `supabase/functions/company-join/index.ts` -- add `change-join-password` action
-- `src/pages/SettingsPage.tsx` -- add Join Password card section
-- `src/components/CompanyJoinRequests.tsx` -- improve message column visibility
+### New Edge Function Action: `approve-company-creation`
+
+Add to `company-join` edge function:
+- Verify caller is Cipher
+- Create the company (same as `create-company` action)
+- Assign requesting user as company admin with full permissions
+- Update request status to "approved"
+
+### New Edge Function Action: `reject-company-creation`
+
+- Verify caller is Cipher
+- Update request status to "rejected" with reason
+
+### Company Selection Page Updates
+
+- Add "Request to Create Business" button alongside "Join Business"
+- Clicking opens a modal/page with the creation request form
+- Form fields: company name, slug (auto-generated), description, industry, estimated students, contact email, contact phone, reason, logo upload
+- On submit, insert into `company_creation_requests` and show success toast
+- Show "Pending Company Requests" section if user has any pending requests
+
+### New Page: Company Creation Requests (`src/pages/CompanyCreationRequests.tsx`)
+
+- Accessible only to Cipher role
+- Table showing all pending requests with user avatar/name, company name, date, industry, actions
+- View detail modal showing all request fields
+- Approve button: creates company, assigns user as admin, updates status
+- Reject button: modal for rejection reason, updates status
+
+### Navigation
+
+- Add "Company Requests" nav item for Cipher in sidebar with pending count badge
+
+---
+
+## Technical Details
+
+### Files to Create
+- `src/pages/CompanyCreationRequests.tsx` -- Cipher review page
+- `src/components/CompanyCreationRequestForm.tsx` -- Request form component
+
+### Files to Modify
+- `src/pages/Auth.tsx` -- Simplify signup/login flow
+- `src/contexts/AuthContext.tsx` -- Remove registration status checks
+- `src/pages/CompanySelection.tsx` -- Add creation request button, remove platform approval UI
+- `src/components/AppLayout.tsx` -- Update navigation items
+- `src/App.tsx` -- Add routes, remove PendingApproval route
+- `supabase/functions/company-join/index.ts` -- Add creation request approve/reject actions
+- `supabase/functions/admin-users/index.ts` -- Remove registration request actions
+
+### Files to Delete
+- `src/hooks/useRegistrationStatus.ts`
+- `src/pages/PendingApproval.tsx`
+- `src/hooks/usePendingRequestsCount.ts`
+
+### Database Migrations
+1. Create `company_creation_requests` table with RLS
+2. Create or modify the auth trigger to assign `user_roles` role `user` immediately on signup instead of creating a `registration_requests` record
+3. Enable realtime on `company_creation_requests` for live updates
+
+### Edge Function Changes
+- `company-join`: Add `request-company-creation`, `approve-company-creation`, `reject-company-creation` actions
+- `admin-users`: Clean up registration request related actions
+- `check-ban`: Simplify to only handle company-level bans (or remove entirely since company-join handles its own ban checks)
+
+### Risks and Mitigations
+- **Existing pending users**: Users who registered under the old system and are still "pending" will need a one-time migration to assign them `user` role so they can log in
+- **Registration requests table**: Not dropped immediately -- kept for historical data but no longer used for new signups
+- **Edge function deployment order**: Database migration must run before edge function changes to avoid referencing non-existent tables
 
