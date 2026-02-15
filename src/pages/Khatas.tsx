@@ -9,6 +9,7 @@ import {
   type ExpenseAccount,
 } from "@/hooks/useExpenseAccounts";
 import { useAccountBalances } from "@/hooks/useExpenses";
+import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, AlertTriangle, Loader2, Sparkles } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertTriangle, Loader2, Sparkles, ArrowLeftRight } from "lucide-react";
 import { SkeletonKhataCards } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import KhataDialog from "@/components/KhataDialog";
+import TransferDialog from "@/components/TransferDialog";
+import TransferHistoryCard from "@/components/TransferHistoryCard";
 
 export default function Khatas() {
   const navigate = useNavigate();
@@ -41,15 +44,19 @@ export default function Khatas() {
   const balanceMap = new Map(balances.map((b) => [b.id, b]));
   
   // Company-level permissions
-  const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer, isDataEntryOperator } = useCompany();
+  const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canTransfer } = useCompany();
   
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();
   const deleteMutation = useDeleteExpenseAccount();
   const createDefaultsMutation = useCreateDefaultAccounts();
+  const { data: transfers = [] } = useKhataTransfers();
+  const createTransferMutation = useCreateKhataTransfer();
+  const deleteTransferMutation = useDeleteKhataTransfer();
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingKhata, setEditingKhata] = useState<ExpenseAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -106,6 +113,25 @@ export default function Khatas() {
     }
   };
 
+  const handleTransfer = async (data: { from_account_id: string; to_account_id: string; amount: number; description?: string }) => {
+    try {
+      await createTransferMutation.mutateAsync(data);
+      toast({ title: "Transfer completed" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  };
+
+  const handleDeleteTransfer = async (id: string) => {
+    try {
+      await deleteTransferMutation.mutateAsync(id);
+      toast({ title: "Transfer deleted" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -141,6 +167,12 @@ export default function Khatas() {
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
               Use Defaults
+            </Button>
+          )}
+          {canTransfer && accounts.length > 1 && (
+            <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Transfer
             </Button>
           )}
           {canAddExpenseSource && (
@@ -337,6 +369,27 @@ export default function Khatas() {
         khata={editingKhata}
         onSave={editingKhata ? handleUpdate : handleCreate}
       />
+
+      {/* Transfer Dialog */}
+      <TransferDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
+        accounts={balances}
+        onTransfer={handleTransfer}
+        isPending={createTransferMutation.isPending}
+      />
+
+      {/* Transfer History */}
+      {transfers.length > 0 && (
+        <TransferHistoryCard
+          transfers={transfers}
+          accounts={balances}
+          onDelete={canDelete ? handleDeleteTransfer : undefined}
+          isDeleting={deleteTransferMutation.isPending}
+          showDelete={canDelete}
+          showDateFilter
+        />
+      )}
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open && !deleteMutation.isPending) setDeleteId(null); }}>
