@@ -19,6 +19,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
+import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
+import { Plus } from "lucide-react";
 import type { Student } from "@/hooks/useStudents";
 import type { StudentPayment, StudentPaymentInsert, StudentSummary } from "@/hooks/useStudentPayments";
 
@@ -50,7 +52,11 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [feeError, setFeeError] = useState<string | null>(null);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [newSourceName, setNewSourceName] = useState("");
   const { fc: formatCurrency } = useCompanyCurrency();
+  const { data: revenueSources = [] } = useRevenueSources();
+  const createSourceMutation = useCreateRevenueSource();
 
   const isEditing = !!editingPayment;
 
@@ -107,10 +113,14 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         });
         setSelectedMonths([]);
         setFeeError(null);
+        // Default to "Student Fees" source
+        const studentFeesSource = revenueSources.find(s => s.name === "Student Fees");
+        setSelectedSourceId(studentFeesSource?.id || null);
       }
       setFeeError(null);
+      setNewSourceName("");
     }
-  }, [open, summary, form, editingPayment]);
+  }, [open, summary, form, editingPayment, revenueSources]);
 
   // Auto-fill admission amount when type switches to admission
   useEffect(() => {
@@ -199,6 +209,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           months_covered: data.payment_type === "monthly" ? selectedMonths : null,
           receipt_number: data.receipt_number || null,
           description: data.description || null,
+          source_id: selectedSourceId || null,
           studentName: student.name,
         });
       }
@@ -313,6 +324,43 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Revenue Source</Label>
+            <Select value={selectedSourceId || "auto"} onValueChange={(v) => setSelectedSourceId(v === "auto" ? null : v)} disabled={saving}>
+              <SelectTrigger><SelectValue placeholder="Auto (Student Fees)" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto (Student Fees)</SelectItem>
+                {revenueSources.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Input
+                placeholder="New source name..."
+                value={newSourceName}
+                onChange={(e) => setNewSourceName(e.target.value)}
+                disabled={saving || createSourceMutation.isPending}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                disabled={!newSourceName.trim() || saving || createSourceMutation.isPending}
+                onClick={async () => {
+                  try {
+                    const created = await createSourceMutation.mutateAsync(newSourceName.trim());
+                    setSelectedSourceId(created.id);
+                    setNewSourceName("");
+                  } catch {}
+                }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
