@@ -385,11 +385,11 @@ export default function Dashboard() {
 
 
   const metrics = [
-    { label: "Total Revenue", value: formatCurrency(data.totalRevenue), icon: TrendingUp, color: "text-primary" },
+    { label: "Total Revenue", value: formatCurrency(data.totalRevenue), icon: TrendingUp, color: "text-success" },
     { label: "Total Expenses", value: formatCurrency(data.totalExpenses), icon: TrendingDown, color: "text-destructive" },
     { label: "Allocated Profit", value: formatCurrency(data.allocatedProfit), icon: PiggyBank, color: data.allocatedProfit >= 0 ? "text-success" : "text-destructive" },
     { label: "Actual Profit", value: formatCurrency(data.actualProfit), icon: DollarSign, color: data.actualProfit >= 0 ? "text-success" : "text-destructive" },
-    { label: "Total Balance", value: formatCurrency(data.totalBalance), icon: Wallet, color: data.totalBalance >= 0 ? "text-primary" : "text-destructive" },
+    { label: "Total Balance", value: formatCurrency(data.totalBalance), icon: Wallet, color: data.totalBalance >= 0 ? "text-success" : "text-destructive" },
   ];
 
   const hasRevenueTrendData = filteredRevenueTrend.length > 0 && filteredRevenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
@@ -614,9 +614,9 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-4">
+            <div className="rounded-lg bg-gradient-to-br from-green-500/5 to-green-500/10 border border-green-500/20 p-4">
               <p className="text-sm font-medium text-muted-foreground">Revenue</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(filteredData.revenue)}</p>
+              <p className="text-2xl font-bold text-success">{formatCurrency(filteredData.revenue)}</p>
               {previousRange && (
                 <PercentageChange
                   current={filteredData.revenue}
@@ -704,8 +704,8 @@ export default function Dashboard() {
                 <AreaChart data={filteredRevenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                     <stop offset="5%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
@@ -739,7 +739,7 @@ export default function Dashboard() {
                     type="monotone"
                     dataKey="revenue"
                     name="revenue"
-                    stroke="hsl(var(--primary))"
+                    stroke="hsl(142, 76%, 36%)"
                     strokeWidth={2}
                     fill="url(#revenueGradient)"
                   />
@@ -845,7 +845,7 @@ export default function Dashboard() {
                             className={cn(
                               "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
                               tx.type === "revenue"
-                                ? "bg-primary/10 text-primary"
+                                ? "bg-green-500/10 text-success"
                                 : "bg-destructive/10 text-destructive"
                             )}
                           >
@@ -877,7 +877,7 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell>
                         {tx.type === "revenue" && tx.category ? (
-                          <Badge variant="outline" className="text-xs text-primary border-primary/30">
+                          <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-500/30">
                             {tx.category}
                           </Badge>
                         ) : (
@@ -888,7 +888,7 @@ export default function Dashboard() {
                         <span
                           className={cn(
                             "font-bold",
-                            tx.type === "revenue" ? "text-primary" : "text-destructive"
+                            tx.type === "revenue" ? "text-success" : "text-destructive"
                           )}
                         >
                           {tx.type === "revenue" ? "+" : "-"}{formatCurrency(tx.amount)}
