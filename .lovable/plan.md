@@ -1,44 +1,45 @@
 
 
-## Fix: Pass Batch Default Fees to Payment Dialog from Batch Detail Page
+## View User Profile Details from Management Pages
 
-### Problem
+### What will change
 
-When opening the "Record Payment" dialog from the Batch Detail page's enrolled student list, the dialog does not show monthly fee amounts under each month or auto-fill the payment amount. This is because two critical props are missing from the `StudentPaymentDialog` component call in `BatchDetail.tsx`.
+Add a "View Profile" action to both the **Platform Users** page (cipher only) and the **Business Members** page (admin/cipher). Clicking it opens a side sheet showing the user's full profile information (phone, address, city, country, department, employee ID, date of birth, bio). Cipher profiles remain hidden from admin users -- the view button simply won't appear for cipher users on the members page.
 
-### Root Cause
+### Approach
 
-In `src/pages/BatchDetail.tsx` (lines 738-744), the `StudentPaymentDialog` is rendered without:
-- `batchDefaultAdmissionFee` -- needed so the dialog knows the admission fee when the student's own fee is 0
-- `batchDefaultMonthlyFee` -- needed so the dialog can display "remaining" amounts under each month and auto-calculate payment totals
+Create a reusable `UserProfileSheet` component that displays profile details in a read-only sheet (slide-out panel). Both pages will import it and trigger it on row click or a dedicated "view" button.
 
-Additionally, the summary lookup uses `studentSummaries` (which only covers filtered/paginated students) instead of `allSummaries` (which covers all batch students). If a student gets filtered out, their summary would be missing.
+### Implementation Details
 
-### Fix
+**1. New component: `src/components/UserProfileSheet.tsx`**
+- Accepts `userId`, `open`, and `onOpenChange` props
+- Fetches full profile from `user_profiles` table for the given `userId`
+- Displays: avatar, full name, email, phone, alt phone, address, city, country, department, employee ID, date of birth, bio, and join date
+- Read-only presentation using labels and values in a clean layout
+- Uses the existing Sheet component from the UI library
 
-One change in one file:
+**2. Update `src/pages/UserManagement.tsx` (Platform Users - cipher only)**
+- Add an "eye" icon button in the Actions column next to the delete button
+- Clicking opens the `UserProfileSheet` for that user
+- Available for all users (cipher can view everyone)
 
-**`src/pages/BatchDetail.tsx`** -- Update the `StudentPaymentDialog` render (around line 738) to pass the two missing props and use `allSummaries` for a more reliable lookup:
+**3. Update `src/pages/CompanyMembers.tsx` (Business Members - admin/cipher)**
+- Add an "eye" icon button in the Actions column
+- Cipher users already hidden from the members list, so no extra filtering needed
+- Admin can view profiles of all visible members (moderators, DEOs, viewers)
 
-```tsx
-<StudentPaymentDialog
-  open={paymentDialogOpen}
-  onOpenChange={(o) => { setPaymentDialogOpen(o); if (!o) setSelectedStudent(null); }}
-  student={selectedStudent}
-  summary={allSummaries.get(selectedStudent.id) || { /* fallback */ }}
-  onSave={handlePayment}
-  batchDefaultAdmissionFee={Number(batch?.default_admission_fee) || 0}
-  batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
-/>
-```
+### Access Control Summary
 
-### What This Fixes
+| Viewer | Can see profiles of |
+|---|---|
+| Cipher | All users (platform + company) |
+| Admin | All company members except cipher (cipher already hidden from list) |
+| Moderator/DEO/Viewer | No profile viewing (no action button shown) |
 
-- Monthly fee amounts (e.g., "1,250 remaining") will now display under each month checkbox in the batch payment dialog
-- The amount field will auto-fill when selecting months (using batch default monthly fee as fallback)
-- Admission fee will auto-fill when admission type is selected (using batch default admission fee as fallback)
-- Both access points (student detail and batch detail) will behave identically
+### Files to create/modify
 
-### Files to Modify
+- **New**: `src/components/UserProfileSheet.tsx` -- reusable profile viewer
+- **Edit**: `src/pages/UserManagement.tsx` -- add view button + sheet
+- **Edit**: `src/pages/CompanyMembers.tsx` -- add view button + sheet
 
-- `src/pages/BatchDetail.tsx` -- add two props and switch summary source (3-line change)
