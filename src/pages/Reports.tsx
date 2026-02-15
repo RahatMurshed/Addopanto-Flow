@@ -518,10 +518,10 @@ export default function Reports() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
+            <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(summary.totalRevenue)}</p>
+            <p className="text-2xl font-bold text-success">{formatCurrency(summary.totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -572,10 +572,10 @@ export default function Reports() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Avg Revenue/Entry</CardTitle>
-            <Calculator className="h-4 w-4 text-primary" />
+            <Calculator className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(kpis.avgRevenue)}</p>
+            <p className="text-2xl font-bold text-success">{formatCurrency(kpis.avgRevenue)}</p>
             <p className="text-xs text-muted-foreground mt-1">{filteredData.revenues.length} revenue entries</p>
           </CardContent>
         </Card>
@@ -604,7 +604,7 @@ export default function Reports() {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Revenue</p>
-                <p className="text-lg font-semibold text-primary">{formatCurrency(yoyComparison.currentRevenue)}</p>
+                <p className="text-lg font-semibold text-success">{formatCurrency(yoyComparison.currentRevenue)}</p>
                 <PercentageChange 
                   current={yoyComparison.currentRevenue} 
                   previous={yoyComparison.previousRevenue}
@@ -657,7 +657,7 @@ export default function Reports() {
                     <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => fc(value, { compact: true })} />
                     <Tooltip content={<CustomBarTooltip />} />
                     <Legend />
-                    <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name="Revenue" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -716,7 +716,7 @@ export default function Reports() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
+              <TrendingUp className="h-5 w-5 text-success" />
               Revenue by Source
             </CardTitle>
           </CardHeader>
@@ -854,7 +854,7 @@ export default function Reports() {
                     {monthlyPagination.paginatedItems.map((row) => (
                       <TableRow key={row.month}>
                         <TableCell className="font-medium">{row.month}</TableCell>
-                        <TableCell className="text-right text-primary">{formatCurrency(row.revenue)}</TableCell>
+                        <TableCell className="text-right text-success">{formatCurrency(row.revenue)}</TableCell>
                         <TableCell className="text-right text-destructive">{formatCurrency(row.expenses)}</TableCell>
                         <TableCell className={cn("text-right font-medium", row.profit >= 0 ? "text-success" : "text-destructive")}>
                           {formatCurrency(row.profit)}
@@ -863,7 +863,7 @@ export default function Reports() {
                     ))}
                     <TableRow className="bg-muted/50 font-bold">
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right text-primary">
+                      <TableCell className="text-right text-success">
                         {formatCurrency(chartBreakdown.reduce((sum, m) => sum + m.revenue, 0))}
                       </TableCell>
                       <TableCell className="text-right text-destructive">
@@ -937,7 +937,7 @@ export default function Reports() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">{account.percentage}%</TableCell>
-                          <TableCell className="text-right text-primary">{formatCurrency(account.allocated)}</TableCell>
+                          <TableCell className="text-right text-success">{formatCurrency(account.allocated)}</TableCell>
                           <TableCell className="text-right text-destructive">{formatCurrency(account.spent)}</TableCell>
                           <TableCell className={cn("text-right font-medium", account.balance >= 0 ? "text-success" : "text-destructive")}>
                             {formatCurrency(account.balance)}
@@ -980,7 +980,7 @@ export default function Reports() {
                         <TableRow key={source.id}>
                           <TableCell className="font-medium">{source.name}</TableCell>
                           <TableCell className="text-right">{source.count}</TableCell>
-                          <TableCell className="text-right text-primary font-medium">
+                          <TableCell className="text-right text-success font-medium">
                             {formatCurrency(source.amount)}
                           </TableCell>
                         </TableRow>
@@ -992,7 +992,7 @@ export default function Reports() {
                         <TableCell className="text-right">
                           {sourceBreakdown.reduce((sum, s) => sum + s.count, 0)}
                         </TableCell>
-                        <TableCell className="text-right text-primary">
+                        <TableCell className="text-right text-success">
                           {formatCurrency(sourceBreakdown.reduce((sum, s) => sum + s.amount, 0))}
                         </TableCell>
                       </TableRow>

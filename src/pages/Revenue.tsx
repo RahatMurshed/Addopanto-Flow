@@ -337,15 +337,15 @@ export default function Revenue() {
       {/* Summary Cards - hidden for DEO */}
       {!isDataEntryOperator && (
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {dateRange?.label || "Selected Period"}
               </CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
+              <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(filteredTotal, currency)}</p>
+              <p className="text-2xl font-bold text-success">{formatCurrency(filteredTotal, currency)}</p>
               <p className="text-xs text-muted-foreground mt-1">{filteredRevenues.length} entries</p>
               {previousRange && (
                 <PercentageChange
@@ -360,7 +360,7 @@ export default function Revenue() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">All Time</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
+              <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{formatCurrency(allTimeTotal, currency)}</p>
@@ -385,7 +385,7 @@ export default function Revenue() {
                     <span className="text-xs text-muted-foreground">({item.count} entries)</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-primary">
+                    <span className="text-sm font-semibold text-success">
                       {formatCurrency(item.amount, currency)}
                     </span>
                     <span className="text-xs text-muted-foreground">
