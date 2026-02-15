@@ -23,28 +23,18 @@ export interface CompanyMembership {
   user_id: string;
   company_id: string;
   role: "admin" | "moderator" | "viewer" | "data_entry_operator";
+  // Moderator-level permissions (shared between moderator & admin)
   can_add_revenue: boolean;
   can_add_expense: boolean;
   can_add_expense_source: boolean;
   can_transfer: boolean;
   can_view_reports: boolean;
   can_manage_students: boolean;
-  // Granular DEO permissions
-  can_add_student: boolean;
-  can_edit_student: boolean;
-  can_delete_student: boolean;
-  can_add_payment: boolean;
-  can_edit_payment: boolean;
-  can_delete_payment: boolean;
-  can_add_batch: boolean;
-  can_edit_batch: boolean;
-  can_delete_batch: boolean;
-  can_edit_revenue: boolean;
-  can_delete_revenue: boolean;
-  can_edit_expense: boolean;
-  can_delete_expense: boolean;
-  can_view_revenue: boolean;
-  can_view_expense: boolean;
+  // DEO category permissions
+  deo_students: boolean;
+  deo_payments: boolean;
+  deo_batches: boolean;
+  deo_finance: boolean;
   status: string;
   joined_at: string;
   approved_by: string | null;
@@ -81,7 +71,13 @@ interface CompanyContextType {
   canManageMembers: boolean;
   canViewMembers: boolean;
 
-  // Granular DEO permissions
+  // DEO category permissions
+  deoStudents: boolean;
+  deoPayments: boolean;
+  deoBatches: boolean;
+  deoFinance: boolean;
+
+  // Derived granular permissions (backward compat)
   canAddStudent: boolean;
   canEditStudent: boolean;
   canDeleteStudent: boolean;
@@ -185,9 +181,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const isCompanyViewer = membership?.role === "viewer";
   const isDataEntryOperator = membership?.role === "data_entry_operator";
 
-  // Existing permissions: admin and cipher get everything
-  const canAddRevenue = isCompanyAdmin || (membership?.can_add_revenue ?? false);
-  const canAddExpense = isCompanyAdmin || (membership?.can_add_expense ?? false);
+  // Moderator-level permissions: admin and cipher get everything
+  const canAddRevenue = isCompanyAdmin || (membership?.can_add_revenue ?? false) || (isDataEntryOperator && (membership?.deo_finance ?? false));
+  const canAddExpense = isCompanyAdmin || (membership?.can_add_expense ?? false) || (isDataEntryOperator && (membership?.deo_finance ?? false));
   const canAddExpenseSource = isCompanyAdmin || (membership?.can_add_expense_source ?? false);
   const canTransfer = isCompanyAdmin || (membership?.can_transfer ?? false);
   const canViewReports = isCompanyAdmin || (membership?.can_view_reports ?? false);
@@ -197,46 +193,46 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canManageMembers = isCompanyAdmin;
   const canViewMembers = isCompanyAdmin || isCompanyModerator;
 
-  // Granular DEO permissions (admin/cipher always have all)
-  const canAddStudent = isCompanyAdmin || (membership?.can_add_student ?? false);
-  const canEditStudent = isCompanyAdmin || (membership?.can_edit_student ?? false);
-  const canDeleteStudent = isCompanyAdmin || (membership?.can_delete_student ?? false);
-  const canAddPayment = isCompanyAdmin || (membership?.can_add_payment ?? false);
-  const canEditPayment = isCompanyAdmin || (membership?.can_edit_payment ?? false);
-  const canDeletePayment = isCompanyAdmin || (membership?.can_delete_payment ?? false);
-  const canAddBatch = isCompanyAdmin || (membership?.can_add_batch ?? false);
-  const canEditBatch = isCompanyAdmin || (membership?.can_edit_batch ?? false);
-  const canDeleteBatch = isCompanyAdmin || (membership?.can_delete_batch ?? false);
-  const canEditRevenue = isCompanyAdmin || (membership?.can_edit_revenue ?? false);
-  const canDeleteRevenue = isCompanyAdmin || (membership?.can_delete_revenue ?? false);
-  const canEditExpense = isCompanyAdmin || (membership?.can_edit_expense ?? false);
-  const canDeleteExpense = isCompanyAdmin || (membership?.can_delete_expense ?? false);
-  const canViewRevenue = isCompanyAdmin || (membership?.can_view_revenue ?? false);
-  const canViewExpense = isCompanyAdmin || (membership?.can_view_expense ?? false);
+  // DEO category permissions
+  const deoStudents = membership?.deo_students ?? false;
+  const deoPayments = membership?.deo_payments ?? false;
+  const deoBatches = membership?.deo_batches ?? false;
+  const deoFinance = membership?.deo_finance ?? false;
+
+  // Derived granular permissions from DEO categories (backward compat)
+  const canAddStudent = isCompanyAdmin || deoStudents;
+  const canEditStudent = isCompanyAdmin || deoStudents;
+  const canDeleteStudent = isCompanyAdmin || deoStudents;
+  const canAddPayment = isCompanyAdmin || deoPayments;
+  const canEditPayment = isCompanyAdmin || deoPayments;
+  const canDeletePayment = isCompanyAdmin || deoPayments;
+  const canAddBatch = isCompanyAdmin || deoBatches;
+  const canEditBatch = isCompanyAdmin || deoBatches;
+  const canDeleteBatch = isCompanyAdmin || deoBatches;
+  const canEditRevenue = isCompanyAdmin || deoFinance;
+  const canDeleteRevenue = isCompanyAdmin || deoFinance;
+  const canEditExpense = isCompanyAdmin || deoFinance;
+  const canDeleteExpense = isCompanyAdmin || deoFinance;
+  const canViewRevenue = isCompanyAdmin || deoFinance;
+  const canViewExpense = isCompanyAdmin || deoFinance;
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
   const switchCompany = useCallback(async (companyId: string) => {
     if (!user?.id) return;
-
-    // Client-side validation: ensure user is a member (defense in depth)
     const isMember = memberships.some(m => m.company_id === companyId && m.status === "active");
     if (!isMember && !isCipher) {
       console.error("Cannot switch to company: not a member");
       return;
     }
-
     const { error } = await supabase
       .from("user_profiles")
       .update({ active_company_id: companyId })
       .eq("user_id", user.id);
-
     if (error) {
       console.error("Failed to switch company:", error.message);
       return;
     }
-
-    // Invalidate everything to reload with new company scope
     queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
     queryClient.invalidateQueries();
   }, [user?.id, memberships, isCipher, queryClient]);
@@ -272,6 +268,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canDelete,
       canManageMembers,
       canViewMembers,
+      deoStudents,
+      deoPayments,
+      deoBatches,
+      deoFinance,
       canAddStudent,
       canEditStudent,
       canDeleteStudent,

@@ -1,78 +1,40 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { GraduationCap, CreditCard, Layers, TrendingUp, Receipt, Wallet, ArrowLeftRight } from "lucide-react";
+import { GraduationCap, CreditCard, Layers, TrendingUp } from "lucide-react";
 import type { CompanyMembership } from "@/contexts/CompanyContext";
 
-interface PermissionGroup {
+interface CategoryToggle {
+  key: keyof CompanyMembership;
   label: string;
+  description: string;
   icon: React.ElementType;
-  permissions: { key: keyof CompanyMembership; label: string }[];
 }
 
-const PERMISSION_GROUPS: PermissionGroup[] = [
+const CATEGORIES: CategoryToggle[] = [
   {
+    key: "deo_students",
     label: "Student Management",
+    description: "Add, edit, and delete students they created",
     icon: GraduationCap,
-    permissions: [
-      { key: "can_add_student", label: "Add Student" },
-      { key: "can_edit_student", label: "Edit Student" },
-      { key: "can_delete_student", label: "Delete Student" },
-    ],
   },
   {
-    label: "Payment Management",
+    key: "deo_payments",
+    label: "Payment Recording",
+    description: "Record, edit, and delete payments they entered",
     icon: CreditCard,
-    permissions: [
-      { key: "can_add_payment", label: "Add Payment" },
-      { key: "can_edit_payment", label: "Edit Payment" },
-      { key: "can_delete_payment", label: "Delete Payment" },
-    ],
   },
   {
+    key: "deo_batches",
     label: "Batch Management",
+    description: "Create, edit, and delete batches they created",
     icon: Layers,
-    permissions: [
-      { key: "can_add_batch", label: "Add Batch" },
-      { key: "can_edit_batch", label: "Edit Batch" },
-      { key: "can_delete_batch", label: "Delete Batch" },
-    ],
   },
   {
-    label: "Revenue Management",
+    key: "deo_finance",
+    label: "Revenue & Expenses",
+    description: "Add, edit, and delete revenue/expense entries they created",
     icon: TrendingUp,
-    permissions: [
-      { key: "can_add_revenue", label: "Add Revenue" },
-      { key: "can_edit_revenue", label: "Edit Revenue" },
-      { key: "can_delete_revenue", label: "Delete Revenue" },
-    ],
-  },
-  {
-    label: "Expense Management",
-    icon: Receipt,
-    permissions: [
-      { key: "can_add_expense", label: "Add Expense" },
-      { key: "can_edit_expense", label: "Edit Expense" },
-      { key: "can_delete_expense", label: "Delete Expense" },
-    ],
-  },
-  {
-    label: "View Data",
-    icon: Wallet,
-    permissions: [
-      { key: "can_view_revenue", label: "View Revenue History" },
-      { key: "can_view_expense", label: "View Expense History" },
-      { key: "can_view_reports", label: "View Reports" },
-    ],
-  },
-  {
-    label: "Other",
-    icon: ArrowLeftRight,
-    permissions: [
-      { key: "can_add_expense_source", label: "Add Expense Source" },
-      { key: "can_transfer", label: "Transfer Between Accounts" },
-      { key: "can_manage_students", label: "Manage Students" },
-    ],
   },
 ];
 
@@ -86,34 +48,36 @@ export function OperatorPermissionMatrix({ member, disabled = false, onPermissio
   return (
     <div className="space-y-4 mt-4">
       <p className="text-sm font-medium text-muted-foreground">Data Entry Operator Permissions</p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {PERMISSION_GROUPS.map((group) => (
-          <Card key={group.label} className="border">
-            <CardHeader className="pb-2 pt-3 px-3">
-              <div className="flex items-center gap-2">
-                <group.icon className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {group.label}
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="px-3 pb-3 space-y-2">
-              {group.permissions.map((perm) => (
-                <div key={perm.key} className="flex items-center justify-between gap-2">
-                  <Label htmlFor={`${member.id}-${perm.key}`} className="text-sm cursor-pointer">
-                    {perm.label}
-                  </Label>
-                  <Switch
-                    id={`${member.id}-${perm.key}`}
-                    checked={member[perm.key] as boolean}
-                    disabled={disabled}
-                    onCheckedChange={(v) => onPermissionChange(perm.key, v)}
-                  />
+      <p className="text-xs text-muted-foreground">
+        When enabled, the operator can add/edit/delete their own entries in each category. They cannot see other users' data.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {CATEGORIES.map((cat) => {
+          const isOn = member[cat.key] as boolean;
+          return (
+            <Card key={cat.key} className={`border transition-colors ${isOn ? "border-primary/40 bg-primary/5" : ""}`}>
+              <CardContent className="flex items-start gap-3 p-4">
+                <div className={`mt-0.5 rounded-lg p-2 ${isOn ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                  <cat.icon className="h-4 w-4" />
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor={`${member.id}-${cat.key}`} className="text-sm font-medium cursor-pointer">
+                      {cat.label}
+                    </Label>
+                    <Switch
+                      id={`${member.id}-${cat.key}`}
+                      checked={isOn}
+                      disabled={disabled}
+                      onCheckedChange={(v) => onPermissionChange(cat.key, v)}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{cat.description}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

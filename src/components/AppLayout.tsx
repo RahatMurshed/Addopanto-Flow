@@ -34,6 +34,7 @@ import {
   ShieldCheck,
   Layers,
   ClipboardList,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -186,6 +187,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="text-xs font-medium text-sidebar-foreground/60">Theme</span>
             <ThemeToggle />
           </div>
+          <Link
+            to="/profile"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname === "/profile"
+                ? "border-l-[3px] border-sidebar-primary bg-sidebar-accent text-sidebar-primary"
+                : "border-l-[3px] border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            )}
+          >
+            <UserCircle className="h-4 w-4" />
+            My Profile
+          </Link>
           <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
             Logout

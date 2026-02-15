@@ -11,6 +11,7 @@ import {
 } from "@/hooks/useExpenses";
 import { useKhataTransfers, useCreateKhataTransfer, useDeleteKhataTransfer } from "@/hooks/useKhataTransfers";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,9 +81,14 @@ export default function Expenses() {
   
   // Company-level permissions
   const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany, isDataEntryOperator, canEditExpense, canDeleteExpense, canViewExpense } = useCompany();
+  const { user } = useAuth();
   const showHistory = !isDataEntryOperator || canViewExpense;
   
-  const { data: expenses = [], isLoading } = useExpenses();
+  const { data: rawExpenses = [], isLoading } = useExpenses();
+  const expenses = useMemo(() => {
+    if (!isDataEntryOperator) return rawExpenses;
+    return rawExpenses.filter(e => e.user_id === user?.id);
+  }, [rawExpenses, isDataEntryOperator, user?.id]);
   const { data: accounts = [] } = useAccountBalances();
   const { data: transfers = [] } = useKhataTransfers();
   const createMutation = useCreateExpense();
@@ -284,8 +290,9 @@ export default function Expenses() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
             {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Your Entries ({expenses.length})</Badge>}
           </div>
-          <p className="text-muted-foreground">Record and track your spending by expense source</p>
+          <p className="text-muted-foreground">{isDataEntryOperator ? "View and manage your expense entries" : "Record and track your spending by expense source"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!isDataEntryOperator && (

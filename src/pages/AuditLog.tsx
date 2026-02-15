@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuditLogs } from "@/hooks/useAuditLogs";
 import { format } from "date-fns";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -178,6 +181,22 @@ export default function AuditLog() {
   const totalCount = result?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // Fetch user profiles for avatar display
+  const logUserIds = useMemo(() => [...new Set(logs.map(l => l.user_id))], [logs]);
+  const { data: logProfiles = [] } = useQuery({
+    queryKey: ["audit-user-profiles", logUserIds],
+    queryFn: async () => {
+      if (logUserIds.length === 0) return [];
+      const { data } = await supabase
+        .from("user_profiles")
+        .select("user_id, full_name, avatar_url")
+        .in("user_id", logUserIds);
+      return data ?? [];
+    },
+    enabled: logUserIds.length > 0,
+  });
+  const getProfile = (userId: string) => logProfiles.find(p => p.user_id === userId);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -262,8 +281,17 @@ export default function AuditLog() {
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                           {format(new Date(log.created_at), "MMM dd, yyyy HH:mm")}
                         </TableCell>
-                        <TableCell className="text-sm truncate max-w-[180px]">
-                          {log.user_email || log.user_id.slice(0, 8)}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <UserAvatar
+                              avatarUrl={getProfile(log.user_id)?.avatar_url}
+                              fullName={getProfile(log.user_id)?.full_name}
+                              size="sm"
+                            />
+                            <span className="text-sm truncate max-w-[140px]">
+                              {getProfile(log.user_id)?.full_name || log.user_email || log.user_id.slice(0, 8)}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>{actionBadge(log.action)}</TableCell>
                         <TableCell>{tableBadge(log.table_name)}</TableCell>
