@@ -38,9 +38,9 @@ const PAGE_SIZE = 25;
 function actionBadge(action: string) {
   switch (action) {
     case "INSERT":
-      return <Badge variant="secondary" className="text-emerald-600">Created</Badge>;
+      return <Badge className="bg-success/15 text-success border-success/20">Created</Badge>;
     case "UPDATE":
-      return <Badge variant="secondary" className="text-amber-600">Updated</Badge>;
+      return <Badge className="bg-warning/15 text-warning border-warning/20">Updated</Badge>;
     case "DELETE":
       return <Badge variant="destructive">Deleted</Badge>;
     default:
