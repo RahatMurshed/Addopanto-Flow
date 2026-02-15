@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -35,10 +36,16 @@ export default function Batches() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
   const [sortBy, setSortBy] = useState("newest");
   const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
-  const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
+  const { data: rawBatches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
+  const { user } = useAuth();
+  
+  const batches = useMemo(() => {
+    if (!isDataEntryOperator) return rawBatches;
+    return rawBatches.filter(b => b.user_id === user?.id);
+  }, [rawBatches, isDataEntryOperator, user?.id]);
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();

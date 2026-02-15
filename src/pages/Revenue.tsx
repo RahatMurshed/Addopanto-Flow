@@ -11,6 +11,7 @@ import {
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,9 +77,14 @@ export default function Revenue() {
   
   // Company-level permissions
   const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany, isDataEntryOperator, canEditRevenue, canDeleteRevenue, canViewRevenue } = useCompany();
+  const { user } = useAuth();
   const showHistory = !isDataEntryOperator || canViewRevenue;
   
-  const { data: revenues = [], isLoading } = useRevenues();
+  const { data: rawRevenues = [], isLoading } = useRevenues();
+  const revenues = useMemo(() => {
+    if (!isDataEntryOperator) return rawRevenues;
+    return rawRevenues.filter(r => r.user_id === user?.id);
+  }, [rawRevenues, isDataEntryOperator, user?.id]);
   const { data: sources = [] } = useRevenueSources();
   const { data: accounts = [] } = useExpenseAccounts();
   const createMutation = useCreateRevenue();
@@ -278,8 +284,9 @@ export default function Revenue() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
             {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Your Entries ({revenues.length})</Badge>}
           </div>
-          <p className="text-muted-foreground">Track income and automatically allocate to expense sources</p>
+          <p className="text-muted-foreground">{isDataEntryOperator ? "View and manage your revenue entries" : "Track income and automatically allocate to expense sources"}</p>
         </div>
         <div className="flex items-center gap-2">
           {!isDataEntryOperator && (

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { useStudents, useCreateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,7 @@ export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
 
   // Server-side filters passed to hook
-  const { data: students = [], isLoading } = useStudents({
+  const { data: rawStudents = [], isLoading } = useStudents({
     search: filters.search,
     status: filters.status,
     sortBy: filters.sortBy,
@@ -39,6 +40,12 @@ export default function Students() {
   });
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment } = useCompany();
+  const { user } = useAuth();
+  
+  const students = useMemo(() => {
+    if (!isDataEntryOperator) return rawStudents;
+    return rawStudents.filter(s => s.user_id === user?.id);
+  }, [rawStudents, isDataEntryOperator, user?.id]);
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();

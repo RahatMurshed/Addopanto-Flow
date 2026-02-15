@@ -307,28 +307,17 @@ export type Database = {
       company_memberships: {
         Row: {
           approved_by: string | null
-          can_add_batch: boolean
           can_add_expense: boolean
           can_add_expense_source: boolean
-          can_add_payment: boolean
           can_add_revenue: boolean
-          can_add_student: boolean
-          can_delete_batch: boolean
-          can_delete_expense: boolean
-          can_delete_payment: boolean
-          can_delete_revenue: boolean
-          can_delete_student: boolean
-          can_edit_batch: boolean
-          can_edit_expense: boolean
-          can_edit_payment: boolean
-          can_edit_revenue: boolean
-          can_edit_student: boolean
           can_manage_students: boolean
           can_transfer: boolean
-          can_view_expense: boolean
           can_view_reports: boolean
-          can_view_revenue: boolean
           company_id: string
+          deo_batches: boolean
+          deo_finance: boolean
+          deo_payments: boolean
+          deo_students: boolean
           id: string
           joined_at: string
           role: Database["public"]["Enums"]["company_role"]
@@ -337,28 +326,17 @@ export type Database = {
         }
         Insert: {
           approved_by?: string | null
-          can_add_batch?: boolean
           can_add_expense?: boolean
           can_add_expense_source?: boolean
-          can_add_payment?: boolean
           can_add_revenue?: boolean
-          can_add_student?: boolean
-          can_delete_batch?: boolean
-          can_delete_expense?: boolean
-          can_delete_payment?: boolean
-          can_delete_revenue?: boolean
-          can_delete_student?: boolean
-          can_edit_batch?: boolean
-          can_edit_expense?: boolean
-          can_edit_payment?: boolean
-          can_edit_revenue?: boolean
-          can_edit_student?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
-          can_view_expense?: boolean
           can_view_reports?: boolean
-          can_view_revenue?: boolean
           company_id: string
+          deo_batches?: boolean
+          deo_finance?: boolean
+          deo_payments?: boolean
+          deo_students?: boolean
           id?: string
           joined_at?: string
           role?: Database["public"]["Enums"]["company_role"]
@@ -367,28 +345,17 @@ export type Database = {
         }
         Update: {
           approved_by?: string | null
-          can_add_batch?: boolean
           can_add_expense?: boolean
           can_add_expense_source?: boolean
-          can_add_payment?: boolean
           can_add_revenue?: boolean
-          can_add_student?: boolean
-          can_delete_batch?: boolean
-          can_delete_expense?: boolean
-          can_delete_payment?: boolean
-          can_delete_revenue?: boolean
-          can_delete_student?: boolean
-          can_edit_batch?: boolean
-          can_edit_expense?: boolean
-          can_edit_payment?: boolean
-          can_edit_revenue?: boolean
-          can_edit_student?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
-          can_view_expense?: boolean
           can_view_reports?: boolean
-          can_view_revenue?: boolean
           company_id?: string
+          deo_batches?: boolean
+          deo_finance?: boolean
+          deo_payments?: boolean
+          deo_students?: boolean
           id?: string
           joined_at?: string
           role?: Database["public"]["Enums"]["company_role"]
@@ -1044,40 +1011,67 @@ export type Database = {
       user_profiles: {
         Row: {
           active_company_id: string | null
+          address: string | null
+          alt_phone: string | null
           avatar_url: string | null
+          bio: string | null
           business_name: string | null
+          city: string | null
+          country: string | null
           created_at: string
           currency: string
+          date_of_birth: string | null
+          department: string | null
           email: string | null
+          employee_id: string | null
           fiscal_year_start_month: number
           full_name: string | null
           id: string
+          phone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           active_company_id?: string | null
+          address?: string | null
+          alt_phone?: string | null
           avatar_url?: string | null
+          bio?: string | null
           business_name?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           currency?: string
+          date_of_birth?: string | null
+          department?: string | null
           email?: string | null
+          employee_id?: string | null
           fiscal_year_start_month?: number
           full_name?: string | null
           id?: string
+          phone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           active_company_id?: string | null
+          address?: string | null
+          alt_phone?: string | null
           avatar_url?: string | null
+          bio?: string | null
           business_name?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           currency?: string
+          date_of_birth?: string | null
+          department?: string | null
           email?: string | null
+          employee_id?: string | null
           fiscal_year_start_month?: number
           full_name?: string | null
           id?: string
+          phone?: string | null
           updated_at?: string
           user_id?: string
         }
