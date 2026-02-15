@@ -22,7 +22,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, TrendingUp, AlertTriangle, Users } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, TrendingUp, AlertTriangle, Users, SlidersHorizontal } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import BatchDialog from "@/components/BatchDialog";
@@ -33,6 +33,7 @@ import type { Batch } from "@/hooks/useBatches";
 export default function Batches() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
+  const [sortBy, setSortBy] = useState("newest");
   const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
   const { data: batches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useStudents();
@@ -81,7 +82,6 @@ export default function Batches() {
         const sum = computeStudentSummary(effectiveStudent, payments);
 
         const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
-        // Filter months based on current filter
         const includedMonths = allMonths.filter((m) => isMonthIncluded(m, filterValue));
 
         for (const m of includedMonths) {
@@ -92,7 +92,6 @@ export default function Batches() {
 
         if (sum.monthlyOverdueMonths.length > 0) overdueCount++;
 
-        // Overdue for included months
         const overdueInRange = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
         const partialInRange = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
         if (overdueInRange.length > 0 || partialInRange.length > 0) {
@@ -107,11 +106,25 @@ export default function Batches() {
     return map;
   }, [batches, allStudents, allPayments, filterValue]);
 
-  const pagination = usePagination(batches);
+  // Sort batches
+  const sortedBatches = useMemo(() => {
+    const sorted = [...batches];
+    switch (sortBy) {
+      case "name-asc": sorted.sort((a, b) => a.batch_name.localeCompare(b.batch_name)); break;
+      case "name-desc": sorted.sort((a, b) => b.batch_name.localeCompare(a.batch_name)); break;
+      case "newest": sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
+      case "oldest": sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
+      case "students-desc": sorted.sort((a, b) => (batchAnalytics.get(b.id)?.studentCount || 0) - (batchAnalytics.get(a.id)?.studentCount || 0)); break;
+      case "students-asc": sorted.sort((a, b) => (batchAnalytics.get(a.id)?.studentCount || 0) - (batchAnalytics.get(b.id)?.studentCount || 0)); break;
+    }
+    return sorted;
+  }, [batches, sortBy, batchAnalytics]);
+
+  const pagination = usePagination(sortedBatches);
 
   useEffect(() => {
     pagination.goToPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, sortBy]);
 
   const handleCreate = async (data: BatchInsert) => {
     try {
@@ -346,10 +359,24 @@ export default function Batches() {
                 <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[160px]">
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest First</SelectItem>
+                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="name-asc">Name A-Z</SelectItem>
+                <SelectItem value="name-desc">Name Z-A</SelectItem>
+                <SelectItem value="students-desc">Most Students</SelectItem>
+                <SelectItem value="students-asc">Fewest Students</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
-          {batches.length === 0 ? (
+          {sortedBatches.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="mb-4 rounded-full bg-muted p-4"><Layers className="h-8 w-8 text-muted-foreground" /></div>
               <h3 className="mb-2 text-lg font-semibold">No batches yet</h3>
