@@ -87,11 +87,11 @@ export default function CompanyMembers() {
     enabled: !!activeCompanyId && canViewMembers,
   });
 
-  // Filter out cipher members for non-cipher users
+  // Always filter out cipher members from the members list (cipher is invisible to everyone)
   const members = useMemo(() => {
-    if (isCipher || cipherUserIds.length === 0) return rawMembers;
+    if (cipherUserIds.length === 0) return rawMembers;
     return rawMembers.filter((m) => !cipherUserIds.includes(m.user_id));
-  }, [rawMembers, cipherUserIds, isCipher]);
+  }, [rawMembers, cipherUserIds]);
 
   // Fetch member profiles
   const { data: profiles = [] } = useQuery({
@@ -302,9 +302,7 @@ export default function CompanyMembers() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            {isCipher && cipherUserIds.includes(member.user_id) && (
-                              <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30">Cipher</Badge>
-                            )}
+                            {/* Cipher badge removed - cipher users are hidden from members list */}
                             {!canModifyMember ? (
                               <CompanyRoleBadge role={member.role} />
                             ) : (
