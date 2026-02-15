@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
   useExpenses,
@@ -65,6 +66,7 @@ import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
 
 export default function Expenses() {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
@@ -93,6 +95,13 @@ export default function Expenses() {
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseWithAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // DEO route guard: redirect if no expense permissions
+  useEffect(() => {
+    if (isDataEntryOperator && !canAddExpense) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, canAddExpense, navigate]);
 
   // Debounce search
   useEffect(() => {
@@ -278,11 +287,13 @@ export default function Expenses() {
           <p className="text-muted-foreground">Record and track your spending by expense source</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ExportButtons
-            onExportCSV={handleExportCSV}
-            onExportPDF={handleExportPDF}
-            disabled={!dateRange}
-          />
+          {!isDataEntryOperator && (
+            <ExportButtons
+              onExportCSV={handleExportCSV}
+              onExportPDF={handleExportPDF}
+              disabled={!dateRange}
+            />
+          )}
           {canTransfer && (
             <Button
               variant="outline"

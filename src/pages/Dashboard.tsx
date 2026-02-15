@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +30,8 @@ import ExportButtons from "@/components/ExportButtons";
 import RevenueDialog from "@/components/RevenueDialog";
 import ExpenseDialog from "@/components/ExpenseDialog";
 import TransferDialog from "@/components/TransferDialog";
+import StudentDialog from "@/components/StudentDialog";
+import BatchDialog from "@/components/BatchDialog";
 import { useCreateKhataTransfer } from "@/hooks/useKhataTransfers";
 import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
@@ -41,6 +44,8 @@ import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
 import { useCompany } from "@/contexts/CompanyContext";
 import { PermissionGuard } from "@/components/RoleGuard";
+import { useCreateStudent } from "@/hooks/useStudents";
+import { useCreateBatch } from "@/hooks/useBatches";
 
 const CHART_COLORS = [
   "hsl(var(--primary))", "hsl(142, 76%, 36%)", "hsl(38, 92%, 50%)", "hsl(262, 83%, 58%)",
@@ -61,10 +66,16 @@ export default function Dashboard() {
   const [filterValue, setFilterValue] = useState<FilterValue>({});
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
+  const navigate = useNavigate();
+
   // Quick action dialog states
   const [revenueDialogOpen, setRevenueDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  
+  // DEO dialog states
+  const [studentDialogOpen, setStudentDialogOpen] = useState(false);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
 
   // Hooks for quick actions
   const { data: revenueSources } = useRevenueSources();
@@ -73,6 +84,8 @@ export default function Dashboard() {
   const createExpense = useCreateExpense();
   const createRevenueSource = useCreateRevenueSource();
   const createTransfer = useCreateKhataTransfer();
+  const createStudent = useCreateStudent();
+  const createBatch = useCreateBatch();
 
   const handleFilterChange = useCallback((range: DateRange, type: FilterType, value: FilterValue) => {
     setDateRange(range);
@@ -434,11 +447,11 @@ export default function Dashboard() {
   // Data Entry Operator: show quick actions only
   if (isDataEntryOperator) {
     const quickActions = [
-      { label: "Add Student", icon: GraduationCap, allowed: canAddStudent, desc: "Create a new student profile" },
-      { label: "Record Payment", icon: CreditCard, allowed: canAddPayment, desc: "Record a student payment" },
-      { label: "Create Batch", icon: Layers, allowed: canAddBatch, desc: "Create a new batch" },
-      { label: "Add Revenue", icon: TrendingUp, allowed: canAddRevenue, desc: "Record a revenue entry" },
-      { label: "Add Expense", icon: Receipt, allowed: canAddExpense, desc: "Record an expense" },
+      { label: "Add Student", icon: GraduationCap, allowed: canAddStudent, desc: "Create a new student profile", onClick: () => setStudentDialogOpen(true) },
+      { label: "Record Payment", icon: CreditCard, allowed: canAddPayment, desc: "Record a student payment", onClick: () => navigate("/students") },
+      { label: "Create Batch", icon: Layers, allowed: canAddBatch, desc: "Create a new batch", onClick: () => setBatchDialogOpen(true) },
+      { label: "Add Revenue", icon: TrendingUp, allowed: canAddRevenue, desc: "Record a revenue entry", onClick: () => setRevenueDialogOpen(true) },
+      { label: "Add Expense", icon: Receipt, allowed: canAddExpense, desc: "Record an expense", onClick: () => setExpenseDialogOpen(true) },
     ].filter((a) => a.allowed);
 
     return (
@@ -462,7 +475,7 @@ export default function Dashboard() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {quickActions.map((action) => (
-              <Card key={action.label} className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30">
+              <Card key={action.label} className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30" onClick={action.onClick}>
                 <CardContent className="flex items-center gap-4 p-6">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <action.icon className="h-6 w-6 text-primary" />
@@ -476,6 +489,54 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+
+        {/* DEO Quick Action Dialogs */}
+        <StudentDialog
+          open={studentDialogOpen}
+          onOpenChange={setStudentDialogOpen}
+          onSave={async (data) => {
+            await createStudent.mutateAsync(data);
+          }}
+        />
+
+        <BatchDialog
+          open={batchDialogOpen}
+          onOpenChange={setBatchDialogOpen}
+          onSave={async (data) => {
+            await createBatch.mutateAsync(data);
+          }}
+        />
+
+        <RevenueDialog
+          open={revenueDialogOpen}
+          onOpenChange={setRevenueDialogOpen}
+          sources={revenueSources || []}
+          onSave={async (data) => {
+            await createRevenue.mutateAsync({
+              amount: data.amount,
+              date: data.date,
+              source_id: data.source_id,
+              description: data.description,
+            });
+          }}
+          onCreateSource={async (name) => {
+            await createRevenueSource.mutateAsync(name);
+          }}
+        />
+
+        <ExpenseDialog
+          open={expenseDialogOpen}
+          onOpenChange={setExpenseDialogOpen}
+          accounts={accountBalances || []}
+          onSave={async (data) => {
+            await createExpense.mutateAsync({
+              amount: data.amount,
+              date: data.date,
+              expense_account_id: data.expense_account_id,
+              description: data.description,
+            });
+          }}
+        />
       </div>
     );
   }
