@@ -13,6 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -21,13 +25,15 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info, Search, X, SlidersHorizontal } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import StudentDialog from "@/components/StudentDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import StudentMonthGrid from "@/components/StudentMonthGrid";
 import MonthlyBreakdownList from "@/components/MonthlyBreakdownList";
+import { usePagination } from "@/hooks/usePagination";
+import TablePagination from "@/components/TablePagination";
 
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +57,19 @@ export default function StudentDetail() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<typeof payments[0] | null>(null);
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
+
+  // Payment filter state
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [debouncedPaymentSearch, setDebouncedPaymentSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [paymentSort, setPaymentSort] = useState("date-desc");
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPaymentSearch(paymentSearch), 300);
+    return () => clearTimeout(timer);
+  }, [paymentSearch]);
 
   // Redirect DEO without edit permission
   useEffect(() => {
@@ -86,6 +105,54 @@ export default function StudentDetail() {
     };
     return computeStudentSummary(effectiveStudent, payments, feeHistory);
   }, [student, payments, feeHistory, effectiveAdmissionFee, effectiveMonthlyFee, batchCourseStartMonth, batchCourseEndMonth]);
+
+  // Filtered & sorted payments
+  const filteredPayments = useMemo(() => {
+    let result = [...payments];
+
+    if (debouncedPaymentSearch) {
+      const q = debouncedPaymentSearch.toLowerCase();
+      result = result.filter((p) =>
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.receipt_number && p.receipt_number.toLowerCase().includes(q))
+      );
+    }
+
+    if (typeFilter !== "all") {
+      result = result.filter((p) => p.payment_type === typeFilter);
+    }
+
+    if (methodFilter !== "all") {
+      result = result.filter((p) => p.payment_method === methodFilter);
+    }
+
+    result.sort((a, b) => {
+      switch (paymentSort) {
+        case "date-asc": return new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime();
+        case "date-desc": return new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
+        case "amount-desc": return Number(b.amount) - Number(a.amount);
+        case "amount-asc": return Number(a.amount) - Number(b.amount);
+        default: return new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
+      }
+    });
+
+    return result;
+  }, [payments, debouncedPaymentSearch, typeFilter, methodFilter, paymentSort]);
+
+  const paymentPagination = usePagination(filteredPayments);
+
+  useEffect(() => {
+    paymentPagination.resetPage();
+  }, [debouncedPaymentSearch, typeFilter, methodFilter, paymentSort]);
+
+  const paymentFilterCount = (debouncedPaymentSearch ? 1 : 0) + (typeFilter !== "all" ? 1 : 0) + (methodFilter !== "all" ? 1 : 0) + (paymentSort !== "date-desc" ? 1 : 0);
+
+  const resetPaymentFilters = () => {
+    setPaymentSearch("");
+    setTypeFilter("all");
+    setMethodFilter("all");
+    setPaymentSort("date-desc");
+  };
 
   const handleUpdate = async (data: StudentInsert) => {
     if (!student) return;
@@ -370,69 +437,149 @@ export default function StudentDetail() {
 
       {/* Payment History */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Payment History</CardTitle>
+        <CardHeader className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Payment History</CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {filteredPayments.length !== payments.length
+                ? `Showing ${filteredPayments.length} of ${payments.length}`
+                : `${payments.length} payments`}
+            </span>
+          </div>
+          {payments.length > 0 && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search description or receipt..."
+                  value={paymentSearch}
+                  onChange={(e) => setPaymentSearch(e.target.value)}
+                  className="pl-9 pr-9"
+                />
+                {paymentSearch && (
+                  <button onClick={() => setPaymentSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[130px]"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="admission">Admission</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={methodFilter} onValueChange={setMethodFilter}>
+                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Method" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="mobile_banking">Mobile Banking</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={paymentSort} onValueChange={setPaymentSort}>
+                <SelectTrigger className="w-[150px]">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date-desc">Date Newest</SelectItem>
+                  <SelectItem value="date-asc">Date Oldest</SelectItem>
+                  <SelectItem value="amount-desc">Amount High</SelectItem>
+                  <SelectItem value="amount-asc">Amount Low</SelectItem>
+                </SelectContent>
+              </Select>
+              {paymentFilterCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={resetPaymentFilters} className="gap-1">
+                  <X className="h-3 w-3" />
+                  Reset
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">{paymentFilterCount}</Badge>
+                </Button>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {payments.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">No payments recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="hidden sm:table-cell">Method</TableHead>
-                    <TableHead className="hidden md:table-cell">Months</TableHead>
-                    <TableHead className="hidden lg:table-cell">Receipt</TableHead>
-                    
-                    {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>{format(new Date(p.payment_date), "MMM d, yyyy")}</TableCell>
-                      <TableCell className="font-semibold text-primary">{formatCurrency(Number(p.amount), currency)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={`capitalize ${p.payment_type === "admission" ? "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" : "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30"}`}
-                        >
-                          {p.payment_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">{formatMethod(p.payment_method)}</TableCell>
-                      <TableCell className="hidden md:table-cell text-sm">
-                        {p.months_covered && p.months_covered.length > 0
-                          ? p.months_covered.map((m) => { const [y, mo] = m.split("-"); return format(new Date(Number(y), Number(mo) - 1), "MMM yy"); }).join(", ")
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-sm">{p.receipt_number || "—"}</TableCell>
-                      
-                      {(canEdit || canDelete) && (
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditPayment(p)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {canDelete && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletePaymentId(p.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          ) : filteredPayments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Search className="h-8 w-8 text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">No payments match your filters.</p>
+              <Button variant="link" onClick={resetPaymentFilters}>Clear filters</Button>
             </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="hidden sm:table-cell">Method</TableHead>
+                      <TableHead className="hidden md:table-cell">Months</TableHead>
+                      <TableHead className="hidden lg:table-cell">Receipt</TableHead>
+                      {(canEdit || canDelete) && <TableHead className="w-24">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentPagination.paginatedItems.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>{format(new Date(p.payment_date), "MMM d, yyyy")}</TableCell>
+                        <TableCell className="font-semibold text-primary">{formatCurrency(Number(p.amount), currency)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={`capitalize ${p.payment_type === "admission" ? "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" : "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30"}`}
+                          >
+                            {p.payment_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">{formatMethod(p.payment_method)}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">
+                          {p.months_covered && p.months_covered.length > 0
+                            ? p.months_covered.map((m) => { const [y, mo] = m.split("-"); return format(new Date(Number(y), Number(mo) - 1), "MMM yy"); }).join(", ")
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">{p.receipt_number || "—"}</TableCell>
+                        {(canEdit || canDelete) && (
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditPayment(p)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletePaymentId(p.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={paymentPagination.currentPage}
+                totalPages={paymentPagination.totalPages}
+                totalItems={paymentPagination.totalItems}
+                startIndex={paymentPagination.startIndex}
+                endIndex={paymentPagination.endIndex}
+                itemsPerPage={paymentPagination.itemsPerPage}
+                onPageChange={paymentPagination.goToPage}
+                onItemsPerPageChange={paymentPagination.setItemsPerPage}
+                canGoNext={paymentPagination.canGoNext}
+                canGoPrev={paymentPagination.canGoPrev}
+              />
+            </>
           )}
         </CardContent>
       </Card>

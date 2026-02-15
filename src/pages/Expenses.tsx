@@ -15,6 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +47,9 @@ import {
   AlertTriangle,
   TrendingDown,
   ArrowLeftRight,
+  Search,
+  X,
+  SlidersHorizontal,
 } from "lucide-react";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +68,12 @@ export default function Expenses() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
+  // Search, filter, sort state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("date-desc");
+
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
@@ -81,6 +94,12 @@ export default function Expenses() {
   const [editingExpense, setEditingExpense] = useState<ExpenseWithAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
     setDateRange(range);
     setPreviousRange(getPreviousPeriodRange(filterType, filterValue));
@@ -92,13 +111,50 @@ export default function Expenses() {
     return expenses.filter((e) => e.date >= dateRange.start && e.date <= dateRange.end);
   }, [expenses, dateRange]);
 
-  // Pagination for filtered expenses
-  const pagination = usePagination(filteredExpenses);
+  // Apply search, account filter, and sort
+  const searchedExpenses = useMemo(() => {
+    let result = filteredExpenses;
 
-  // Reset page when date range changes
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter((e) =>
+        (e.description && e.description.toLowerCase().includes(q)) ||
+        (e.expense_accounts?.name && e.expense_accounts.name.toLowerCase().includes(q))
+      );
+    }
+
+    if (accountFilter !== "all") {
+      result = result.filter((e) => e.expense_account_id === accountFilter);
+    }
+
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "date-asc": return a.date.localeCompare(b.date);
+        case "date-desc": return b.date.localeCompare(a.date);
+        case "amount-desc": return Number(b.amount) - Number(a.amount);
+        case "amount-asc": return Number(a.amount) - Number(b.amount);
+        default: return b.date.localeCompare(a.date);
+      }
+    });
+
+    return result;
+  }, [filteredExpenses, debouncedSearch, accountFilter, sortBy]);
+
+  // Pagination for searched expenses
+  const pagination = usePagination(searchedExpenses);
+
+  // Reset page when filters change
   useEffect(() => {
     pagination.resetPage();
-  }, [dateRange]);
+  }, [dateRange, debouncedSearch, accountFilter, sortBy]);
+
+  const activeFilterCount = (debouncedSearch ? 1 : 0) + (accountFilter !== "all" ? 1 : 0) + (sortBy !== "date-desc" ? 1 : 0);
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setAccountFilter("all");
+    setSortBy("date-desc");
+  };
 
   const filteredTotal = useMemo(() => {
     return filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -419,95 +475,157 @@ export default function Expenses() {
         </Card>
       ) : (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Expense History - {dateRange?.label}</CardTitle>
-            <span className="text-sm text-muted-foreground">{filteredExpenses.length} entries</span>
+          <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Expense History - {dateRange?.label}</CardTitle>
+              <span className="text-sm text-muted-foreground">
+                {searchedExpenses.length !== filteredExpenses.length
+                  ? `Showing ${searchedExpenses.length} of ${filteredExpenses.length}`
+                  : `${filteredExpenses.length} entries`}
+              </span>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-9"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {accounts.length > 0 && (
+                <Select value={accountFilter} onValueChange={setAccountFilter}>
+                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Source" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[160px]">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date-desc">Date Newest</SelectItem>
+                  <SelectItem value="date-asc">Date Oldest</SelectItem>
+                  <SelectItem value="amount-desc">Amount High</SelectItem>
+                  <SelectItem value="amount-asc">Amount Low</SelectItem>
+                </SelectContent>
+              </Select>
+              {activeFilterCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={resetFilters} className="gap-1">
+                  <X className="h-3 w-3" />
+                  Reset
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">{activeFilterCount}</Badge>
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Expense Source</TableHead>
-                    <TableHead className="hidden md:table-cell">Description</TableHead>
-                    {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && <TableHead className="w-24">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagination.paginatedItems.map((exp) => (
-                    <TableRow key={exp.id}>
-                      <TableCell className="font-medium">
-                        {format(new Date(exp.date), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell className="font-semibold text-destructive">
-                        {formatCurrency(Number(exp.amount), currency)}
-                      </TableCell>
-                      <TableCell>
-                        {exp.expense_accounts ? (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="h-3 w-3 rounded-full"
-                              style={{ backgroundColor: exp.expense_accounts.color }}
-                            />
-                            <span>{exp.expense_accounts.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden max-w-xs truncate md:table-cell">
-                        {exp.description || <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && (
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {(canEdit || canEditExpense) && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => {
-                                  setEditingExpense(exp);
-                                  setDialogOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+            {searchedExpenses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Search className="h-8 w-8 text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No results match your filters.</p>
+                <Button variant="link" onClick={resetFilters}>Clear filters</Button>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Expense Source</TableHead>
+                        <TableHead className="hidden md:table-cell">Description</TableHead>
+                        {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && <TableHead className="w-24">Actions</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagination.paginatedItems.map((exp) => (
+                        <TableRow key={exp.id}>
+                          <TableCell className="font-medium">
+                            {format(new Date(exp.date), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell className="font-semibold text-destructive">
+                            {formatCurrency(Number(exp.amount), currency)}
+                          </TableCell>
+                          <TableCell>
+                            {exp.expense_accounts ? (
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="h-3 w-3 rounded-full"
+                                  style={{ backgroundColor: exp.expense_accounts.color }}
+                                />
+                                <span>{exp.expense_accounts.name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
                             )}
-                            {(canDelete || canDeleteExpense) && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => setDeleteId(exp.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div data-pdf-hide>
-              <TablePagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.totalItems}
-                startIndex={pagination.startIndex}
-                endIndex={pagination.endIndex}
-                itemsPerPage={pagination.itemsPerPage}
-                onPageChange={pagination.goToPage}
-                onItemsPerPageChange={pagination.setItemsPerPage}
-                canGoNext={pagination.canGoNext}
-                canGoPrev={pagination.canGoPrev}
-              />
-            </div>
+                          </TableCell>
+                          <TableCell className="hidden max-w-xs truncate md:table-cell">
+                            {exp.description || <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && (
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {(canEdit || canEditExpense) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                      setEditingExpense(exp);
+                                      setDialogOpen(true);
+                                    }}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {(canDelete || canDeleteExpense) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => setDeleteId(exp.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div data-pdf-hide>
+                  <TablePagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    totalItems={pagination.totalItems}
+                    startIndex={pagination.startIndex}
+                    endIndex={pagination.endIndex}
+                    itemsPerPage={pagination.itemsPerPage}
+                    onPageChange={pagination.goToPage}
+                    onItemsPerPageChange={pagination.setItemsPerPage}
+                    canGoNext={pagination.canGoNext}
+                    canGoPrev={pagination.canGoPrev}
+                  />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

@@ -13,10 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -56,6 +59,10 @@ export default function BatchDetail() {
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
+  const [studentStatusFilter, setStudentStatusFilter] = useState("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+  const [studentSort, setStudentSort] = useState("name-asc");
+
   // Redirect DEO without edit permission
   useEffect(() => {
     if (!companyLoading && isDataEntryOperator && !canEditBatch) {
@@ -80,40 +87,13 @@ export default function BatchDetail() {
 
   const batchTotalMonths = batch?.course_duration_months || 0;
 
-  const batchStudents = useMemo(() => {
-    if (!id) return [];
-    let students = allStudents.filter((s: any) => s.batch_id === id);
-    if (studentSearch.trim()) {
-      const q = studentSearch.toLowerCase();
-      students = students.filter((s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.student_id_number && s.student_id_number.toLowerCase().includes(q))
-      );
-    }
-    return students;
-  }, [allStudents, id, studentSearch]);
-
-  const studentSummaries = useMemo(() => {
-    const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
-    for (const s of batchStudents) {
-      const effectiveStudent = {
-        ...s,
-        admission_fee_total: Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0,
-        monthly_fee_amount: Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0,
-        course_start_month: s.course_start_month || batchCourseStartMonth || null,
-        course_end_month: s.course_end_month || batchCourseEndMonth || null,
-      };
-      const payments = allPayments.filter((p) => p.student_id === s.id);
-      map.set(s.id, computeStudentSummary(effectiveStudent, payments));
-    }
-    return map;
-  }, [batchStudents, allPayments, batch, batchCourseStartMonth, batchCourseEndMonth]);
-
+  // All students in this batch (unfiltered, for stats)
   const allBatchStudents = useMemo(() => {
     if (!id) return [];
     return allStudents.filter((s: any) => s.batch_id === id);
   }, [allStudents, id]);
 
+  // Summaries for all batch students
   const allSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
     for (const s of allBatchStudents) {
@@ -129,6 +109,79 @@ export default function BatchDetail() {
     }
     return map;
   }, [allBatchStudents, allPayments, batch, batchCourseStartMonth, batchCourseEndMonth]);
+
+  // Compute worst status for each student (needed for payment status filter)
+  const studentWorstStatuses = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of allBatchStudents) {
+      const sum = allSummaries.get(s.id);
+      const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
+      let worstStatus = "na";
+      if (sum && effMonthly > 0) {
+        const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
+        const includedMonths = allMonths.filter((m) => isMonthIncluded(m, filterValue));
+        if (includedMonths.length > 0) {
+          const overdueMonths = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
+          const partialMonths = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
+          const pendingMonths = sum.monthlyPendingMonths.filter((m) => isMonthIncluded(m, filterValue));
+          const allPaid = includedMonths.every((m) => sum.monthlyPaidMonths.includes(m));
+          if (overdueMonths.length > 0) worstStatus = "overdue";
+          else if (partialMonths.length > 0) worstStatus = "partial";
+          else if (pendingMonths.length > 0) worstStatus = "pending";
+          else if (allPaid) worstStatus = "paid";
+        }
+      }
+      map.set(s.id, worstStatus);
+    }
+    return map;
+  }, [allBatchStudents, allSummaries, batch, filterValue]);
+
+  // Filtered batch students
+  const batchStudents = useMemo(() => {
+    if (!id) return [];
+    let students = allBatchStudents;
+
+    // Name search
+    if (studentSearch.trim()) {
+      const q = studentSearch.toLowerCase();
+      students = students.filter((s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.student_id_number && s.student_id_number.toLowerCase().includes(q))
+      );
+    }
+
+    // Status filter
+    if (studentStatusFilter !== "all") {
+      students = students.filter((s) => s.status === studentStatusFilter);
+    }
+
+    // Payment status filter
+    if (paymentStatusFilter !== "all") {
+      students = students.filter((s) => studentWorstStatuses.get(s.id) === paymentStatusFilter);
+    }
+
+    // Sort
+    students = [...students].sort((a, b) => {
+      switch (studentSort) {
+        case "name-asc": return a.name.localeCompare(b.name);
+        case "name-desc": return b.name.localeCompare(a.name);
+        case "newest": return new Date(b.enrollment_date).getTime() - new Date(a.enrollment_date).getTime();
+        case "oldest": return new Date(a.enrollment_date).getTime() - new Date(b.enrollment_date).getTime();
+        default: return a.name.localeCompare(b.name);
+      }
+    });
+
+    return students;
+  }, [allBatchStudents, id, studentSearch, studentStatusFilter, paymentStatusFilter, studentWorstStatuses, studentSort]);
+
+  const studentSummaries = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
+    for (const s of batchStudents) {
+      const existing = allSummaries.get(s.id);
+      if (existing) map.set(s.id, existing);
+    }
+    return map;
+  }, [batchStudents, allSummaries]);
 
   const batchStats = useMemo(() => {
     let totalCollected = 0;
@@ -211,7 +264,16 @@ export default function BatchDetail() {
 
   useEffect(() => {
     pagination.goToPage(1);
-  }, [studentSearch]);
+  }, [studentSearch, studentStatusFilter, paymentStatusFilter, studentSort]);
+
+  const activeFilterCount = (studentStatusFilter !== "all" ? 1 : 0) + (paymentStatusFilter !== "all" ? 1 : 0) + (studentSort !== "name-asc" ? 1 : 0);
+
+  const resetStudentFilters = () => {
+    setStudentSearch("");
+    setStudentStatusFilter("all");
+    setPaymentStatusFilter("all");
+    setStudentSort("name-asc");
+  };
 
   const handleUpdate = async (data: BatchInsert) => {
     if (!batch) return;
@@ -349,7 +411,6 @@ export default function BatchDetail() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Students */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -362,7 +423,6 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Collected */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -383,7 +443,6 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Pending */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -399,7 +458,6 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Overdue */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -427,31 +485,75 @@ export default function BatchDetail() {
         <CardHeader className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Enrolled Students</CardTitle>
-            <span className="text-sm text-muted-foreground">{batchStudents.length} students</span>
+            <span className="text-sm text-muted-foreground">
+              {batchStudents.length !== allBatchStudents.length
+                ? `Showing ${batchStudents.length} of ${allBatchStudents.length}`
+                : `${allBatchStudents.length} students`}
+            </span>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search students in this batch..."
-              value={studentSearch}
-              onChange={(e) => setStudentSearch(e.target.value)}
-              className="pl-9 pr-9"
-            />
-            {studentSearch && (
-              <button onClick={() => setStudentSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search students in this batch..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="pl-9 pr-9"
+              />
+              {studentSearch && (
+                <button onClick={() => setStudentSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Select value={studentStatusFilter} onValueChange={setStudentStatusFilter}>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="graduated">Graduated</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Payment" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="partial">Partial</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={studentSort} onValueChange={setStudentSort}>
+              <SelectTrigger className="w-[150px]">
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">Name A-Z</SelectItem>
+                <SelectItem value="name-desc">Name Z-A</SelectItem>
+                <SelectItem value="newest">Newest Enrolled</SelectItem>
+                <SelectItem value="oldest">Oldest Enrolled</SelectItem>
+              </SelectContent>
+            </Select>
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={resetStudentFilters} className="gap-1">
+                <X className="h-3 w-3" />
+                Reset
+                <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">{activeFilterCount}</Badge>
+              </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
           {batchStudents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              {studentSearch ? (
+              {studentSearch || studentStatusFilter !== "all" || paymentStatusFilter !== "all" ? (
                 <>
                   <Search className="h-8 w-8 text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground">No students match your search.</p>
-                  <Button variant="link" onClick={() => setStudentSearch("")}>Clear search</Button>
+                  <p className="text-muted-foreground">No students match your filters.</p>
+                  <Button variant="link" onClick={resetStudentFilters}>Clear filters</Button>
                 </>
               ) : (
                 <>
@@ -481,10 +583,9 @@ export default function BatchDetail() {
                       const sum = studentSummaries.get(s.id);
                       const effMonthly = Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
 
-                      // Compute filtered paid/pending based on filter mode
                       let filteredPaid = 0;
                       let filteredPending = 0;
-                      let worstStatus: "paid" | "pending" | "overdue" | "partial" | "na" = "na";
+                      const worstStatus = studentWorstStatuses.get(s.id) || "na";
                       let pendingMonthCount = 0;
                       let overdueMonthCount = 0;
                       let partialMonthCount = 0;
@@ -504,12 +605,6 @@ export default function BatchDetail() {
                           const overdueMonths = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
                           const partialMonths = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
                           const pendingMonths = sum.monthlyPendingMonths.filter((m) => isMonthIncluded(m, filterValue));
-                          const allPaid = includedMonths.every((m) => sum.monthlyPaidMonths.includes(m));
-
-                          if (overdueMonths.length > 0) worstStatus = "overdue";
-                          else if (partialMonths.length > 0) worstStatus = "partial";
-                          else if (pendingMonths.length > 0) worstStatus = "pending";
-                          else if (allPaid) worstStatus = "paid";
 
                           pendingMonthCount = pendingMonths.length + overdueMonths.length + partialMonths.length;
                           overdueMonthCount = overdueMonths.length;
