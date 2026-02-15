@@ -970,6 +970,7 @@ export type Database = {
           payment_method: string
           payment_type: string
           receipt_number: string | null
+          source_id: string | null
           student_id: string
           user_id: string
         }
@@ -984,6 +985,7 @@ export type Database = {
           payment_method?: string
           payment_type: string
           receipt_number?: string | null
+          source_id?: string | null
           student_id: string
           user_id: string
         }
@@ -998,6 +1000,7 @@ export type Database = {
           payment_method?: string
           payment_type?: string
           receipt_number?: string | null
+          source_id?: string | null
           student_id?: string
           user_id?: string
         }
@@ -1014,6 +1017,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payments_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "revenue_sources"
             referencedColumns: ["id"]
           },
           {

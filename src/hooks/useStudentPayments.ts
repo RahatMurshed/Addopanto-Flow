@@ -27,6 +27,7 @@ export interface StudentPaymentInsert {
   months_covered?: string[] | null;
   receipt_number?: string | null;
   description?: string | null;
+  source_id?: string | null;
 }
 
 export function useStudentPayments(studentId?: string) {
@@ -63,13 +64,13 @@ export function useCreateStudentPayment() {
     mutationFn: async (payment: StudentPaymentInsert & { studentName?: string }) => {
       if (!user) throw new Error("Not authenticated");
       if (!activeCompanyId) throw new Error("No active company");
-      const { studentName, ...paymentData } = payment;
+      const { studentName, source_id, ...paymentData } = payment;
 
       // Insert student payment — the database trigger automatically creates
       // the linked revenue entry and allocations
       const { data, error } = await supabase
         .from("student_payments")
-        .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId })
+        .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId, ...(source_id ? { source_id } : {}) } as any)
         .select()
         .single();
       if (error) throw error;

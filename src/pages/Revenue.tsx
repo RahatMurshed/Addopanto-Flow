@@ -190,7 +190,7 @@ export default function Revenue() {
 
   // Revenue by source for selected period
   const filteredBySource = useMemo(() => {
-    return sources
+    const bySource = sources
       .map((source) => {
         const sourceRevenue = filteredRevenues
           .filter((r) => r.source_id === source.id)
@@ -203,6 +203,19 @@ export default function Revenue() {
         };
       })
       .filter((item) => item.amount > 0);
+
+    // Add "Uncategorized" for revenues with no source
+    const uncategorized = filteredRevenues.filter((r) => !r.source_id);
+    if (uncategorized.length > 0) {
+      bySource.push({
+        id: "uncategorized",
+        name: "Uncategorized",
+        amount: uncategorized.reduce((sum, r) => sum + Number(r.amount), 0),
+        count: uncategorized.length,
+      });
+    }
+
+    return bySource;
   }, [sources, filteredRevenues]);
 
   // Export handlers
@@ -514,7 +527,7 @@ export default function Revenue() {
                             {rev.revenue_sources?.name ? (
                               <Badge variant="secondary">{rev.revenue_sources.name}</Badge>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <Badge variant="outline" className="text-muted-foreground">Uncategorized</Badge>
                             )}
                           </TableCell>
                           <TableCell className="hidden max-w-xs truncate md:table-cell">
