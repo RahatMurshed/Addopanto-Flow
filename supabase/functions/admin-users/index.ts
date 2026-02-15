@@ -120,7 +120,10 @@ Deno.serve(async (req) => {
       const perPage = Math.min(parseInt(paramsParsed.data.perPage || "50", 10), 100);
 
       const { data: authUsers, error: authError } = await adminClient.auth.admin.listUsers({ page, perPage });
-      if (authError) return jsonResp(500, { error: "Failed to fetch users" });
+      if (authError) {
+        console.error("listUsers error:", JSON.stringify(authError));
+        return jsonResp(500, { error: "Failed to fetch users", details: authError.message });
+      }
 
       const { data: roles } = await adminClient.from("user_roles").select("user_id, role, created_at");
       const userIds = authUsers.users.map((u) => u.id);
