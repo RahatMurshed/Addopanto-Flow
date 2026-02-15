@@ -11,6 +11,7 @@ import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, 
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getSourceBadgeStyle } from "@/utils/sourceColors";
 import {
   AreaChart,
   Area,
@@ -863,11 +864,7 @@ export default function Dashboard() {
                           <Badge 
                             variant="secondary" 
                             className="text-xs"
-                            style={{ 
-                              backgroundColor: tx.color ? `${tx.color}20` : undefined,
-                              color: tx.color || undefined,
-                              borderColor: tx.color ? `${tx.color}40` : undefined
-                            }}
+                            style={getSourceBadgeStyle(tx.category)}
                           >
                             {tx.category}
                           </Badge>
@@ -877,7 +874,11 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell>
                         {tx.type === "revenue" && tx.category ? (
-                          <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-500/30">
+                          <Badge 
+                            variant="secondary" 
+                            className="text-xs"
+                            style={getSourceBadgeStyle(tx.category)}
+                          >
                             {tx.category}
                           </Badge>
                         ) : (

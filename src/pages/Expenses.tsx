@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { getSourceBadgeStyle } from "@/utils/sourceColors";
 import {
   useExpenses,
   useCreateExpense,
@@ -583,15 +584,11 @@ export default function Expenses() {
                           </TableCell>
                           <TableCell>
                             {exp.expense_accounts ? (
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="h-3 w-3 rounded-full"
-                                  style={{ backgroundColor: exp.expense_accounts.color }}
-                                />
-                                <span>{exp.expense_accounts.name}</span>
-                              </div>
+                              <Badge variant="secondary" style={getSourceBadgeStyle(exp.expense_accounts.name)}>
+                                {exp.expense_accounts.name}
+                              </Badge>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <Badge variant="outline" style={getSourceBadgeStyle(null)}>Uncategorized</Badge>
                             )}
                           </TableCell>
                           <TableCell className="hidden max-w-xs truncate md:table-cell">
