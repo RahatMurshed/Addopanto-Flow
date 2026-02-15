@@ -73,6 +73,33 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   });
 
   const paymentType = form.watch("payment_type");
+  const watchedAmount = form.watch("amount");
+
+  // Real-time max allowed calculation for overpayment prevention
+  const maxAllowed = useMemo(() => {
+    if (paymentType === "admission") {
+      const total = Number(student.admission_fee_total) || batchDefaultAdmissionFee || 0;
+      if (total <= 0) return null;
+      const paid = isEditing ? summary.admissionPaid - Number(editingPayment?.amount || 0) : summary.admissionPaid;
+      return Math.max(0, total - paid);
+    }
+    if (paymentType === "monthly" && selectedMonths.length > 0) {
+      let max = 0;
+      for (const m of selectedMonths) {
+        const fee = Number(student.monthly_fee_amount) || batchDefaultMonthlyFee || 0;
+        let paid = summary.monthlyPaymentsByMonth?.get(m) || 0;
+        if (isEditing && editingPayment?.months_covered?.includes(m)) {
+          paid -= Number(editingPayment.amount) / (editingPayment.months_covered?.length || 1);
+        }
+        max += Math.max(0, fee - Math.max(0, paid));
+      }
+      return max;
+    }
+    return null; // no cap for advance/unselected monthly
+  }, [paymentType, selectedMonths, student.admission_fee_total, student.monthly_fee_amount, batchDefaultAdmissionFee, batchDefaultMonthlyFee, summary, isEditing, editingPayment]);
+
+  const isOverpaying = maxAllowed !== null && watchedAmount > maxAllowed;
+  const isFullyPaid = summary.totalPending <= 0 && !isEditing;
 
   // Available unpaid months for monthly payments (including partial)
   // When editing, also include the months from the editing payment
@@ -235,6 +262,12 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           <DialogDescription>Payment for {student.name}</DialogDescription>
         </DialogHeader>
 
+        {isFullyPaid && (
+          <div className="rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400 font-medium">
+            ✅ All fees collected — No pending payments
+          </div>
+        )}
+
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Payment Type</Label>
@@ -294,6 +327,11 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
             <Label htmlFor="amount">Amount</Label>
             <Input id="amount" type="number" step="0.01" min="0.01" disabled={saving} {...form.register("amount", { valueAsNumber: true })} />
             {form.formState.errors.amount && <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>}
+            {isOverpaying && maxAllowed !== null && (
+              <p className="text-sm text-destructive font-medium">
+                Amount exceeds pending: Maximum allowed is {formatCurrency(maxAllowed)}
+              </p>
+            )}
             {feeError && <p className="text-sm text-destructive font-medium">{feeError}</p>}
           </div>
 
@@ -375,7 +413,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving || isOverpaying || isFullyPaid}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {saving ? (isEditing ? "Saving..." : "Recording...") : (isEditing ? "Save Changes" : "Record Payment")}
             </Button>

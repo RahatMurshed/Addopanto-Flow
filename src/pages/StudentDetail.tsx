@@ -249,7 +249,13 @@ export default function StudentDetail() {
         </div>
         <div className="flex gap-2">
           {canEdit && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
-          {canAddRevenue && <Button onClick={() => setPaymentDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Payment</Button>}
+          {canAddRevenue && (
+            summary && summary.totalPending <= 0 ? (
+              <Button disabled className="opacity-60"><Plus className="mr-2 h-4 w-4" />All Fees Collected</Button>
+            ) : (
+              <Button onClick={() => setPaymentDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Payment</Button>
+            )
+          )}
         </div>
       </div>
 
