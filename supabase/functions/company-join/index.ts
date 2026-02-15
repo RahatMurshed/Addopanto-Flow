@@ -12,7 +12,7 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  // Handle new format (salt:hash)
+  // Handle salt:hash format
   if (stored.includes(':')) {
     const [saltHex, storedHash] = stored.split(':');
     const data = new TextEncoder().encode(saltHex + password);
@@ -20,8 +20,19 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
     const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     return hashHex === storedHash;
   }
-  // Fallback: plain text comparison for legacy passwords
-  return stored === password;
+  // Legacy plaintext: verify and return needs-rehash signal
+  // Use constant-time-ish comparison to mitigate timing attacks
+  if (stored.length !== password.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < stored.length; i++) {
+    mismatch |= stored.charCodeAt(i) ^ password.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+// Returns true if the stored password is legacy plaintext (not hashed)
+function isLegacyPassword(stored: string): boolean {
+  return !stored.includes(':');
 }
 
 const corsHeaders = {
@@ -241,8 +252,14 @@ Deno.serve(async (req) => {
       
       let passwordValid = false;
       try { passwordValid = await verifyPassword(password, company.join_password); }
-      catch { passwordValid = company.join_password === password; }
+      catch { passwordValid = false; }
       if (!passwordValid) return json(400, { error: "Incorrect password" });
+
+      // Auto-rehash legacy plaintext passwords to secure format
+      if (isLegacyPassword(company.join_password)) {
+        const rehashed = await hashPassword(password);
+        await adminClient.from("companies").update({ join_password: rehashed }).eq("id", companyId);
+      }
 
       const { data: existing } = await adminClient
         .from("company_memberships")
