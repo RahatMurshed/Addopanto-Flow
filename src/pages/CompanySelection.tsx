@@ -174,14 +174,9 @@ export default function CompanySelection() {
           <Button variant="outline" onClick={() => navigate("/companies/join")}>
             <UserPlus className="mr-2 h-4 w-4" /> Join Business
           </Button>
-          <Button variant="outline" onClick={() => navigate("/companies/create")}>
-            <Plus className="mr-2 h-4 w-4" /> Request New Business
+          <Button variant={isCipher ? "default" : "outline"} onClick={() => navigate("/companies/create")}>
+            <Plus className="mr-2 h-4 w-4" /> {isCipher ? "Create Business" : "Request New Business"}
           </Button>
-          {isCipher && (
-            <Button onClick={() => navigate("/companies/create")}>
-              <Plus className="mr-2 h-4 w-4" /> Create Business
-            </Button>
-          )}
           <Button variant="ghost" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" /> Sign Out
           </Button>
