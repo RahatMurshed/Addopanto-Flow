@@ -1,6 +1,28 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
+
+// Use Web Crypto API instead of bcrypt (Worker not available in Edge Runtime)
+async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const data = new TextEncoder().encode(saltHex + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return saltHex + ':' + hashHex;
+}
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  // Handle new format (salt:hash)
+  if (stored.includes(':')) {
+    const [saltHex, storedHash] = stored.split(':');
+    const data = new TextEncoder().encode(saltHex + password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex === storedHash;
+  }
+  // Fallback: plain text comparison for legacy passwords
+  return stored === password;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -160,7 +182,7 @@ Deno.serve(async (req) => {
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
 
       const { name, slug, description, joinPassword, currency } = parsed.data;
-      const hashedPassword = joinPassword ? await bcrypt.hash(joinPassword) : null;
+      const hashedPassword = joinPassword ? await hashPassword(joinPassword) : null;
 
       const { data: company, error: createError } = await adminClient
         .from("companies")
@@ -218,7 +240,7 @@ Deno.serve(async (req) => {
       if (!company || !company.join_password) return json(400, { error: "Company does not accept password joins" });
       
       let passwordValid = false;
-      try { passwordValid = await bcrypt.compare(password, company.join_password); }
+      try { passwordValid = await verifyPassword(password, company.join_password); }
       catch { passwordValid = company.join_password === password; }
       if (!passwordValid) return json(400, { error: "Incorrect password" });
 
@@ -376,7 +398,7 @@ Deno.serve(async (req) => {
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
       const { companyId, newPassword } = parsed.data;
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
-      const hashedPassword = await bcrypt.hash(newPassword);
+      const hashedPassword = await hashPassword(newPassword);
       const { error: updateError } = await adminClient.from("companies").update({ join_password: hashedPassword }).eq("id", companyId);
       if (updateError) return json(500, { error: "Failed to update password" });
       return json(200, { success: true });
