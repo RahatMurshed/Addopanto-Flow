@@ -1,112 +1,75 @@
 
-## Add Advanced Filter and Search to All List Sections
+
+## Fix Data Entry Operator (DEO) Role Issues
 
 ### Summary
-Add consistent search, filter, and sort controls to 5 pages: Revenue history, Expense history, StudentDetail payment history, Batches table, and BatchDetail students table. All filtering is client-side on already-loaded data.
+After thorough code review of the DEO role implementation, I found several issues that need fixing for proper permission enforcement.
 
 ---
 
-### 1. Revenue Page (`src/pages/Revenue.tsx`)
+### Issues Found
 
-**Current state**: Has date filter and pagination but no search/source filter/sort on the history table.
+#### 1. Dashboard Quick Action Cards Are Non-Functional (Critical)
+The DEO dashboard shows quick action cards (Add Student, Record Payment, etc.) with `cursor-pointer` styling, but **none of them have `onClick` handlers**. Clicking them does nothing.
 
-**Add to the Revenue History Card header (between CardTitle and table):**
-- Debounced text search input (filters by description, 300ms delay)
-- Source dropdown filter (populated from `sources` array): All Sources, then each source name
-- Sort dropdown: Date Newest, Date Oldest, Amount High-Low, Amount Low-High
-- Reset button with active filter count badge
-- Results count text when filtered
+**Fix**: Wire each card to open the corresponding dialog or navigate to the appropriate page with the add dialog pre-opened.
 
-**Logic changes:**
-- Add state: `searchQuery`, `sourceFilter`, `sortBy`
-- Add `searchedRevenues` memo that applies search + source filter + sort on top of `filteredRevenues`, then pass to `usePagination` instead of `filteredRevenues`
-- Reset pagination on filter change
+**File**: `src/pages/Dashboard.tsx` (lines 464-476)
 
 ---
 
-### 2. Expenses Page (`src/pages/Expenses.tsx`)
+#### 2. No Route Protection for Revenue, Expenses, Khatas Pages (Critical)
+DEOs without the relevant permissions can navigate directly to `/revenue`, `/expenses`, `/khatas` via URL and see full financial data. Reports and Settings have redirect guards, but these pages do not.
 
-**Current state**: Has date filter and pagination but no search/account filter/sort on the history table.
+**Fix**: Add `useEffect` redirect guards on Revenue, Expenses, and Khatas pages that redirect DEOs without the corresponding permissions back to the dashboard.
 
-**Add to the Expense History Card header:**
-- Debounced text search input (filters by description)
-- Account/source dropdown filter (populated from `accounts` array): All Sources, then each account name
-- Sort dropdown: Date Newest, Date Oldest, Amount High-Low, Amount Low-High
-- Reset button with active filter count badge
-- Results count when filtered
-
-**Logic changes:**
-- Same pattern as Revenue: `searchQuery`, `accountFilter`, `sortBy` state
-- `searchedExpenses` memo applied before pagination
+**Files**: 
+- `src/pages/Revenue.tsx` -- redirect if DEO and no revenue permissions
+- `src/pages/Expenses.tsx` -- redirect if DEO and no expense permissions  
+- `src/pages/Khatas.tsx` -- redirect if DEO and no expense source permissions
 
 ---
 
-### 3. StudentDetail Payment History (`src/pages/StudentDetail.tsx`)
+#### 3. Revenue/Expenses Pages Show Full Financial Summaries to DEOs (Medium)
+Even when a DEO has "Add Revenue" permission, they can see financial totals, trend data, period comparisons, and export buttons. According to the role hierarchy, DEOs should not see financial analytics.
 
-**Current state**: No search, no filters, no pagination on payment history table. Shows all payments.
+**Fix**: Hide summary cards, period overview, charts, and export buttons for DEOs. Show only the add button and history table on Revenue/Expenses pages.
 
-**Add filter bar above the payment history table:**
-- Debounced text search (description, receipt number)
-- Type filter dropdown: All / Admission / Monthly
-- Method filter dropdown: All / Cash / Bank Transfer / Mobile Banking / Other
-- Sort dropdown: Date Newest, Date Oldest, Amount High-Low, Amount Low-High
-- Reset button
-- Results count when filtered
-
-**Logic changes:**
-- Add state: `paymentSearch`, `typeFilter`, `methodFilter`, `paymentSort`
-- Add `filteredPayments` memo that filters and sorts `payments`
-- Add `usePagination(filteredPayments)` for paginated display
-- Add `TablePagination` component below the table
+**Files**: `src/pages/Revenue.tsx`, `src/pages/Expenses.tsx`
 
 ---
 
-### 4. Batches Page (`src/pages/Batches.tsx`)
+#### 4. Batches/Students Pages Missing DEO Guards for Detail Navigation (Low)
+DEOs without edit/view permissions can click the "Eye" view button on Students/Batches pages. The detail pages redirect them, but the button shouldn't appear at all if they can't access it.
 
-**Current state**: Already has search input and status filter. Missing sort.
-
-**Add sort dropdown next to the existing status filter:**
-- Sort options: Name A-Z, Name Z-A, Newest First, Oldest First, Most Students, Fewest Students
-
-**Logic changes:**
-- Add `sortBy` state
-- Apply sort to `batches` before passing to `usePagination`
-- Since `useBatches` returns server-filtered data, sort is applied client-side via a `sortedBatches` memo
-
----
-
-### 5. BatchDetail Students Table (`src/pages/BatchDetail.tsx`)
-
-**Current state**: Has student name search. Missing status and payment status filters.
-
-**Add filters next to existing search:**
-- Status dropdown: All / Active / Inactive / Graduated
-- Payment status dropdown: All / Paid / Pending / Overdue / Partial (based on computed `worstStatus`)
-- Sort dropdown: Name A-Z, Name Z-A, Newest Enrolled, Most Pending
-
-**Logic changes:**
-- Add state: `studentStatusFilter`, `paymentStatusFilter`, `studentSort`
-- Apply filters in `batchStudents` memo (status filter) and add a new `filteredBatchStudents` memo that also filters by payment status (requires computed summaries)
-- Pass filtered list to pagination
+**Status**: Already partially handled -- the Eye button on Students is hidden for DEOs (line 326-329), and BatchDetail redirects DEOs without `canEditBatch`. This is working correctly.
 
 ---
 
 ### Technical Details
 
-**Shared patterns across all pages:**
-- Search uses debounced local state (300ms `setTimeout` in `useEffect`)
-- Search input with `Search` icon left, `X` clear button right (matching `StudentFilters` pattern)
-- Select dropdowns use Radix `Select` component with sentinel `"all"` value
-- Sort dropdown uses `SlidersHorizontal` icon prefix
-- Reset button appears only when filters are non-default, shows active count via `Badge`
-- Results count text: "Showing X of Y [items]" when any filter is active
-- `pagination.resetPage()` called in `useEffect` when any filter state changes
+**Dashboard Quick Actions (src/pages/Dashboard.tsx)**:
+- Import missing dialog components (StudentDialog, StudentPaymentDialog, BatchDialog)
+- Add dialog state variables for each action type
+- Wire `onClick` on each quick action card to open the corresponding dialog
+- Render dialog components conditionally
 
-**Files to modify:**
-- `src/pages/Revenue.tsx` -- add search, source filter, sort to history table
-- `src/pages/Expenses.tsx` -- add search, account filter, sort to history table
-- `src/pages/StudentDetail.tsx` -- add search, type/method filter, sort, pagination to payment history
-- `src/pages/Batches.tsx` -- add sort dropdown to existing filter bar
-- `src/pages/BatchDetail.tsx` -- add status filter, payment status filter, sort to student table
+**Route Protection Pattern** (same as Reports.tsx):
+```
+useEffect(() => {
+  if (!companyLoading && isDataEntryOperator && !hasRelevantPermission) {
+    navigate("/dashboard", { replace: true });
+  }
+}, [companyLoading, isDataEntryOperator, ...]);
+```
 
-**No new components or database changes needed.** All filtering is client-side on existing data.
+**Financial Data Hiding Pattern**:
+- Wrap summary cards, charts, and export buttons in `{!isDataEntryOperator && (...)}` blocks
+- Keep the add button and history table visible for DEOs with appropriate permissions
+
+### Files to Modify
+- `src/pages/Dashboard.tsx` -- wire quick action card onClick handlers and dialogs
+- `src/pages/Revenue.tsx` -- add DEO redirect guard and hide financial summaries
+- `src/pages/Expenses.tsx` -- add DEO redirect guard and hide financial summaries
+- `src/pages/Khatas.tsx` -- add DEO redirect guard
+
