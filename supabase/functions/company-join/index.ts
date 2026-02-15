@@ -15,8 +15,6 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-// --- Zod schemas per action ---
-
 const uuidField = z.string().uuid("Invalid ID format");
 
 const permissionsSchema = z.object({
@@ -88,6 +86,17 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(1, "Password required").max(100, "Password too long"),
 });
 
+const approveCreationSchema = z.object({
+  action: z.literal("approve-company-creation"),
+  requestId: uuidField,
+});
+
+const rejectCreationSchema = z.object({
+  action: z.literal("reject-company-creation"),
+  requestId: uuidField,
+  reason: z.string().max(500, "Reason too long").optional().nullable(),
+});
+
 const actionSchema = z.object({
   action: z.string().min(1, "Action required").max(50, "Action too long"),
 }).passthrough();
@@ -118,7 +127,6 @@ Deno.serve(async (req) => {
 
     const rawBody = await req.json().catch(() => null);
     
-    // Validate base action field first
     const baseCheck = actionSchema.safeParse(rawBody);
     if (!baseCheck.success) {
       return json(400, { error: baseCheck.error.issues[0]?.message || "Invalid input" });
@@ -126,7 +134,6 @@ Deno.serve(async (req) => {
 
     const { action } = baseCheck.data;
 
-    // Check if user is cipher
     const { data: cipherCheck } = await adminClient
       .from("user_roles")
       .select("role")
@@ -135,7 +142,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const isCipher = !!cipherCheck;
 
-    // Helper: check if user is admin of a company
     const isCompanyAdmin = async (companyId: string) => {
       const { data } = await adminClient
         .from("company_memberships")
@@ -154,14 +160,12 @@ Deno.serve(async (req) => {
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
 
       const { name, slug, description, joinPassword, currency } = parsed.data;
-
       const hashedPassword = joinPassword ? await bcrypt.hash(joinPassword) : null;
 
       const { data: company, error: createError } = await adminClient
         .from("companies")
         .insert({
-          name,
-          slug,
+          name, slug,
           description: description || null,
           join_password: hashedPassword,
           currency: currency || "BDT",
@@ -175,20 +179,11 @@ Deno.serve(async (req) => {
         return json(500, { error: createError.message });
       }
 
-      await adminClient
-        .from("company_memberships")
-        .insert({
-          user_id: user.id,
-          company_id: company.id,
-          role: "admin",
-          can_add_revenue: true,
-          can_add_expense: true,
-          can_add_expense_source: true,
-          can_transfer: true,
-          can_view_reports: true,
-          can_manage_students: true,
-          status: "active",
-        });
+      await adminClient.from("company_memberships").insert({
+        user_id: user.id, company_id: company.id, role: "admin",
+        can_add_revenue: true, can_add_expense: true, can_add_expense_source: true,
+        can_transfer: true, can_view_reports: true, can_manage_students: true, status: "active",
+      });
 
       return json(200, { success: true, company });
     }
@@ -199,7 +194,6 @@ Deno.serve(async (req) => {
 
       const { companyId, password, message } = parsed.data;
 
-      // Check if banned from this company
       const { data: banCheck } = await adminClient
         .from("company_join_requests")
         .select("banned_until")
@@ -215,7 +209,6 @@ Deno.serve(async (req) => {
         return json(400, { error: `You are temporarily blocked from joining this company. Try again in ${remaining} hour(s).` });
       }
 
-      // Verify password
       const { data: company } = await adminClient
         .from("companies")
         .select("join_password")
@@ -225,24 +218,18 @@ Deno.serve(async (req) => {
       if (!company || !company.join_password) return json(400, { error: "Company does not accept password joins" });
       
       let passwordValid = false;
-      try {
-        passwordValid = await bcrypt.compare(password, company.join_password);
-      } catch {
-        passwordValid = company.join_password === password;
-      }
+      try { passwordValid = await bcrypt.compare(password, company.join_password); }
+      catch { passwordValid = company.join_password === password; }
       if (!passwordValid) return json(400, { error: "Incorrect password" });
 
-      // Check if already a member
       const { data: existing } = await adminClient
         .from("company_memberships")
         .select("id")
         .eq("user_id", user.id)
         .eq("company_id", companyId)
         .maybeSingle();
-
       if (existing) return json(400, { error: "Already a member" });
 
-      // Check for existing pending request
       const { data: existingReq } = await adminClient
         .from("company_join_requests")
         .select("id")
@@ -250,16 +237,11 @@ Deno.serve(async (req) => {
         .eq("company_id", companyId)
         .eq("status", "pending")
         .maybeSingle();
-
       if (existingReq) return json(400, { error: "Join request already pending" });
 
-      await adminClient
-        .from("company_join_requests")
-        .insert({
-          user_id: user.id,
-          company_id: companyId,
-          message: message || null,
-        });
+      await adminClient.from("company_join_requests").insert({
+        user_id: user.id, company_id: companyId, message: message || null,
+      });
 
       return json(200, { success: true });
     }
@@ -269,255 +251,196 @@ Deno.serve(async (req) => {
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
 
       const { inviteCode } = parsed.data;
-
       const { data: company } = await adminClient
-        .from("companies")
-        .select("id")
-        .eq("invite_code", inviteCode.toUpperCase())
-        .maybeSingle();
-
+        .from("companies").select("id").eq("invite_code", inviteCode.toUpperCase()).maybeSingle();
       if (!company) return json(400, { error: "Invalid invite code" });
 
       const { data: existing } = await adminClient
-        .from("company_memberships")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("company_id", company.id)
-        .maybeSingle();
-
+        .from("company_memberships").select("id").eq("user_id", user.id).eq("company_id", company.id).maybeSingle();
       if (existing) return json(400, { error: "Already a member" });
 
-      await adminClient
-        .from("company_memberships")
-        .insert({
-          user_id: user.id,
-          company_id: company.id,
-          role: "viewer",
-          status: "active",
-        });
-
-      await adminClient
-        .from("user_profiles")
-        .update({ active_company_id: company.id })
-        .eq("user_id", user.id);
-
+      await adminClient.from("company_memberships").insert({
+        user_id: user.id, company_id: company.id, role: "viewer", status: "active",
+      });
+      await adminClient.from("user_profiles").update({ active_company_id: company.id }).eq("user_id", user.id);
       return json(200, { success: true });
     }
 
     if (action === "generate-invite") {
       const parsed = generateInviteSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-
       const { companyId } = parsed.data;
-
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
       const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
       let code = "";
       for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
-
-      await adminClient
-        .from("companies")
-        .update({ invite_code: code })
-        .eq("id", companyId);
-
+      await adminClient.from("companies").update({ invite_code: code }).eq("id", companyId);
       return json(200, { success: true, inviteCode: code });
     }
 
     if (action === "approve-join-request") {
       const parsed = approveJoinSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-
       const { requestId, companyId, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
       const { data: joinReq, error: reqError } = await adminClient
-        .from("company_join_requests")
-        .select("*")
-        .eq("id", requestId)
-        .eq("company_id", companyId)
-        .eq("status", "pending")
-        .single();
-
+        .from("company_join_requests").select("*")
+        .eq("id", requestId).eq("company_id", companyId).eq("status", "pending").single();
       if (reqError || !joinReq) return json(400, { error: "Join request not found or already processed" });
 
       const p = perms || {};
+      await adminClient.from("company_join_requests").update({
+        status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user.id,
+      }).eq("id", requestId);
 
-      const { error: updateError } = await adminClient
-        .from("company_join_requests")
-        .update({
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-        })
-        .eq("id", requestId);
-
-      if (updateError) return json(500, { error: "Failed to update request" });
-
-      const { error: memberError } = await adminClient
-        .from("company_memberships")
-        .insert({
-          user_id: joinReq.user_id,
-          company_id: companyId,
-          role: "moderator",
-          status: "active",
-          approved_by: user.id,
-          can_add_revenue: p.can_add_revenue ?? false,
-          can_add_expense: p.can_add_expense ?? false,
-          can_add_expense_source: p.can_add_expense_source ?? false,
-          can_transfer: p.can_transfer ?? false,
-          can_view_reports: p.can_view_reports ?? false,
-          can_manage_students: p.can_manage_students ?? false,
-        });
-
+      const { error: memberError } = await adminClient.from("company_memberships").insert({
+        user_id: joinReq.user_id, company_id: companyId, role: "moderator", status: "active",
+        approved_by: user.id,
+        can_add_revenue: p.can_add_revenue ?? false, can_add_expense: p.can_add_expense ?? false,
+        can_add_expense_source: p.can_add_expense_source ?? false, can_transfer: p.can_transfer ?? false,
+        can_view_reports: p.can_view_reports ?? false, can_manage_students: p.can_manage_students ?? false,
+      });
       if (memberError) return json(500, { error: "Failed to create membership: " + memberError.message });
-
       return json(200, { success: true });
     }
 
     if (action === "reject-join-request") {
       const parsed = rejectJoinSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-
       const { requestId, companyId, reason } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
       const { data: joinReq, error: reqError } = await adminClient
-        .from("company_join_requests")
-        .select("*")
-        .eq("id", requestId)
-        .eq("company_id", companyId)
-        .eq("status", "pending")
-        .single();
-
+        .from("company_join_requests").select("*")
+        .eq("id", requestId).eq("company_id", companyId).eq("status", "pending").single();
       if (reqError || !joinReq) return json(400, { error: "Join request not found or already processed" });
 
       const bannedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const { error: updateError } = await adminClient
-        .from("company_join_requests")
-        .update({
-          status: "rejected",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-          rejection_reason: reason || null,
-          banned_until: bannedUntil,
-        })
-        .eq("id", requestId);
+      await adminClient.from("company_join_requests").update({
+        status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: user.id,
+        rejection_reason: reason || null, banned_until: bannedUntil,
+      }).eq("id", requestId);
 
-      if (updateError) return json(500, { error: "Failed to update request" });
-
-      try {
-        await adminClient.auth.admin.signOut(joinReq.user_id, "global");
-      } catch (_e) { /* non-fatal */ }
-
+      try { await adminClient.auth.admin.signOut(joinReq.user_id, "global"); } catch (_e) {}
       return json(200, { success: true });
     }
 
     if (action === "accept-rejected-join-request") {
       const parsed = acceptRejectedSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-
       const { requestId, companyId, targetUserId, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
-
       const p = perms || {};
 
-      const { error: updateError } = await adminClient
-        .from("company_join_requests")
-        .update({
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-          banned_until: null,
-        })
-        .eq("id", requestId)
-        .eq("company_id", companyId)
-        .eq("status", "rejected");
+      await adminClient.from("company_join_requests").update({
+        status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user.id, banned_until: null,
+      }).eq("id", requestId).eq("company_id", companyId).eq("status", "rejected");
 
-      if (updateError) return json(500, { error: "Failed to update request" });
-
-      const { error: memberError } = await adminClient
-        .from("company_memberships")
-        .insert({
-          user_id: targetUserId,
-          company_id: companyId,
-          role: "moderator",
-          status: "active",
-          approved_by: user.id,
-          can_add_revenue: p.can_add_revenue ?? false,
-          can_add_expense: p.can_add_expense ?? false,
-          can_add_expense_source: p.can_add_expense_source ?? false,
-          can_transfer: p.can_transfer ?? false,
-          can_view_reports: p.can_view_reports ?? false,
-          can_manage_students: p.can_manage_students ?? false,
-        });
-
+      const { error: memberError } = await adminClient.from("company_memberships").insert({
+        user_id: targetUserId, company_id: companyId, role: "moderator", status: "active",
+        approved_by: user.id,
+        can_add_revenue: p.can_add_revenue ?? false, can_add_expense: p.can_add_expense ?? false,
+        can_add_expense_source: p.can_add_expense_source ?? false, can_transfer: p.can_transfer ?? false,
+        can_view_reports: p.can_view_reports ?? false, can_manage_students: p.can_manage_students ?? false,
+      });
       if (memberError) return json(500, { error: "Failed to create membership: " + memberError.message });
-
       return json(200, { success: true });
     }
 
     if (action === "cipher-join") {
       const parsed = cipherJoinSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-
       const { companyId } = parsed.data;
       if (!isCipher) return json(403, { error: "Only super admins can use this action" });
 
       const { data: existing } = await adminClient
-        .from("company_memberships")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("company_id", companyId)
-        .maybeSingle();
-
+        .from("company_memberships").select("id").eq("user_id", user.id).eq("company_id", companyId).maybeSingle();
       if (existing) return json(400, { error: "Already a member of this company" });
 
-      const { error: memberError } = await adminClient
-        .from("company_memberships")
-        .insert({
-          user_id: user.id,
-          company_id: companyId,
-          role: "admin",
-          status: "active",
-          can_add_revenue: true,
-          can_add_expense: true,
-          can_add_expense_source: true,
-          can_transfer: true,
-          can_view_reports: true,
-          can_manage_students: true,
-        });
-
-      if (memberError) return json(500, { error: "Failed to join: " + memberError.message });
-
-      await adminClient
-        .from("user_profiles")
-        .update({ active_company_id: companyId })
-        .eq("user_id", user.id);
-
+      await adminClient.from("company_memberships").insert({
+        user_id: user.id, company_id: companyId, role: "admin", status: "active",
+        can_add_revenue: true, can_add_expense: true, can_add_expense_source: true,
+        can_transfer: true, can_view_reports: true, can_manage_students: true,
+      });
+      await adminClient.from("user_profiles").update({ active_company_id: companyId }).eq("user_id", user.id);
       return json(200, { success: true });
     }
 
     if (action === "change-join-password") {
       const parsed = changePasswordSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-
       const { companyId, newPassword } = parsed.data;
-
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
-
       const hashedPassword = await bcrypt.hash(newPassword);
-
-      const { error: updateError } = await adminClient
-        .from("companies")
-        .update({ join_password: hashedPassword })
-        .eq("id", companyId);
-
+      const { error: updateError } = await adminClient.from("companies").update({ join_password: hashedPassword }).eq("id", companyId);
       if (updateError) return json(500, { error: "Failed to update password" });
+      return json(200, { success: true });
+    }
 
+    // --- Company Creation Request actions ---
+
+    if (action === "approve-company-creation") {
+      const parsed = approveCreationSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+      if (!isCipher) return json(403, { error: "Only Cipher can approve company creation requests" });
+
+      const { requestId } = parsed.data;
+      const { data: request, error: reqErr } = await adminClient
+        .from("company_creation_requests").select("*")
+        .eq("id", requestId).eq("status", "pending").single();
+      if (reqErr || !request) return json(400, { error: "Request not found or already processed" });
+
+      // Check slug uniqueness
+      const { data: existingSlug } = await adminClient
+        .from("companies").select("id").eq("slug", request.company_slug).maybeSingle();
+      if (existingSlug) return json(400, { error: "Company slug already exists. Ask the user to modify their request." });
+
+      // Create the company
+      const { data: company, error: createErr } = await adminClient
+        .from("companies")
+        .insert({
+          name: request.company_name,
+          slug: request.company_slug,
+          description: request.description || null,
+          logo_url: request.logo_url || null,
+          created_by: request.user_id,
+        })
+        .select()
+        .single();
+      if (createErr) return json(500, { error: "Failed to create company: " + createErr.message });
+
+      // Assign requesting user as admin
+      await adminClient.from("company_memberships").insert({
+        user_id: request.user_id, company_id: company.id, role: "admin", status: "active",
+        can_add_revenue: true, can_add_expense: true, can_add_expense_source: true,
+        can_transfer: true, can_view_reports: true, can_manage_students: true,
+      });
+
+      // Update request status
+      await adminClient.from("company_creation_requests").update({
+        status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString(),
+      }).eq("id", requestId);
+
+      return json(200, { success: true, company });
+    }
+
+    if (action === "reject-company-creation") {
+      const parsed = rejectCreationSchema.safeParse(rawBody);
+      if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+      if (!isCipher) return json(403, { error: "Only Cipher can reject company creation requests" });
+
+      const { requestId, reason } = parsed.data;
+      const { error: updateErr } = await adminClient
+        .from("company_creation_requests").update({
+          status: "rejected", rejection_reason: reason || null,
+          reviewed_by: user.id, reviewed_at: new Date().toISOString(),
+        }).eq("id", requestId).eq("status", "pending");
+      if (updateErr) return json(500, { error: "Failed to reject request" });
       return json(200, { success: true });
     }
 

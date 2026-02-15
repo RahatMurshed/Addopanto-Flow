@@ -10,128 +10,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, ShieldAlert, XCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import gaLogo from "@/assets/GA-LOGO.png";
-import { formatDistanceToNow } from "date-fns";
-
-interface BanInfo {
-  banned: boolean;
-  banned_until: string | null;
-  ban_type: "rejected" | "deleted" | null;
-  rejected: boolean;
-  rejection_reason: string | null;
-}
-
-interface PendingInfo {
-  isPending: true;
-}
-
-async function checkBan(email: string): Promise<BanInfo | null> {
-  const { data, error } = await supabase.functions.invoke("check-ban", {
-    body: { email },
-  });
-  if (error) {
-    console.error("Ban check failed:", error);
-    return null;
-  }
-  return data as BanInfo;
-}
-
-function BanMessage({ banInfo }: { banInfo: BanInfo }) {
-  const remaining = banInfo.banned_until
-    ? formatDistanceToNow(new Date(banInfo.banned_until), { addSuffix: false })
-    : "some time";
-
-  const reason =
-    banInfo.ban_type === "rejected"
-      ? "Your registration request was rejected."
-      : "Your account was permanently deleted.";
-
-  return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
-      <ShieldAlert className="h-8 w-8 text-destructive" />
-      <div className="space-y-2">
-        <h3 className="font-semibold text-destructive">Account Banned</h3>
-        <p className="text-sm text-muted-foreground">{reason}</p>
-        <p className="text-sm text-muted-foreground">
-          You can try again in <strong>{remaining}</strong>.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RejectionMessage({ reason }: { reason: string | null }) {
-  return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
-      <XCircle className="h-8 w-8 text-destructive" />
-      <div className="space-y-2">
-        <h3 className="font-semibold text-destructive">Access Denied</h3>
-        <p className="text-sm text-muted-foreground">
-          {reason || "Your registration request has been rejected by an administrator."}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function PendingMessage() {
-  return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-6 text-center">
-      <ShieldAlert className="h-8 w-8 text-yellow-600" />
-      <div className="space-y-2">
-        <h3 className="font-semibold text-yellow-700 dark:text-yellow-500">Account Pending Approval</h3>
-        <p className="text-sm text-muted-foreground">
-          Your account is pending approval from an administrator. Please wait for approval before logging in.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RegistrationSuccess() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Link to="/"><img src={gaLogo} alt="Grammar Addopanto" className="mx-auto mb-2 h-16 w-auto object-contain" /></Link>
-          <CardTitle className="text-2xl sr-only">Addopanto Flow</CardTitle>
-          <CardDescription className="mt-2">Registration Submitted</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex flex-col items-center gap-4 rounded-lg border border-border bg-muted/50 p-6 text-center">
-            <div className="space-y-2">
-              <h3 className="font-semibold">Awaiting Admin Approval</h3>
-              <p className="text-sm text-muted-foreground">
-                Your account registration has been submitted and is pending approval from an administrator.
-                You can try logging in once your account is approved.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 export default function Auth() {
-  const { signIn, signUp, signOut, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
-  const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(() => {
-    const stored = sessionStorage.getItem("registration_success");
-    if (stored) {
-      sessionStorage.removeItem("registration_success");
-      return true;
-    }
-    return false;
-  });
-  const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
-  const [pendingInfo, setPendingInfo] = useState<PendingInfo | null>(null);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -143,17 +32,8 @@ export default function Auth() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const [rejectionInfo, setRejectionInfo] = useState<{ reason: string | null } | null>(null);
-
-  const clearAlerts = () => {
-    setBanInfo(null);
-    setRejectionInfo(null);
-    setPendingInfo(null);
-  };
-
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
-    clearAlerts();
     const { error } = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
     });
@@ -165,7 +45,6 @@ export default function Auth() {
 
   const handleAppleLogin = async () => {
     setAppleLoading(true);
-    clearAlerts();
     const { error } = await lovable.auth.signInWithOAuth("apple", {
       redirect_uri: window.location.origin,
     });
@@ -177,22 +56,7 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAlerts();
     setLoading(true);
-
-    // Check ban before attempting login
-    const ban = await checkBan(loginEmail);
-    if (ban?.banned) {
-      setBanInfo(ban);
-      setLoading(false);
-      return;
-    }
-    // Check if rejected (ban expired but still rejected)
-    if (ban?.rejected) {
-      setRejectionInfo({ reason: ban.rejection_reason });
-      setLoading(false);
-      return;
-    }
 
     const { error } = await signIn(loginEmail, loginPassword);
     if (error) {
@@ -201,51 +65,12 @@ export default function Auth() {
       return;
     }
 
-    // Post-login: check if user already has a role (approved users skip registration check)
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser) {
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", currentUser.id)
-        .maybeSingle();
-
-      if (roleData) {
-        // User has a role — they're approved, proceed directly
-        setLoading(false);
-        navigate("/companies");
-        return;
-      }
-    }
-
-    // No role found — check registration status
-    const { data: regData } = await supabase
-      .from("registration_requests")
-      .select("status, rejection_reason")
-      .maybeSingle();
-
-    if (regData?.status === "rejected") {
-      await signOut();
-      setRejectionInfo({ reason: regData.rejection_reason });
-      setLoading(false);
-      return;
-    }
-
-    if (regData?.status === "pending") {
-      await signOut();
-      setPendingInfo({ isPending: true });
-      setLoading(false);
-      return;
-    }
-
-    // Approved or unknown — proceed
     setLoading(false);
     navigate("/companies");
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAlerts();
 
     if (signupPassword !== signupConfirm) {
       toast({ title: "Passwords don't match", variant: "destructive" });
@@ -258,27 +83,9 @@ export default function Auth() {
 
     setLoading(true);
 
-    // Check ban before attempting signup
-    const ban = await checkBan(signupEmail);
-    if (ban?.banned) {
-      setBanInfo(ban);
-      setLoading(false);
-      return;
-    }
-    if (ban?.rejected) {
-      setRejectionInfo({ reason: ban.rejection_reason });
-      setLoading(false);
-      return;
-    }
-
     const { error, data: signUpData } = await signUp(signupEmail, signupPassword, signupName.trim() || undefined);
     if (error) {
-      const msg = error.message || "";
-      if (msg.toLowerCase().includes("temporarily blocked") || msg.toLowerCase().includes("banned")) {
-        toast({ title: "Registration blocked", description: "This email has been temporarily blocked. Please try again later.", variant: "destructive" });
-      } else {
-        toast({ title: "Signup failed", description: msg, variant: "destructive" });
-      }
+      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
       setLoading(false);
     } else {
       // Upload avatar if selected
@@ -295,12 +102,10 @@ export default function Auth() {
           console.error("Avatar upload failed:", avatarErr);
         }
       }
-      // Persist flag before signOut — component may unmount due to PublicRoute redirect
-      sessionStorage.setItem("registration_success", "true");
-      // Immediately sign out — user must wait for admin approval
-      await signOut();
+      // User is now logged in immediately — navigate to companies
+      toast({ title: "Account created!", description: "Welcome to Addopanto Flow." });
       setLoading(false);
-      setShowRegistrationSuccess(true);
+      navigate("/companies");
     }
   };
 
@@ -316,10 +121,6 @@ export default function Auth() {
       setShowReset(false);
     }
   };
-
-  if (showRegistrationSuccess) {
-    return <RegistrationSuccess />;
-  }
 
   if (showReset) {
     return (
@@ -360,11 +161,7 @@ export default function Auth() {
           <p className="text-sm text-muted-foreground">Smart revenue allocation for your institution</p>
         </div>
 
-        {banInfo?.banned && <BanMessage banInfo={banInfo} />}
-        {rejectionInfo && <RejectionMessage reason={rejectionInfo.reason} />}
-        {pendingInfo && <PendingMessage />}
-
-        <Tabs defaultValue="login" className="w-full" onValueChange={() => clearAlerts()}>
+        <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -373,13 +170,7 @@ export default function Auth() {
           <TabsContent value="login">
             <Card>
               <CardContent className="space-y-4 pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleGoogleLogin}
-                  disabled={googleLoading || loading}
-                >
+                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={googleLoading || loading}>
                   {googleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -393,13 +184,7 @@ export default function Auth() {
                   Continue with Google
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleAppleLogin}
-                  disabled={appleLoading || loading || googleLoading}
-                >
+                <Button type="button" variant="outline" className="w-full" onClick={handleAppleLogin} disabled={appleLoading || loading || googleLoading}>
                   {appleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -411,9 +196,7 @@ export default function Auth() {
                 </Button>
 
                 <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                  </div>
+                  <div className="absolute inset-0 flex items-center"><Separator className="w-full" /></div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
                   </div>
@@ -443,13 +226,7 @@ export default function Auth() {
           <TabsContent value="signup">
             <Card>
               <CardContent className="space-y-4 pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleGoogleLogin}
-                  disabled={googleLoading || loading}
-                >
+                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={googleLoading || loading}>
                   {googleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -463,13 +240,7 @@ export default function Auth() {
                   Sign up with Google
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleAppleLogin}
-                  disabled={appleLoading || loading || googleLoading}
-                >
+                <Button type="button" variant="outline" className="w-full" onClick={handleAppleLogin} disabled={appleLoading || loading || googleLoading}>
                   {appleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -481,9 +252,7 @@ export default function Auth() {
                 </Button>
 
                 <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                  </div>
+                  <div className="absolute inset-0 flex items-center"><Separator className="w-full" /></div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
                   </div>

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Building2, Link2, FileText, KeyRound, ImageIcon } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, Link2, FileText, KeyRound, ImageIcon, Users, Mail, Phone, Briefcase, MessageSquare } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import gaLogo from "@/assets/GA-LOGO.png";
 import { ImageUpload } from "@/components/ImageUpload";
@@ -29,8 +29,12 @@ export default function CreateCompany() {
   const [currency, setCurrency] = useState("BDT");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-
-  if (!isCipher) return <Navigate to="/companies" replace />;
+  // Extra fields for non-cipher creation requests
+  const [industry, setIndustry] = useState("");
+  const [estimatedStudents, setEstimatedStudents] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [reason, setReason] = useState("");
 
   const uploadLogo = async (companyId: string): Promise<string | null> => {
     if (!logoFile) return null;
@@ -42,6 +46,7 @@ export default function CreateCompany() {
     return urlData.publicUrl;
   };
 
+  // Cipher: direct creation
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -62,7 +67,6 @@ export default function CreateCompany() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Upload logo if selected
       if (logoFile && data?.company?.id) {
         try {
           const logoUrl = await uploadLogo(data.company.id);
@@ -71,7 +75,6 @@ export default function CreateCompany() {
           }
         } catch (logoErr) {
           console.error("Logo upload failed:", logoErr);
-          // Non-fatal: company was still created
         }
       }
 
@@ -83,10 +86,53 @@ export default function CreateCompany() {
     setLoading(false);
   };
 
+  // Non-cipher: submit creation request
+  const handleRequestCreation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      const companySlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+      // Upload logo to a temporary location if provided
+      let logoUrl: string | null = null;
+      if (logoFile) {
+        const ext = logoFile.name.split(".").pop();
+        const path = `creation-requests/${user.id}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("company-logos").upload(path, logoFile, { upsert: true });
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from("company-logos").getPublicUrl(path);
+          logoUrl = urlData.publicUrl;
+        }
+      }
+
+      const { error } = await supabase.from("company_creation_requests").insert({
+        user_id: user.id,
+        company_name: name,
+        company_slug: companySlug,
+        description: description || null,
+        logo_url: logoUrl,
+        industry: industry || null,
+        estimated_students: estimatedStudents ? parseInt(estimatedStudents) : null,
+        contact_email: contactEmail || null,
+        contact_phone: contactPhone || null,
+        reason: reason || null,
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Request submitted!", description: "Your company creation request is under review." });
+      navigate("/companies");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-lg space-y-6">
-        {/* Branding header */}
         <div className="text-center space-y-2">
           <Link to="/companies">
             <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto h-14 w-auto object-contain" />
@@ -98,15 +144,17 @@ export default function CreateCompany() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Create Business</h1>
-            <p className="text-sm text-muted-foreground">Set up a new business workspace</p>
+            <h1 className="text-2xl font-bold">{isCipher ? "Create Business" : "Request New Business"}</h1>
+            <p className="text-sm text-muted-foreground">
+              {isCipher ? "Set up a new business workspace" : "Submit a request to create a new business"}
+            </p>
           </div>
         </div>
 
         <Card>
           <CardContent className="pt-6">
-            <form onSubmit={handleCreate} className="space-y-6">
-              {/* Basic Info Section */}
+            <form onSubmit={isCipher ? handleCreate : handleRequestCreation} className="space-y-6">
+              {/* Basic Info */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Building2 className="h-4 w-4" />
@@ -140,7 +188,7 @@ export default function CreateCompany() {
 
               <Separator />
 
-              {/* Logo Section */}
+              {/* Logo */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <ImageIcon className="h-4 w-4" />
@@ -161,7 +209,7 @@ export default function CreateCompany() {
 
               <Separator />
 
-              {/* Details Section */}
+              {/* Details */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <FileText className="h-4 w-4" />
@@ -173,24 +221,64 @@ export default function CreateCompany() {
                 </div>
               </div>
 
-              <Separator />
+              {/* Extra fields for non-cipher requests */}
+              {!isCipher && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Briefcase className="h-4 w-4" />
+                      Additional Details
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Industry</Label>
+                        <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Education" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Estimated Students</Label>
+                        <Input type="number" value={estimatedStudents} onChange={(e) => setEstimatedStudents(e.target.value)} placeholder="e.g. 50" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Contact Email</Label>
+                        <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="contact@business.com" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Contact Phone</Label>
+                        <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+1234567890" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> Reason for Request</Label>
+                      <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why do you want to create this business?" rows={2} />
+                    </div>
+                  </div>
+                </>
+              )}
 
-              {/* Security Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <KeyRound className="h-4 w-4" />
-                  Access & Security
-                </div>
-                <div className="space-y-2">
-                  <Label>Join Password</Label>
-                  <Input value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} placeholder="Set a password for joining..." />
-                  <p className="text-xs text-muted-foreground">Users need this password to request joining your business</p>
-                </div>
-              </div>
+              {/* Security (cipher only) */}
+              {isCipher && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <KeyRound className="h-4 w-4" />
+                      Access & Security
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Join Password</Label>
+                      <Input value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} placeholder="Set a password for joining..." />
+                      <p className="text-xs text-muted-foreground">Users need this password to request joining your business</p>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <Button type="submit" className="w-full" disabled={loading || !name}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Business
+                {isCipher ? "Create Business" : "Submit Request"}
               </Button>
             </form>
           </CardContent>

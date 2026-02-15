@@ -1,83 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, UserPlus, LogOut, Loader2, Users, Clock, XCircle, ChevronRight } from "lucide-react";
+import { Building2, Plus, UserPlus, LogOut, Loader2, Users, ChevronRight, Clock } from "lucide-react";
 import gaLogo from "@/assets/GA-LOGO.png";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-function NoCompaniesSection({ isCipher, navigate, signOut }: { isCipher: boolean; navigate: (path: string) => void; signOut: () => Promise<void> }) {
-  const { user } = useAuth();
-
-  const { data: regStatus, isLoading: regLoading } = useQuery({
-    queryKey: ["registration-status", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from("registration_requests")
-        .select("status, rejection_reason, banned_until")
-        .eq("user_id", user.id)
-        .order("requested_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user?.id && !isCipher,
-  });
-
-  if (!isCipher && regLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Pending registration
-  if (!isCipher && regStatus?.status === "pending") {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <Clock className="h-12 w-12 text-yellow-500 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Pending Approval</h3>
-          <p className="text-muted-foreground mb-4 max-w-sm">
-            Your account is awaiting admin approval. You'll get access once an administrator reviews your request.
-          </p>
-          <Button variant="ghost" onClick={async () => { await signOut(); navigate("/auth"); }}>
-            <LogOut className="mr-2 h-4 w-4" /> Sign Out
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Rejected / banned
-  if (!isCipher && regStatus?.status === "rejected") {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <XCircle className="h-12 w-12 text-destructive mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
-          <p className="text-muted-foreground mb-4 max-w-sm">
-            Your registration request was rejected.{regStatus.rejection_reason ? ` Reason: ${regStatus.rejection_reason}` : ""}
-          </p>
-          <Button variant="ghost" onClick={async () => { await signOut(); navigate("/auth"); }}>
-            <LogOut className="mr-2 h-4 w-4" /> Sign Out
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Normal no-companies state — auto-redirect handled in parent useEffect
-  return null;
-}
 
 export default function CompanySelection() {
   const { signOut, user } = useAuth();
@@ -98,7 +29,7 @@ export default function CompanySelection() {
     enabled: !isCipher && companies.length > 0,
   });
 
-  // Get member counts for each company (filter out ciphers for non-cipher users)
+  // Get member counts for each company
   const { data: memberCounts = {} } = useQuery({
     queryKey: ["company-member-counts", companies.map(c => c.id), cipherUserIds],
     queryFn: async () => {
@@ -112,7 +43,6 @@ export default function CompanySelection() {
       if (error) throw error;
       const counts: Record<string, number> = {};
       for (const row of data ?? []) {
-        // Filter out cipher users from counts for non-cipher viewers
         if (!isCipher && cipherUserIds.includes(row.user_id)) continue;
         counts[row.company_id] = (counts[row.company_id] || 0) + 1;
       }
@@ -121,33 +51,28 @@ export default function CompanySelection() {
     enabled: companies.length > 0,
   });
 
-  // Check registration status for no-companies redirect logic
-  const { data: regStatus, isLoading: regLoading } = useQuery({
-    queryKey: ["registration-status-redirect", user?.id],
+  // Fetch user's pending company creation requests
+  const { data: pendingCreationRequests = [] } = useQuery({
+    queryKey: ["my-creation-requests", user?.id],
     queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from("registration_requests")
-        .select("status")
-        .eq("user_id", user.id)
-        .order("requested_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase
+        .from("company_creation_requests")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       return data;
     },
-    enabled: !!user?.id && !isCipher && companies.length === 0 && !isLoading,
+    enabled: !!user?.id,
   });
 
-  // Auto-redirect to join page when user has no companies and no pending/rejected status
+  // Auto-redirect to join page when user has no companies
   useEffect(() => {
-    if (isLoading || regLoading) return;
+    if (isLoading) return;
     if (companies.length === 0 && !isCipher) {
-      const status = regStatus?.status;
-      if (!status || (status !== "pending" && status !== "rejected")) {
-        navigate("/companies/join", { replace: true });
-      }
+      navigate("/companies/join", { replace: true });
     }
-  }, [companies.length, isCipher, isLoading, regLoading, regStatus, navigate]);
+  }, [companies.length, isCipher, isLoading, navigate]);
 
   const handleSelectCompany = async (companyId: string) => {
     await switchCompany(companyId);
@@ -187,9 +112,25 @@ export default function CompanySelection() {
           <p className="text-muted-foreground">Choose a business to continue</p>
         </div>
 
-        {companies.length === 0 ? (
-          <NoCompaniesSection isCipher={isCipher} navigate={navigate} signOut={signOut} />
-        ) : (
+        {/* Pending company creation requests */}
+        {pendingCreationRequests.length > 0 && (
+          <div className="space-y-2">
+            {pendingCreationRequests.map((req) => (
+              <Card key={req.id} className="border-yellow-500/30 bg-yellow-500/5">
+                <CardContent className="flex items-center gap-3 py-3">
+                  <Clock className="h-5 w-5 text-yellow-600 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Company creation request pending: <span className="text-primary">{req.company_name}</span></p>
+                    <p className="text-xs text-muted-foreground">Submitted {new Date(req.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <Badge variant="secondary" className="text-yellow-700 dark:text-yellow-400">Pending</Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {companies.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2">
             {companies.map((company) => (
               <Card
@@ -229,9 +170,12 @@ export default function CompanySelection() {
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 flex-wrap">
           <Button variant="outline" onClick={() => navigate("/companies/join")}>
             <UserPlus className="mr-2 h-4 w-4" /> Join Business
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/companies/create")}>
+            <Plus className="mr-2 h-4 w-4" /> Request New Business
           </Button>
           {isCipher && (
             <Button onClick={() => navigate("/companies/create")}>

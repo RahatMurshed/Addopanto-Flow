@@ -61,62 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  // Fallback: periodically validate session in case Realtime misses the deletion event
-  useEffect(() => {
-    if (!user) return;
-
-    const interval = setInterval(async () => {
-      // Check if user has a role first (approved users)
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (roleData) {
-        // User has a role — just validate auth session
-        const { error } = await supabase.auth.getUser();
-        if (error) {
-          console.log('Session validation failed, forcing logout:', error.message);
-          await supabase.auth.signOut({ scope: 'local' });
-        }
-        return;
-      }
-
-      // No role — check registration request status
-      const { data: regData } = await supabase
-        .from("registration_requests")
-        .select("status")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      // Pending users stay on /pending page
-      if (regData?.status === "pending") {
-        return;
-      }
-
-      // Rejected users get forced logout immediately
-      if (regData?.status === "rejected") {
-        console.log('User rejected, forcing logout');
-        await supabase.auth.signOut({ scope: 'local' });
-        return;
-      }
-
-      // No role and no registration request — force logout
-      console.log('User role not found, forcing logout');
-      await supabase.auth.signOut({ scope: 'local' });
-
-      // Validate auth session
-      const { error } = await supabase.auth.getUser();
-      if (error) {
-        console.log('Session validation failed, forcing logout:', error.message);
-        await supabase.auth.signOut({ scope: 'local' });
-      }
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [user]);
-
   const signUp = async (email: string, password: string, fullName?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,

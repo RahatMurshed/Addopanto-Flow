@@ -250,6 +250,63 @@ export type Database = {
         }
         Relationships: []
       }
+      company_creation_requests: {
+        Row: {
+          company_name: string
+          company_slug: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          description: string | null
+          estimated_students: number | null
+          id: string
+          industry: string | null
+          logo_url: string | null
+          reason: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          company_name: string
+          company_slug: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_students?: number | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          reason?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          company_name?: string
+          company_slug?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_students?: number | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          reason?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       company_join_requests: {
         Row: {
           banned_until: string | null
