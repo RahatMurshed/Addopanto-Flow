@@ -62,21 +62,14 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: roleData, error: roleError } = await adminClient
-      .from("user_roles").select("role").eq("user_id", user.id).single();
+    const { data: roleData } = await adminClient
+      .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
 
-    if (roleError || !roleData) {
-      return new Response(JSON.stringify({ error: "Forbidden - no role found" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const callerRole = roleData.role;
+    const callerRole = roleData?.role || "user";
     const isCipher = callerRole === "cipher";
-    const isAdmin = callerRole === "admin";
 
-    if (!isCipher && !isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden - insufficient permissions" }), {
+    if (!isCipher) {
+      return new Response(JSON.stringify({ error: "Forbidden - only cipher can access this" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
