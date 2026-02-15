@@ -1,66 +1,67 @@
 
 
-## Standardize AdvancedDateFilter and TablePagination Across All Pages
+## Add Revenue Source Selection to Student Payment Dialog
 
-### Summary
+### What will change
 
-Replace all custom/missing date filters and pagination with the unified `AdvancedDateFilter` and `TablePagination` components (matching the Dashboard pattern) across the entire app.
+When recording a student payment, users will be able to select a **revenue source** (category) from the existing revenue sources list. Currently, the database trigger hardcodes "Student Fees" as the source for all student payments. This change gives users flexibility to categorize payments under any revenue source.
 
-### Current State
+Additionally, revenues that currently have no source assigned will display as "Uncategorized" consistently across the app (this is already partially done on the Revenue page but needs consistency).
 
-| Page | AdvancedDateFilter | TablePagination |
-|---|---|---|
-| Dashboard | Yes | Yes |
-| Revenue | Yes | Yes |
-| Expenses | Yes | Yes |
-| Reports | Yes | Yes |
-| Batches | No (uses BatchDateFilter) | Yes |
-| Students | No | Yes |
-| Audit Log | No | No (custom pagination) |
-| Expense Sources (Transfer History) | No (custom calendar popup) | Yes |
-| Company Members | No | No |
+### Implementation Details
 
-### Changes
+**1. Add `source_id` column to `student_payments` table**
+- New migration: `ALTER TABLE public.student_payments ADD COLUMN source_id uuid REFERENCES public.revenue_sources(id) ON DELETE SET NULL;`
+- This column is optional (nullable) -- when null, the trigger falls back to the existing "Student Fees" auto-creation logic
 
-**1. TransferHistoryCard -- Replace custom calendar filter with AdvancedDateFilter**
-- Remove the `react-day-picker` based date range popover
-- Replace with `AdvancedDateFilter` component in the card header
-- Update filtering logic to use `DateRange` from `dateRangeUtils` instead of `react-day-picker` DateRange
-- Remove the `showDateFilter` prop; replace with an `advancedFilter` boolean or always show AdvancedDateFilter
-- Keep existing TablePagination (already present)
+**2. Update the database trigger `sync_student_payment_revenue()`**
+- Modify the trigger to use `NEW.source_id` when provided, instead of always looking up/creating "Student Fees"
+- Fallback: if `NEW.source_id IS NULL`, keep the current behavior (find or create "Student Fees")
+- On UPDATE: if `source_id` changed, also update the linked revenue's `source_id`
 
-**2. Audit Log -- Replace custom pagination with TablePagination**
-- The Audit Log uses server-side pagination (offset-based), so we need to adapt `TablePagination` to work with the existing `page`/`totalCount` pattern rather than introducing `usePagination` (which is client-side)
-- Replace the custom `ChevronLeft/ChevronRight` pagination block with `TablePagination`
-- Map the existing `page` (0-indexed) to TablePagination's 1-indexed interface
-- Add items-per-page selector (replace hardcoded `PAGE_SIZE = 25`)
+**3. Update `StudentPaymentDialog.tsx`**
+- Add a "Revenue Source" dropdown (Select component) after Payment Method
+- Fetch revenue sources using `useRevenueSources()` hook
+- Default to the "Student Fees" source if one exists, otherwise null
+- Allow "Add new source" inline (same pattern as RevenueDialog -- input + plus button)
+- Pass the selected `source_id` in the payment data
 
-**3. Batches -- No change needed**
-- Batches uses `BatchDateFilter` which is purpose-built for month-based batch filtering (students enrolled per month). This is fundamentally different from the financial date range filter; changing it would break the batch logic. It stays as-is.
+**4. Update `useStudentPayments.ts`**
+- Add `source_id?: string | null` to the `StudentPaymentInsert` interface
+- Pass it through in the insert mutation
 
-**4. Students -- No date filter needed**
-- Students are not date-ranged financial data; they have enrollment status filters. The existing `StudentFilters` component is appropriate. No change needed.
-
-**5. Company Members -- No change needed**
-- Members are a settings-type list, not time-series data. No date filter is appropriate. The list is typically small enough that pagination is unnecessary.
+**5. Display "Uncategorized" consistently**
+- On the Revenue page table, revenues without a `source_id` already show source name from the join. Ensure "Uncategorized" badge appears for null sources
+- On the Expenses page, expense entries already require an `expense_account_id` (mandatory), so no change needed there
+- In the Revenue by Source breakdown card, group null-source revenues under "Uncategorized"
 
 ### Technical Details
 
-**TransferHistoryCard changes:**
-- Import `AdvancedDateFilter` and `DateRange` from `dateRangeUtils`
-- Remove imports for `Calendar`, `Popover`, `CalendarIcon`, `X` (from date filter usage)
-- Replace `dateRange` state (react-day-picker type) with `filterDateRange` state using the app's `DateRange` type
-- Filter transfers by comparing `transfer.created_at` against `filterDateRange.start` and `filterDateRange.end`
-- AdvancedDateFilter placed in the CardHeader where the old calendar button was
+**Migration SQL:**
+```sql
+-- Add source_id to student_payments
+ALTER TABLE public.student_payments 
+  ADD COLUMN source_id uuid REFERENCES public.revenue_sources(id) ON DELETE SET NULL;
 
-**AuditLog changes:**
-- Replace the manual pagination div (lines 312-325) with `TablePagination`
-- Convert `page` state from 0-indexed to 1-indexed for TablePagination compatibility
-- Add `pageSize` state (replacing `PAGE_SIZE` constant) to support the per-page dropdown
-- Calculate `startIndex` and `endIndex` for display
-- Remove `ChevronLeft`/`ChevronRight` icon imports (if no longer used elsewhere)
+-- Update trigger to respect source_id from payment
+CREATE OR REPLACE FUNCTION public.sync_student_payment_revenue() ...
+  -- Use NEW.source_id if provided, else fallback to "Student Fees" auto-create
+```
+
+**StudentPaymentDialog changes:**
+- Import `useRevenueSources`, `useCreateRevenueSource` from hooks
+- Add source selector UI between Payment Method and Receipt Number fields
+- Pre-select "Student Fees" source by default (find by name in sources list)
+- Include inline "add source" input matching the RevenueDialog pattern
+
+**Revenue page "Uncategorized" handling:**
+- In the "Revenue by Source" breakdown, add a row for revenues where `source_id` is null, labeled "Uncategorized"
+- In the table, show "Uncategorized" badge when `revenue_sources` is null
 
 ### Files to modify
 
-- `src/components/TransferHistoryCard.tsx` -- replace calendar date filter with AdvancedDateFilter
-- `src/pages/AuditLog.tsx` -- replace custom pagination with TablePagination, add page size selector
+- **New migration** -- add `source_id` column to `student_payments`, update trigger
+- `src/hooks/useStudentPayments.ts` -- add `source_id` to insert type
+- `src/components/StudentPaymentDialog.tsx` -- add source selector UI
+- `src/pages/Revenue.tsx` -- ensure "Uncategorized" handling in source breakdown
+
