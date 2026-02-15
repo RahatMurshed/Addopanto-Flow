@@ -1,67 +1,51 @@
 
+## Make Revenue and Achievements Green Across the App
 
-## Add Revenue Source Selection to Student Payment Dialog
+### Summary
 
-### What will change
+Change all revenue-related and achievement/positive indicators from the current orange (`text-primary`) color to green (`text-success` / green variants), consistently across all pages. Expenses stay red (`text-destructive`).
 
-When recording a student payment, users will be able to select a **revenue source** (category) from the existing revenue sources list. Currently, the database trigger hardcodes "Student Fees" as the source for all student payments. This change gives users flexibility to categorize payments under any revenue source.
+### Color Mapping
 
-Additionally, revenues that currently have no source assigned will display as "Uncategorized" consistently across the app (this is already partially done on the Revenue page but needs consistency).
+| Element | Current Color | New Color |
+|---|---|---|
+| Revenue amounts, icons, badges | `text-primary` (orange) | `text-success` / `text-green-600` |
+| Revenue gradient backgrounds | `from-primary/5 to-primary/10 border-primary/20` | `from-green-500/5 to-green-500/10 border-green-500/20` |
+| Revenue chart lines/fills | `hsl(var(--primary))` | `hsl(var(--success))` / `hsl(142, 76%, 36%)` |
+| Revenue badges in transactions | `text-primary border-primary/30` | `text-green-600 dark:text-green-400 border-green-500/30` |
+| Positive achievements (profit, paid status) | Already green -- no change needed |
+| Expenses | `text-destructive` (red) -- no change |
 
-### Implementation Details
+### Files to Modify
 
-**1. Add `source_id` column to `student_payments` table**
-- New migration: `ALTER TABLE public.student_payments ADD COLUMN source_id uuid REFERENCES public.revenue_sources(id) ON DELETE SET NULL;`
-- This column is optional (nullable) -- when null, the trigger falls back to the existing "Student Fees" auto-creation logic
+**1. `src/pages/Dashboard.tsx`**
+- Metrics array: Change "Total Revenue" color from `text-primary` to `text-success`
+- Period Overview revenue card: Change gradient from `from-primary/...` to `from-green-500/...`
+- Revenue text: `text-primary` to `text-success`
+- Revenue chart gradient and stroke: `hsl(var(--primary))` to `hsl(142, 76%, 36%)`
+- Recent transactions: Revenue amounts from `text-primary` to `text-success`
+- Revenue category badge: from `text-primary border-primary/30` to `text-green-600 dark:text-green-400 border-green-500/30`
 
-**2. Update the database trigger `sync_student_payment_revenue()`**
-- Modify the trigger to use `NEW.source_id` when provided, instead of always looking up/creating "Student Fees"
-- Fallback: if `NEW.source_id IS NULL`, keep the current behavior (find or create "Student Fees")
-- On UPDATE: if `source_id` changed, also update the linked revenue's `source_id`
+**2. `src/pages/Revenue.tsx`**
+- Summary card gradient: `from-primary/...` to `from-green-500/...`
+- Revenue total text and icons: `text-primary` to `text-success`
 
-**3. Update `StudentPaymentDialog.tsx`**
-- Add a "Revenue Source" dropdown (Select component) after Payment Method
-- Fetch revenue sources using `useRevenueSources()` hook
-- Default to the "Student Fees" source if one exists, otherwise null
-- Allow "Add new source" inline (same pattern as RevenueDialog -- input + plus button)
-- Pass the selected `source_id` in the payment data
+**3. `src/pages/Reports.tsx`**
+- Revenue summary card icon and value: `text-primary` to `text-success`
+- Average Revenue card: `text-primary` to `text-success`
+- YoY revenue value: `text-primary` to `text-success`
+- Revenue by Source header icon: `text-primary` to `text-success`
+- Revenue bar chart fill: `hsl(var(--primary))` to `hsl(142, 76%, 36%)`
+- Monthly breakdown table revenue column: `text-primary` to `text-success`
+- Allocation table allocated column: `text-primary` to `text-success`
 
-**4. Update `useStudentPayments.ts`**
-- Add `source_id?: string | null` to the `StudentPaymentInsert` interface
-- Pass it through in the insert mutation
+**4. `src/pages/Expenses.tsx`** (if any revenue references exist)
+- Check for any revenue-colored elements and update
 
-**5. Display "Uncategorized" consistently**
-- On the Revenue page table, revenues without a `source_id` already show source name from the join. Ensure "Uncategorized" badge appears for null sources
-- On the Expenses page, expense entries already require an `expense_account_id` (mandatory), so no change needed there
-- In the Revenue by Source breakdown card, group null-source revenues under "Uncategorized"
+### Technical Notes
 
-### Technical Details
-
-**Migration SQL:**
-```sql
--- Add source_id to student_payments
-ALTER TABLE public.student_payments 
-  ADD COLUMN source_id uuid REFERENCES public.revenue_sources(id) ON DELETE SET NULL;
-
--- Update trigger to respect source_id from payment
-CREATE OR REPLACE FUNCTION public.sync_student_payment_revenue() ...
-  -- Use NEW.source_id if provided, else fallback to "Student Fees" auto-create
-```
-
-**StudentPaymentDialog changes:**
-- Import `useRevenueSources`, `useCreateRevenueSource` from hooks
-- Add source selector UI between Payment Method and Receipt Number fields
-- Pre-select "Student Fees" source by default (find by name in sources list)
-- Include inline "add source" input matching the RevenueDialog pattern
-
-**Revenue page "Uncategorized" handling:**
-- In the "Revenue by Source" breakdown, add a row for revenues where `source_id` is null, labeled "Uncategorized"
-- In the table, show "Uncategorized" badge when `revenue_sources` is null
-
-### Files to modify
-
-- **New migration** -- add `source_id` column to `student_payments`, update trigger
-- `src/hooks/useStudentPayments.ts` -- add `source_id` to insert type
-- `src/components/StudentPaymentDialog.tsx` -- add source selector UI
-- `src/pages/Revenue.tsx` -- ensure "Uncategorized" handling in source breakdown
-
+- Using `text-success` (which maps to `hsl(142, 76%, 36%)`) for text elements -- this is already defined in the design system
+- For chart colors, using the raw HSL `hsl(142, 76%, 36%)` since recharts needs direct color values
+- Dark mode variants: `text-green-600 dark:text-green-400` for elements not using the `success` CSS variable
+- No database changes required
+- No new dependencies needed
