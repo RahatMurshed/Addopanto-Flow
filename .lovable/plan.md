@@ -1,51 +1,44 @@
 
-## Make Revenue and Achievements Green Across the App
 
-### Summary
+## Fix: Pass Batch Default Fees to Payment Dialog from Batch Detail Page
 
-Change all revenue-related and achievement/positive indicators from the current orange (`text-primary`) color to green (`text-success` / green variants), consistently across all pages. Expenses stay red (`text-destructive`).
+### Problem
 
-### Color Mapping
+When opening the "Record Payment" dialog from the Batch Detail page's enrolled student list, the dialog does not show monthly fee amounts under each month or auto-fill the payment amount. This is because two critical props are missing from the `StudentPaymentDialog` component call in `BatchDetail.tsx`.
 
-| Element | Current Color | New Color |
-|---|---|---|
-| Revenue amounts, icons, badges | `text-primary` (orange) | `text-success` / `text-green-600` |
-| Revenue gradient backgrounds | `from-primary/5 to-primary/10 border-primary/20` | `from-green-500/5 to-green-500/10 border-green-500/20` |
-| Revenue chart lines/fills | `hsl(var(--primary))` | `hsl(var(--success))` / `hsl(142, 76%, 36%)` |
-| Revenue badges in transactions | `text-primary border-primary/30` | `text-green-600 dark:text-green-400 border-green-500/30` |
-| Positive achievements (profit, paid status) | Already green -- no change needed |
-| Expenses | `text-destructive` (red) -- no change |
+### Root Cause
+
+In `src/pages/BatchDetail.tsx` (lines 738-744), the `StudentPaymentDialog` is rendered without:
+- `batchDefaultAdmissionFee` -- needed so the dialog knows the admission fee when the student's own fee is 0
+- `batchDefaultMonthlyFee` -- needed so the dialog can display "remaining" amounts under each month and auto-calculate payment totals
+
+Additionally, the summary lookup uses `studentSummaries` (which only covers filtered/paginated students) instead of `allSummaries` (which covers all batch students). If a student gets filtered out, their summary would be missing.
+
+### Fix
+
+One change in one file:
+
+**`src/pages/BatchDetail.tsx`** -- Update the `StudentPaymentDialog` render (around line 738) to pass the two missing props and use `allSummaries` for a more reliable lookup:
+
+```tsx
+<StudentPaymentDialog
+  open={paymentDialogOpen}
+  onOpenChange={(o) => { setPaymentDialogOpen(o); if (!o) setSelectedStudent(null); }}
+  student={selectedStudent}
+  summary={allSummaries.get(selectedStudent.id) || { /* fallback */ }}
+  onSave={handlePayment}
+  batchDefaultAdmissionFee={Number(batch?.default_admission_fee) || 0}
+  batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
+/>
+```
+
+### What This Fixes
+
+- Monthly fee amounts (e.g., "1,250 remaining") will now display under each month checkbox in the batch payment dialog
+- The amount field will auto-fill when selecting months (using batch default monthly fee as fallback)
+- Admission fee will auto-fill when admission type is selected (using batch default admission fee as fallback)
+- Both access points (student detail and batch detail) will behave identically
 
 ### Files to Modify
 
-**1. `src/pages/Dashboard.tsx`**
-- Metrics array: Change "Total Revenue" color from `text-primary` to `text-success`
-- Period Overview revenue card: Change gradient from `from-primary/...` to `from-green-500/...`
-- Revenue text: `text-primary` to `text-success`
-- Revenue chart gradient and stroke: `hsl(var(--primary))` to `hsl(142, 76%, 36%)`
-- Recent transactions: Revenue amounts from `text-primary` to `text-success`
-- Revenue category badge: from `text-primary border-primary/30` to `text-green-600 dark:text-green-400 border-green-500/30`
-
-**2. `src/pages/Revenue.tsx`**
-- Summary card gradient: `from-primary/...` to `from-green-500/...`
-- Revenue total text and icons: `text-primary` to `text-success`
-
-**3. `src/pages/Reports.tsx`**
-- Revenue summary card icon and value: `text-primary` to `text-success`
-- Average Revenue card: `text-primary` to `text-success`
-- YoY revenue value: `text-primary` to `text-success`
-- Revenue by Source header icon: `text-primary` to `text-success`
-- Revenue bar chart fill: `hsl(var(--primary))` to `hsl(142, 76%, 36%)`
-- Monthly breakdown table revenue column: `text-primary` to `text-success`
-- Allocation table allocated column: `text-primary` to `text-success`
-
-**4. `src/pages/Expenses.tsx`** (if any revenue references exist)
-- Check for any revenue-colored elements and update
-
-### Technical Notes
-
-- Using `text-success` (which maps to `hsl(142, 76%, 36%)`) for text elements -- this is already defined in the design system
-- For chart colors, using the raw HSL `hsl(142, 76%, 36%)` since recharts needs direct color values
-- Dark mode variants: `text-green-600 dark:text-green-400` for elements not using the `success` CSS variable
-- No database changes required
-- No new dependencies needed
+- `src/pages/BatchDetail.tsx` -- add two props and switch summary source (3-line change)
