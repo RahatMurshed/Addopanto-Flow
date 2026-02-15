@@ -7,29 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { UserRoleBadge } from "@/components/UserRoleBadge";
@@ -46,7 +31,7 @@ interface UserWithRole {
   email: string | null;
   full_name: string | null;
   avatar_url: string | null;
-  role: AppRole;
+  role: string; // raw role from DB, could be legacy values
   created_at: string;
 }
 
@@ -59,7 +44,7 @@ interface PaginationInfo {
 
 export default function UserManagement() {
   const { user: currentUser, session } = useAuth();
-  const { isCipher, isAdmin, canManageUsers, canManageRole } = useRole();
+  const { isCipher, canManageRole } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,26 +52,21 @@ export default function UserManagement() {
     userId: string;
     email: string;
     newRole: AppRole;
-    currentRole: AppRole;
+    currentRole: string;
   } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     userId: string;
     email: string;
-    role: AppRole;
+    role: string;
   } | null>(null);
   const [deleteEmailInput, setDeleteEmailInput] = useState("");
 
-  // Fetch users with infinite scrolling pagination
+  // Fetch users with infinite scrolling
   const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+    data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ["admin-users"],
     queryFn: async ({ pageParam = 1 }): Promise<{ users: UserWithRole[]; pagination: PaginationInfo }> => {
-      // Use fetch with query params for pagination
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?page=${pageParam}&perPage=50`,
         {
@@ -97,33 +77,20 @@ export default function UserManagement() {
           },
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
+      if (!response.ok) throw new Error("Failed to fetch users");
       const result = await response.json();
       return {
         users: result.users || [],
         pagination: result.pagination || { page: pageParam, perPage: 50, total: 0, hasMore: false },
       };
     },
-    getNextPageParam: (lastPage) => {
-      if (lastPage.pagination.hasMore) {
-        return lastPage.pagination.page + 1;
-      }
-      return undefined;
-    },
+    getNextPageParam: (lastPage) => lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined,
     initialPageParam: 1,
     enabled: isCipher && !!session?.access_token,
   });
 
-  // Flatten all pages into a single array
-  const users = useMemo(() => {
-    return data?.pages.flatMap((page) => page.users) || [];
-  }, [data]);
+  const users = useMemo(() => data?.pages.flatMap((page) => page.users) || [], [data]);
 
-  // Filter users by search query
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) return users;
     const query = searchQuery.toLowerCase();
@@ -131,47 +98,26 @@ export default function UserManagement() {
       (u) =>
         u.email?.toLowerCase().includes(query) ||
         u.full_name?.toLowerCase().includes(query) ||
-        u.user_id.toLowerCase().includes(query) ||
-        u.role.toLowerCase().includes(query)
+        u.user_id.toLowerCase().includes(query)
     );
   }, [users, searchQuery]);
 
-  // Mutation to change user role
+  // Simplified role display: only cipher and user
+  const getDisplayRole = (rawRole: string): AppRole => rawRole === "cipher" ? "cipher" : "user";
+
+  // Change role mutation
   const changeRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
-      // First delete existing role
       const { error: deleteError } = await supabase
         .from("user_roles")
         .delete()
         .eq("user_id", userId);
-
       if (deleteError) throw deleteError;
 
-      // Then insert new role
       const { error: insertError } = await supabase
         .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: newRole,
-          assigned_by: currentUser?.id,
-        });
-
+        .insert({ user_id: userId, role: newRole, assigned_by: currentUser?.id });
       if (insertError) throw insertError;
-
-      // If changing to moderator, create default permissions
-      if (newRole === "moderator") {
-        const { error: permError } = await supabase
-          .from("moderator_permissions")
-          .upsert({
-            user_id: userId,
-            can_add_revenue: true,
-            can_add_expense: true,
-            can_view_reports: true,
-            controlled_by: currentUser?.id,
-          });
-
-        if (permError) throw permError;
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -183,41 +129,28 @@ export default function UserManagement() {
     },
   });
 
-  // Mutation to delete user
+  // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const { data, error } = await supabase.functions.invoke("admin-users", {
         method: "POST",
         body: { userId },
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
       });
-
       if (error) {
         const errAny = error as any;
         const ctx = errAny?.context as Response | undefined;
-
-        // If we have a Response context, try to extract the JSON error body.
         if (ctx) {
           const contentType = ctx.headers.get("content-type") || "";
-
           if (contentType.includes("application/json")) {
             const payload = await ctx.json().catch(() => null);
-            const message =
-              payload?.details
-                ? `${payload.error}: ${payload.details}`
-                : payload?.error || errAny?.message || "Failed to delete user";
-            throw new Error(message);
+            throw new Error(payload?.details ? `${payload.error}: ${payload.details}` : payload?.error || "Failed to delete user");
           }
-
           const text = await ctx.text().catch(() => "");
           throw new Error(text || errAny?.message || "Failed to delete user");
         }
-
         throw new Error(errAny?.message || "Failed to delete user");
       }
-
       return data;
     },
     onSuccess: () => {
@@ -230,60 +163,23 @@ export default function UserManagement() {
     },
   });
 
-  const handleRoleChange = (userId: string, email: string | null, currentRole: AppRole, newRole: AppRole) => {
-    // Prevent changing own role
+  const handleRoleChange = (userId: string, email: string | null, currentRole: string, newRole: AppRole) => {
     if (userId === currentUser?.id) {
       toast({ title: "Cannot change your own role", variant: "destructive" });
       return;
     }
-
-    // Check if user can manage this role
-    if (!canManageRole(currentRole) || !canManageRole(newRole)) {
-      toast({ title: "You don't have permission to manage this role", variant: "destructive" });
-      return;
-    }
-
     setRoleChangeConfirm({ userId, email: email || userId, newRole, currentRole });
   };
 
-  const confirmRoleChange = () => {
-    if (!roleChangeConfirm) return;
-    changeRoleMutation.mutate({
-      userId: roleChangeConfirm.userId,
-      newRole: roleChangeConfirm.newRole,
-    });
-  };
-
-  const handleDeleteUser = (userId: string, email: string | null, role: AppRole) => {
-    // Prevent deleting self
+  const handleDeleteUser = (userId: string, email: string | null, role: string) => {
     if (userId === currentUser?.id) {
       toast({ title: "Cannot delete yourself", variant: "destructive" });
       return;
     }
-
-    // Check if user can manage this role
-    if (!canManageRole(role)) {
-      toast({ title: "You don't have permission to delete this user", variant: "destructive" });
-      return;
-    }
-
     setDeleteConfirm({ userId, email: email || userId, role });
   };
 
-  const confirmDeleteUser = () => {
-    if (!deleteConfirm) return;
-    deleteUserMutation.mutate(deleteConfirm.userId);
-  };
-
-  // Available roles based on current user's role (removed "user" option)
-  const availableRoles: AppRole[] = isCipher
-    ? ["cipher", "admin", "moderator"]
-    : ["moderator"];
-
-  // Redirect if not authorized (after all hooks)
-  if (!isCipher) {
-    return <Navigate to="/" replace />;
-  }
+  if (!isCipher) return <Navigate to="/" replace />;
 
   if (isLoading) {
     return (
@@ -292,18 +188,16 @@ export default function UserManagement() {
           <Skeleton className="h-7 w-48 mb-2" />
           <Skeleton className="h-4 w-64" />
         </div>
-        <SkeletonTable rows={8} columns={5} />
+        <SkeletonTable rows={8} columns={4} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground">Manage user roles and permissions</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Platform Users</h1>
+        <p className="text-muted-foreground">Manage platform-level user roles (Cipher / User)</p>
       </div>
 
       <RoleGuard roles={["cipher"]} fallback={
@@ -314,17 +208,14 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       }>
-        {/* Search */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="h-5 w-5" />
-              All Users
+              All Users ({users.length})
             </CardTitle>
             <CardDescription>
-              {isCipher
-                ? "You can see and manage all users including Cipher accounts."
-                : "Cipher accounts are hidden from this view."}
+              Platform-level management only. Company roles are managed in each business's Members page.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -332,7 +223,7 @@ export default function UserManagement() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, email, ID, or role..."
+                  placeholder="Search by name or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -341,17 +232,14 @@ export default function UserManagement() {
             </div>
 
             {filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No users found.
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No users found.</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
-                      <TableHead>Current Role</TableHead>
-                      <TableHead>Change Role</TableHead>
+                      <TableHead>Platform Role</TableHead>
                       <TableHead>Member Since</TableHead>
                       <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
@@ -359,56 +247,39 @@ export default function UserManagement() {
                   <TableBody>
                     {filteredUsers.map((u) => {
                       const isCurrentUser = u.user_id === currentUser?.id;
-                      const canModify = canManageRole(u.role) && !isCurrentUser;
+                      const displayRole = getDisplayRole(u.role);
+                      const canModify = !isCurrentUser && displayRole !== "cipher";
 
                       return (
                         <TableRow key={u.user_id}>
                           <TableCell>
                             <div className="flex items-center gap-2.5">
-                              <UserAvatar
-                                avatarUrl={u.avatar_url}
-                                fullName={u.full_name}
-                                email={u.email}
-                                size="sm"
-                              />
+                              <UserAvatar avatarUrl={u.avatar_url} fullName={u.full_name} email={u.email} size="sm" />
                               <div>
                                 <p className="font-medium">
                                   {u.full_name || u.email || "No email"}
-                                  {isCurrentUser && (
-                                    <span className="ml-2 text-xs text-muted-foreground">(you)</span>
-                                  )}
+                                  {isCurrentUser && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
                                 </p>
-                                {u.full_name && (
-                                  <p className="text-xs text-muted-foreground">{u.email || "No email"}</p>
-                                )}
-                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                  {u.user_id}
-                                </p>
+                                {u.full_name && <p className="text-xs text-muted-foreground">{u.email || "No email"}</p>}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <UserRoleBadge role={u.role} />
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={u.role}
-                              onValueChange={(newRole: AppRole) =>
-                                handleRoleChange(u.user_id, u.email, u.role, newRole)
-                              }
-                              disabled={!canModify || changeRoleMutation.isPending}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableRoles.map((role) => (
-                                  <SelectItem key={role} value={role}>
-                                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            {canModify ? (
+                              <Select
+                                value={displayRole}
+                                onValueChange={(newRole: AppRole) => handleRoleChange(u.user_id, u.email, u.role, newRole)}
+                                disabled={changeRoleMutation.isPending}
+                              >
+                                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="cipher">Cipher</SelectItem>
+                                  <SelectItem value="user">User</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <UserRoleBadge role={displayRole} />
+                            )}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {new Date(u.created_at).toLocaleDateString()}
@@ -432,19 +303,10 @@ export default function UserManagement() {
               </div>
             )}
 
-            {/* Load More Button */}
             {hasNextPage && (
               <div className="flex justify-center mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                >
-                  {isFetchingNextPage ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <ChevronDown className="mr-2 h-4 w-4" />
-                  )}
+                <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                  {isFetchingNextPage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ChevronDown className="mr-2 h-4 w-4" />}
                   Load More
                 </Button>
               </div>
@@ -453,25 +315,21 @@ export default function UserManagement() {
         </Card>
       </RoleGuard>
 
-      {/* Role Change Confirmation Dialog */}
+      {/* Role Change Confirmation */}
       <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open && !changeRoleMutation.isPending) setRoleChangeConfirm(null); }}>
         <AlertDialogContent onEscapeKeyDown={(e) => { if (changeRoleMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Role Change</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to change <strong>{roleChangeConfirm?.email}</strong>'s role
-              from <strong>{roleChangeConfirm?.currentRole}</strong> to{" "}
-              <strong>{roleChangeConfirm?.newRole}</strong>?
-              {roleChangeConfirm?.newRole === "moderator" && (
-                <span className="block mt-2">
-                  Default moderator permissions will be granted.
-                </span>
-              )}
+              Change <strong>{roleChangeConfirm?.email}</strong>'s platform role to <strong>{roleChangeConfirm?.newRole}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changeRoleMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmRoleChange(); }} disabled={changeRoleMutation.isPending}>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); if (roleChangeConfirm) changeRoleMutation.mutate({ userId: roleChangeConfirm.userId, newRole: roleChangeConfirm.newRole }); }}
+              disabled={changeRoleMutation.isPending}
+            >
               {changeRoleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {changeRoleMutation.isPending ? "Updating..." : "Confirm"}
             </AlertDialogAction>
@@ -479,42 +337,21 @@ export default function UserManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete User Confirmation Dialog */}
-      <AlertDialog
-        open={!!deleteConfirm}
-        onOpenChange={(open) => {
-          if (!open && !deleteUserMutation.isPending) {
-            setDeleteConfirm(null);
-            setDeleteEmailInput("");
-          }
-        }}
-      >
+      {/* Delete User Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open && !deleteUserMutation.isPending) { setDeleteConfirm(null); setDeleteEmailInput(""); } }}>
         <AlertDialogContent onEscapeKeyDown={(e) => { if (deleteUserMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>
-                  Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?
-                </p>
-                <p className="text-destructive font-medium">
-                  This action cannot be undone. All user data will be permanently removed.
-                </p>
-
-                {/* Require email confirmation for high-privilege roles */}
-                {(deleteConfirm?.role === "admin" || deleteConfirm?.role === "cipher") && (
+                <p>Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?</p>
+                <p className="text-destructive font-medium">This action cannot be undone.</p>
+                {deleteConfirm?.role === "cipher" && (
                   <div className="pt-2">
                     <p className="text-sm text-muted-foreground mb-2">
-                      Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to
-                      confirm deletion of this {deleteConfirm?.role} account:
+                      Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to confirm:
                     </p>
-                    <Input
-                      value={deleteEmailInput}
-                      onChange={(e) => setDeleteEmailInput(e.target.value)}
-                      placeholder="Enter email to confirm"
-                      className="mt-1"
-                      autoComplete="off"
-                    />
+                    <Input value={deleteEmailInput} onChange={(e) => setDeleteEmailInput(e.target.value)} placeholder="Enter email to confirm" autoComplete="off" />
                   </div>
                 )}
               </div>
@@ -523,13 +360,9 @@ export default function UserManagement() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); confirmDeleteUser(); }}
-              disabled={
-                deleteUserMutation.isPending ||
-                ((deleteConfirm?.role === "admin" || deleteConfirm?.role === "cipher") &&
-                  deleteEmailInput !== deleteConfirm?.email)
-              }
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              onClick={(e) => { e.preventDefault(); if (deleteConfirm) deleteUserMutation.mutate(deleteConfirm.userId); }}
+              disabled={deleteUserMutation.isPending || (deleteConfirm?.role === "cipher" && deleteEmailInput !== deleteConfirm?.email)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deleteUserMutation.isPending ? "Deleting..." : "Delete"}

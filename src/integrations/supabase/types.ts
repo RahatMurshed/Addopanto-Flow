@@ -377,6 +377,21 @@ export type Database = {
           deo_students: boolean
           id: string
           joined_at: string
+          mod_batches_add: boolean
+          mod_batches_delete: boolean
+          mod_batches_edit: boolean
+          mod_expenses_add: boolean
+          mod_expenses_delete: boolean
+          mod_expenses_edit: boolean
+          mod_payments_add: boolean
+          mod_payments_delete: boolean
+          mod_payments_edit: boolean
+          mod_revenue_add: boolean
+          mod_revenue_delete: boolean
+          mod_revenue_edit: boolean
+          mod_students_add: boolean
+          mod_students_delete: boolean
+          mod_students_edit: boolean
           role: Database["public"]["Enums"]["company_role"]
           status: string
           user_id: string
@@ -396,6 +411,21 @@ export type Database = {
           deo_students?: boolean
           id?: string
           joined_at?: string
+          mod_batches_add?: boolean
+          mod_batches_delete?: boolean
+          mod_batches_edit?: boolean
+          mod_expenses_add?: boolean
+          mod_expenses_delete?: boolean
+          mod_expenses_edit?: boolean
+          mod_payments_add?: boolean
+          mod_payments_delete?: boolean
+          mod_payments_edit?: boolean
+          mod_revenue_add?: boolean
+          mod_revenue_delete?: boolean
+          mod_revenue_edit?: boolean
+          mod_students_add?: boolean
+          mod_students_delete?: boolean
+          mod_students_edit?: boolean
           role?: Database["public"]["Enums"]["company_role"]
           status?: string
           user_id: string
@@ -415,6 +445,21 @@ export type Database = {
           deo_students?: boolean
           id?: string
           joined_at?: string
+          mod_batches_add?: boolean
+          mod_batches_delete?: boolean
+          mod_batches_edit?: boolean
+          mod_expenses_add?: boolean
+          mod_expenses_delete?: boolean
+          mod_expenses_edit?: boolean
+          mod_payments_add?: boolean
+          mod_payments_delete?: boolean
+          mod_payments_edit?: boolean
+          mod_revenue_add?: boolean
+          mod_revenue_delete?: boolean
+          mod_revenue_edit?: boolean
+          mod_students_add?: boolean
+          mod_students_delete?: boolean
+          mod_students_edit?: boolean
           role?: Database["public"]["Enums"]["company_role"]
           status?: string
           user_id?: string

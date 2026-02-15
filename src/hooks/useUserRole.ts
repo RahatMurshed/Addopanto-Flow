@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type AppRole = "cipher" | "admin" | "moderator" | "user";
+export type AppRole = "cipher" | "user";
 
 interface UserRole {
   id: string;
@@ -33,14 +33,16 @@ export function useUserRole() {
         return null;
       }
 
-      // Return the role if found, otherwise null (pending user)
-      return (data?.role as AppRole) ?? null;
+      // Map any legacy roles to "user"
+      const rawRole = data?.role as string | undefined;
+      if (rawRole === "cipher") return "cipher";
+      if (rawRole) return "user";
+      return null;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Role can be null for pending users
   const role = userRole ?? null;
   const hasNoRole = role === null;
 
@@ -50,27 +52,19 @@ export function useUserRole() {
     error,
     refetch,
     hasNoRole,
-    // Helper functions - only true when role explicitly matches
     isCipher: role === "cipher",
-    isAdmin: role === "admin" || role === "cipher",
-    isModerator: role === "moderator",
     isUser: role === "user",
-    // Check if user has at least the given role level
     hasRoleLevel: (requiredRole: AppRole): boolean => {
       if (hasNoRole) return false;
       const roleHierarchy: Record<AppRole, number> = {
-        cipher: 4,
-        admin: 3,
-        moderator: 2,
+        cipher: 2,
         user: 1,
       };
       return roleHierarchy[role!] >= roleHierarchy[requiredRole];
     },
-    // Check if current user can manage target role
     canManageRole: (targetRole: AppRole): boolean => {
       if (hasNoRole) return false;
       if (role === "cipher") return true;
-      if (role === "admin" && targetRole === "moderator") return true;
       return false;
     },
   };
