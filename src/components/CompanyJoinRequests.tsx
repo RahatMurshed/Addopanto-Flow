@@ -334,8 +334,14 @@ export default function CompanyJoinRequests() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate text-muted-foreground">
-                            {request.message || "—"}
+                          <TableCell className="max-w-[300px]">
+                            {request.message ? (
+                              <p className="whitespace-pre-wrap break-words text-sm font-medium text-foreground bg-muted/50 rounded-md px-2.5 py-1.5 border border-border/50">
+                                {request.message}
+                              </p>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>{format(new Date(request.requested_at), "MMM d, yyyy h:mm a")}</TableCell>
                           <TableCell className="text-right">

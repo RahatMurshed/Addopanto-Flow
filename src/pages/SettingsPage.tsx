@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Info } from "lucide-react";
+import { Loader2, Info, Eye, EyeOff, Lock } from "lucide-react";
 import { DataManagementSection } from "@/components/DataManagementSection";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
@@ -39,6 +39,11 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [savingLogo, setSavingLogo] = useState(false);
+
+  // Join password state
+  const [newJoinPassword, setNewJoinPassword] = useState("");
+  const [showJoinPassword, setShowJoinPassword] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState({
@@ -322,6 +327,72 @@ export default function SettingsPage() {
                 {savingLogo ? "Uploading..." : "Save Logo"}
               </Button>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Join Password Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Join Password
+            </CardTitle>
+            <CardDescription>Change the password that new members use to request joining this business</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="join-password">New Join Password</Label>
+              <div className="relative">
+                <Input
+                  id="join-password"
+                  type={showJoinPassword ? "text" : "password"}
+                  value={newJoinPassword}
+                  onChange={(e) => setNewJoinPassword(e.target.value)}
+                  placeholder="Enter new join password"
+                  disabled={savingPassword}
+                  className="pr-10"
+                  maxLength={100}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-10 w-10"
+                  onClick={() => setShowJoinPassword(!showJoinPassword)}
+                  tabIndex={-1}
+                >
+                  {showJoinPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              disabled={savingPassword || !newJoinPassword.trim()}
+              onClick={async () => {
+                if (!activeCompanyId || !newJoinPassword.trim()) return;
+                setSavingPassword(true);
+                try {
+                  const { data: result, error } = await supabase.functions.invoke("company-join", {
+                    body: {
+                      action: "change-join-password",
+                      companyId: activeCompanyId,
+                      newPassword: newJoinPassword.trim(),
+                    },
+                  });
+                  if (error) throw error;
+                  if (result?.error) throw new Error(result.error);
+                  setNewJoinPassword("");
+                  toast({ title: "Join password updated" });
+                } catch (err: any) {
+                  toast({ title: "Failed to update password", description: err.message, variant: "destructive" });
+                } finally {
+                  setSavingPassword(false);
+                }
+              }}
+            >
+              {savingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {savingPassword ? "Updating..." : "Change Password"}
+            </Button>
           </CardContent>
         </Card>
 
