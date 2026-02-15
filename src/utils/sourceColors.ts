@@ -35,12 +35,15 @@ const UNCATEGORIZED_STYLE = {
 };
 
 function hashString(str: string): number {
-  let hash = 0;
+  let hash = 5381;
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
+    hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0;
   }
-  return Math.abs(hash);
+  // Mix the bits for better distribution
+  hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+  hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+  hash = (hash >> 16) ^ hash;
+  return hash >>> 0;
 }
 
 export function getSourceColor(name: string | null | undefined, isDark?: boolean): { bg: string; text: string; border: string } {
