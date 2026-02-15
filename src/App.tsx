@@ -10,7 +10,17 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { RoleGuard } from "@/components/RoleGuard";
 import AppLayout from "@/components/AppLayout";
+
+function AccessDenied() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
+      <h1 className="text-2xl font-bold text-foreground">Access Denied</h1>
+      <p className="mt-2 text-muted-foreground">You do not have permission to view this page.</p>
+    </div>
+  );
+}
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
@@ -144,7 +154,7 @@ const App = () => (
                   <Route path="/batches/:id" element={<ProtectedRoute><BatchDetail /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                  <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+                  <Route path="/users" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><UserManagement /></RoleGuard></ProtectedRoute>} />
                   <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
                   <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
