@@ -65,7 +65,7 @@ export default function UserManagement() {
   const {
     data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["admin-users"],
+    queryKey: ["admin-users", session?.access_token],
     queryFn: async ({ pageParam = 1 }): Promise<{ users: UserWithRole[]; pagination: PaginationInfo }> => {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?page=${pageParam}&perPage=50`,
