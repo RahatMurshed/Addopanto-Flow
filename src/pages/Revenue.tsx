@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
   useRevenues,
@@ -61,6 +62,7 @@ import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
 
 export default function Revenue() {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
@@ -90,6 +92,13 @@ export default function Revenue() {
 
   const activeAccounts = accounts.filter((a) => a.is_active);
   const totalAllocationPercent = activeAccounts.reduce((sum, a) => sum + Number(a.allocation_percentage), 0);
+
+  // DEO route guard: redirect if no revenue permissions
+  useEffect(() => {
+    if (isDataEntryOperator && !canAddRevenue) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, canAddRevenue, navigate]);
 
   // Debounce search
   useEffect(() => {
@@ -272,11 +281,13 @@ export default function Revenue() {
           <p className="text-muted-foreground">Track income and automatically allocate to expense sources</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
-            onExportCSV={handleExportCSV}
-            onExportPDF={handleExportPDF}
-            disabled={!dateRange}
-          />
+          {!isDataEntryOperator && (
+            <ExportButtons
+              onExportCSV={handleExportCSV}
+              onExportPDF={handleExportPDF}
+              disabled={!dateRange}
+            />
+          )}
           {canAddRevenue && (
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />

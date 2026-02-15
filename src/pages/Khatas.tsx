@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   useExpenseAccounts,
   useCreateExpenseAccount,
@@ -30,11 +31,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import KhataDialog from "@/components/KhataDialog";
 
 export default function Khatas() {
+  const navigate = useNavigate();
   const { data: accounts = [], isLoading } = useExpenseAccounts();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer } = useCompany();
+  const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer, isDataEntryOperator } = useCompany();
   
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();
@@ -45,6 +47,13 @@ export default function Khatas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingKhata, setEditingKhata] = useState<ExpenseAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // DEO route guard: redirect if no expense source permissions
+  useEffect(() => {
+    if (isDataEntryOperator && !canAddExpenseSource) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, canAddExpenseSource, navigate]);
 
   const totalPercentage = accounts
     .filter((a) => a.is_active)
