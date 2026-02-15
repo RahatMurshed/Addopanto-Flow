@@ -12,8 +12,6 @@ import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import AppLayout from "@/components/AppLayout";
 
-
-// Lazy-loaded page components for code splitting
 const Auth = lazy(() => import("@/pages/Auth"));
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -28,13 +26,14 @@ const StudentDetail = lazy(() => import("@/pages/StudentDetail"));
 const CompanySelection = lazy(() => import("@/pages/CompanySelection"));
 const JoinCompany = lazy(() => import("@/pages/JoinCompany"));
 const CreateCompany = lazy(() => import("@/pages/CreateCompany"));
-const RegistrationRequests = lazy(() => import("@/pages/RegistrationRequests"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
 const CompanyMembers = lazy(() => import("@/pages/CompanyMembers"));
 const Batches = lazy(() => import("@/pages/Batches"));
 const BatchDetail = lazy(() => import("@/pages/BatchDetail"));
 const AuditLog = lazy(() => import("@/pages/AuditLog"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+const CompanyCreationRequests = lazy(() => import("@/pages/CompanyCreationRequests"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 2, staleTime: 30_000, refetchOnWindowFocus: true },
@@ -145,11 +144,14 @@ const App = () => (
                   <Route path="/batches/:id" element={<ProtectedRoute><BatchDetail /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                  <Route path="/requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
                   <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
                   <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+                  <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  
+                  {/* Redirect old routes */}
+                  <Route path="/requests" element={<Navigate to="/company/members" replace />} />
                   
                   <Route path="*" element={<NotFound />} />
                 </Routes>

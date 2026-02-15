@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
-import { usePendingRequestsCount } from "@/hooks/usePendingRequestsCount";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -15,26 +16,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  LayoutDashboard,
-  Wallet,
-  TrendingUp,
-  Receipt,
-  FileText,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Users,
-  UserPlus,
-  Building2,
-  ChevronDown,
-  Plus,
-  GraduationCap,
-  ArrowLeftRight,
-  ShieldCheck,
-  Layers,
-  ClipboardList,
-  UserCircle,
+  LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
+  Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
+  ShieldCheck, Layers, ClipboardList, UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -47,26 +31,50 @@ const baseNavItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
   const {
-    activeCompany,
-    companies,
-    switchCompany,
-    isCompanyAdmin,
-    isCipher,
-    canManageMembers,
-    canViewMembers,
-    isDataEntryOperator,
+    activeCompany, companies, switchCompany, isCompanyAdmin, isCipher,
+    canManageMembers, canViewMembers, isDataEntryOperator,
     canAddStudent, canEditStudent, canDeleteStudent,
     canAddBatch, canEditBatch, canDeleteBatch,
     canAddRevenue, canEditRevenue, canDeleteRevenue,
     canAddExpense, canEditExpense, canDeleteExpense,
     canAddExpenseSource,
   } = useCompany();
-  const pendingCount = usePendingRequestsCount();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Build nav items dynamically based on role
+  // Count pending company creation requests for cipher badge
+  const { data: pendingCreationCount = 0 } = useQuery({
+    queryKey: ["pending-creation-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("company_creation_requests")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: isCipher,
+    refetchInterval: 30000,
+  });
+
+  // Count pending join requests for company admin badge
+  const { data: pendingJoinCount = 0 } = useQuery({
+    queryKey: ["pending-join-count", activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany?.id) return 0;
+      const { count, error } = await supabase
+        .from("company_join_requests")
+        .select("*", { count: "exact", head: true })
+        .eq("company_id", activeCompany.id)
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: (isCompanyAdmin || isCipher) && !!activeCompany?.id,
+    refetchInterval: 30000,
+  });
+
   const showStudents = !isDataEntryOperator || canAddStudent || canEditStudent || canDeleteStudent;
   const showBatches = !isDataEntryOperator || canAddBatch || canEditBatch || canDeleteBatch;
   const showRevenue = !isDataEntryOperator || canAddRevenue || canEditRevenue || canDeleteRevenue;
@@ -82,9 +90,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(showRevenue ? [{ label: "Revenue", href: "/revenue", icon: TrendingUp }] : []),
     ...(showExpenses ? [{ label: "Expenses", href: "/expenses", icon: Receipt }] : []),
     ...(showReports ? [{ label: "Reports", href: "/reports", icon: FileText }] : []),
-    ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Requests", href: "/requests", icon: UserPlus, badge: pendingCount }] : []),
-    ...(canViewMembers && !isDataEntryOperator ? [{ label: "Members", href: "/company/members", icon: Users }] : []),
+    ...(canViewMembers && !isDataEntryOperator ? [{ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 }] : []),
     ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Audit Log", href: "/audit-log", icon: ClipboardList }] : []),
+    ...(isCipher ? [{ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount }] : []),
     ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
     ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
   ];
@@ -102,9 +110,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop Sidebar — deep blue */}
+      {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-col bg-sidebar md:flex">
-        {/* Logo + Company Switcher */}
         <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-4 py-4">
           <Link to="/">
             <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
@@ -139,11 +146,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem onClick={() => navigate("/companies/join")} className="gap-2 text-muted-foreground">
                   <Plus className="h-4 w-4" /> Join another business
                 </DropdownMenuItem>
-                {isCipher && (
-                  <DropdownMenuItem onClick={() => navigate("/companies/create")} className="gap-2 text-muted-foreground">
-                    <Plus className="h-4 w-4" /> Create new business
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onClick={() => navigate("/companies/create")} className="gap-2 text-muted-foreground">
+                  <Plus className="h-4 w-4" /> {isCipher ? "Create new business" : "Request new business"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -223,7 +228,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Mobile Nav Overlay */}
         {mobileOpen && (
           <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)}>
             <nav className="absolute right-0 top-14 w-64 bg-sidebar p-3 shadow-lg h-[calc(100vh-3.5rem)] flex flex-col" onClick={(e) => e.stopPropagation()}>
