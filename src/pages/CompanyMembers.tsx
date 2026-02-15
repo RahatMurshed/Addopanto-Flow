@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2, Settings2 } from "lucide-react";
+import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2, Settings2, Eye } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { CompanyRoleBadge } from "@/components/UserRoleBadge";
 import { PermissionAssignmentModal } from "@/components/PermissionAssignmentModal";
+import { UserProfileSheet } from "@/components/UserProfileSheet";
 
 function getPermissionsSummary(member: CompanyMembership): string {
   if (member.role === "admin") return "Full access";
@@ -56,6 +57,7 @@ export default function CompanyMembers() {
   const [search, setSearch] = useState("");
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [editingMember, setEditingMember] = useState<CompanyMembership | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   // Fetch cipher user IDs to filter them out for non-cipher users
   const { data: cipherUserIds = [] } = useQuery({
@@ -330,6 +332,11 @@ export default function CompanyMembers() {
                         {canManageMembers && (
                           <TableCell>
                             <div className="flex items-center gap-1">
+                              {(isCompanyAdmin || isCipher) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingUserId(member.user_id)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
                               {/* Edit permissions: only for moderator and DEO */}
                               {canModifyMember && (member.role === "moderator" || member.role === "data_entry_operator") && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingMember(member)}>
@@ -430,6 +437,13 @@ export default function CompanyMembers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* User Profile Sheet */}
+      <UserProfileSheet
+        userId={viewingUserId}
+        open={!!viewingUserId}
+        onOpenChange={(open) => { if (!open) setViewingUserId(null); }}
+      />
     </div>
   );
 }
