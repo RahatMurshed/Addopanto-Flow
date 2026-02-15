@@ -692,11 +692,18 @@ export default function BatchDetail() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {canAddRevenue && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
-                                  <CreditCard className="h-4 w-4" />
-                                </Button>
-                              )}
+                              {canAddRevenue && (() => {
+                                const sPending = allSummaries.get(s.id)?.totalPending ?? 1;
+                                return sPending <= 0 ? (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-40 cursor-not-allowed" disabled title="All fees collected">
+                                    <CreditCard className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
+                                    <CreditCard className="h-4 w-4" />
+                                  </Button>
+                                );
+                              })()}
                               {canEdit && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteStudentId(s.id)}>
                                   <Trash2 className="h-4 w-4" />
