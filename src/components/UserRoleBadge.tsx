@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { AppRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
-import { Shield, ShieldCheck, User, Eye, Clock } from "lucide-react";
+import { Eye, User, Clock } from "lucide-react";
 
 interface UserRoleBadgeProps {
   role: AppRole | null;
@@ -9,21 +9,11 @@ interface UserRoleBadgeProps {
   showIcon?: boolean;
 }
 
-const roleConfig: Record<AppRole | "pending", { label: string; className: string; icon: typeof Shield }> = {
+const roleConfig: Record<AppRole | "pending", { label: string; className: string; icon: typeof Eye }> = {
   cipher: {
     label: "Cipher",
     className: "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0",
     icon: Eye,
-  },
-  admin: {
-    label: "Admin",
-    className: "bg-primary text-primary-foreground border-0",
-    icon: ShieldCheck,
-  },
-  moderator: {
-    label: "Moderator",
-    className: "bg-blue-500 text-white border-0",
-    icon: Shield,
   },
   user: {
     label: "User",
@@ -37,17 +27,7 @@ const roleConfig: Record<AppRole | "pending", { label: string; className: string
   },
 };
 
-// Company-level role config (separate from platform roles)
-const companyRoleConfig: Record<string, { label: string; className: string; icon: typeof Shield }> = {
-  data_entry_operator: {
-    label: "Data Entry Operator",
-    className: "bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0",
-    icon: User,
-  },
-};
-
 export function UserRoleBadge({ role, size = "md", showIcon = true }: UserRoleBadgeProps) {
-  // Handle null role (pending users)
   const configKey = role ?? "pending";
   const config = roleConfig[configKey];
   const Icon = config.icon;
@@ -60,6 +40,37 @@ export function UserRoleBadge({ role, size = "md", showIcon = true }: UserRoleBa
       )}
     >
       {showIcon && <Icon className={cn("mr-1", size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5")} />}
+      {config.label}
+    </Badge>
+  );
+}
+
+// Company role badge for member pages
+type CompanyRole = "admin" | "moderator" | "viewer" | "data_entry_operator";
+
+const companyRoleConfig: Record<CompanyRole, { label: string; className: string }> = {
+  admin: {
+    label: "Admin",
+    className: "bg-primary/15 text-primary border-primary/30",
+  },
+  moderator: {
+    label: "Moderator",
+    className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
+  },
+  viewer: {
+    label: "Viewer",
+    className: "bg-muted text-muted-foreground",
+  },
+  data_entry_operator: {
+    label: "Data Entry Operator",
+    className: "bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30",
+  },
+};
+
+export function CompanyRoleBadge({ role, size = "md" }: { role: CompanyRole; size?: "sm" | "md" }) {
+  const config = companyRoleConfig[role];
+  return (
+    <Badge className={cn(config.className, size === "sm" ? "text-xs px-1.5 py-0" : "text-xs px-2 py-0.5")}>
       {config.label}
     </Badge>
   );

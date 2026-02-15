@@ -2,35 +2,51 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCompany } from "@/contexts/CompanyContext";
+import { useCompany, type CompanyMembership } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2, Settings2 } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
-import { OperatorPermissionMatrix } from "@/components/OperatorPermissionMatrix";
+import { CompanyRoleBadge } from "@/components/UserRoleBadge";
+import { PermissionAssignmentModal } from "@/components/PermissionAssignmentModal";
+
+function getPermissionsSummary(member: CompanyMembership): string {
+  if (member.role === "admin") return "Full access";
+  if (member.role === "viewer") return "Read-only";
+  if (member.role === "data_entry_operator") {
+    const cats = [];
+    if (member.deo_students) cats.push("Students");
+    if (member.deo_payments) cats.push("Payments");
+    if (member.deo_batches) cats.push("Batches");
+    if (member.deo_finance) cats.push("Finance");
+    return cats.length > 0 ? cats.join(", ") : "No access";
+  }
+  if (member.role === "moderator") {
+    const cats = [];
+    if (member.mod_students_add || member.mod_students_edit || member.mod_students_delete) cats.push("Students");
+    if (member.mod_payments_add || member.mod_payments_edit || member.mod_payments_delete) cats.push("Payments");
+    if (member.mod_batches_add || member.mod_batches_edit || member.mod_batches_delete) cats.push("Batches");
+    if (member.mod_revenue_add || member.mod_revenue_edit || member.mod_revenue_delete) cats.push("Revenue");
+    if (member.mod_expenses_add || member.mod_expenses_edit || member.mod_expenses_delete) cats.push("Expenses");
+    return cats.length > 0 ? cats.join(", ") : "View only";
+  }
+  return "";
+}
 
 export default function CompanyMembers() {
   const { user } = useAuth();
@@ -39,7 +55,9 @@ export default function CompanyMembers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
-  // Fetch cipher user IDs (only needed for non-cipher users to filter them out)
+  const [editingMember, setEditingMember] = useState<CompanyMembership | null>(null);
+
+  // Fetch cipher user IDs to filter them out for non-cipher users
   const { data: cipherUserIds = [] } = useQuery({
     queryKey: ["cipher-user-ids"],
     queryFn: async () => {
@@ -64,7 +82,7 @@ export default function CompanyMembers() {
         .eq("company_id", activeCompanyId)
         .order("joined_at", { ascending: true });
       if (error) throw error;
-      return data;
+      return data as CompanyMembership[];
     },
     enabled: !!activeCompanyId && canViewMembers,
   });
@@ -75,7 +93,7 @@ export default function CompanyMembers() {
     return rawMembers.filter((m) => !cipherUserIds.includes(m.user_id));
   }, [rawMembers, cipherUserIds, isCipher]);
 
-  // Fetch member emails
+  // Fetch member profiles
   const { data: profiles = [] } = useQuery({
     queryKey: ["member-profiles", members.map(m => m.user_id)],
     queryFn: async () => {
@@ -83,14 +101,14 @@ export default function CompanyMembers() {
       const userIds = members.map(m => m.user_id);
       const { data } = await supabase
         .from("user_profiles")
-        .select("user_id, full_name, avatar_url")
+        .select("user_id, full_name, avatar_url, email")
         .in("user_id", userIds);
       return data ?? [];
     },
     enabled: members.length > 0,
   });
 
-  // Count pending join requests for badge
+  // Count pending join requests
   const { data: pendingJoinCount = 0 } = useQuery({
     queryKey: ["pending-join-requests-count", activeCompanyId],
     queryFn: async () => {
@@ -106,7 +124,7 @@ export default function CompanyMembers() {
     enabled: !!activeCompanyId && canViewMembers,
   });
 
-  // Fetch invite code directly (admin-only, not in public view)
+  // Fetch invite code
   const { data: companySecrets } = useQuery({
     queryKey: ["company-secrets", activeCompanyId],
     queryFn: async () => {
@@ -122,8 +140,10 @@ export default function CompanyMembers() {
     enabled: !!activeCompanyId && canManageMembers,
   });
 
-  const getName = (userId: string) => profiles.find(p => p.user_id === userId)?.full_name || null;
-  const getAvatarUrl = (userId: string) => profiles.find(p => p.user_id === userId)?.avatar_url || null;
+  const getProfile = (userId: string) => profiles.find(p => p.user_id === userId);
+  const getName = (userId: string) => getProfile(userId)?.full_name || null;
+  const getEmail = (userId: string) => getProfile(userId)?.email || null;
+  const getAvatarUrl = (userId: string) => getProfile(userId)?.avatar_url || null;
 
   // Update member mutation
   const updateMemberMutation = useMutation({
@@ -174,12 +194,26 @@ export default function CompanyMembers() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const handlePermissionChange = (key: string, value: boolean) => {
+    if (!editingMember) return;
+    updateMemberMutation.mutate(
+      { memberId: editingMember.id, updates: { [key]: value } },
+      {
+        onSuccess: () => {
+          // Update local editing member state for immediate UI feedback
+          setEditingMember(prev => prev ? { ...prev, [key]: value } : null);
+        },
+      }
+    );
+  };
+
   const filteredMembers = useMemo(() => {
     if (!search.trim()) return members;
     const q = search.toLowerCase();
     return members.filter(m => {
       const name = getName(m.user_id) || "";
-      return name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
+      const email = getEmail(m.user_id) || "";
+      return name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
     });
   }, [members, search, profiles]);
 
@@ -192,21 +226,10 @@ export default function CompanyMembers() {
           <Skeleton className="h-7 w-48 mb-2" />
           <Skeleton className="h-4 w-64" />
         </div>
-        <SkeletonTable rows={5} columns={7} />
+        <SkeletonTable rows={5} columns={6} />
       </div>
     );
   }
-
-  const roleBadge = (role: string) => {
-    const colors: Record<string, string> = {
-      admin: "bg-primary/15 text-primary border-primary/30",
-      moderator: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
-      viewer: "bg-muted text-muted-foreground",
-      data_entry_operator: "bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30",
-    };
-    const labels: Record<string, string> = { data_entry_operator: "Data Entry Operator" };
-    return <Badge className={colors[role] || ""}>{labels[role] || role}</Badge>;
-  };
 
   return (
     <div className="space-y-6">
@@ -248,13 +271,8 @@ export default function CompanyMembers() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead className="hidden md:table-cell">Permissions</TableHead>
                     <TableHead className="hidden md:table-cell">Joined</TableHead>
-                    <TableHead className="hidden md:table-cell">Revenue</TableHead>
-                    <TableHead className="hidden md:table-cell">Expense</TableHead>
-                    <TableHead className="hidden lg:table-cell">Exp. Sources</TableHead>
-                    <TableHead className="hidden md:table-cell">Transfer</TableHead>
-                    <TableHead className="hidden md:table-cell">Reports</TableHead>
-                    <TableHead className="hidden lg:table-cell">Students</TableHead>
                     {canManageMembers && <TableHead>Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -262,13 +280,10 @@ export default function CompanyMembers() {
                   {filteredMembers.map((member) => {
                     const isCurrentUser = member.user_id === user?.id;
                     const memberIsAdmin = member.role === "admin";
-                    // Cipher can manage everyone except themselves; admin can manage non-admins
                     const canModifyMember = !isCurrentUser && (isCipher || (isCompanyAdmin && !memberIsAdmin));
-                    // Permissions switches: admins always have all perms, only modifiable if canModifyMember
-                    const permsDisabled = !canModifyMember || memberIsAdmin;
+
                     return (
-                      <React.Fragment key={member.id}>
-                      <TableRow>
+                      <TableRow key={member.id}>
                         <TableCell>
                           <div className="flex items-center gap-2.5">
                             <UserAvatar
@@ -281,6 +296,7 @@ export default function CompanyMembers() {
                                 {getName(member.user_id) || "Unknown Member"}
                                 {isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
                               </p>
+                              <p className="text-xs text-muted-foreground">{getEmail(member.user_id)}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -290,59 +306,47 @@ export default function CompanyMembers() {
                               <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30">Cipher</Badge>
                             )}
                             {!canModifyMember ? (
-                              roleBadge(member.role)
+                              <CompanyRoleBadge role={member.role} />
                             ) : (
-                            <Select
-                              value={member.role}
-                              onValueChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { role: v } })}
-                            >
-                              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {isCipher && <SelectItem value="admin">Admin</SelectItem>}
-                                <SelectItem value="moderator">Moderator</SelectItem>
-                                <SelectItem value="viewer">Viewer</SelectItem>
-                                <SelectItem value="data_entry_operator">Data Entry Operator</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              <Select
+                                value={member.role}
+                                onValueChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { role: v } })}
+                              >
+                                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {isCipher && <SelectItem value="admin">Admin</SelectItem>}
+                                  <SelectItem value="moderator">Moderator</SelectItem>
+                                  <SelectItem value="data_entry_operator">Data Entry Operator</SelectItem>
+                                  <SelectItem value="viewer">Viewer</SelectItem>
+                                </SelectContent>
+                              </Select>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <span className="text-xs text-muted-foreground">{getPermissionsSummary(member)}</span>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                           {format(new Date(member.joined_at), "MMM d, yyyy")}
                         </TableCell>
-                        {["can_add_revenue", "can_add_expense", "can_add_expense_source", "can_transfer", "can_view_reports", "can_manage_students"].map((perm) => (
-                          <TableCell key={perm} className={["can_add_expense_source", "can_manage_students"].includes(perm) ? "hidden lg:table-cell" : "hidden md:table-cell"}>
-                            <Switch
-                              checked={memberIsAdmin || member[perm as keyof typeof member] as boolean}
-                              disabled={permsDisabled}
-                              onCheckedChange={(v) => updateMemberMutation.mutate({ memberId: member.id, updates: { [perm]: v } })}
-                            />
-                          </TableCell>
-                        ))}
                         {canManageMembers && (
                           <TableCell>
-                            {canModifyMember && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setRemovingMemberId(member.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {/* Edit permissions: only for moderator and DEO */}
+                              {canModifyMember && (member.role === "moderator" || member.role === "data_entry_operator") && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingMember(member)}>
+                                  <Settings2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canModifyMember && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setRemovingMemberId(member.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
-                      {member.role === "data_entry_operator" && canManageMembers && canModifyMember && (
-                        <TableRow>
-                          <TableCell colSpan={10} className="p-3 border-t-0">
-                            <OperatorPermissionMatrix
-                              member={member as any}
-                              disabled={!canModifyMember}
-                              onPermissionChange={(key, value) =>
-                                updateMemberMutation.mutate({ memberId: member.id, updates: { [key]: value } })
-                              }
-                            />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      </React.Fragment>
                     );
                   })}
                 </TableBody>
@@ -384,6 +388,17 @@ export default function CompanyMembers() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Permission Assignment Modal */}
+      {editingMember && (
+        <PermissionAssignmentModal
+          open={!!editingMember}
+          onOpenChange={(open) => { if (!open) setEditingMember(null); }}
+          member={editingMember}
+          memberName={getName(editingMember.user_id) || "Member"}
+          onPermissionChange={handlePermissionChange}
+        />
+      )}
 
       {/* Remove Member Confirmation */}
       <AlertDialog open={!!removingMemberId} onOpenChange={(open) => { if (!open && !removeMemberMutation.isPending) setRemovingMemberId(null); }}>

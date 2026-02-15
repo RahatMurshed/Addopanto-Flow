@@ -5,23 +5,12 @@ import type { AppRole } from "@/hooks/useUserRole";
 
 interface RoleGuardProps {
   children: ReactNode;
-  /** Roles that are allowed to see this content */
   roles?: AppRole[];
-  /** Minimum role level required (uses hierarchy: cipher > admin > moderator > user) */
   minRole?: AppRole;
-  /** Show a fallback component if not authorized */
   fallback?: ReactNode;
-  /** If true, shows loading skeleton while checking role */
   showLoading?: boolean;
 }
 
-/**
- * RoleGuard - Conditionally renders children based on user role
- * 
- * Usage:
- * - <RoleGuard roles={['admin', 'cipher']}>Admin-only content</RoleGuard>
- * - <RoleGuard minRole="moderator">Moderator+ content</RoleGuard>
- */
 export function RoleGuard({ 
   children, 
   roles, 
@@ -35,31 +24,17 @@ export function RoleGuard({
     return <div className="animate-pulse h-8 bg-muted rounded" />;
   }
 
-  if (isLoading) {
-    return null;
-  }
+  if (isLoading) return null;
 
-  // Block all access if user has no role (pending)
-  if (hasNoRole) {
-    return <>{fallback}</>;
-  }
+  if (hasNoRole) return <>{fallback}</>;
 
-  // Check if role is in allowed list
-  if (roles && role && !roles.includes(role)) {
-    return <>{fallback}</>;
-  }
+  if (roles && role && !roles.includes(role)) return <>{fallback}</>;
 
-  // Check if role meets minimum level
-  if (minRole && !hasRoleLevel(minRole)) {
-    return <>{fallback}</>;
-  }
+  if (minRole && !hasRoleLevel(minRole)) return <>{fallback}</>;
 
   return <>{children}</>;
 }
 
-/**
- * PermissionGuard - Conditionally renders based on company-scoped permissions
- */
 interface PermissionGuardProps {
   children: ReactNode;
   permission: "canAddRevenue" | "canAddExpense" | "canAddExpenseSource" | "canTransfer" | "canViewReports" | "canEdit" | "canDelete" | "canManageMembers" | "canManageStudents";
@@ -70,9 +45,7 @@ export function PermissionGuard({ children, permission, fallback = null }: Permi
   const companyContext = useCompany();
   const hasPermission = companyContext[permission as keyof typeof companyContext];
 
-  if (!hasPermission) {
-    return <>{fallback}</>;
-  }
+  if (!hasPermission) return <>{fallback}</>;
 
   return <>{children}</>;
 }
