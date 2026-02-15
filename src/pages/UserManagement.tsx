@@ -20,11 +20,12 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { RoleGuard } from "@/components/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
-import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown } from "lucide-react";
+import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown, Eye } from "lucide-react";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Navigate } from "react-router-dom";
 import { UserAvatar } from "@/components/UserAvatar";
+import { UserProfileSheet } from "@/components/UserProfileSheet";
 
 interface UserWithRole {
   user_id: string;
@@ -60,6 +61,7 @@ export default function UserManagement() {
     role: string;
   } | null>(null);
   const [deleteEmailInput, setDeleteEmailInput] = useState("");
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   // Fetch users with infinite scrolling
   const {
@@ -285,15 +287,25 @@ export default function UserManagement() {
                             {new Date(u.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteUser(u.user_id, u.email, u.role)}
-                              disabled={!canModify || deleteUserMutation.isPending}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setViewingUserId(u.user_id)}
+                                className="h-8 w-8"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteUser(u.user_id, u.email, u.role)}
+                                disabled={!canModify || deleteUserMutation.isPending}
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -370,6 +382,12 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* User Profile Sheet */}
+      <UserProfileSheet
+        userId={viewingUserId}
+        open={!!viewingUserId}
+        onOpenChange={(open) => { if (!open) setViewingUserId(null); }}
+      />
     </div>
   );
 }
