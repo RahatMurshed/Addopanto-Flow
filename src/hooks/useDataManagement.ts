@@ -250,28 +250,28 @@ export function useDataManagement() {
     if (!user || !user.email || !activeCompanyId) return false;
     setIsResetting(true);
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password,
-      });
-      if (authError) {
-        toast({ title: "Authentication failed", description: "Incorrect password", variant: "destructive" });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        toast({ title: "Reset failed", description: "No active session", variant: "destructive" });
         return false;
       }
 
-      const companyId = activeCompanyId;
+      const response = await supabase.functions.invoke("reset-company-data", {
+        body: { companyId: activeCompanyId, password },
+      });
 
-      // Delete data scoped to company (order matters for FK constraints)
-      await supabase.from("allocations").delete().eq("company_id", companyId);
-      await supabase.from("khata_transfers").delete().eq("company_id", companyId);
-      await supabase.from("expenses").delete().eq("company_id", companyId);
-      await supabase.from("revenues").delete().eq("company_id", companyId);
-      await supabase.from("expense_accounts").delete().eq("company_id", companyId);
-      await supabase.from("revenue_sources").delete().eq("company_id", companyId);
-      await supabase.from("student_payments").delete().eq("company_id", companyId);
-      await supabase.from("monthly_fee_history").delete().eq("company_id", companyId);
-      await supabase.from("students").delete().eq("company_id", companyId);
-      await supabase.from("batches").delete().eq("company_id", companyId);
+      if (response.error) {
+        const msg = response.error.message || "Reset failed";
+        toast({ title: "Reset failed", description: msg, variant: "destructive" });
+        return false;
+      }
+
+      const result = response.data;
+      if (!result?.success) {
+        toast({ title: "Reset failed", description: result?.error || "Incorrect password", variant: "destructive" });
+        return false;
+      }
 
       await queryClient.invalidateQueries();
       toast({ title: "Data reset complete", description: "All company data has been deleted." });
