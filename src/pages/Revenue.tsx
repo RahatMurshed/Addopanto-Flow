@@ -75,7 +75,8 @@ export default function Revenue() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany, isDataEntryOperator, canEditRevenue, canDeleteRevenue } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany, isDataEntryOperator, canEditRevenue, canDeleteRevenue, canViewRevenue } = useCompany();
+  const showHistory = !isDataEntryOperator || canViewRevenue;
   
   const { data: revenues = [], isLoading } = useRevenues();
   const { data: sources = [] } = useRevenueSources();
@@ -95,10 +96,10 @@ export default function Revenue() {
 
   // DEO route guard: redirect if no revenue permissions
   useEffect(() => {
-    if (isDataEntryOperator && !canAddRevenue) {
+    if (isDataEntryOperator && !canAddRevenue && !canViewRevenue) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isDataEntryOperator, canAddRevenue, navigate]);
+  }, [isDataEntryOperator, canAddRevenue, canViewRevenue, navigate]);
 
   // Debounce search
   useEffect(() => {
@@ -298,9 +299,11 @@ export default function Revenue() {
       </div>
 
       {/* Advanced Date Filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
-      </div>
+      {showHistory && (
+        <div className="flex flex-wrap items-center gap-2">
+          <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
+        </div>
+      )}
 
       {activeAccounts.length === 0 && (
         <Alert>
@@ -398,7 +401,7 @@ export default function Revenue() {
       )}
 
       {/* Revenue Table */}
-      {filteredRevenues.length === 0 ? (
+      {showHistory && (filteredRevenues.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 rounded-full bg-muted p-4">
@@ -562,7 +565,7 @@ export default function Revenue() {
             )}
           </CardContent>
         </Card>
-      )}
+      ))}
 
       {/* Create/Edit Dialog */}
       <RevenueDialog

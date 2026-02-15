@@ -43,6 +43,8 @@ export interface CompanyMembership {
   can_delete_revenue: boolean;
   can_edit_expense: boolean;
   can_delete_expense: boolean;
+  can_view_revenue: boolean;
+  can_view_expense: boolean;
   status: string;
   joined_at: string;
   approved_by: string | null;
@@ -93,6 +95,8 @@ interface CompanyContextType {
   canDeleteRevenue: boolean;
   canEditExpense: boolean;
   canDeleteExpense: boolean;
+  canViewRevenue: boolean;
+  canViewExpense: boolean;
 
   // Actions
   switchCompany: (companyId: string) => Promise<void>;
@@ -207,6 +211,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canDeleteRevenue = isCompanyAdmin || (membership?.can_delete_revenue ?? false);
   const canEditExpense = isCompanyAdmin || (membership?.can_edit_expense ?? false);
   const canDeleteExpense = isCompanyAdmin || (membership?.can_delete_expense ?? false);
+  const canViewRevenue = isCompanyAdmin || (membership?.can_view_revenue ?? false);
+  const canViewExpense = isCompanyAdmin || (membership?.can_view_expense ?? false);
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -279,6 +285,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canDeleteRevenue,
       canEditExpense,
       canDeleteExpense,
+      canViewRevenue,
+      canViewExpense,
       switchCompany,
       refetch,
     }}>

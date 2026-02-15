@@ -57,12 +57,20 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
-    label: "Other",
+    label: "View Data",
     icon: Wallet,
+    permissions: [
+      { key: "can_view_revenue", label: "View Revenue History" },
+      { key: "can_view_expense", label: "View Expense History" },
+      { key: "can_view_reports", label: "View Reports" },
+    ],
+  },
+  {
+    label: "Other",
+    icon: ArrowLeftRight,
     permissions: [
       { key: "can_add_expense_source", label: "Add Expense Source" },
       { key: "can_transfer", label: "Transfer Between Accounts" },
-      { key: "can_view_reports", label: "View Reports" },
       { key: "can_manage_students", label: "Manage Students" },
     ],
   },

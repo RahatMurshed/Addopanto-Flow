@@ -325,7 +325,9 @@ export type Database = {
           can_edit_student: boolean
           can_manage_students: boolean
           can_transfer: boolean
+          can_view_expense: boolean
           can_view_reports: boolean
+          can_view_revenue: boolean
           company_id: string
           id: string
           joined_at: string
@@ -353,7 +355,9 @@ export type Database = {
           can_edit_student?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
+          can_view_expense?: boolean
           can_view_reports?: boolean
+          can_view_revenue?: boolean
           company_id: string
           id?: string
           joined_at?: string
@@ -381,7 +385,9 @@ export type Database = {
           can_edit_student?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
+          can_view_expense?: boolean
           can_view_reports?: boolean
+          can_view_revenue?: boolean
           company_id?: string
           id?: string
           joined_at?: string

@@ -79,7 +79,8 @@ export default function Expenses() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany, isDataEntryOperator, canEditExpense, canDeleteExpense } = useCompany();
+  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany, isDataEntryOperator, canEditExpense, canDeleteExpense, canViewExpense } = useCompany();
+  const showHistory = !isDataEntryOperator || canViewExpense;
   
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: accounts = [] } = useAccountBalances();
@@ -98,10 +99,10 @@ export default function Expenses() {
 
   // DEO route guard: redirect if no expense permissions
   useEffect(() => {
-    if (isDataEntryOperator && !canAddExpense) {
+    if (isDataEntryOperator && !canAddExpense && !canViewExpense) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isDataEntryOperator, canAddExpense, navigate]);
+  }, [isDataEntryOperator, canAddExpense, canViewExpense, navigate]);
 
   // Debounce search
   useEffect(() => {
@@ -314,9 +315,11 @@ export default function Expenses() {
       </div>
 
       {/* Advanced Date Filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
-      </div>
+      {showHistory && (
+        <div className="flex flex-wrap items-center gap-2">
+          <AdvancedDateFilter onFilterChange={handleFilterChange} defaultFilterType="monthly" />
+        </div>
+      )}
 
       {accounts.length === 0 && (
         <Alert>
@@ -467,7 +470,7 @@ export default function Expenses() {
       )}
 
       {/* Expense Table */}
-      {filteredExpenses.length === 0 ? (
+      {showHistory && (filteredExpenses.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 rounded-full bg-muted p-4">
@@ -639,7 +642,7 @@ export default function Expenses() {
             )}
           </CardContent>
         </Card>
-      )}
+      ))}
 
       {/* Transfer History - hidden for DEO */}
       {!isDataEntryOperator && (
