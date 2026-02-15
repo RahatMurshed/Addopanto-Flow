@@ -661,7 +661,7 @@ export default function BatchDetail() {
                                   ) : worstStatus === "partial" ? (
                                     <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{partialMonthCount}/{pendingMonthCount} Partial</Badge>
                                   ) : worstStatus === "pending" ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{purelyPendingCount} Pending</Badge>
+                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{purelyPendingCount} months pending</Badge>
                                   ) : (
                                     <Badge className="block w-fit bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                   )}
