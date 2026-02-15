@@ -8,6 +8,7 @@ import {
   useDeleteRevenue,
   type RevenueWithSource,
 } from "@/hooks/useRevenues";
+import { getSourceBadgeStyle } from "@/utils/sourceColors";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
 import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -381,7 +382,7 @@ export default function Revenue() {
               {filteredBySource.map((item) => (
                 <div key={item.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{item.name}</Badge>
+                    <Badge variant="secondary" style={getSourceBadgeStyle(item.name)}>{item.name}</Badge>
                     <span className="text-xs text-muted-foreground">({item.count} entries)</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -525,9 +526,9 @@ export default function Revenue() {
                           </TableCell>
                           <TableCell>
                             {rev.revenue_sources?.name ? (
-                              <Badge variant="secondary">{rev.revenue_sources.name}</Badge>
+                              <Badge variant="secondary" style={getSourceBadgeStyle(rev.revenue_sources.name)}>{rev.revenue_sources.name}</Badge>
                             ) : (
-                              <Badge variant="outline" className="text-muted-foreground">Uncategorized</Badge>
+                              <Badge variant="outline" style={getSourceBadgeStyle(null)}>Uncategorized</Badge>
                             )}
                           </TableCell>
                           <TableCell className="hidden max-w-xs truncate md:table-cell">
