@@ -34,12 +34,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
   const {
     activeCompany, companies, switchCompany, isCompanyAdmin, isCipher,
-    canManageMembers, canViewMembers, isModerator,
+    canManageMembers, canViewMembers, isModerator, isDataEntryModerator, isTraditionalModerator,
     canAddStudent, canEditStudent, canDeleteStudent,
     canAddBatch, canEditBatch, canDeleteBatch,
+    canAddCourse, canEditCourse, canDeleteCourse,
     canAddRevenue, canEditRevenue, canDeleteRevenue,
     canAddExpense, canEditExpense, canDeleteExpense,
     canAddExpenseSource,
+    canViewReports,
   } = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
@@ -90,29 +92,67 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
-  const showStudents = !isModerator || canAddStudent || canEditStudent || canDeleteStudent;
-  const showBatches = !isModerator || canAddBatch || canEditBatch || canDeleteBatch;
-  const showRevenue = !isModerator || canAddRevenue || canEditRevenue || canDeleteRevenue;
-  const showExpenses = !isModerator || canAddExpense || canEditExpense || canDeleteExpense;
-  const showKhatas = !isModerator || canAddExpenseSource;
-  const showReports = !isModerator;
+  // Build navigation based on role
+  const buildNavItems = () => {
+    const items: Array<{ label: string; href: string; icon: any; badge?: number }> = [...baseNavItems];
 
-  const navItems = [
-    ...baseNavItems,
-    ...(showBatches ? [{ label: "Courses", href: "/courses", icon: BookOpen }] : []),
-    ...(showStudents ? [{ label: "Students", href: "/students", icon: GraduationCap }] : []),
-    ...(showKhatas ? [{ label: "Expense Sources", href: "/khatas", icon: Wallet }] : []),
-    ...(showRevenue ? [{ label: "Revenue", href: "/revenue", icon: TrendingUp }] : []),
-    ...(showExpenses ? [{ label: "Expenses", href: "/expenses", icon: Receipt }] : []),
-    ...(showReports ? [{ label: "Reports", href: "/reports", icon: FileText }] : []),
-    ...(canViewMembers && !isModerator ? [{ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 }] : []),
-    ...((isCompanyAdmin || isCipher) && !isModerator ? [{ label: "Audit Log", href: "/audit-log", icon: ClipboardList }] : []),
-    
-    ...(isCipher ? [{ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount }] : []),
-    ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
-    
-    ...((isCompanyAdmin || isCipher) && !isModerator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
-  ];
+    if (isDataEntryModerator) {
+      // Data Entry Moderator: restricted navigation
+      // Always show Students (read-only reference + own entries)
+      if (canAddStudent || canEditStudent || canDeleteStudent) {
+        items.push({ label: "Students", href: "/students", icon: GraduationCap });
+      }
+      // Show Batches for reference (read-only)
+      if (canAddBatch || canEditBatch || canDeleteBatch) {
+        items.push({ label: "Batches", href: "/batches", icon: Layers });
+      }
+      // Show Courses for reference
+      if (canAddCourse || canEditCourse || canDeleteCourse) {
+        items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+      }
+      if (canAddRevenue || canEditRevenue || canDeleteRevenue) {
+        items.push({ label: "My Revenue", href: "/revenue", icon: TrendingUp });
+      }
+      if (canAddExpense || canEditExpense || canDeleteExpense) {
+        items.push({ label: "My Expenses", href: "/expenses", icon: Receipt });
+      }
+    } else {
+      // Admin or Traditional Moderator: full navigation
+      const showCourses = !isTraditionalModerator || canAddCourse || canEditCourse || canDeleteCourse;
+      const showStudents = !isTraditionalModerator || canAddStudent || canEditStudent || canDeleteStudent;
+      const showBatches = !isTraditionalModerator || canAddBatch || canEditBatch || canDeleteBatch;
+      const showRevenue = !isTraditionalModerator || canAddRevenue || canEditRevenue || canDeleteRevenue;
+      const showExpenses = !isTraditionalModerator || canAddExpense || canEditExpense || canDeleteExpense;
+      const showKhatas = !isTraditionalModerator || canAddExpenseSource;
+
+      if (showCourses) items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+      if (showStudents) items.push({ label: "Students", href: "/students", icon: GraduationCap });
+      if (showKhatas) items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
+      if (showRevenue) items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
+      if (showExpenses) items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
+      if (canViewReports) items.push({ label: "Reports", href: "/reports", icon: FileText });
+      if (canViewMembers && !isTraditionalModerator) {
+        items.push({ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 });
+      }
+      if ((isCompanyAdmin || isCipher) && !isTraditionalModerator) {
+        items.push({ label: "Audit Log", href: "/audit-log", icon: ClipboardList });
+      }
+
+      // Cipher-only platform pages
+      if (isCipher) {
+        items.push({ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount });
+        items.push({ label: "Platform Users", href: "/users", icon: ShieldCheck });
+      }
+
+      if ((isCompanyAdmin || isCipher) && !isTraditionalModerator) {
+        items.push({ label: "Settings", href: "/settings", icon: Settings });
+      }
+    }
+
+    return items;
+  };
+
+  const navItems = buildNavItems();
 
   const handleLogout = async () => {
     await signOut();
@@ -125,6 +165,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     navigate("/dashboard");
   };
 
+  const showCompanySwitcher = !isDataEntryModerator;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <SkipLink />
@@ -134,7 +176,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/">
             <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
           </Link>
-          {!isModerator ? (
+          {showCompanySwitcher ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">
@@ -249,11 +291,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {mobileOpen && (
           <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)}>
             <nav className="absolute right-0 top-14 w-64 bg-sidebar p-3 shadow-lg h-[calc(100vh-3.5rem)] flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="mb-4">
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { navigate("/companies"); setMobileOpen(false); }}>
-                  <ArrowLeftRight className="h-4 w-4" /> Switch Business
-                </Button>
-              </div>
+              {showCompanySwitcher && (
+                <div className="mb-4">
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { navigate("/companies"); setMobileOpen(false); }}>
+                    <ArrowLeftRight className="h-4 w-4" /> Switch Business
+                  </Button>
+                </div>
+              )}
               <div className="flex-1 space-y-1">
                 {navItems.map((item) => {
                   const isActive = location.pathname === item.href;

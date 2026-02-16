@@ -30,12 +30,24 @@ import { UserProfileSheet } from "@/components/auth/UserProfileSheet";
 function getPermissionsSummary(member: CompanyMembership): string {
   if (member.role === "admin") return "Full access";
   if (member.role === "moderator") {
+    if (member.data_entry_mode) {
+      const cats = [];
+      if (member.deo_students) cats.push("Students");
+      if (member.deo_payments) cats.push("Payments");
+      if (member.deo_batches) cats.push("Batches");
+      if (member.deo_courses) cats.push("Courses");
+      if (member.deo_finance) cats.push("Finance");
+      return cats.length > 0 ? `Data Entry: ${cats.join(", ")}` : "Data Entry (no access)";
+    }
+    // Traditional moderator
     const cats = [];
-    if (member.deo_students) cats.push("Students");
-    if (member.deo_payments) cats.push("Payments");
-    if (member.deo_batches) cats.push("Batches");
-    if (member.deo_finance) cats.push("Finance");
-    return cats.length > 0 ? cats.join(", ") : "No access";
+    if (member.mod_students_add || member.mod_students_edit || member.mod_students_delete) cats.push("Students");
+    if (member.mod_payments_add || member.mod_payments_edit || member.mod_payments_delete) cats.push("Payments");
+    if (member.mod_batches_add || member.mod_batches_edit || member.mod_batches_delete) cats.push("Batches");
+    if (member.mod_courses_add || member.mod_courses_edit || member.mod_courses_delete) cats.push("Courses");
+    if (member.mod_revenue_add || member.mod_revenue_edit || member.mod_revenue_delete) cats.push("Revenue");
+    if (member.mod_expenses_add || member.mod_expenses_edit || member.mod_expenses_delete) cats.push("Expenses");
+    return cats.length > 0 ? cats.join(", ") : "Full view access";
   }
   return "";
 }
@@ -313,9 +325,8 @@ export default function CompanyMembers() {
                                 <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   {isCipher && <SelectItem value="admin">Admin</SelectItem>}
+                                  {!isCipher && isCompanyAdmin && <SelectItem value="admin">Admin</SelectItem>}
                                   <SelectItem value="moderator">Moderator</SelectItem>
-                                  <SelectItem value="data_entry_operator">Data Entry Operator</SelectItem>
-                                  <SelectItem value="viewer">Viewer</SelectItem>
                                 </SelectContent>
                               </Select>
                             )}

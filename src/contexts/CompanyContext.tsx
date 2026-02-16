@@ -23,6 +23,7 @@ export interface CompanyMembership {
   user_id: string;
   company_id: string;
   role: "admin" | "moderator";
+  data_entry_mode: boolean;
   // Legacy fields kept for backward compat
   can_add_revenue: boolean;
   can_add_expense: boolean;
@@ -30,12 +31,13 @@ export interface CompanyMembership {
   can_transfer: boolean;
   can_view_reports: boolean;
   can_manage_students: boolean;
-  // Moderator category permissions (formerly DEO permissions)
+  // Data Entry Mode category permissions
   deo_students: boolean;
   deo_payments: boolean;
   deo_batches: boolean;
   deo_finance: boolean;
-  // Legacy mod_* fields (no longer used but kept in DB)
+  deo_courses: boolean;
+  // Granular mod_* permissions (for traditional moderator)
   mod_students_add: boolean;
   mod_students_edit: boolean;
   mod_students_delete: boolean;
@@ -51,6 +53,9 @@ export interface CompanyMembership {
   mod_expenses_add: boolean;
   mod_expenses_edit: boolean;
   mod_expenses_delete: boolean;
+  mod_courses_add: boolean;
+  mod_courses_edit: boolean;
+  mod_courses_delete: boolean;
   status: string;
   joined_at: string;
   approved_by: string | null;
@@ -64,6 +69,7 @@ interface CompanyContextType {
   companies: Company[];
   memberships: CompanyMembership[];
   isLoading: boolean;
+  companyLoading: boolean;
   hasCompanies: boolean;
 
   // Platform-level
@@ -72,6 +78,8 @@ interface CompanyContextType {
   // Company-level role checks
   isCompanyAdmin: boolean;
   isModerator: boolean;
+  isDataEntryModerator: boolean;
+  isTraditionalModerator: boolean;
 
   // Cipher override
   forceFullDashboard: boolean;
@@ -89,11 +97,12 @@ interface CompanyContextType {
   canManageMembers: boolean;
   canViewMembers: boolean;
 
-  // Moderator category permissions
+  // Data Entry Mode category permissions
   deoStudents: boolean;
   deoPayments: boolean;
   deoBatches: boolean;
   deoFinance: boolean;
+  deoCourses: boolean;
 
   // Derived granular permissions
   canAddStudent: boolean;
@@ -105,6 +114,9 @@ interface CompanyContextType {
   canAddBatch: boolean;
   canEditBatch: boolean;
   canDeleteBatch: boolean;
+  canAddCourse: boolean;
+  canEditCourse: boolean;
+  canDeleteCourse: boolean;
   canEditRevenue: boolean;
   canDeleteRevenue: boolean;
   canEditExpense: boolean;
@@ -112,6 +124,11 @@ interface CompanyContextType {
   canViewRevenue: boolean;
   canViewExpense: boolean;
   canViewStudentPII: boolean;
+
+  // Data entry mode specific
+  canViewDashboardMetrics: boolean;
+  canViewPaymentHistory: boolean;
+  canViewFinancialData: boolean;
 
   // Actions
   switchCompany: (companyId: string) => Promise<void>;
@@ -208,45 +225,61 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
   const isModerator = membership?.role === "moderator" && !isCompanyAdmin && !(isCipher && forceFullDashboard);
+  const isDataEntryModerator = isModerator && (membership?.data_entry_mode ?? false);
+  const isTraditionalModerator = isModerator && !(membership?.data_entry_mode ?? false);
 
-  // Moderator category permissions
+  // Data Entry Mode category permissions
   const deoStudents = membership?.deo_students ?? false;
   const deoPayments = membership?.deo_payments ?? false;
   const deoBatches = membership?.deo_batches ?? false;
   const deoFinance = membership?.deo_finance ?? false;
+  const deoCourses = membership?.deo_courses ?? false;
 
-  // Derived granular permissions (simplified: admin = full, moderator = per-category)
-  const canAddStudent = isCompanyAdmin || (isModerator && deoStudents);
-  const canEditStudent = isCompanyAdmin || (isModerator && deoStudents);
-  const canDeleteStudent = isCompanyAdmin || (isModerator && deoStudents);
+  // Derived granular permissions
+  // Admin = full access
+  // Traditional Moderator = per-category via mod_* flags
+  // Data Entry Moderator = add via deo_* flags, edit/delete only own entries (enforced in queries)
 
-  const canAddPayment = isCompanyAdmin || (isModerator && deoPayments);
-  const canEditPayment = isCompanyAdmin || (isModerator && deoPayments);
-  const canDeletePayment = isCompanyAdmin || (isModerator && deoPayments);
+  const canAddStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_add ?? false)) || (isDataEntryModerator && deoStudents);
+  const canEditStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_edit ?? false)) || (isDataEntryModerator && deoStudents);
+  const canDeleteStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_delete ?? false)) || (isDataEntryModerator && deoStudents);
 
-  const canAddBatch = isCompanyAdmin || (isModerator && deoBatches);
-  const canEditBatch = isCompanyAdmin || (isModerator && deoBatches);
-  const canDeleteBatch = isCompanyAdmin || (isModerator && deoBatches);
+  const canAddPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_add ?? false)) || (isDataEntryModerator && deoPayments);
+  const canEditPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_edit ?? false)) || (isDataEntryModerator && deoPayments);
+  const canDeletePayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_delete ?? false)) || (isDataEntryModerator && deoPayments);
 
-  const canAddRevenue = isCompanyAdmin || (isModerator && deoFinance);
-  const canEditRevenue = isCompanyAdmin || (isModerator && deoFinance);
-  const canDeleteRevenue = isCompanyAdmin || (isModerator && deoFinance);
+  const canAddBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_add ?? false)) || (isDataEntryModerator && deoBatches);
+  const canEditBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_edit ?? false)) || (isDataEntryModerator && deoBatches);
+  const canDeleteBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_delete ?? false)) || (isDataEntryModerator && deoBatches);
 
-  const canAddExpense = isCompanyAdmin || (isModerator && deoFinance);
-  const canEditExpense = isCompanyAdmin || (isModerator && deoFinance);
-  const canDeleteExpense = isCompanyAdmin || (isModerator && deoFinance);
+  const canAddCourse = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_courses_add ?? false)) || (isDataEntryModerator && deoCourses);
+  const canEditCourse = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_courses_edit ?? false)) || (isDataEntryModerator && deoCourses);
+  const canDeleteCourse = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_courses_delete ?? false)) || (isDataEntryModerator && deoCourses);
+
+  const canAddRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_add ?? false)) || (isDataEntryModerator && deoFinance);
+  const canEditRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_edit ?? false)) || (isDataEntryModerator && deoFinance);
+  const canDeleteRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_delete ?? false)) || (isDataEntryModerator && deoFinance);
+
+  const canAddExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_add ?? false)) || (isDataEntryModerator && deoFinance);
+  const canEditExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_edit ?? false)) || (isDataEntryModerator && deoFinance);
+  const canDeleteExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_delete ?? false)) || (isDataEntryModerator && deoFinance);
 
   const canAddExpenseSource = isCompanyAdmin;
-  const canTransfer = isCompanyAdmin || (isModerator && (membership?.can_transfer ?? false));
-  const canViewReports = isCompanyAdmin || isModerator;
-  const canManageStudents = isCompanyAdmin || (isModerator && deoStudents);
+  const canTransfer = isCompanyAdmin || (isTraditionalModerator && (membership?.can_transfer ?? false));
+  const canViewReports = isCompanyAdmin || isTraditionalModerator;
+  const canManageStudents = isCompanyAdmin || canAddStudent || canEditStudent;
   const canEdit = isCompanyAdmin;
   const canDelete = isCompanyAdmin;
   const canManageMembers = isCompanyAdmin;
-  const canViewMembers = isCompanyAdmin || isModerator;
-  const canViewRevenue = isCompanyAdmin || (isModerator && deoFinance);
-  const canViewExpense = isCompanyAdmin || (isModerator && deoFinance);
+  const canViewMembers = isCompanyAdmin || isTraditionalModerator;
+  const canViewRevenue = isCompanyAdmin || (isTraditionalModerator && ((membership?.mod_revenue_add ?? false) || (membership?.mod_revenue_edit ?? false))) || (isDataEntryModerator && deoFinance);
+  const canViewExpense = isCompanyAdmin || (isTraditionalModerator && ((membership?.mod_expenses_add ?? false) || (membership?.mod_expenses_edit ?? false))) || (isDataEntryModerator && deoFinance);
   const canViewStudentPII = isCompanyAdmin;
+
+  // Data entry mode specific visibility
+  const canViewDashboardMetrics = !isDataEntryModerator;
+  const canViewPaymentHistory = !isDataEntryModerator;
+  const canViewFinancialData = !isDataEntryModerator;
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -284,10 +317,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       companies,
       memberships,
       isLoading,
+      companyLoading: isLoading,
       hasCompanies: companies.length > 0,
       isCipher,
       isCompanyAdmin,
       isModerator,
+      isDataEntryModerator,
+      isTraditionalModerator,
       forceFullDashboard,
       toggleForceFullDashboard,
       canAddRevenue,
@@ -304,6 +340,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       deoPayments,
       deoBatches,
       deoFinance,
+      deoCourses,
       canAddStudent,
       canEditStudent,
       canDeleteStudent,
@@ -313,6 +350,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canAddBatch,
       canEditBatch,
       canDeleteBatch,
+      canAddCourse,
+      canEditCourse,
+      canDeleteCourse,
       canEditRevenue,
       canDeleteRevenue,
       canEditExpense,
@@ -320,6 +360,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canViewRevenue,
       canViewExpense,
       canViewStudentPII,
+      canViewDashboardMetrics,
+      canViewPaymentHistory,
+      canViewFinancialData,
       switchCompany,
       refetch,
     }}>
