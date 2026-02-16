@@ -88,24 +88,39 @@ Deno.serve(async (req) => {
       });
 
     // Helper: write audit log entry via service role (bypasses RLS)
-    const writeAuditLog = async (action: string, recordId: string, oldData: unknown, newData: unknown) => {
-      // Get caller's active company for context
-      const { data: profile } = await adminClient
-        .from("user_profiles")
-        .select("active_company_id, email")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    // action must be INSERT/UPDATE/DELETE to satisfy the check constraint
+    // extra context is stored inside old_data/new_data JSON
+    const writeAuditLog = async (logAction: string, recordId: string, oldData: unknown, newData: unknown) => {
+      try {
+        const { data: profile } = await adminClient
+          .from("user_profiles")
+          .select("active_company_id, email")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      await adminClient.from("audit_logs").insert({
-        company_id: profile?.active_company_id || "00000000-0000-0000-0000-000000000000",
-        user_id: user.id,
-        user_email: profile?.email || user.email || null,
-        table_name: "user_roles",
-        record_id: recordId,
-        action,
-        old_data: oldData ? JSON.parse(JSON.stringify(oldData)) : null,
-        new_data: newData ? JSON.parse(JSON.stringify(newData)) : null,
-      });
+        // company_id FK must reference a real company; skip audit if none available
+        const companyId = profile?.active_company_id;
+        if (!companyId) {
+          console.warn("Skipping audit log: no active company for caller", user.id);
+          return;
+        }
+
+        // Map custom actions to valid DB action values; store details in new_data
+        const dbAction = logAction.includes("DELETE") ? "DELETE" : logAction.includes("INSERT") ? "INSERT" : "UPDATE";
+
+        await adminClient.from("audit_logs").insert({
+          company_id: companyId,
+          user_id: user.id,
+          user_email: profile?.email || user.email || null,
+          table_name: "user_roles",
+          record_id: recordId,
+          action: dbAction,
+          old_data: oldData ? JSON.parse(JSON.stringify({ _context: logAction, ...oldData as Record<string, unknown> })) : null,
+          new_data: newData ? JSON.parse(JSON.stringify({ _context: logAction, ...newData as Record<string, unknown> })) : null,
+        });
+      } catch (e) {
+        console.warn("Audit log write failed (non-fatal):", e);
+      }
     };
 
     const handleDeleteUser = async (userId: string, password?: string, targetEmail?: string) => {
