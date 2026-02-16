@@ -303,15 +303,17 @@ export default function UserManagement() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteUser(u.user_id, u.email, u.role)}
-                                disabled={!canDelete || deleteUserMutation.isPending}
-                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {!isCurrentUser && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteUser(u.user_id, u.email, u.role)}
+                                  disabled={deleteUserMutation.isPending}
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -391,31 +393,26 @@ export default function UserManagement() {
             <AlertDialogTitle>{deleteConfirm?.role === "cipher" ? "Delete Cipher User" : "Delete User"}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                {deleteConfirm?.role === "cipher" ? (
-                  <>
-                    <p>You are about to delete a <strong>Cipher</strong> user: <strong>{deleteConfirm?.email}</strong></p>
-                    <p className="text-destructive font-medium">This action cannot be undone.</p>
-                    <div className="pt-2 space-y-3">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to confirm:
-                        </p>
-                        <Input value={deleteEmailInput} onChange={(e) => setDeleteEmailInput(e.target.value)} placeholder="Enter their email to confirm" autoComplete="off" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Enter <strong className="text-foreground">YOUR</strong> password to verify identity:
-                        </p>
-                        <Input type="password" value={deletePasswordInput} onChange={(e) => setDeletePasswordInput(e.target.value)} placeholder="Your password" autoComplete="current-password" />
-                      </div>
+                <>
+                  <p>
+                    You are about to delete{deleteConfirm?.role === "cipher" ? " a Cipher" : ""} user: <strong>{deleteConfirm?.email}</strong>
+                  </p>
+                  <p className="text-destructive font-medium">This action cannot be undone.</p>
+                  <div className="pt-2 space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to confirm:
+                      </p>
+                      <Input value={deleteEmailInput} onChange={(e) => setDeleteEmailInput(e.target.value)} placeholder="Enter their email to confirm" autoComplete="off" />
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <p>Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?</p>
-                    <p className="text-destructive font-medium">This action cannot be undone.</p>
-                  </>
-                )}
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Enter <strong className="text-foreground">your</strong> password to verify identity:
+                      </p>
+                      <Input type="password" value={deletePasswordInput} onChange={(e) => setDeletePasswordInput(e.target.value)} placeholder="Your password" autoComplete="current-password" />
+                    </div>
+                  </div>
+                </>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -425,19 +422,16 @@ export default function UserManagement() {
               onClick={(e) => {
                 e.preventDefault();
                 if (!deleteConfirm) return;
-                if (deleteConfirm.role === "cipher") {
-                  deleteUserMutation.mutate({
-                    userId: deleteConfirm.userId,
-                    password: deletePasswordInput,
-                    targetEmail: deleteEmailInput,
-                  });
-                } else {
-                  deleteUserMutation.mutate({ userId: deleteConfirm.userId });
-                }
+                deleteUserMutation.mutate({
+                  userId: deleteConfirm.userId,
+                  password: deletePasswordInput,
+                  targetEmail: deleteEmailInput,
+                });
               }}
               disabled={
                 deleteUserMutation.isPending ||
-                (deleteConfirm?.role === "cipher" && (deleteEmailInput !== deleteConfirm?.email || !deletePasswordInput.trim()))
+                deleteEmailInput !== deleteConfirm?.email ||
+                !deletePasswordInput.trim()
               }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
