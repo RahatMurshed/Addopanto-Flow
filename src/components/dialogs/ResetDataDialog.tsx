@@ -10,8 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Shield } from "lucide-react";
 import { useDataManagement } from "@/hooks/useDataManagement";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useNavigate } from "react-router-dom";
 
 interface ResetDataDialogProps {
@@ -27,6 +28,7 @@ const COOLDOWN_SECONDS = 5;
 export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
   const navigate = useNavigate();
   const { resetAllData, isResetting } = useDataManagement();
+  const { activeCompany } = useCompany();
 
   const [step, setStep] = useState<Step>("warning");
   const [confirmText, setConfirmText] = useState("");
@@ -34,7 +36,6 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
 
-  // Reset state when dialog opens/closes
   useEffect(() => {
     if (!open) {
       setStep("warning");
@@ -45,7 +46,6 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
     }
   }, [open]);
 
-  // Cooldown timer
   useEffect(() => {
     if (cooldown > 0) {
       const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
@@ -53,9 +53,7 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
     }
   }, [cooldown]);
 
-  const handleProceedToConfirm = () => {
-    setStep("confirm");
-  };
+  const handleProceedToConfirm = () => setStep("confirm");
 
   const handleProceedToPassword = () => {
     if (confirmText !== CONFIRMATION_TEXT) {
@@ -80,9 +78,7 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
   };
 
   const handleClose = () => {
-    if (!isResetting) {
-      onOpenChange(false);
-    }
+    if (!isResetting) onOpenChange(false);
   };
 
   return (
@@ -95,36 +91,42 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
                 <div className="rounded-full bg-destructive/10 p-2">
                   <AlertTriangle className="h-5 w-5 text-destructive" />
                 </div>
-                <DialogTitle className="text-destructive">Warning: Permanent Action</DialogTitle>
+                <DialogTitle className="text-destructive">⚠️ WARNING: Permanent Action</DialogTitle>
               </div>
               <DialogDescription className="pt-2">
-                This action cannot be undone. All your data will be permanently deleted.
+                This will <strong>PERMANENTLY DELETE ALL</strong> company data for{" "}
+                <strong>{activeCompany?.name || "this company"}</strong>. This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
 
             <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4">
               <p className="font-medium mb-2">You are about to permanently delete:</p>
               <ul className="space-y-1 text-sm text-muted-foreground">
-                <li>• All revenues and allocations</li>
-                <li>• All expenses</li>
-                <li>• All expense sources</li>
-                <li>• All expense source transfers</li>
-                <li>• All revenue sources</li>
-                <li>• All batches and students</li>
+                <li>• All courses and batches</li>
+                <li>• All students and enrollment data</li>
                 <li>• All student payments and fee history</li>
+                <li>• All revenues and allocations</li>
+                <li>• All expenses and transfers</li>
+                <li>• All expense categories and revenue sources</li>
+                <li>• All non-admin members and their permissions</li>
+                <li>• All audit logs and currency change logs</li>
+                <li>• All join requests</li>
               </ul>
               <p className="mt-3 text-sm">
-                <strong>Your profile settings will be preserved.</strong>
+                <strong>Only the company entity and admin user will be preserved.</strong>
               </p>
             </div>
 
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <p className="text-sm text-primary font-medium">Cipher-only operation</p>
+              </div>
+            </div>
+
             <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={handleProceedToConfirm}>
-                I Understand
-              </Button>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button variant="destructive" onClick={handleProceedToConfirm}>I Understand</Button>
             </DialogFooter>
           </>
         )}
@@ -153,9 +155,7 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
               <Button
                 variant="destructive"
                 onClick={handleProceedToPassword}
@@ -172,7 +172,7 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
             <DialogHeader>
               <DialogTitle>Enter Your Password</DialogTitle>
               <DialogDescription>
-                For security, please enter your password to proceed with the data reset.
+                For security, enter your password to proceed with the data reset.
               </DialogDescription>
             </DialogHeader>
 
@@ -192,19 +192,14 @@ export function ResetDataDialog({ open, onOpenChange }: ResetDataDialogProps) {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={handleClose} disabled={isResetting}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={handleClose} disabled={isResetting}>Cancel</Button>
               <Button
                 variant="destructive"
                 onClick={handleReset}
                 disabled={!password || cooldown > 0 || isResetting}
               >
                 {isResetting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Resetting...
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Resetting...</>
                 ) : cooldown > 0 ? (
                   `Reset All Data (${cooldown})`
                 ) : (

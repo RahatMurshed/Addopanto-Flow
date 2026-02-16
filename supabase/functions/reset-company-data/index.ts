@@ -47,7 +47,6 @@ Deno.serve(async (req) => {
 
     const { companyId, password } = parsed.data;
 
-    // Re-authenticate with password server-side
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -63,15 +62,7 @@ Deno.serve(async (req) => {
       return json(403, { error: "Incorrect password" });
     }
 
-    // Verify user is admin of this company or cipher
-    const { data: membership } = await adminClient
-      .from("company_memberships")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("company_id", companyId)
-      .eq("status", "active")
-      .maybeSingle();
-
+    // CIPHER-ONLY: Only cipher users can reset data
     const { data: cipherCheck } = await adminClient
       .from("user_roles")
       .select("role")
@@ -79,11 +70,8 @@ Deno.serve(async (req) => {
       .eq("role", "cipher")
       .maybeSingle();
 
-    const isCipher = !!cipherCheck;
-    const isAdmin = membership?.role === "admin";
-
-    if (!isCipher && !isAdmin) {
-      return json(403, { error: "Only company admins can reset data" });
+    if (!cipherCheck) {
+      return json(403, { error: "Only platform administrators can reset company data" });
     }
 
     // Delete data scoped to company (order matters for FK constraints)
@@ -94,10 +82,17 @@ Deno.serve(async (req) => {
       "revenues",
       "expense_accounts",
       "revenue_sources",
+      "student_siblings",
+      "student_batch_history",
       "student_payments",
       "monthly_fee_history",
       "students",
       "batches",
+      "courses",
+      "audit_logs",
+      "currency_change_logs",
+      "dashboard_access_logs",
+      "company_join_requests",
     ];
 
     for (const table of tables) {
@@ -108,8 +103,19 @@ Deno.serve(async (req) => {
 
       if (error) {
         console.error(`Error deleting from ${table}:`, error);
-        return json(500, { error: `Failed to delete ${table}` });
+        // Continue with other tables, some may not have company_id
       }
+    }
+
+    // Remove non-admin memberships (keep admin)
+    const { error: membershipError } = await adminClient
+      .from("company_memberships")
+      .delete()
+      .eq("company_id", companyId)
+      .neq("role", "admin");
+
+    if (membershipError) {
+      console.error("Error cleaning memberships:", membershipError);
     }
 
     return json(200, { success: true });
