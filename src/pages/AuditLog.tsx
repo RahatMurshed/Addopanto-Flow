@@ -125,9 +125,22 @@ function getActionLabel(table: string, action: string, log?: AuditLogType): { la
 function getEntityName(log: AuditLogType): string {
   const d = log.new_data || log.old_data;
   if (!d) return log.record_id.slice(0, 8);
+  // Named entities
   if (typeof d.name === "string") return d.name;
   if (typeof d.batch_name === "string") return d.batch_name;
   if (typeof d.course_name === "string") return d.course_name;
+  // Email-based entities (memberships, join requests)
+  if (log.table_name === "company_memberships" || log.table_name === "company_join_requests") {
+    return log.user_email || (typeof d.user_id === "string" ? d.user_id.slice(0, 8) : log.record_id.slice(0, 8));
+  }
+  // Moderator permissions — show target user
+  if (log.table_name === "moderator_permissions") {
+    return log.user_email || "Moderator";
+  }
+  // Batch transfers — reference student
+  if (log.table_name === "student_batch_history") {
+    return typeof d.student_id === "string" ? `Student ${d.student_id.slice(0, 8)}` : "Batch Transfer";
+  }
   if (typeof d.description === "string" && (d.description as string).length < 50) return d.description as string;
   return log.record_id.slice(0, 8);
 }
@@ -198,12 +211,29 @@ function getDescription(log: AuditLogType): string {
     return parts.join(" · ");
   }
   if (log.table_name === "revenue_sources") {
-    return d.name ? `Source: ${d.name}` : "";
+    const parts: string[] = [];
+    if (d.name) parts.push(`Source: ${d.name}`);
+    if (log.action === "UPDATE" && log.old_data && log.new_data) {
+      const o = log.old_data as Record<string, unknown>;
+      const n = log.new_data as Record<string, unknown>;
+      if (o.name !== n.name) parts.push(`Renamed: ${o.name} → ${n.name}`);
+      if (o.is_active !== n.is_active) parts.push(n.is_active ? "Activated" : "Deactivated");
+    } else if (log.action === "INSERT") {
+      if (d.is_active === false) parts.push("Created inactive");
+    }
+    return parts.join(" · ") || "";
   }
   if (log.table_name === "company_join_requests") {
     const parts: string[] = [];
     if (d.status) parts.push(`Status: ${d.status}`);
-    if (d.message) parts.push(`Message: ${String(d.message).slice(0, 60)}`);
+    if (log.action === "UPDATE" && log.old_data && log.new_data) {
+      const o = log.old_data as Record<string, unknown>;
+      const n = log.new_data as Record<string, unknown>;
+      if (o.status !== n.status) parts.push(`${o.status} → ${n.status}`);
+      if (n.rejection_reason) parts.push(`Reason: ${String(n.rejection_reason).slice(0, 60)}`);
+      if (n.banned_until) parts.push(`Banned until: ${String(n.banned_until).slice(0, 10)}`);
+    }
+    if (d.message && log.action === "INSERT") parts.push(`Message: ${String(d.message).slice(0, 60)}`);
     return parts.join(" · ");
   }
   if (log.table_name === "moderator_permissions") {
@@ -233,6 +263,13 @@ function getDescription(log: AuditLogType): string {
   }
   if (log.table_name === "student_batch_history") {
     const parts: string[] = [];
+    if (d.from_batch_id && d.to_batch_id) {
+      parts.push(`From: ${String(d.from_batch_id).slice(0, 8)} → To: ${String(d.to_batch_id).slice(0, 8)}`);
+    } else if (d.to_batch_id) {
+      parts.push(`Assigned to batch: ${String(d.to_batch_id).slice(0, 8)}`);
+    } else if (d.from_batch_id) {
+      parts.push(`Removed from batch: ${String(d.from_batch_id).slice(0, 8)}`);
+    }
     if (d.reason) parts.push(`Reason: ${d.reason}`);
     return parts.join(" · ") || "Batch transfer";
   }
