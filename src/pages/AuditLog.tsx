@@ -59,7 +59,45 @@ const DEFAULT_PAGE_SIZE = 25;
 
 /* ── Helpers ── */
 
-function getActionLabel(table: string, action: string): { label: string; color: string } {
+function getActionLabel(table: string, action: string, log?: AuditLogType): { label: string; color: string } {
+  // Smart labels for company_memberships based on what changed
+  if (table === "company_memberships" && action === "UPDATE" && log?.old_data && log?.new_data) {
+    const o = log.old_data as Record<string, unknown>;
+    const n = log.new_data as Record<string, unknown>;
+    if (o.role !== n.role) {
+      return { label: "Role Changed", color: "bg-violet-500/15 text-violet-600 border-violet-500/20 dark:text-violet-400" };
+    }
+    if (o.status !== n.status) {
+      const statusLabel = n.status === "active" ? "Member Activated" : "Member Deactivated";
+      return { label: statusLabel, color: "bg-amber-500/15 text-amber-600 border-amber-500/20 dark:text-amber-400" };
+    }
+    // Check if any permission flags changed
+    const permKeys = ["deo_students", "deo_payments", "deo_batches", "deo_finance",
+      "mod_students_add", "mod_students_edit", "mod_students_delete",
+      "mod_payments_add", "mod_payments_edit", "mod_payments_delete",
+      "mod_batches_add", "mod_batches_edit", "mod_batches_delete",
+      "mod_expenses_add", "mod_expenses_edit", "mod_expenses_delete",
+      "mod_revenue_add", "mod_revenue_edit", "mod_revenue_delete"];
+    if (permKeys.some(k => o[k] !== n[k])) {
+      return { label: "Permissions Changed", color: "bg-violet-500/15 text-violet-600 border-violet-500/20 dark:text-violet-400" };
+    }
+  }
+
+  // Smart labels for companies based on what changed
+  if (table === "companies" && action === "UPDATE" && log?.old_data && log?.new_data) {
+    const o = log.old_data as Record<string, unknown>;
+    const n = log.new_data as Record<string, unknown>;
+    if (o.currency !== n.currency || o.exchange_rate !== n.exchange_rate || o.base_currency !== n.base_currency) {
+      return { label: "Currency Updated", color: "bg-amber-500/15 text-amber-600 border-amber-500/20 dark:text-amber-400" };
+    }
+    if (o.fiscal_year_start_month !== n.fiscal_year_start_month) {
+      return { label: "Fiscal Year Changed", color: "bg-amber-500/15 text-amber-600 border-amber-500/20 dark:text-amber-400" };
+    }
+    if (o.name !== n.name || o.description !== n.description || o.logo_url !== n.logo_url) {
+      return { label: "Company Profile Updated", color: "bg-amber-500/15 text-amber-600 border-amber-500/20 dark:text-amber-400" };
+    }
+  }
+
   const map: Record<string, Record<string, string>> = {
     student_payments: { INSERT: "Payment Recorded", UPDATE: "Payment Updated", DELETE: "Payment Deleted" },
     students: { INSERT: "Student Added", UPDATE: "Student Updated", DELETE: "Student Removed" },
@@ -133,6 +171,30 @@ function getDescription(log: AuditLogType): string {
     const parts: string[] = [];
     if (d.role) parts.push(`Role: ${d.role}`);
     if (d.status) parts.push(`Status: ${d.status}`);
+    // Show explicit permission diff on UPDATE
+    if (log.action === "UPDATE" && log.old_data && log.new_data) {
+      const o = log.old_data as Record<string, unknown>;
+      const n = log.new_data as Record<string, unknown>;
+      if (o.role !== n.role) parts.push(`${o.role} → ${n.role}`);
+      const permLabels: Record<string, string> = {
+        deo_students: "Students", deo_payments: "Payments", deo_batches: "Batches", deo_finance: "Finance",
+        mod_students_add: "Students Add", mod_students_edit: "Students Edit", mod_students_delete: "Students Delete",
+        mod_payments_add: "Payments Add", mod_payments_edit: "Payments Edit", mod_payments_delete: "Payments Delete",
+        mod_batches_add: "Batches Add", mod_batches_edit: "Batches Edit", mod_batches_delete: "Batches Delete",
+        mod_expenses_add: "Expenses Add", mod_expenses_edit: "Expenses Edit", mod_expenses_delete: "Expenses Delete",
+        mod_revenue_add: "Revenue Add", mod_revenue_edit: "Revenue Edit", mod_revenue_delete: "Revenue Delete",
+      };
+      const granted: string[] = [];
+      const revoked: string[] = [];
+      for (const [key, label] of Object.entries(permLabels)) {
+        if (o[key] !== n[key]) {
+          if (n[key] === true) granted.push(label);
+          else revoked.push(label);
+        }
+      }
+      if (granted.length > 0) parts.push(`Granted: ${granted.join(", ")}`);
+      if (revoked.length > 0) parts.push(`Revoked: ${revoked.join(", ")}`);
+    }
     return parts.join(" · ");
   }
   if (log.table_name === "revenue_sources") {
@@ -145,6 +207,26 @@ function getDescription(log: AuditLogType): string {
     return parts.join(" · ");
   }
   if (log.table_name === "moderator_permissions") {
+    if (log.action === "UPDATE" && log.old_data && log.new_data) {
+      const o = log.old_data as Record<string, unknown>;
+      const n = log.new_data as Record<string, unknown>;
+      const flagLabels: Record<string, string> = {
+        can_add_revenue: "Add Revenue", can_add_expense: "Add Expense",
+        can_add_expense_source: "Add Expense Source", can_transfer: "Transfer", can_view_reports: "View Reports",
+      };
+      const granted: string[] = [];
+      const revoked: string[] = [];
+      for (const [key, label] of Object.entries(flagLabels)) {
+        if (o[key] !== n[key]) {
+          if (n[key] === true) granted.push(label);
+          else revoked.push(label);
+        }
+      }
+      const parts: string[] = [];
+      if (granted.length > 0) parts.push(`Granted: ${granted.join(", ")}`);
+      if (revoked.length > 0) parts.push(`Revoked: ${revoked.join(", ")}`);
+      return parts.join(" · ") || "Permissions unchanged";
+    }
     const flags = ["can_add_revenue", "can_add_expense", "can_add_expense_source", "can_transfer", "can_view_reports"] as const;
     const enabled = flags.filter(f => d[f] === true).map(f => f.replace("can_", "").replace(/_/g, " "));
     return enabled.length > 0 ? `Enabled: ${enabled.join(", ")}` : "All permissions disabled";
@@ -155,6 +237,21 @@ function getDescription(log: AuditLogType): string {
     return parts.join(" · ") || "Batch transfer";
   }
   if (log.table_name === "companies") {
+    if (log.action === "UPDATE" && log.old_data && log.new_data) {
+      const o = log.old_data as Record<string, unknown>;
+      const n = log.new_data as Record<string, unknown>;
+      const changes: string[] = [];
+      if (o.name !== n.name) changes.push(`Name: ${o.name} → ${n.name}`);
+      if (o.currency !== n.currency) changes.push(`Currency: ${o.currency} → ${n.currency}`);
+      if (o.base_currency !== n.base_currency) changes.push(`Base Currency: ${o.base_currency} → ${n.base_currency}`);
+      if (o.exchange_rate !== n.exchange_rate) changes.push(`Exchange Rate: ${o.exchange_rate} → ${n.exchange_rate}`);
+      if (o.fiscal_year_start_month !== n.fiscal_year_start_month) changes.push(`Fiscal Year Start: Month ${o.fiscal_year_start_month} → ${n.fiscal_year_start_month}`);
+      if (o.description !== n.description) changes.push("Description updated");
+      if (o.logo_url !== n.logo_url) changes.push("Logo updated");
+      if (o.join_password !== n.join_password) changes.push("Join password changed");
+      if (o.invite_code !== n.invite_code) changes.push("Invite code changed");
+      return changes.length > 0 ? changes.join(" · ") : `Company: ${d.name || ""}`;
+    }
     return d.name ? `Company: ${d.name}` : "";
   }
   return "";
@@ -387,7 +484,7 @@ export default function AuditLog() {
         const membership = memberMap.get(log.user_id);
         const approver = membership?.approved_by ? approverMap.get(membership.approved_by) || "" : "";
         const actorName = actorMap.get(log.user_id) || "";
-        const { label } = getActionLabel(log.table_name, log.action);
+        const { label } = getActionLabel(log.table_name, log.action, log);
         const entityName = getEntityName(log);
         const desc = getDescription(log);
 
@@ -519,7 +616,7 @@ export default function AuditLog() {
                   <TableBody>
                     {logs.map((log) => {
                       const profile = getProfile(log.user_id);
-                      const { label: actionLabel, color: actionColor } = getActionLabel(log.table_name, log.action);
+                      const { label: actionLabel, color: actionColor } = getActionLabel(log.table_name, log.action, log);
                       const entityName = getEntityName(log);
                       const entityLink = getEntityLink(log);
                       const desc = getDescription(log);
@@ -594,7 +691,7 @@ export default function AuditLog() {
             <DialogTitle className="flex items-center gap-2 flex-wrap">
               Audit Detail
               {detail && (() => {
-                const { label, color } = getActionLabel(detail.table_name, detail.action);
+                const { label, color } = getActionLabel(detail.table_name, detail.action, detail);
                 return <Badge className={color} variant="outline">{label}</Badge>;
               })()}
             </DialogTitle>
