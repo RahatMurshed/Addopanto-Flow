@@ -9,6 +9,7 @@ interface AccessLogParams {
   isCipher: boolean;
   isCompanyAdmin: boolean;
   isModerator: boolean;
+  forceFullDashboard?: boolean;
 }
 
 export function useDashboardAccessLogger({
@@ -19,6 +20,7 @@ export function useDashboardAccessLogger({
   isCipher,
   isCompanyAdmin,
   isModerator,
+  forceFullDashboard = false,
 }: AccessLogParams) {
   useEffect(() => {
     if (!userId) return;
@@ -37,6 +39,10 @@ export function useDashboardAccessLogger({
     // Anomaly: membership role is admin but computed isModerator is true
     if (membershipRole === "admin" && isModerator) {
       anomalies.push("Role mismatch: membership=admin but computed as moderator");
+    }
+
+    if (forceFullDashboard) {
+      anomalies.push("Cipher force-full-dashboard override active");
     }
 
     const isAnomaly = anomalies.length > 0;
@@ -62,6 +68,6 @@ export function useDashboardAccessLogger({
       .then(({ error }) => {
         if (error) console.warn("[DASHBOARD AUDIT] Failed to log access:", error.message);
       });
-  }, [userId, companyId, isCipher, isCompanyAdmin, isModerator, membershipRole, userEmail]);
+  }, [userId, companyId, isCipher, isCompanyAdmin, isModerator, membershipRole, userEmail, forceFullDashboard]);
 }
 
