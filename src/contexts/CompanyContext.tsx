@@ -81,9 +81,8 @@ interface CompanyContextType {
   isDataEntryModerator: boolean;
   isTraditionalModerator: boolean;
 
-  // Cipher override
-  forceFullDashboard: boolean;
-  toggleForceFullDashboard: () => void;
+
+
 
   // Granular permissions
   canAddRevenue: boolean;
@@ -212,19 +211,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const activeCompany = companies.find((c) => c.id === activeCompanyId) ?? null;
   const membership = memberships.find((m) => m.company_id === activeCompanyId) ?? null;
 
-  // Cipher force-full-dashboard override
-  const [forceFullDashboard, setForceFullDashboard] = useState(false);
-  const toggleForceFullDashboard = useCallback(() => {
-    setForceFullDashboard(prev => {
-      const next = !prev;
-      if (next) console.warn("[CIPHER OVERRIDE] Force full dashboard activated");
-      else console.info("[CIPHER OVERRIDE] Force full dashboard deactivated");
-      return next;
-    });
-  }, []);
+
+
 
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
-  const isModerator = membership?.role === "moderator" && !isCompanyAdmin && !(isCipher && forceFullDashboard);
+  const isModerator = membership?.role === "moderator" && !isCompanyAdmin;
   const isDataEntryModerator = isModerator && (membership?.data_entry_mode ?? false);
   const isTraditionalModerator = isModerator && !(membership?.data_entry_mode ?? false);
 
@@ -324,8 +315,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       isModerator,
       isDataEntryModerator,
       isTraditionalModerator,
-      forceFullDashboard,
-      toggleForceFullDashboard,
+
+
       canAddRevenue,
       canAddExpense,
       canAddExpenseSource,

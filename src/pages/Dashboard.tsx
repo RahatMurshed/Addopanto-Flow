@@ -7,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, ShieldAlert, BookOpen } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, BookOpen } from "lucide-react";
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
+
 import { getSourceBadgeStyle } from "@/utils/sourceColors";
 import {
   AreaChart,
@@ -62,7 +62,7 @@ export default function Dashboard() {
     activeCompanyId, activeCompany, isModerator, isCipher, isCompanyAdmin, membership,
     isDataEntryModerator, isTraditionalModerator,
     canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense, canAddCourse,
-    forceFullDashboard, toggleForceFullDashboard,
+    
     canViewDashboardMetrics,
   } = useCompany();
 
@@ -551,20 +551,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" id="dashboard-content">
-      {isCipher && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
-          <ShieldAlert className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium text-foreground">Cipher Override: Force Full Dashboard</span>
-          <Switch
-            checked={forceFullDashboard}
-            onCheckedChange={toggleForceFullDashboard}
-            aria-label="Force full dashboard override"
-          />
-          {forceFullDashboard && (
-            <Badge variant="destructive" className="ml-auto text-xs">Override Active</Badge>
-          )}
-        </div>
-      )}
+
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
