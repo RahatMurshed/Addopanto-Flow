@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { Search, X, SlidersHorizontal, ChevronDown, Filter, Bookmark } from "lucide-react";
+import { Search, X, SlidersHorizontal, ChevronDown, Filter, Bookmark, MapPin } from "lucide-react";
 import { useBatches } from "@/hooks/useBatches";
 import type { SavedSearchPreset } from "@/hooks/useSavedSearchPresets";
 
@@ -468,43 +468,46 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
             </div>
 
             {/* Row 2: Address group */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Address</p>
+            <div className="rounded-md border border-border/60 bg-background/50 p-3 space-y-2.5">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Address Filters</p>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">City</label>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">Area / Locality</label>
                   <Input
-                    placeholder="Filter by city"
-                    value={cityInput}
-                    onChange={(e) => setCityInput(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">State</label>
-                  <Input
-                    placeholder="Filter by state"
-                    value={stateInput}
-                    onChange={(e) => setStateInput(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Area / Locality</label>
-                  <Input
-                    placeholder="Filter by area"
+                    placeholder="e.g. Lajpat Nagar"
                     value={areaInput}
                     onChange={(e) => setAreaInput(e.target.value)}
-                    className="h-9"
+                    className="h-8 text-sm"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">PIN / ZIP</label>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">City</label>
                   <Input
-                    placeholder="Filter by PIN/ZIP"
+                    placeholder="e.g. New Delhi"
+                    value={cityInput}
+                    onChange={(e) => setCityInput(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">State</label>
+                  <Input
+                    placeholder="e.g. Maharashtra"
+                    value={stateInput}
+                    onChange={(e) => setStateInput(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">PIN / ZIP</label>
+                  <Input
+                    placeholder="e.g. 110024"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
-                    className="h-9"
+                    className="h-8 text-sm"
                   />
                 </div>
               </div>
