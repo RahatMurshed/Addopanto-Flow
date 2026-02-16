@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,7 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2, Settings2, Eye } from "lucide-react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import CompanyJoinRequests from "@/components/CompanyJoinRequests";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,9 +51,17 @@ function getPermissionsSummary(member: CompanyMembership): string {
 
 export default function CompanyMembers() {
   const { user } = useAuth();
-  const { activeCompanyId, activeCompany, canManageMembers, canViewMembers, isCipher, isCompanyAdmin } = useCompany();
+  const { activeCompanyId, activeCompany, canManageMembers, canViewMembers, isCipher, isCompanyAdmin, isDataEntryOperator } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  // DEO route guard: DEOs cannot access member management
+  useEffect(() => {
+    if (isDataEntryOperator) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, navigate]);
   const [search, setSearch] = useState("");
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [editingMember, setEditingMember] = useState<CompanyMembership | null>(null);
