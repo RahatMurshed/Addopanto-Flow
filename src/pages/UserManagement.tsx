@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Button } from "@/components/ui/button";
@@ -64,7 +63,6 @@ export default function UserManagement() {
   } | null>(null);
   const [deleteEmailInput, setDeleteEmailInput] = useState("");
   const [deletePasswordInput, setDeletePasswordInput] = useState("");
-  const [passwordVerifying, setPasswordVerifying] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   // Fetch users with infinite scrolling
@@ -141,34 +139,31 @@ export default function UserManagement() {
     },
   });
 
-  // Delete user mutation
+  // Delete user mutation - now sends password+targetEmail for server-side Cipher verification
   const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const { data, error } = await supabase.functions.invoke("admin-users", {
-        method: "POST",
-        body: { userId },
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
-      if (error) {
-        const errAny = error as any;
-        const ctx = errAny?.context as Response | undefined;
-        if (ctx) {
-          const contentType = ctx.headers.get("content-type") || "";
-          if (contentType.includes("application/json")) {
-            const payload = await ctx.json().catch(() => null);
-            throw new Error(payload?.details ? `${payload.error}: ${payload.details}` : payload?.error || "Failed to delete user");
-          }
-          const text = await ctx.text().catch(() => "");
-          throw new Error(text || errAny?.message || "Failed to delete user");
+    mutationFn: async ({ userId, password, targetEmail }: { userId: string; password?: string; targetEmail?: string }) => {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId, ...(password ? { password } : {}), ...(targetEmail ? { targetEmail } : {}) }),
         }
-        throw new Error(errAny?.message || "Failed to delete user");
-      }
-      return data;
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to delete user");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "User deleted successfully" });
       setDeleteConfirm(null);
+      setDeleteEmailInput("");
+      setDeletePasswordInput("");
     },
     onError: (error) => {
       toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
@@ -390,8 +385,8 @@ export default function UserManagement() {
       </AlertDialog>
 
       {/* Delete User Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open && !deleteUserMutation.isPending && !passwordVerifying) { setDeleteConfirm(null); setDeleteEmailInput(""); setDeletePasswordInput(""); } }}>
-        <AlertDialogContent onEscapeKeyDown={(e) => { if (deleteUserMutation.isPending || passwordVerifying) e.preventDefault(); }}>
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open && !deleteUserMutation.isPending) { setDeleteConfirm(null); setDeleteEmailInput(""); setDeletePasswordInput(""); } }}>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (deleteUserMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>{deleteConfirm?.role === "cipher" ? "Delete Cipher User" : "Delete User"}</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -425,39 +420,29 @@ export default function UserManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteUserMutation.isPending || passwordVerifying}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={async (e) => {
+              onClick={(e) => {
                 e.preventDefault();
                 if (!deleteConfirm) return;
                 if (deleteConfirm.role === "cipher") {
-                  setPasswordVerifying(true);
-                  try {
-                    const { error } = await supabase.auth.signInWithPassword({
-                      email: currentUser?.email || "",
-                      password: deletePasswordInput,
-                    });
-                    if (error) {
-                      toast({ title: "Password verification failed", description: "Incorrect password. Please try again.", variant: "destructive" });
-                      return;
-                    }
-                    deleteUserMutation.mutate(deleteConfirm.userId);
-                  } finally {
-                    setPasswordVerifying(false);
-                  }
+                  deleteUserMutation.mutate({
+                    userId: deleteConfirm.userId,
+                    password: deletePasswordInput,
+                    targetEmail: deleteEmailInput,
+                  });
                 } else {
-                  deleteUserMutation.mutate(deleteConfirm.userId);
+                  deleteUserMutation.mutate({ userId: deleteConfirm.userId });
                 }
               }}
               disabled={
                 deleteUserMutation.isPending ||
-                passwordVerifying ||
                 (deleteConfirm?.role === "cipher" && (deleteEmailInput !== deleteConfirm?.email || !deletePasswordInput.trim()))
               }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {(deleteUserMutation.isPending || passwordVerifying) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {passwordVerifying ? "Verifying..." : deleteUserMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
