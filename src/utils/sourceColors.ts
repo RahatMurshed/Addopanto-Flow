@@ -38,11 +38,11 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
       border: `hsl(${hue}, 35%, 28%)`,
     };
   }
-  // Light: outlined style — transparent bg, colored border + text
+  // Light: outlined with subtle tinted background
   return {
-    bg: "transparent",
-    text: `hsl(${hue}, 55%, 40%)`,
-    border: `hsl(${hue}, 45%, 65%)`,
+    bg: `hsl(${hue}, 50%, 96%)`,
+    text: `hsl(${hue}, 55%, 35%)`,
+    border: `hsl(${hue}, 45%, 70%)`,
   };
 }
 
