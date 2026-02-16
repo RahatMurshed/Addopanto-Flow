@@ -1,50 +1,100 @@
 
 
-## Recommended Fixes — Implementation Plan
+## Restrict Student PII Access to Admin and Cipher Only
 
-### Fix 1: Storage Bucket Hardening
+### The Problem
 
-All three buckets (`company-logos`, `user-avatars`, `profile-avatars`) currently have **no file size limit** and **no MIME type restriction**. This means users could upload arbitrarily large files or non-image files.
+The `students` table has 60+ columns including highly sensitive PII:
+- National ID (`aadhar_id_number`)
+- Contact info (`email`, `phone`, `whatsapp_number`, `alt_contact_number`)
+- Full address (house, street, area, city, state, PIN)
+- Family details (`father_contact`, `mother_contact`, `guardian_contact`, `father_annual_income`)
+- Medical info (`special_needs_medical`, `blood_group`)
+- Emergency contacts
 
-**Change:** Update each bucket to enforce:
-- **5 MB** max file size
-- **Allowed MIME types:** `image/png`, `image/jpeg`, `image/webp`
+Currently, **all company members** (including DEOs and Viewers) can query every column via the SELECT policy. Only Admins and Ciphers should see the sensitive fields.
 
-This is a safe, non-breaking change. The frontend `ImageUpload` component already enforces a 2 MB limit and the same MIME types client-side — this adds the server-side safety net.
+### Solution: Database View + Conditional Frontend Fetching
 
----
-
-### Fix 2: Remove Duplicate RLS Policies on `courses`
-
-The `courses` table currently has **7 policies**, but 3 are redundant duplicates:
-
-| Keep (descriptive names) | Remove (duplicates) |
-|---|---|
-| Users with batch add permission can create courses (INSERT) | `courses_insert` (INSERT) |
-| Users with batch edit permission can update courses (UPDATE) | `courses_update` (UPDATE) |
-| Users with batch delete permission can delete courses (DELETE) | `courses_delete` (DELETE) |
-
-The duplicates use the same permission functions with swapped argument order (`auth.uid(), company_id` vs `company_id, auth.uid()`), but both resolve identically. Removing the duplicates eliminates unnecessary policy evaluation overhead.
-
-**Migration SQL:**
-```sql
-DROP POLICY IF EXISTS "courses_insert" ON public.courses;
-DROP POLICY IF EXISTS "courses_update" ON public.courses;
-DROP POLICY IF EXISTS "courses_delete" ON public.courses;
-```
+**Approach:** Create a `students_safe` view that exposes only non-sensitive columns. Non-admin roles query this view; Admins/Ciphers continue querying the full table.
 
 ---
 
-### Fix 3: Enable Leaked Password Protection
+### Step 1: Create `students_safe` View
 
-Enable the **HaveIBeenPwned** password check via the auth configuration tool. This rejects passwords known to be compromised — zero risk to existing users (only applies at signup/password change time).
+A new database view that excludes sensitive columns:
+
+**Included (safe) columns:**
+`id`, `name`, `student_id_number`, `enrollment_date`, `billing_start_month`, `admission_fee_total`, `monthly_fee_amount`, `status`, `notes`, `user_id`, `created_at`, `updated_at`, `course_start_month`, `course_end_month`, `company_id`, `batch_id`, `class_grade`, `roll_number`, `academic_year`, `section_division`, `gender`
+
+**Excluded (sensitive) columns:**
+`email`, `phone`, `whatsapp_number`, `alt_contact_number`, `date_of_birth`, `blood_group`, `religion_category`, `nationality`, `aadhar_id_number`, all address fields (12 columns), all family fields (8 columns), `special_needs_medical`, `emergency_contact_name`, `emergency_contact_number`, `previous_school`, `previous_qualification`, `previous_percentage`, `board_university`, `transportation_mode`, `distance_from_institution`, `extracurricular_interests`, `language_proficiency`
+
+The view uses `security_invoker=on` so it inherits the caller's RLS context.
+
+### Step 2: Modify RLS on `students` Table
+
+- **Keep** the existing SELECT policy for company members (needed for the view to work)
+- **Add** a new restrictive SELECT policy that limits full-table access to Admin/Cipher only
+- **Replace** the current broad SELECT policy so non-admin direct table queries return no rows
+- The safe view continues to work because it only exposes non-sensitive columns
+
+Alternatively (simpler, less disruptive):
+- Leave the base table RLS unchanged
+- Only change the **frontend code** to route non-admin users to the `students_safe` view
+- This is a defense-in-depth approach: even if a non-admin somehow queries the base table, RLS still requires company membership, but they won't get PII through the app
+
+### Step 3: Update Frontend Data Fetching
+
+Modify `useStudents.ts` to check the user's role:
+- If the user is **Admin** or **Cipher**: query `students` table (full access)
+- Otherwise: query `students_safe` view (no PII columns)
+
+This requires passing the company role into the hook or reading it from context.
+
+### Step 4: Conditionally Hide PII in UI
+
+Update these components to hide sensitive fields for non-admin users:
+- `StudentProfileDialog` -- hide contact/family/address tabs
+- `StudentDetail` page -- hide PII sections
+- `StudentExportDialog` -- exclude PII columns from exports for non-admins
+- `ReviewStep` in the wizard -- no changes needed (only admins can add students with full data)
 
 ---
+
+### Risk Assessment
+
+| Area | Risk | Mitigation |
+|---|---|---|
+| View creation | None -- additive change | View is read-only, base table unaffected |
+| Frontend routing | Low -- conditional query target | Fallback to safe view if role unknown |
+| Student creation/editing | None -- only admins can do full edits | DEOs already restricted by existing permissions |
+| Exports/backups | Low -- must filter columns | Check role before including PII in exports |
+| Existing features | None -- admin/cipher experience unchanged | They continue seeing everything |
 
 ### Technical Details
 
-- **Fix 1** — One SQL migration updating `storage.buckets` rows (data update, not schema change).
-- **Fix 2** — One SQL migration dropping 3 redundant policies.
-- **Fix 3** — Auth config tool call.
-- No application code changes required for any of these fixes.
+**Migration SQL:**
+```sql
+CREATE VIEW public.students_safe
+WITH (security_invoker=on) AS
+  SELECT id, name, student_id_number, enrollment_date, billing_start_month,
+         admission_fee_total, monthly_fee_amount, status, notes, user_id,
+         created_at, updated_at, course_start_month, course_end_month,
+         company_id, batch_id, class_grade, roll_number, academic_year,
+         section_division, gender
+  FROM public.students;
+```
+
+**Frontend changes:**
+- `src/hooks/useStudents.ts` -- add role-based table selection
+- `src/components/dialogs/StudentProfileDialog.tsx` -- conditionally render PII sections
+- `src/components/dialogs/StudentExportDialog.tsx` -- filter export columns by role
+- `src/pages/StudentDetail.tsx` -- hide sensitive sections for non-admin roles
+
+**No changes to:**
+- Student creation/editing flows (already permission-gated)
+- Payment flows (no PII involved)
+- Batch/course management
+- Any existing RLS policies
 
