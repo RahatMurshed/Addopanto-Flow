@@ -61,6 +61,8 @@ export default function UserManagement() {
     role: string;
   } | null>(null);
   const [deleteEmailInput, setDeleteEmailInput] = useState("");
+  const [deletePasswordInput, setDeletePasswordInput] = useState("");
+  const [passwordVerifying, setPasswordVerifying] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   // Fetch users with infinite scrolling
@@ -250,7 +252,8 @@ export default function UserManagement() {
                     {filteredUsers.map((u) => {
                       const isCurrentUser = u.user_id === currentUser?.id;
                       const displayRole = getDisplayRole(u.role);
-                      const canModify = !isCurrentUser && displayRole !== "cipher";
+                      const canChangeRole = !isCurrentUser && displayRole !== "cipher";
+                      const canDelete = !isCurrentUser;
 
                       return (
                         <TableRow key={u.user_id}>
@@ -267,7 +270,7 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {canModify ? (
+                            {canChangeRole ? (
                               <Select
                                 value={displayRole}
                                 onValueChange={(newRole: AppRole) => handleRoleChange(u.user_id, u.email, u.role, newRole)}
@@ -300,7 +303,7 @@ export default function UserManagement() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDeleteUser(u.user_id, u.email, u.role)}
-                                disabled={!canModify || deleteUserMutation.isPending}
+                                disabled={!canDelete || deleteUserMutation.isPending}
                                 className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -350,34 +353,74 @@ export default function UserManagement() {
       </AlertDialog>
 
       {/* Delete User Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open && !deleteUserMutation.isPending) { setDeleteConfirm(null); setDeleteEmailInput(""); } }}>
-        <AlertDialogContent onEscapeKeyDown={(e) => { if (deleteUserMutation.isPending) e.preventDefault(); }}>
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open && !deleteUserMutation.isPending && !passwordVerifying) { setDeleteConfirm(null); setDeleteEmailInput(""); setDeletePasswordInput(""); } }}>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (deleteUserMutation.isPending || passwordVerifying) e.preventDefault(); }}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogTitle>{deleteConfirm?.role === "cipher" ? "Delete Cipher User" : "Delete User"}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?</p>
-                <p className="text-destructive font-medium">This action cannot be undone.</p>
-                {deleteConfirm?.role === "cipher" && (
-                  <div className="pt-2">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to confirm:
-                    </p>
-                    <Input value={deleteEmailInput} onChange={(e) => setDeleteEmailInput(e.target.value)} placeholder="Enter email to confirm" autoComplete="off" />
-                  </div>
+                {deleteConfirm?.role === "cipher" ? (
+                  <>
+                    <p>You are about to delete a <strong>Cipher</strong> user: <strong>{deleteConfirm?.email}</strong></p>
+                    <p className="text-destructive font-medium">This action cannot be undone.</p>
+                    <div className="pt-2 space-y-3">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Type <strong className="text-foreground">{deleteConfirm?.email}</strong> to confirm:
+                        </p>
+                        <Input value={deleteEmailInput} onChange={(e) => setDeleteEmailInput(e.target.value)} placeholder="Enter their email to confirm" autoComplete="off" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Enter <strong className="text-foreground">YOUR</strong> password to verify identity:
+                        </p>
+                        <Input type="password" value={deletePasswordInput} onChange={(e) => setDeletePasswordInput(e.target.value)} placeholder="Your password" autoComplete="current-password" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>Are you sure you want to delete <strong>{deleteConfirm?.email}</strong>?</p>
+                    <p className="text-destructive font-medium">This action cannot be undone.</p>
+                  </>
                 )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteUserMutation.isPending || passwordVerifying}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); if (deleteConfirm) deleteUserMutation.mutate(deleteConfirm.userId); }}
-              disabled={deleteUserMutation.isPending || (deleteConfirm?.role === "cipher" && deleteEmailInput !== deleteConfirm?.email)}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!deleteConfirm) return;
+                if (deleteConfirm.role === "cipher") {
+                  setPasswordVerifying(true);
+                  try {
+                    const { error } = await supabase.auth.signInWithPassword({
+                      email: currentUser?.email || "",
+                      password: deletePasswordInput,
+                    });
+                    if (error) {
+                      toast({ title: "Password verification failed", description: "Incorrect password. Please try again.", variant: "destructive" });
+                      return;
+                    }
+                    deleteUserMutation.mutate(deleteConfirm.userId);
+                  } finally {
+                    setPasswordVerifying(false);
+                  }
+                } else {
+                  deleteUserMutation.mutate(deleteConfirm.userId);
+                }
+              }}
+              disabled={
+                deleteUserMutation.isPending ||
+                passwordVerifying ||
+                (deleteConfirm?.role === "cipher" && (deleteEmailInput !== deleteConfirm?.email || !deletePasswordInput.trim()))
+              }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deleteUserMutation.isPending ? "Deleting..." : "Delete"}
+              {(deleteUserMutation.isPending || passwordVerifying) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {passwordVerifying ? "Verifying..." : deleteUserMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
