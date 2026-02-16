@@ -142,6 +142,25 @@ export default function CompanyJoinRequests() {
   const roleLabel = (role: MemberRole) =>
     role === "data_entry_operator" ? "Data Entry Operator" : role === "viewer" ? "Viewer" : "Moderator";
 
+  const buildPermissionsSummary = (data: ApproveData): string => {
+    if (data.role === "viewer") return "Read-only access (no permissions)";
+    const enabled: string[] = [];
+    if (data.role === "data_entry_operator") {
+      if (data.deoStudents) enabled.push("Students");
+      if (data.deoPayments) enabled.push("Payments");
+      if (data.deoBatches) enabled.push("Batches");
+      if (data.deoFinance) enabled.push("Finance");
+    } else {
+      if (data.canAddRevenue) enabled.push("Revenue");
+      if (data.canAddExpense) enabled.push("Expense");
+      if (data.canAddExpenseSource) enabled.push("Expense Sources");
+      if (data.canTransfer) enabled.push("Transfer");
+      if (data.canViewReports) enabled.push("Reports");
+      if (data.canManageStudents) enabled.push("Students");
+    }
+    return enabled.length > 0 ? enabled.join(", ") : "No permissions enabled";
+  };
+
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async (data: ApproveData) => {
@@ -153,8 +172,11 @@ export default function CompanyJoinRequests() {
         permissions: buildPermissionsPayload(data),
       });
     },
-    onSuccess: () => {
-      toast({ title: "Join request approved", description: "User has been added to the business." });
+    onSuccess: (_result, data) => {
+      toast({
+        title: "Join request approved",
+        description: `${data.email} added as ${roleLabel(data.role)}. Permissions: ${buildPermissionsSummary(data)}`,
+      });
       queryClient.invalidateQueries({ queryKey: ["company-join-requests-admin", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["pending-join-requests-count"] });
@@ -199,8 +221,11 @@ export default function CompanyJoinRequests() {
         permissions: buildPermissionsPayload(data),
       });
     },
-    onSuccess: () => {
-      toast({ title: "User accepted", description: "Rejected user has been added to the business." });
+    onSuccess: (_result, data) => {
+      toast({
+        title: "User accepted",
+        description: `${data.email} added as ${roleLabel(data.role)}. Permissions: ${buildPermissionsSummary(data)}`,
+      });
       queryClient.invalidateQueries({ queryKey: ["company-join-requests-admin", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
       setAcceptRejectedDialog(null);
