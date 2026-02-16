@@ -23,16 +23,21 @@
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
+    <script>
+      // Apply stored theme BEFORE first paint to prevent flash
+      (function(){var t=localStorage.getItem('theme');var d=t==='dark'||(t==null&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.classList.add('dark')})();
+    </script>
     <style>
-      #initial-loader{display:flex;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;background:#09090b;font-family:system-ui,sans-serif}
+      #initial-loader{display:flex;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;background:#fafbfd;font-family:system-ui,sans-serif}
+      .dark #initial-loader{background:#09090b}
       .loader-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:64px;height:64px}
       .ring-outer{position:absolute;width:64px;height:64px;border-radius:50%;border:3px solid transparent;border-top-color:#ff8c00;animation:spin 2.5s linear infinite}
       .ring-inner{position:absolute;width:40px;height:40px;border-radius:50%;border:3px solid transparent;border-bottom-color:#1e3a8a;animation:spin 1.8s linear infinite reverse}
       .dot{width:12px;height:12px;border-radius:50%;background:#ff8c00;box-shadow:0 0 12px rgba(255,140,0,.6);animation:pulse 1.4s ease-in-out infinite}
-      #initial-loader p{margin-top:1.5rem;font-size:.75rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#a1a1aa;animation:pulse 2s ease-in-out infinite}
+      #initial-loader p{margin-top:1.5rem;font-size:.75rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#71717a;animation:pulse 2s ease-in-out infinite}
+      .dark #initial-loader p{color:#a1a1aa}
       @keyframes spin{to{transform:rotate(360deg)}}
       @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.92)}}
-      @media(prefers-color-scheme:light){#initial-loader{background:#fafbfd}#initial-loader p{color:#71717a}}
     </style>
   </head>
 

@@ -1,10 +1,23 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { validateAndFixContrast } from "@/utils/contrastValidator";
+import { SEMANTIC_PAIRS, validateAndFixContrast } from "@/utils/contrastValidator";
+
+/** Remove any inline overrides set by the contrast validator before re-validating */
+function clearContrastOverrides() {
+  for (const pair of SEMANTIC_PAIRS) {
+    document.documentElement.style.removeProperty(pair.fg);
+  }
+}
 
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    // Read synchronously so initial render matches
+    if (typeof document !== "undefined") {
+      return document.documentElement.classList.contains("dark");
+    }
+    return false;
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -12,7 +25,7 @@ export function ThemeToggle() {
     const dark = stored === "dark" || (!stored && prefersDark);
     setIsDark(dark);
     document.documentElement.classList.toggle("dark", dark);
-    // Auto-validate & fix contrast after initial theme is applied
+    clearContrastOverrides();
     requestAnimationFrame(() => validateAndFixContrast());
   }, []);
 
@@ -21,7 +34,8 @@ export function ThemeToggle() {
     setIsDark(newDark);
     document.documentElement.classList.toggle("dark", newDark);
     localStorage.setItem("theme", newDark ? "dark" : "light");
-    // Auto-validate & fix contrast after theme switch
+    // Clear stale inline overrides from previous theme, then re-validate
+    clearContrastOverrides();
     requestAnimationFrame(() => validateAndFixContrast());
   };
 
