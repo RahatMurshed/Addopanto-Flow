@@ -9,7 +9,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, Users, DollarSign, Clock } from "lucide-react";
+import { AlertTriangle, Users, DollarSign, Clock, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { exportToPDF } from "@/utils/exportUtils";
 import ExportButtons from "@/components/ExportButtons";
@@ -232,13 +233,36 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
 
         {/* Overdue Table */}
         {filteredRows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
             <div className="mb-3 rounded-full bg-muted p-3">
               <AlertTriangle className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground">
-              No overdue students for the selected period.
+            <p className="font-medium text-foreground">
+              {severityFilter !== "all"
+                ? `No "${severityFilter}" severity overdue records found`
+                : "No overdue students for the selected period"}
             </p>
+            <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+              {severityFilter !== "all"
+                ? "Try a different severity level or reset filters to see all overdue records."
+                : filterMode === "specific"
+                  ? 'Try switching to "All Months" or selecting a different month.'
+                  : "All students are up to date — great job! 🎉"}
+            </p>
+            {(severityFilter !== "all" || filterMode === "specific") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => {
+                  setSeverityFilter("all");
+                  setFilterMode("all");
+                }}
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                Reset Filters
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
