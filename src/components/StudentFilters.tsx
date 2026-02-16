@@ -11,10 +11,10 @@ import { useBatches } from "@/hooks/useBatches";
 
 export interface StudentFilterValues {
   search: string;
-  status: "all" | "active" | "inactive" | "graduated";
+  status: "all" | "active" | "inactive" | "graduated" | "dropout" | "transferred";
   admissionStatus: "all" | "paid" | "partial" | "pending";
   monthlyStatus: "all" | "paid" | "pending" | "overdue";
-  sortBy: "name" | "enrollment_date" | "monthly_fee_amount";
+  sortBy: "name" | "enrollment_date" | "monthly_fee_amount" | "student_id_number" | "date_of_birth" | "class_grade" | "created_at";
   sortOrder: "asc" | "desc";
   // Advanced filters
   batchId: "all" | string;
@@ -161,7 +161,7 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name, ID, father name, phone..."
+            placeholder="Search name, ID, father, mother, phone, WhatsApp, email, city..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9 pr-9"
@@ -187,6 +187,8 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
               <SelectItem value="graduated">Graduated</SelectItem>
+              <SelectItem value="dropout">Dropout</SelectItem>
+              <SelectItem value="transferred">Transferred</SelectItem>
             </SelectContent>
           </Select>
 
@@ -228,10 +230,15 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
             <SelectContent>
               <SelectItem value="name-asc">Name A–Z</SelectItem>
               <SelectItem value="name-desc">Name Z–A</SelectItem>
-              <SelectItem value="enrollment_date-desc">Newest First</SelectItem>
-              <SelectItem value="enrollment_date-asc">Oldest First</SelectItem>
+              <SelectItem value="enrollment_date-desc">Newest Enrolled</SelectItem>
+              <SelectItem value="enrollment_date-asc">Oldest Enrolled</SelectItem>
               <SelectItem value="monthly_fee_amount-desc">Fee High–Low</SelectItem>
               <SelectItem value="monthly_fee_amount-asc">Fee Low–High</SelectItem>
+              <SelectItem value="student_id_number-asc">Student ID A–Z</SelectItem>
+              <SelectItem value="date_of_birth-asc">DOB Oldest</SelectItem>
+              <SelectItem value="date_of_birth-desc">DOB Newest</SelectItem>
+              <SelectItem value="class_grade-asc">Class A–Z</SelectItem>
+              <SelectItem value="created_at-desc">Recently Added</SelectItem>
             </SelectContent>
           </Select>
 

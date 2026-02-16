@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCourses, useCreateCourse, useUpdateCourse, useDeleteCourse, type Course, type CourseInsert } from "@/hooks/useCourses";
 import { useBatches } from "@/hooks/useBatches";
-import { useStudents } from "@/hooks/useStudents";
+import { useAllStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,7 +35,7 @@ export default function Courses() {
   const [sortBy, setSortBy] = useState("newest");
   const { data: courses = [], isLoading } = useCourses({ search, status: statusFilter });
   const { data: allBatches = [] } = useBatches();
-  const { data: allStudents = [] } = useStudents();
+  const { data: allStudents = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
   const { user } = useAuth();

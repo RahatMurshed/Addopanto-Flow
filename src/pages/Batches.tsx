@@ -5,7 +5,7 @@ import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilte
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useStudents } from "@/hooks/useStudents";
+import { useAllStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ export default function Batches() {
   const [sortBy, setSortBy] = useState("newest");
   const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
   const { data: rawBatches = [], isLoading } = useBatches({ search, status: statusFilter });
-  const { data: allStudents = [] } = useStudents();
+  const { data: allStudents = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
   const { user } = useAuth();

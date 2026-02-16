@@ -1031,6 +1031,75 @@ export type Database = {
           },
         ]
       }
+      student_batch_history: {
+        Row: {
+          company_id: string
+          from_batch_id: string | null
+          id: string
+          reason: string | null
+          student_id: string
+          to_batch_id: string | null
+          transferred_at: string
+          transferred_by: string
+        }
+        Insert: {
+          company_id: string
+          from_batch_id?: string | null
+          id?: string
+          reason?: string | null
+          student_id: string
+          to_batch_id?: string | null
+          transferred_at?: string
+          transferred_by: string
+        }
+        Update: {
+          company_id?: string
+          from_batch_id?: string | null
+          id?: string
+          reason?: string | null
+          student_id?: string
+          to_batch_id?: string | null
+          transferred_at?: string
+          transferred_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_batch_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_batch_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_batch_history_from_batch_id_fkey"
+            columns: ["from_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_batch_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_batch_history_to_batch_id_fkey"
+            columns: ["to_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_payments: {
         Row: {
           amount: number
@@ -1650,7 +1719,12 @@ export type Database = {
     Enums: {
       app_role: "cipher" | "admin" | "moderator" | "user"
       company_role: "admin" | "moderator" | "viewer" | "data_entry_operator"
-      student_status: "active" | "inactive" | "graduated"
+      student_status:
+        | "active"
+        | "inactive"
+        | "graduated"
+        | "dropout"
+        | "transferred"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1780,7 +1854,13 @@ export const Constants = {
     Enums: {
       app_role: ["cipher", "admin", "moderator", "user"],
       company_role: ["admin", "moderator", "viewer", "data_entry_operator"],
-      student_status: ["active", "inactive", "graduated"],
+      student_status: [
+        "active",
+        "inactive",
+        "graduated",
+        "dropout",
+        "transferred",
+      ],
     },
   },
 } as const

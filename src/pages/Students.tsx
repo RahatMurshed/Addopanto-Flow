@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { useStudents, useCreateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
+import { useStudents, useAllStudents, useCreateStudent, useDeleteStudent, useBulkDeleteStudents, type StudentInsert, type Student } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
@@ -27,8 +27,8 @@ import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import BulkImportDialog from "@/components/BulkImportDialog";
 import BatchAssignDialog from "@/components/BatchAssignDialog";
 import BatchDropZone from "@/components/BatchDropZone";
+import ExportButtons from "@/components/ExportButtons";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
-import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
 import StudentOverdueSection from "@/components/StudentOverdueSection";
 import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/components/StudentFilters";
@@ -38,19 +38,37 @@ export default function Students() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchAssignOpen, setBatchAssignOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  // Server-side filters passed to hook
-  const { data: rawStudents = [], isLoading } = useStudents({
+  // Server-side pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
+  // Server-side paginated query
+  const { data: paginatedResult, isLoading } = useStudents({
     search: filters.search,
-    status: filters.status,
-    sortBy: filters.sortBy,
+    status: filters.status as any,
+    sortBy: filters.sortBy as any,
     sortOrder: filters.sortOrder,
     batchId: filters.batchId,
     gender: filters.gender,
     classGrade: filters.classGrade,
     addressCity: filters.addressCity,
     academicYear: filters.academicYear,
+    page,
+    pageSize,
   });
+
+  const serverStudents = paginatedResult?.data ?? [];
+  const serverTotalCount = paginatedResult?.totalCount ?? 0;
+
+  // All students for summary cards & overdue section (uses separate cached query)
+  const { data: allStudentsRaw = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment } = useCompany();
   const { user } = useAuth();
@@ -59,13 +77,21 @@ export default function Students() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // DEO filter for all students (summary cards)
+  const allStudents = useMemo(() => {
+    if (!isDataEntryOperator) return allStudentsRaw;
+    return allStudentsRaw.filter(s => s.user_id === user?.id);
+  }, [allStudentsRaw, isDataEntryOperator, user?.id]);
+
+  // DEO filter for paginated students
   const students = useMemo(() => {
-    if (!isDataEntryOperator) return rawStudents;
-    return rawStudents.filter(s => s.user_id === user?.id);
-  }, [rawStudents, isDataEntryOperator, user?.id]);
+    if (!isDataEntryOperator) return serverStudents;
+    return serverStudents.filter(s => s.user_id === user?.id);
+  }, [serverStudents, isDataEntryOperator, user?.id]);
 
   const createMutation = useCreateStudent();
   const deleteMutation = useDeleteStudent();
+  const bulkDeleteMutation = useBulkDeleteStudents();
   const createPaymentMutation = useCreateStudentPayment();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -74,7 +100,17 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Compute summaries for all students
+  // Compute summaries for all students (for summary cards)
+  const allStudentSummaries = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
+    for (const s of allStudents) {
+      const payments = allPayments.filter((p) => p.student_id === s.id);
+      map.set(s.id, computeStudentSummary(s, payments));
+    }
+    return map;
+  }, [allStudents, allPayments]);
+
+  // Compute summaries for current page students
   const studentSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
     for (const s of students) {
@@ -84,7 +120,7 @@ export default function Students() {
     return map;
   }, [students, allPayments]);
 
-  // Client-side payment status filters (admission & monthly depend on computed summaries)
+  // Client-side payment status filters on current page
   const filteredStudents = useMemo(() => {
     let result = students;
 
@@ -112,32 +148,30 @@ export default function Students() {
     return result;
   }, [students, studentSummaries, filters.admissionStatus, filters.monthlyStatus]);
 
-  // Summary cards (use all server-returned students, not filtered)
-  const totalStudents = students.length;
-  const activeStudents = students.filter((s) => s.status === "active").length;
-  const pendingAdmission = students.filter((s) => {
-    const sum = studentSummaries.get(s.id);
+  // Summary cards (use all students, not paginated)
+  const totalStudents = allStudents.length;
+  const activeStudents = allStudents.filter((s) => s.status === "active").length;
+  const pendingAdmission = allStudents.filter((s) => {
+    const sum = allStudentSummaries.get(s.id);
     return sum && sum.admissionStatus !== "paid" && sum.admissionTotal > 0;
   }).length;
-  const overdueStudents = students.filter((s) => {
-    const sum = studentSummaries.get(s.id);
+  const overdueStudents = allStudents.filter((s) => {
+    const sum = allStudentSummaries.get(s.id);
     return sum && sum.monthlyOverdueMonths.length > 0;
   }).length;
 
-  const pagination = usePagination(filteredStudents);
+  // Server-side pagination calculations
+  const totalPages = Math.max(1, Math.ceil(serverTotalCount / pageSize));
+  const startIndex = serverTotalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endIndex = Math.min(page * pageSize, serverTotalCount);
 
-  // Reset pagination when filters change
-  useEffect(() => {
-    pagination.goToPage(1);
-  }, [filters]);
-
-  // Clear selection when filtered results change
+  // Clear selection when page/filters change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filteredStudents.length, filters]);
+  }, [page, pageSize, filters]);
 
   // Selection helpers
-  const currentPageIds = useMemo(() => pagination.paginatedItems.map(s => s.id), [pagination.paginatedItems]);
+  const currentPageIds = useMemo(() => filteredStudents.map(s => s.id), [filteredStudents]);
   const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
   const somePageSelected = currentPageIds.some(id => selectedIds.has(id));
 
@@ -208,6 +242,18 @@ export default function Students() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    try {
+      await bulkDeleteMutation.mutateAsync(ids);
+      toast({ title: `${ids.length} student${ids.length > 1 ? "s" : ""} deleted` });
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handlePayment = async (data: any) => {
     try {
       await createPaymentMutation.mutateAsync(data);
@@ -216,6 +262,41 @@ export default function Students() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
     }
+  };
+
+  // Export functions
+  const handleExportCSV = () => {
+    const rows = filteredStudents.map(s => {
+      const sum = studentSummaries.get(s.id);
+      return {
+        Name: s.name,
+        "Student ID": s.student_id_number || "",
+        Status: s.status,
+        Phone: s.phone || "",
+        Email: s.email || "",
+        "Father Name": s.father_name || "",
+        "Class/Grade": s.class_grade || "",
+        "Admission Fee": s.admission_fee_total,
+        "Monthly Fee": s.monthly_fee_amount,
+        "Total Paid": sum?.totalPaid || 0,
+        "Total Pending": sum?.totalPending || 0,
+      };
+    });
+    const headers = Object.keys(rows[0] || {});
+    const csv = [
+      headers.join(","),
+      ...rows.map(r => headers.map(h => `"${String((r as any)[h]).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `students_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.click();
+  };
+
+  const handleExportPDF = async () => {
+    const { exportToPDF } = await import("@/utils/exportUtils");
+    await exportToPDF("students-table", `students_${format(new Date(), "yyyy-MM-dd")}`, "Student List", format(new Date(), "MMMM yyyy"));
   };
 
   if (isLoading) {
@@ -246,16 +327,26 @@ export default function Students() {
           </div>
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>
-        {effectiveCanAdd && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" /> Import CSV
-            </Button>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Student
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          {filteredStudents.length > 0 && (
+            <ExportButtons
+              onExportCSV={handleExportCSV}
+              onExportPDF={handleExportPDF}
+              csvLabel="Export CSV"
+              pdfLabel="Export PDF"
+            />
+          )}
+          {effectiveCanAdd && (
+            <>
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" /> Import CSV
+              </Button>
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Student
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards - hidden for DEO */}
@@ -293,16 +384,16 @@ export default function Students() {
       )}
 
       {/* Monthly Overdue Section - hidden for DEO */}
-      {!isDataEntryOperator && students.length > 0 && (
+      {!isDataEntryOperator && allStudents.length > 0 && (
         <StudentOverdueSection
-          students={students}
-          studentSummaries={studentSummaries}
+          students={allStudents}
+          studentSummaries={allStudentSummaries}
           currency={currency}
         />
       )}
 
       {/* Students Table */}
-      {students.length === 0 && filters.search === "" && filters.status === "all" ? (
+      {allStudents.length === 0 && filters.search === "" && filters.status === "all" ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 rounded-full bg-muted p-4"><GraduationCap className="h-8 w-8 text-muted-foreground" /></div>
@@ -316,7 +407,7 @@ export default function Students() {
           <CardHeader className="flex flex-col gap-4">
             <div className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">All Students</CardTitle>
-              <span className="text-sm text-muted-foreground">{filteredStudents.length} students</span>
+              <span className="text-sm text-muted-foreground">{serverTotalCount} students</span>
             </div>
             <StudentFilters
               filters={filters}
@@ -326,19 +417,32 @@ export default function Students() {
             />
 
             {/* Bulk action bar */}
-            {selectedIds.size > 0 && effectiveCanEdit && (
+            {selectedIds.size > 0 && (effectiveCanEdit || effectiveCanDelete) && (
               <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
                 <span className="text-sm font-medium">
                   {selectedIds.size} student{selectedIds.size > 1 ? "s" : ""} selected
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBatchAssignOpen(true)}
-                >
-                  <Layers className="mr-1.5 h-3.5 w-3.5" />
-                  Assign to Batch
-                </Button>
+                {effectiveCanEdit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setBatchAssignOpen(true)}
+                  >
+                    <Layers className="mr-1.5 h-3.5 w-3.5" />
+                    Assign to Batch
+                  </Button>
+                )}
+                {effectiveCanDelete && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => setBulkDeleteOpen(true)}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete Selected
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -372,9 +476,9 @@ export default function Students() {
               </div>
             ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" id="students-table">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow>
                        {effectiveCanEdit && (
                         <TableHead className="w-10">
@@ -399,7 +503,7 @@ export default function Students() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pagination.paginatedItems.map((s) => {
+                    {filteredStudents.map((s) => {
                       const sum = studentSummaries.get(s.id)!;
                       const isSelected = selectedIds.has(s.id);
                       return (
@@ -494,11 +598,17 @@ export default function Students() {
                 </Table>
               </div>
               <TablePagination
-                currentPage={pagination.currentPage} totalPages={pagination.totalPages}
-                totalItems={pagination.totalItems} startIndex={pagination.startIndex}
-                endIndex={pagination.endIndex} itemsPerPage={pagination.itemsPerPage}
-                onPageChange={pagination.goToPage} onItemsPerPageChange={pagination.setItemsPerPage}
-                canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev}
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={serverTotalCount}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                itemsPerPage={pageSize}
+                onPageChange={setPage}
+                onItemsPerPageChange={(size) => { setPageSize(size); setPage(1); }}
+                itemsPerPageOptions={[25, 50, 100, 200]}
+                canGoNext={page < totalPages}
+                canGoPrev={page > 1}
               />
             </>
             )}
@@ -543,6 +653,24 @@ export default function Students() {
             <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} disabled={deleteMutation.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={(open) => { if (!open && !bulkDeleteMutation.isPending) setBulkDeleteOpen(false); }}>
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (bulkDeleteMutation.isPending) e.preventDefault(); }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Students</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} student{selectedIds.size > 1 ? "s" : ""} and all their payment records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleBulkDelete(); }} disabled={bulkDeleteMutation.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {bulkDeleteMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : `Delete ${selectedIds.size} Students`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
