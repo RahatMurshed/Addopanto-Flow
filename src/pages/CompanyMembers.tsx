@@ -224,9 +224,9 @@ export default function CompanyMembers() {
     });
   }, [members, search, profiles]);
 
-  // DEO access check: redirect to dashboard
+  // DEO access check: show denied page then auto-redirect
   if (isDataEntryOperator) {
-    return <Navigate to="/dashboard" replace />;
+    return <PermissionDenied message="You don't have permission to manage company members. Contact your company admin for assistance." autoRedirectSeconds={5} />;
   }
 
   if (!canViewMembers) return <Navigate to="/" replace />;
