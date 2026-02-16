@@ -123,25 +123,22 @@ Deno.serve(async (req) => {
         return jsonResp(403, { error: "Admins can only delete moderators" });
       }
 
-      // Server-side two-step verification for Cipher deletions
-      if (targetUserRole === "cipher") {
-        // Step 1: Require target email match
-        if (!targetEmail || targetEmail !== targetActualEmail) {
-          return jsonResp(400, { error: "Target email verification failed. You must provide the exact email of the Cipher user." });
-        }
+      // Require target email match for ALL deletions
+      if (!targetEmail || targetEmail !== targetActualEmail) {
+        return jsonResp(400, { error: "Target email verification failed. You must provide the exact email of the user being deleted." });
+      }
 
-        // Step 2: Require caller password re-authentication
-        if (!password) {
-          return jsonResp(400, { error: "Password required to delete a Cipher user" });
-        }
+      // Require caller password re-authentication for ALL deletions
+      if (!password) {
+        return jsonResp(400, { error: "Password required to delete a user" });
+      }
 
-        const { error: authError } = await adminClient.auth.signInWithPassword({
-          email: user.email!,
-          password,
-        });
-        if (authError) {
-          return jsonResp(403, { error: "Password verification failed. Cannot delete Cipher user." });
-        }
+      const { error: authError } = await adminClient.auth.signInWithPassword({
+        email: user.email!,
+        password,
+      });
+      if (authError) {
+        return jsonResp(403, { error: "Password verification failed. Cannot proceed with deletion." });
       }
 
       // Write audit log BEFORE deletion (so we capture the data)
