@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -52,7 +53,17 @@ const AddStudent = lazy(() => import("@/pages/AddStudent"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 2, staleTime: 30_000, refetchOnWindowFocus: true },
-    mutations: { retry: 0 },
+    mutations: {
+      retry: 0,
+      onError: (error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : "Something went wrong";
+        // Use sonner toast for global mutation errors
+        import("sonner").then(({ toast }) => {
+          toast.error(message, { duration: 5000 });
+        });
+      },
+    },
   },
 });
 
@@ -135,6 +146,7 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <OfflineBanner />
         <Toaster />
         <Sonner />
         <BrowserRouter>
