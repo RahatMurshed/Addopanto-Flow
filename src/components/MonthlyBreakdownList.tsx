@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/utils/currencyUtils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import type { StudentPayment, StudentSummary, MonthlyFeeHistory } from "@/hooks/useStudentPayments";
 
 interface MonthlyBreakdownListProps {
@@ -8,7 +8,7 @@ interface MonthlyBreakdownListProps {
   payments: StudentPayment[];
   feeHistory: MonthlyFeeHistory[];
   monthlyFeeAmount: number;
-  currency: string;
+  currency?: string; // kept for backward compat but useCompanyCurrency is used internally
 }
 
 function getFeeForMonth(month: string, monthlyFeeAmount: number, feeHistory: MonthlyFeeHistory[]): number {
@@ -41,7 +41,8 @@ function findPaymentForMonth(month: string, payments: StudentPayment[]) {
   return null;
 }
 
-export default function MonthlyBreakdownList({ summary, payments, feeHistory, monthlyFeeAmount, currency }: MonthlyBreakdownListProps) {
+export default function MonthlyBreakdownList({ summary, payments, feeHistory, monthlyFeeAmount }: MonthlyBreakdownListProps) {
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const hasPaid = summary.monthlyPaidMonths.length > 0;
   const hasPartial = summary.monthlyPartialMonths.length > 0;
   const hasOverdue = summary.monthlyOverdueMonths.length > 0;
