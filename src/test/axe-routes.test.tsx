@@ -72,7 +72,13 @@ const PROTECTED: RouteSpec[] = [
   { label: "AddStudent", load: () => import("@/pages/AddStudent") },
 ];
 
-async function runAxeCheck(spec: RouteSpec) {
+// New/experimental routes — warnings only (non-blocking fence checks)
+const FENCE_ROUTES: RouteSpec[] = [
+  // Move routes here temporarily when first added; promote to PROTECTED once stable
+  // Example: { label: "NewFeature", load: () => import("@/pages/NewFeature") },
+];
+
+async function runAxeCheck(spec: RouteSpec, mode: "strict" | "fence" = "strict") {
   const Comp = (await spec.load()).default;
   let container: HTMLElement;
   try {
@@ -95,25 +101,42 @@ async function runAxeCheck(spec: RouteSpec) {
           v.nodes.map((n) => `  → ${n.html.slice(0, 120)}`).join("\n")
       )
       .join("\n\n");
-    expect.fail(`A11y violations in ${spec.label}:\n${summary}`);
+
+    if (mode === "fence") {
+      // Non-blocking: log warning but don't fail
+      console.warn(`⚠️ A11y fence warnings in ${spec.label}:\n${summary}`);
+    } else {
+      expect.fail(`A11y violations in ${spec.label}:\n${summary}`);
+    }
   }
 }
 
-describe("axe-core — Public Routes", () => {
+describe("axe-core — Public Routes (blocking)", () => {
   for (const spec of PUBLIC) {
-    it(`${spec.label} passes axe checks`, () => runAxeCheck(spec), 30_000);
+    it(`${spec.label} passes axe checks`, () => runAxeCheck(spec, "strict"), 30_000);
   }
 });
 
-describe("axe-core — Protected Route Components", () => {
+describe("axe-core — Protected Route Components (blocking)", () => {
   for (const spec of PROTECTED) {
-    it(`${spec.label} passes axe checks`, () => runAxeCheck(spec), 30_000);
+    it(`${spec.label} passes axe checks`, () => runAxeCheck(spec, "strict"), 30_000);
+  }
+});
+
+describe("axe-core — Fence Checks (non-blocking warnings)", () => {
+  if (FENCE_ROUTES.length === 0) {
+    it("no fence routes configured (add new routes here first)", () => {
+      expect(true).toBe(true);
+    });
+  }
+  for (const spec of FENCE_ROUTES) {
+    it(`${spec.label} — fence check (warnings only)`, () => runAxeCheck(spec, "fence"), 30_000);
   }
 });
 
 describe("axe-core — Route Coverage", () => {
   it("covers all application routes", () => {
-    const all = [...PUBLIC, ...PROTECTED].map((r) => r.label);
+    const all = [...PUBLIC, ...PROTECTED, ...FENCE_ROUTES].map((r) => r.label);
     expect(new Set(all).size).toBe(all.length);
     expect(all.length).toBeGreaterThanOrEqual(22);
   });
