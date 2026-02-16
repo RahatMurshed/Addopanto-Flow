@@ -248,11 +248,17 @@ Deno.serve(async (req) => {
         .eq("id", companyId)
         .single();
 
-      if (!company || !company.join_password) return json(400, { error: "Company does not accept password joins" });
+      if (!company || !company.join_password) {
+        console.log("No company or no join_password", { companyId, hasCompany: !!company, hasPassword: !!company?.join_password });
+        return json(400, { error: "Company does not accept password joins" });
+      }
+      
+      console.log("Password verification attempt", { companyId, storedFormat: company.join_password.includes(':') ? 'hashed' : 'plaintext', inputLength: password.length });
       
       let passwordValid = false;
       try { passwordValid = await verifyPassword(password, company.join_password); }
-      catch { passwordValid = false; }
+      catch (e) { console.log("Password verification error", e); passwordValid = false; }
+      console.log("Password verification result", { passwordValid });
       if (!passwordValid) return json(400, { error: "Incorrect password" });
 
       // Auto-rehash legacy plaintext passwords to secure format
