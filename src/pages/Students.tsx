@@ -315,7 +315,7 @@ export default function Students() {
               <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" /> Import CSV
               </Button>
-              <Button onClick={() => setDialogOpen(true)}>
+              <Button onClick={() => navigate("/students/new")}>
                 <Plus className="mr-2 h-4 w-4" /> Add Student
               </Button>
             </>
@@ -373,7 +373,7 @@ export default function Students() {
             <div className="mb-4 rounded-full bg-muted p-4"><GraduationCap className="h-8 w-8 text-muted-foreground" /></div>
             <h3 className="mb-2 text-lg font-semibold">No students yet</h3>
             <p className="mb-4 max-w-sm text-muted-foreground">Add your first student to start tracking admission fees and monthly tuition payments.</p>
-            {effectiveCanAdd && <Button onClick={() => setDialogOpen(true)}>Add Student</Button>}
+            {effectiveCanAdd && <Button onClick={() => navigate("/students/new")}>Add Student</Button>}
           </CardContent>
         </Card>
       ) : (
