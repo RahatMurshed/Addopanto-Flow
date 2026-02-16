@@ -501,12 +501,10 @@ export default function Students() {
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{batchName}</TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              {!isDataEntryOperator && (
                               <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setProfileStudent(s); setProfileOpen(true); }}>
                                   <Eye className="h-3.5 w-3.5" />
                                   <span className="hidden lg:inline">View</span>
                                 </Button>
-                              )}
                               {effectiveCanPayment && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStudent(s); setPaymentDialogOpen(true); }}>
                                   <CreditCard className="h-4 w-4" />
