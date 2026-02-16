@@ -1,14 +1,28 @@
 import { format } from "date-fns";
 import { Check, Clock, AlertTriangle, CircleDot } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import type { StudentSummary } from "@/hooks/useStudentPayments";
 
 interface StudentMonthGridProps {
   summary: StudentSummary;
+  monthlyFeeAmount: number;
+  feeHistory?: Array<{ effective_from: string; monthly_amount: number }>;
   className?: string;
 }
 
-export default function StudentMonthGrid({ summary, className }: StudentMonthGridProps) {
+function getFeeForMonth(month: string, monthlyFeeAmount: number, feeHistory: Array<{ effective_from: string; monthly_amount: number }>): number {
+  if (feeHistory.length === 0) return Number(monthlyFeeAmount);
+  let fee = Number(monthlyFeeAmount);
+  for (const h of feeHistory) {
+    if (h.effective_from <= month) fee = Number(h.monthly_amount);
+  }
+  return fee;
+}
+
+export default function StudentMonthGrid({ summary, monthlyFeeAmount, feeHistory = [], className }: StudentMonthGridProps) {
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
+
   const allMonths = [
     ...summary.monthlyPaidMonths,
     ...summary.monthlyPartialMonths,
@@ -32,6 +46,8 @@ export default function StudentMonthGrid({ summary, className }: StudentMonthGri
         const isPaid = summary.monthlyPaidMonths.includes(m);
         const isPartial = summary.monthlyPartialMonths.includes(m);
         const isOverdue = summary.monthlyOverdueMonths.includes(m);
+        const paid = summary.monthlyPaymentsByMonth.get(m) || 0;
+        const fee = getFeeForMonth(m, monthlyFeeAmount, feeHistory);
         return (
           <div
             key={m}
@@ -48,6 +64,11 @@ export default function StudentMonthGrid({ summary, className }: StudentMonthGri
             {isOverdue && <AlertTriangle className="h-3.5 w-3.5 mb-0.5" />}
             {!isPaid && !isPartial && !isOverdue && <Clock className="h-3.5 w-3.5 mb-0.5" />}
             <span>{formatMonth(m)}</span>
+            {isPartial && (
+              <span className="text-[10px] mt-0.5 opacity-80">
+                {formatCurrency(paid, currency)}/{formatCurrency(fee, currency)}
+              </span>
+            )}
           </div>
         );
       })}

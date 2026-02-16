@@ -539,7 +539,7 @@ export default function Students() {
                                 if (hasPartial) {
                                   return (
                                     <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                                      {formatCurrency(sum.monthlyPaidTotal)}/{formatCurrency(sum.monthlyPaidTotal + sum.monthlyPendingTotal)} Partial
+                                      {formatCurrency(sum.monthlyPaidTotal, currency)}/{formatCurrency(sum.monthlyPaidTotal + sum.monthlyPendingTotal, currency)} Partial
                                     </Badge>
                                   );
                                 }

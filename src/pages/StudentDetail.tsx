@@ -385,6 +385,15 @@ export default function StudentDetail() {
                       {formatCurrency(
                         summary.monthlyPartialMonths.reduce((s, m) => s + (summary.monthlyPaymentsByMonth.get(m) || 0), 0),
                         currency
+                      )}/{formatCurrency(
+                        summary.monthlyPartialMonths.reduce((s, m) => s + (summary.monthlyPaymentsByMonth.get(m) || 0), 0) +
+                        summary.monthlyPartialMonths.reduce((s, m) => {
+                          const fee = feeHistory.length > 0
+                            ? feeHistory.reduce((f, h) => h.effective_from <= m ? Number(h.monthly_amount) : f, effectiveMonthlyFee)
+                            : effectiveMonthlyFee;
+                          return s + (fee - (summary.monthlyPaymentsByMonth.get(m) || 0));
+                        }, 0),
+                        currency
                       )}
                     </span>
                   </div>
@@ -518,7 +527,7 @@ export default function StudentDetail() {
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
-            <StudentMonthGrid summary={summary} />
+            <StudentMonthGrid summary={summary} monthlyFeeAmount={effectiveMonthlyFee} feeHistory={feeHistory} />
 
             {/* Overall Progress Bar */}
             <div className="space-y-2">
