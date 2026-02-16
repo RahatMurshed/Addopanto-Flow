@@ -18,7 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
@@ -26,6 +26,7 @@ import StudentWizardDialog from "@/components/StudentWizardDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import BulkImportDialog from "@/components/BulkImportDialog";
 import BatchAssignDialog from "@/components/BatchAssignDialog";
+import BatchDropZone from "@/components/BatchDropZone";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
@@ -36,6 +37,7 @@ export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchAssignOpen, setBatchAssignOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Server-side filters passed to hook
   const { data: rawStudents = [], isLoading } = useStudents({
@@ -167,6 +169,22 @@ export default function Students() {
   const selectedStudentNames = useMemo(() => {
     return filteredStudents.filter(s => selectedIds.has(s.id)).map(s => s.name);
   }, [filteredStudents, selectedIds]);
+
+  const studentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    filteredStudents.forEach(s => map.set(s.id, s.name));
+    return map;
+  }, [filteredStudents]);
+
+  const handleDragStart = useCallback((e: React.DragEvent, studentId: string) => {
+    e.dataTransfer.setData("text/student-id", studentId);
+    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   const handleCreate = async (data: StudentInsert) => {
     try {
@@ -331,6 +349,15 @@ export default function Students() {
                 </Button>
               </div>
             )}
+
+            {/* Drag-and-drop batch drop zone */}
+            {effectiveCanEdit && isDragging && (
+              <BatchDropZone
+                selectedIds={selectedIds}
+                studentNameMap={studentNameMap}
+                onSuccess={() => setSelectedIds(new Set())}
+              />
+            )}
           </CardHeader>
           <CardContent>
             {filteredStudents.length === 0 ? (
@@ -349,13 +376,16 @@ export default function Students() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {effectiveCanEdit && (
+                       {effectiveCanEdit && (
                         <TableHead className="w-10">
-                          <Checkbox
-                            checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
-                            onCheckedChange={toggleAll}
-                            aria-label="Select all on page"
-                          />
+                          <div className="flex items-center gap-1">
+                            <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+                            <Checkbox
+                              checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                              onCheckedChange={toggleAll}
+                              aria-label="Select all on page"
+                            />
+                          </div>
                         </TableHead>
                       )}
                       <TableHead>Name</TableHead>
@@ -373,14 +403,23 @@ export default function Students() {
                       const sum = studentSummaries.get(s.id)!;
                       const isSelected = selectedIds.has(s.id);
                       return (
-                        <TableRow key={s.id} className={isSelected ? "bg-primary/5" : undefined}>
+                        <TableRow
+                          key={s.id}
+                          className={`${isSelected ? "bg-primary/5" : ""} ${effectiveCanEdit ? "cursor-grab active:cursor-grabbing" : ""}`}
+                          draggable={effectiveCanEdit}
+                          onDragStart={(e) => handleDragStart(e, s.id)}
+                          onDragEnd={handleDragEnd}
+                        >
                           {effectiveCanEdit && (
                             <TableCell>
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={() => toggleOne(s.id)}
-                                aria-label={`Select ${s.name}`}
-                              />
+                              <div className="flex items-center gap-1">
+                                <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleOne(s.id)}
+                                  aria-label={`Select ${s.name}`}
+                                />
+                              </div>
                             </TableCell>
                           )}
                           <TableCell className="font-medium">{s.name}</TableCell>
