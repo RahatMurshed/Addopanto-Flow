@@ -43,6 +43,13 @@ export default function Courses() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // DEO route guard: redirect if no batch/course permissions
+  useEffect(() => {
+    if (isDataEntryOperator && !canAddBatch && !canEditBatch && !canDeleteBatch) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch, navigate]);
+
   const createMutation = useCreateCourse();
   const updateMutation = useUpdateCourse();
   const deleteMutation = useDeleteCourse();
