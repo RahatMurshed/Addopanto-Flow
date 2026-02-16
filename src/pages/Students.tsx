@@ -39,6 +39,11 @@ export default function Students() {
     status: filters.status,
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
+    batchId: filters.batchId,
+    gender: filters.gender,
+    classGrade: filters.classGrade,
+    addressCity: filters.addressCity,
+    academicYear: filters.academicYear,
   });
   const { data: allPayments = [] } = useStudentPayments();
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment } = useCompany();

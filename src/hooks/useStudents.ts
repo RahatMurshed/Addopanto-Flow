@@ -139,6 +139,12 @@ export interface StudentFilters {
   status?: "all" | "active" | "inactive" | "graduated";
   sortBy?: "name" | "enrollment_date" | "monthly_fee_amount";
   sortOrder?: "asc" | "desc";
+  // Advanced filters
+  batchId?: "all" | string;
+  gender?: "all" | string;
+  classGrade?: string;
+  addressCity?: string;
+  academicYear?: string;
 }
 
 export function useStudents(filters?: StudentFilters) {
@@ -147,11 +153,16 @@ export function useStudents(filters?: StudentFilters) {
   const status = filters?.status || "all";
   const sortBy = filters?.sortBy || "name";
   const sortOrder = (filters?.sortOrder || "asc") === "asc";
+  const batchId = filters?.batchId || "all";
+  const gender = filters?.gender || "all";
+  const classGrade = filters?.classGrade?.trim() || "";
+  const addressCity = filters?.addressCity?.trim() || "";
+  const academicYear = filters?.academicYear?.trim() || "";
 
   const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder }],
+    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, academicYear }],
     queryFn: async () => {
       if (!user) return [];
       if (!activeCompanyId) return [];
@@ -161,10 +172,33 @@ export function useStudents(filters?: StudentFilters) {
         query = query.eq("status", status);
       }
 
+      if (batchId !== "all") {
+        query = query.eq("batch_id", batchId);
+      }
+
+      if (gender !== "all") {
+        query = query.eq("gender", gender);
+      }
+
+      if (classGrade) {
+        const sanitizedClass = classGrade.replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("class_grade", `%${sanitizedClass}%`);
+      }
+
+      if (addressCity) {
+        const sanitizedCity = addressCity.replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("address_city", `%${sanitizedCity}%`);
+      }
+
+      if (academicYear) {
+        const sanitizedYear = academicYear.replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("academic_year", `%${sanitizedYear}%`);
+      }
+
       if (search) {
         // Escape special LIKE pattern characters to prevent pattern injection
         const sanitized = search.replace(/[%_\\]/g, '\\$&');
-        query = query.or(`name.ilike.%${sanitized}%,student_id_number.ilike.%${sanitized}%`);
+        query = query.or(`name.ilike.%${sanitized}%,student_id_number.ilike.%${sanitized}%,father_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
       }
 
       query = query.order(sortBy, { ascending: sortOrder });
