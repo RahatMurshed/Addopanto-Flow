@@ -144,6 +144,9 @@ export interface StudentFilters {
   gender?: "all" | string;
   classGrade?: string;
   addressCity?: string;
+  addressState?: string;
+  addressArea?: string;
+  addressPinZip?: string;
   academicYear?: string;
   // Server-side pagination
   page?: number;
@@ -165,6 +168,9 @@ export function useStudents(filters?: StudentFilters) {
   const gender = filters?.gender || "all";
   const classGrade = filters?.classGrade?.trim() || "";
   const addressCity = filters?.addressCity?.trim() || "";
+  const addressState = filters?.addressState?.trim() || "";
+  const addressArea = filters?.addressArea?.trim() || "";
+  const addressPinZip = filters?.addressPinZip?.trim() || "";
   const academicYear = filters?.academicYear?.trim() || "";
   const page = filters?.page || 1;
   const pageSize = filters?.pageSize || 50;
@@ -172,7 +178,7 @@ export function useStudents(filters?: StudentFilters) {
   const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, academicYear, page, pageSize }],
+    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear, page, pageSize }],
     queryFn: async (): Promise<PaginatedStudentsResult> => {
       if (!user) return { data: [], totalCount: 0 };
       if (!activeCompanyId) return { data: [], totalCount: 0 };
@@ -213,6 +219,24 @@ export function useStudents(filters?: StudentFilters) {
         const sanitizedYear = academicYear.replace(/[%_\\]/g, '\\$&');
         countQuery = countQuery.ilike("academic_year", `%${sanitizedYear}%`);
         dataQuery = dataQuery.ilike("academic_year", `%${sanitizedYear}%`);
+      }
+
+      if (addressState) {
+        const s = addressState.replace(/[%_\\]/g, '\\$&');
+        countQuery = countQuery.ilike("address_state", `%${s}%`);
+        dataQuery = dataQuery.ilike("address_state", `%${s}%`);
+      }
+
+      if (addressArea) {
+        const s = addressArea.replace(/[%_\\]/g, '\\$&');
+        countQuery = countQuery.ilike("address_area", `%${s}%`);
+        dataQuery = dataQuery.ilike("address_area", `%${s}%`);
+      }
+
+      if (addressPinZip) {
+        const s = addressPinZip.replace(/[%_\\]/g, '\\$&');
+        countQuery = countQuery.ilike("address_pin_zip", `%${s}%`);
+        dataQuery = dataQuery.ilike("address_pin_zip", `%${s}%`);
       }
 
       if (search) {
