@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Info, Eye, EyeOff, Lock } from "lucide-react";
 import { DataManagementSection } from "@/components/shared/DataManagementSection";
-import { DesignTokenEditor } from "@/components/shared/DesignTokenEditor";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { UnsavedChangesDialog } from "@/components/dialogs/UnsavedChangesDialog";
 import { ImageUpload } from "@/components/shared/ImageUpload";
@@ -396,8 +395,6 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
-
-        <DesignTokenEditor />
 
         {isCipher && <DataManagementSection />}
       </div>

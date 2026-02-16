@@ -3,16 +3,16 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SEMANTIC_PAIRS, validateAndFixContrast } from "@/utils/contrastValidator";
 
-/** Remove any inline overrides set by the contrast validator before re-validating */
-function clearContrastOverrides() {
+/** Remove ALL inline style overrides set by the contrast validator */
+function clearAllContrastOverrides() {
   for (const pair of SEMANTIC_PAIRS) {
     document.documentElement.style.removeProperty(pair.fg);
+    document.documentElement.style.removeProperty(pair.bg);
   }
 }
 
 export function ThemeToggle() {
   const [isDark, setIsDark] = useState(() => {
-    // Read synchronously so initial render matches
     if (typeof document !== "undefined") {
       return document.documentElement.classList.contains("dark");
     }
@@ -25,8 +25,11 @@ export function ThemeToggle() {
     const dark = stored === "dark" || (!stored && prefersDark);
     setIsDark(dark);
     document.documentElement.classList.toggle("dark", dark);
-    clearContrastOverrides();
-    requestAnimationFrame(() => validateAndFixContrast());
+    clearAllContrastOverrides();
+    // Double rAF ensures browser has recomputed styles from CSS after clearing inline overrides
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => validateAndFixContrast());
+    });
   }, []);
 
   const toggleTheme = () => {
@@ -34,9 +37,11 @@ export function ThemeToggle() {
     setIsDark(newDark);
     document.documentElement.classList.toggle("dark", newDark);
     localStorage.setItem("theme", newDark ? "dark" : "light");
-    // Clear stale inline overrides from previous theme, then re-validate
-    clearContrastOverrides();
-    requestAnimationFrame(() => validateAndFixContrast());
+    // Clear stale inline overrides, wait for CSS recompute, then re-validate
+    clearAllContrastOverrides();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => validateAndFixContrast());
+    });
   };
 
   return (
