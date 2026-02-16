@@ -31,14 +31,14 @@ export function useContrastValidator(autoFix = true) {
       }
     };
 
-    // Run once on mount (after paint)
-    requestAnimationFrame(run);
+    // Run once on mount (after paint — double rAF to ensure CSS recompute)
+    requestAnimationFrame(() => requestAnimationFrame(run));
 
     // Watch for class changes on <html> (theme toggle adds/removes "dark")
     observer.current = new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (m.attributeName === "class") {
-          requestAnimationFrame(run);
+          requestAnimationFrame(() => requestAnimationFrame(run));
           break;
         }
       }
