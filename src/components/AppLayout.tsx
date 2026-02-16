@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Bookmark } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +107,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(showReports ? [{ label: "Reports", href: "/reports", icon: FileText }] : []),
     ...(canViewMembers && !isDataEntryOperator ? [{ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 }] : []),
     ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Audit Log", href: "/audit-log", icon: ClipboardList }] : []),
+    { label: "Presets", href: "/presets", icon: Bookmark },
     ...(isCipher ? [{ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount }] : []),
     ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
     ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
