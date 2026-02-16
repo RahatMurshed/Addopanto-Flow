@@ -1,52 +1,64 @@
 
+# Saved Search Presets for Student List
 
-# Add Advanced Address Filters to Student Search Panel
+## Overview
+Add a "Saved Searches" feature that lets admins save the current filter combination as a named preset and recall it with one click. Presets are stored per-user per-company in a new database table, so they persist across sessions.
 
-## Current State
-The Advanced Filters panel has 5 fields: Batch, Gender, Class/Grade, City, and Academic Year. The "City" field is the only address filter, but the server-side search already supports all address fields via the global search bar.
+## Database
 
-## Plan
+### New table: `saved_search_presets`
 
-### 1. Expand `StudentFilterValues` interface (StudentFilters.tsx)
-Add new filter fields:
-- `addressState: string`
-- `addressArea: string`
-- `addressPinZip: string`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid (PK, default gen_random_uuid()) | |
+| `user_id` | uuid, NOT NULL, references auth.users(id) ON DELETE CASCADE | |
+| `company_id` | uuid, NOT NULL, references companies(id) ON DELETE CASCADE | |
+| `name` | text, NOT NULL | Display label (e.g. "Overdue Males in Delhi") |
+| `filters` | jsonb, NOT NULL | Serialized `StudentFilterValues` object |
+| `created_at` | timestamptz, default now() | |
 
-Update `defaultFilters` with empty strings for each.
+**RLS policies**: Users can only SELECT/INSERT/UPDATE/DELETE rows matching `auth.uid() = user_id`. An additional filter on `company_id` ensures presets are scoped to the active company.
 
-### 2. Add debounced inputs for new fields (StudentFilters.tsx)
-Follow the existing pattern used for `cityInput`/`classInput`:
-- Add `stateInput`, `areaInput`, `pinInput` state variables
-- Add debounce `useEffect` hooks (300ms) for each
-- Add sync-back `useEffect` hooks for external changes
+**Index**: Composite index on `(user_id, company_id)`.
 
-### 3. Update the Advanced Filters grid (StudentFilters.tsx)
-Reorganize the grid from 5 columns to 2 rows:
-- Row 1: Batch, Gender, Class/Grade, Academic Year
-- Row 2 (Address group): City, State, Area/Locality, PIN/ZIP
+## New Hook: `src/hooks/useSavedSearchPresets.ts`
 
-The address group will have a subtle "Address" label/divider to visually group them.
+- `useSavedSearchPresets()` -- fetches all presets for the current user and active company via React Query.
+- `useCreatePreset()` -- mutation to insert a new preset.
+- `useDeletePreset()` -- mutation to delete a preset by ID.
+- Uses `useActiveCompanyId()` and `useAuth()` for scoping.
+- Query key: `["saved-search-presets", companyId]`.
 
-### 4. Update filter counting and chips (StudentFilters.tsx)
-- Include new fields in `advancedFilterCount`
-- Add chips for State, Area, PIN/ZIP (like existing City chip)
-- Update `clearChip` and `resetAll` to handle new fields
+## UI Changes: `src/components/StudentFilters.tsx`
 
-### 5. Add server-side filtering (useStudents.ts)
-Apply `.ilike()` filters for `address_state`, `address_area`, and `address_pin_zip` following the same pattern as `addressCity`:
-```
-if (addressState) {
-  const s = addressState.replace(/[%_\\]/g, '\\$&');
-  countQuery = countQuery.ilike("address_state", `%${s}%`);
-  dataQuery = dataQuery.ilike("address_state", `%${s}%`);
-}
-```
-Add these to the query key array as well.
+### New props
+- `savedPresets: Preset[]`
+- `onSavePreset: (name: string) => void`
+- `onDeletePreset: (id: string) => void`
+- `onLoadPreset: (filters: StudentFilterValues) => void`
 
-### Files Modified
+### Layout addition
+Add a row between the search bar and the Advanced Filters button:
+
+1. **"Save Current" button** (Bookmark icon) -- opens a small Popover with a text input for the preset name and a "Save" confirmation button. Only enabled when filters differ from defaults.
+2. **Preset chips** -- horizontal scrollable list of saved presets as `Badge` buttons. Clicking one calls `onLoadPreset(preset.filters)`. Each chip has a small X to delete.
+
+## Wiring: `src/pages/Students.tsx`
+
+- Import and call the new `useSavedSearchPresets` hook.
+- Pass preset data and handlers down to `StudentFilters`.
+- `onLoadPreset` sets the filter state, which triggers the existing `useEffect` page reset and server query.
+
+## Technical Details
+
+### Serialization
+`StudentFilterValues` is a flat object of strings, so it serializes to JSONB cleanly. When loading, cast values back to the `StudentFilterValues` type with a simple spread over `defaultFilters` to fill any missing keys from older presets.
+
+### Files changed
+
 | File | Change |
 |------|--------|
-| `src/components/StudentFilters.tsx` | Add state/area/PIN inputs, debounce hooks, chips, grid layout update |
-| `src/hooks/useStudents.ts` | Add `addressState`, `addressArea`, `addressPinZip` to filters interface and query logic |
-
+| (migration) | Create `saved_search_presets` table + RLS + index |
+| `src/hooks/useSavedSearchPresets.ts` | New file -- query + mutations |
+| `src/components/StudentFilters.tsx` | Add preset save/load UI row |
+| `src/pages/Students.tsx` | Wire hook to filters component |
