@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, ShieldAlert } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, ShieldAlert, BookOpen } from "lucide-react";
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -60,8 +60,10 @@ export default function Dashboard() {
   const { user } = useAuth();
   const {
     activeCompanyId, activeCompany, isModerator, isCipher, isCompanyAdmin, membership,
-    canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense,
+    isDataEntryModerator, isTraditionalModerator,
+    canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense, canAddCourse,
     forceFullDashboard, toggleForceFullDashboard,
+    canViewDashboardMetrics,
   } = useCompany();
 
   const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
@@ -449,12 +451,13 @@ export default function Dashboard() {
     return null;
   };
 
-  // Data Entry Operator: show quick actions only
-  if (isModerator) {
+  // Data Entry Moderator: show quick actions only, no financial metrics
+  if (isDataEntryModerator) {
     const quickActions = [
       { label: "Add Student", icon: GraduationCap, allowed: canAddStudent, desc: "Create a new student profile", onClick: () => setStudentDialogOpen(true) },
       { label: "Record Payment", icon: CreditCard, allowed: canAddPayment, desc: "Record a student payment", onClick: () => navigate("/students") },
       { label: "Create Batch", icon: Layers, allowed: canAddBatch, desc: "Create a new batch", onClick: () => setBatchDialogOpen(true) },
+      { label: "Add Course", icon: BookOpen, allowed: canAddCourse, desc: "Create a new course", onClick: () => navigate("/courses") },
       { label: "Add Revenue", icon: TrendingUp, allowed: canAddRevenue, desc: "Record a revenue entry", onClick: () => setRevenueDialogOpen(true) },
       { label: "Add Expense", icon: Receipt, allowed: canAddExpense, desc: "Record an expense", onClick: () => setExpenseDialogOpen(true) },
     ].filter((a) => a.allowed);
