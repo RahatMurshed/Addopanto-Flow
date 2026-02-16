@@ -194,7 +194,13 @@ export function useStudents(filters?: StudentFilters) {
         dataQuery = dataQuery.eq("status", status);
       }
 
-      if (batchId !== "all") {
+      if (batchId === "none") {
+        countQuery = countQuery.is("batch_id", null);
+        dataQuery = dataQuery.is("batch_id", null);
+      } else if (batchId === "enrolled") {
+        countQuery = countQuery.not("batch_id", "is", null);
+        dataQuery = dataQuery.not("batch_id", "is", null);
+      } else if (batchId !== "all") {
         countQuery = countQuery.eq("batch_id", batchId);
         dataQuery = dataQuery.eq("batch_id", batchId);
       }
@@ -446,7 +452,13 @@ export async function fetchFilteredStudentsForExport(
     if (status !== "all") query = query.eq("status", status);
 
     const batchId = filters.batchId || "all";
-    if (batchId !== "all") query = query.eq("batch_id", batchId);
+    if (batchId === "none") {
+      query = query.is("batch_id", null);
+    } else if (batchId === "enrolled") {
+      query = query.not("batch_id", "is", null);
+    } else if (batchId !== "all") {
+      query = query.eq("batch_id", batchId);
+    }
 
     const gender = filters.gender || "all";
     if (gender !== "all") query = query.eq("gender", gender);
