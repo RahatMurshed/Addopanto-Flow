@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
 import { UserAvatar } from "@/components/UserAvatar";
+import CommandPalette from "@/components/CommandPalette";
 
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -42,6 +43,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+
+  // Register Cmd/Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   // Count pending company creation requests for cipher badge
   const { data: pendingCreationCount = 0 } = useQuery({
@@ -272,6 +286,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
   );
 }
