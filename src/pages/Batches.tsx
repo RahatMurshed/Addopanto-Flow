@@ -39,13 +39,13 @@ export default function Batches() {
   const { data: rawBatches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
   const { user } = useAuth();
   
   const batches = useMemo(() => {
-    if (!isDataEntryOperator) return rawBatches;
+    if (!isModerator) return rawBatches;
     return rawBatches.filter(b => b.user_id === user?.id);
-  }, [rawBatches, isDataEntryOperator, user?.id]);
+  }, [rawBatches, isModerator, user?.id]);
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -231,13 +231,12 @@ export default function Batches() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Batches</h1>
-            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
-            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Data Entry</Badge>}
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Moderator</Badge>}
           </div>
           <p className="text-muted-foreground">Manage student batches and track batch-level analytics</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {!isDataEntryOperator && <BatchDateFilter value={filterValue} onChange={setFilterValue} />}
+          {!isModerator && <BatchDateFilter value={filterValue} onChange={setFilterValue} />}
           {effectiveCanAdd && (
             <Button onClick={() => { setEditBatch(null); setDialogOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" /> Create Batch
@@ -247,7 +246,7 @@ export default function Batches() {
       </div>
 
       {/* Summary Cards - hidden for DEO */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -286,7 +285,7 @@ export default function Batches() {
       )}
 
       {/* Overdue Section - hidden for DEO */}
-      {!isDataEntryOperator && (() => {
+      {!isModerator && (() => {
         const overdueBatches = batches.filter((b) => {
           const a = batchAnalytics.get(b.id);
           return a && a.monthOverdueCount > 0;
@@ -398,11 +397,11 @@ export default function Batches() {
                     <TableRow>
                       <TableHead>Batch Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Code</TableHead>
-                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">Start Date</TableHead>}
-                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">End Date</TableHead>}
+                      {!isModerator && <TableHead className="hidden md:table-cell">Start Date</TableHead>}
+                      {!isModerator && <TableHead className="hidden md:table-cell">End Date</TableHead>}
                       <TableHead>Students</TableHead>
-                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
-                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Pending</TableHead>}
+                      {!isModerator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
+                      {!isModerator && <TableHead className="hidden lg:table-cell">Pending</TableHead>}
                       <TableHead>Status</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
@@ -419,21 +418,21 @@ export default function Batches() {
                             </span>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{b.batch_code}</TableCell>
-                          {!isDataEntryOperator && <TableCell className="hidden md:table-cell">{format(new Date(b.start_date), "MMM d, yyyy")}</TableCell>}
-                          {!isDataEntryOperator && <TableCell className="hidden md:table-cell">{b.end_date ? format(new Date(b.end_date), "MMM d, yyyy") : "—"}</TableCell>}
+                          {!isModerator && <TableCell className="hidden md:table-cell">{format(new Date(b.start_date), "MMM d, yyyy")}</TableCell>}
+                          {!isModerator && <TableCell className="hidden md:table-cell">{b.end_date ? format(new Date(b.end_date), "MMM d, yyyy") : "—"}</TableCell>}
                           <TableCell>
                             <Badge variant="secondary">
                               {count}{b.max_capacity ? `/${b.max_capacity}` : ""}
                             </Badge>
                           </TableCell>
-                          {!isDataEntryOperator && (
+                          {!isModerator && (
                             <TableCell className="hidden lg:table-cell">
                               <span className="font-semibold text-green-600 dark:text-green-400">
                                 {formatCurrency(analytics?.monthRevenue || 0, currency)}
                               </span>
                             </TableCell>
                           )}
-                          {!isDataEntryOperator && (
+                          {!isModerator && (
                             <TableCell className="hidden lg:table-cell">
                               {(analytics?.monthPending || 0) > 0 ? (
                                 <span className="font-semibold text-orange-600 dark:text-orange-400">
@@ -447,7 +446,7 @@ export default function Batches() {
                           <TableCell>{statusBadge(b.status)}</TableCell>
                           <TableCell>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              {!isDataEntryOperator && (
+                              {!isModerator && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/batches/${b.id}`)}>
                                   <Eye className="h-4 w-4" />
                                 </Button>

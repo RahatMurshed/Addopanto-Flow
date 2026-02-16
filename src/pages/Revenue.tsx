@@ -77,17 +77,17 @@ export default function Revenue() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddRevenue, canEdit, canDelete, isCompanyModerator: isModerator, isCompanyViewer, activeCompany, isDataEntryOperator, canEditRevenue, canDeleteRevenue, canViewRevenue } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, activeCompany, canEditRevenue, canDeleteRevenue, canViewRevenue } = useCompany();
   const { user } = useAuth();
-  const showHistory = !isDataEntryOperator || canViewRevenue;
+  const showHistory = !isModerator || canViewRevenue;
   
   
 
   const { data: rawRevenues = [], isLoading } = useRevenues();
   const revenues = useMemo(() => {
-    if (!isDataEntryOperator) return rawRevenues;
+    if (!isModerator) return rawRevenues;
     return rawRevenues.filter(r => r.user_id === user?.id);
-  }, [rawRevenues, isDataEntryOperator, user?.id]);
+  }, [rawRevenues, isModerator, user?.id]);
   const { data: sources = [] } = useRevenueSources();
   const { data: accounts = [] } = useExpenseAccounts();
   const createMutation = useCreateRevenue();
@@ -298,13 +298,12 @@ export default function Revenue() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
-            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
-            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Your Entries ({revenues.length})</Badge>}
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Your Entries ({revenues.length})</Badge>}
           </div>
-          <p className="text-muted-foreground">{isDataEntryOperator ? "View and manage your revenue entries" : "Track income and automatically allocate to expense sources"}</p>
+          <p className="text-muted-foreground">{isModerator ? "View and manage your revenue entries" : "Track income and automatically allocate to expense sources"}</p>
         </div>
         <div className="flex items-center gap-2">
-          {!isDataEntryOperator && (
+          {!isModerator && (
             <ExportButtons
               onExportCSV={handleExportCSV}
               onExportPDF={handleExportPDF}
@@ -337,7 +336,7 @@ export default function Revenue() {
       )}
 
       {/* Summary Cards - hidden for DEO */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -373,7 +372,7 @@ export default function Revenue() {
       )}
 
       {/* Revenue by Source for Selected Period - hidden for DEO */}
-      {!isDataEntryOperator && filteredBySource.length > 0 && dateRange && (
+      {!isModerator && filteredBySource.length > 0 && dateRange && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Revenue by Source - {dateRange.label}</CardTitle>
@@ -402,7 +401,7 @@ export default function Revenue() {
       )}
 
       {/* Allocation Info - hidden for DEO */}
-      {!isDataEntryOperator && activeAccounts.length > 0 && (
+      {!isModerator && activeAccounts.length > 0 && (
         <Card>
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground">

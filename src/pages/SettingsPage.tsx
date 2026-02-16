@@ -25,7 +25,7 @@ const months = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isDataEntryOperator, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
+  const { isLoading: roleLoading, isCompanyAdmin, isCipher, isModerator, activeCompany, activeCompanyId, refetch: refetchCompany } = useCompany();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();

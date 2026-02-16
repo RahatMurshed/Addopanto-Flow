@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { AccessGuard, ACCESS_RULES } from "@/components/auth/AccessGuard";
 
 const mockCompanyContext = {
-  isDataEntryOperator: false,
+  isModerator: false,
   canAddRevenue: false,
   canViewRevenue: false,
   canAddStudent: false,
@@ -32,7 +32,7 @@ function renderGuard(rules: Parameters<typeof AccessGuard>[0]["rules"]) {
 describe("AccessGuard – /company/members (deoMembers rule)", () => {
   beforeEach(() => {
     Object.assign(mockCompanyContext, {
-      isDataEntryOperator: false,
+      isModerator: false,
       canAddRevenue: false,
       canViewRevenue: false,
       canAddStudent: false,
@@ -44,28 +44,28 @@ describe("AccessGuard – /company/members (deoMembers rule)", () => {
     });
   });
 
-  it("allows non-DEO users to see protected content", () => {
+  it("allows non-moderator users to see protected content", () => {
     const { getByTestId, queryByText } = renderGuard([ACCESS_RULES.deoMembers]);
     expect(getByTestId("protected-content")).toBeInTheDocument();
     expect(queryByText(/Access Denied/i)).not.toBeInTheDocument();
   });
 
-  it("blocks DEO users and shows permission denied", () => {
-    mockCompanyContext.isDataEntryOperator = true;
+  it("blocks moderator users and shows permission denied", () => {
+    mockCompanyContext.isModerator = true;
     const { queryByTestId, getByText } = renderGuard([ACCESS_RULES.deoMembers]);
     expect(queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(getByText(/Access Denied/i)).toBeInTheDocument();
     expect(getByText(/manage company members/i)).toBeInTheDocument();
   });
 
-  it("shows auto-redirect countdown for DEO on members page", () => {
-    mockCompanyContext.isDataEntryOperator = true;
+  it("shows auto-redirect countdown for moderator on members page", () => {
+    mockCompanyContext.isModerator = true;
     const { getByText } = renderGuard([ACCESS_RULES.deoMembers]);
     expect(getByText(/Redirecting to dashboard in/i)).toBeInTheDocument();
   });
 
   it("shows 'Go to Dashboard' CTA button", () => {
-    mockCompanyContext.isDataEntryOperator = true;
+    mockCompanyContext.isModerator = true;
     const { getByRole } = renderGuard([ACCESS_RULES.deoMembers]);
     expect(getByRole("button", { name: /Go to Dashboard/i })).toBeInTheDocument();
   });
@@ -74,21 +74,21 @@ describe("AccessGuard – /company/members (deoMembers rule)", () => {
 describe("AccessGuard – multiple rules", () => {
   beforeEach(() => {
     Object.assign(mockCompanyContext, {
-      isDataEntryOperator: false,
+      isModerator: false,
       canAddRevenue: false,
       canViewRevenue: false,
     });
   });
 
   it("blocks when first matching rule denies access", () => {
-    mockCompanyContext.isDataEntryOperator = true;
+    mockCompanyContext.isModerator = true;
     const { queryByTestId, getByText } = renderGuard([ACCESS_RULES.deoRevenue, ACCESS_RULES.deoMembers]);
     expect(queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(getByText(/revenue data/i)).toBeInTheDocument();
   });
 
-  it("allows access when DEO has the relevant permission", () => {
-    mockCompanyContext.isDataEntryOperator = true;
+  it("allows access when moderator has the relevant permission", () => {
+    mockCompanyContext.isModerator = true;
     mockCompanyContext.canAddRevenue = true;
     const { getByTestId } = renderGuard([ACCESS_RULES.deoRevenue]);
     expect(getByTestId("protected-content")).toBeInTheDocument();

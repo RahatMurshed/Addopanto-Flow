@@ -57,7 +57,7 @@ const CHART_COLORS = [
 export default function Dashboard() {
   const { user } = useAuth();
   const {
-    activeCompanyId, activeCompany, isDataEntryOperator,
+    activeCompanyId, activeCompany, isModerator,
     canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense,
   } = useCompany();
   const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
@@ -446,7 +446,7 @@ export default function Dashboard() {
   };
 
   // Data Entry Operator: show quick actions only
-  if (isDataEntryOperator) {
+  if (isModerator) {
     const quickActions = [
       { label: "Add Student", icon: GraduationCap, allowed: canAddStudent, desc: "Create a new student profile", onClick: () => setStudentDialogOpen(true) },
       { label: "Record Payment", icon: CreditCard, allowed: canAddPayment, desc: "Record a student payment", onClick: () => navigate("/students") },

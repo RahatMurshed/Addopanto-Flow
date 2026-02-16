@@ -44,7 +44,7 @@ export default function Khatas() {
   const balanceMap = new Map(balances.map((b) => [b.id, b]));
   
   // Company-level permissions
-  const { canAddExpenseSource, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canTransfer } = useCompany();
+  const { canAddExpenseSource, canEdit, canDelete, isModerator, canTransfer } = useCompany();
   
   const createMutation = useCreateExpenseAccount();
   const updateMutation = useUpdateExpenseAccount();
@@ -62,10 +62,10 @@ export default function Khatas() {
 
   // DEO route guard: redirect if no expense source permissions
   useEffect(() => {
-    if (isDataEntryOperator && !canAddExpenseSource) {
+    if (isModerator && !canAddExpenseSource) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isDataEntryOperator, canAddExpenseSource, navigate]);
+  }, [isModerator, canAddExpenseSource, navigate]);
 
   const totalPercentage = accounts
     .filter((a) => a.is_active)
@@ -150,7 +150,7 @@ export default function Khatas() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Expense Sources</h1>
-            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Moderator</Badge>}
           </div>
           <p className="text-muted-foreground">Manage your expense categories and allocation percentages</p>
         </div>

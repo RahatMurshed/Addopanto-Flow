@@ -29,8 +29,7 @@ import { UserProfileSheet } from "@/components/auth/UserProfileSheet";
 
 function getPermissionsSummary(member: CompanyMembership): string {
   if (member.role === "admin") return "Full access";
-  if (member.role === "viewer") return "Read-only";
-  if (member.role === "data_entry_operator") {
+  if (member.role === "moderator") {
     const cats = [];
     if (member.deo_students) cats.push("Students");
     if (member.deo_payments) cats.push("Payments");
@@ -38,21 +37,12 @@ function getPermissionsSummary(member: CompanyMembership): string {
     if (member.deo_finance) cats.push("Finance");
     return cats.length > 0 ? cats.join(", ") : "No access";
   }
-  if (member.role === "moderator") {
-    const cats = [];
-    if (member.mod_students_add || member.mod_students_edit || member.mod_students_delete) cats.push("Students");
-    if (member.mod_payments_add || member.mod_payments_edit || member.mod_payments_delete) cats.push("Payments");
-    if (member.mod_batches_add || member.mod_batches_edit || member.mod_batches_delete) cats.push("Batches");
-    if (member.mod_revenue_add || member.mod_revenue_edit || member.mod_revenue_delete) cats.push("Revenue");
-    if (member.mod_expenses_add || member.mod_expenses_edit || member.mod_expenses_delete) cats.push("Expenses");
-    return cats.length > 0 ? cats.join(", ") : "View only";
-  }
   return "";
 }
 
 export default function CompanyMembers() {
   const { user } = useAuth();
-  const { activeCompanyId, activeCompany, canManageMembers, canViewMembers, isCipher, isCompanyAdmin, isDataEntryOperator } = useCompany();
+  const { activeCompanyId, activeCompany, canManageMembers, canViewMembers, isCipher, isCompanyAdmin, isModerator } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -346,7 +336,7 @@ export default function CompanyMembers() {
                                 </Button>
                               )}
                               {/* Edit permissions: only for moderator and DEO */}
-                              {canModifyMember && (member.role === "moderator" || member.role === "data_entry_operator") && (
+                              {canModifyMember && member.role === "moderator" && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingMember(member)}>
                                   <Settings2 className="h-4 w-4" />
                                 </Button>
