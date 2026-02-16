@@ -1,10 +1,12 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { Moon, Sun, CheckCircle2, AlertTriangle, XCircle, RotateCcw, Palette } from "lucide-react";
+import { Moon, Sun, CheckCircle2, AlertTriangle, XCircle, RotateCcw, Palette, Zap, Shield, Download } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { validateAndFixContrast } from "@/utils/contrastValidator";
 import {
   parseHSL,
   hslToString,
@@ -202,6 +204,69 @@ export function DesignTokenEditor() {
     else setDarkTokens({ ...DEFAULT_DARK });
   }, [previewMode]);
 
+  // ── One-click remediation: fix both themes & apply to live DOM ──
+
+  const [applyStatus, setApplyStatus] = useState<"idle" | "applied">("idle");
+  const { toast } = useToast();
+
+  const lightResults = useMemo(() => auditTokens(lightTokens), [lightTokens]);
+  const darkResults = useMemo(() => auditTokens(darkTokens), [darkTokens]);
+  const totalLightFail = lightResults.filter((r) => !r.passes).length;
+  const totalDarkFail = darkResults.filter((r) => !r.passes).length;
+  const totalIssues = totalLightFail + totalDarkFail;
+
+  const handleFixBothThemes = useCallback(() => {
+    // Fix light tokens
+    setLightTokens((prev) => {
+      const next = { ...prev };
+      for (const pair of SEMANTIC_PAIRS) {
+        const fg = parseHSL(next[pair.fg] ?? "");
+        const bg = parseHSL(next[pair.bg] ?? "");
+        if (!fg || !bg) continue;
+        const fixed = adjustForContrast(fg, bg, pair.minRatio ?? 4.5);
+        if (fixed) next[pair.fg] = hslToString(fixed);
+      }
+      return next;
+    });
+    // Fix dark tokens
+    setDarkTokens((prev) => {
+      const next = { ...prev };
+      for (const pair of SEMANTIC_PAIRS) {
+        const fg = parseHSL(next[pair.fg] ?? "");
+        const bg = parseHSL(next[pair.bg] ?? "");
+        if (!fg || !bg) continue;
+        const fixed = adjustForContrast(fg, bg, pair.minRatio ?? 4.5);
+        if (fixed) next[pair.fg] = hslToString(fixed);
+      }
+      return next;
+    });
+    toast({ title: "All contrast issues fixed", description: "Both light and dark themes are now WCAG AA compliant." });
+  }, [toast]);
+
+  const handleApplyToLive = useCallback(() => {
+    // Apply current theme's tokens to the live DOM
+    const isDark = document.documentElement.classList.contains("dark");
+    const activeTokens = isDark ? darkTokens : lightTokens;
+
+    for (const [name, value] of Object.entries(activeTokens)) {
+      document.documentElement.style.setProperty(name, value);
+    }
+
+    // Also run the live validator for any edge cases
+    validateAndFixContrast();
+
+    setApplyStatus("applied");
+    toast({ title: "Applied to live app", description: `${isDark ? "Dark" : "Light"} theme tokens applied to the running application.` });
+    setTimeout(() => setApplyStatus("idle"), 3000);
+  }, [lightTokens, darkTokens, toast]);
+
+  const handleExportTokens = useCallback(() => {
+    const css = `:root {\n${Object.entries(lightTokens).map(([k, v]) => `    ${k}: ${v};`).join("\n")}\n}\n\n.dark {\n${Object.entries(darkTokens).map(([k, v]) => `    ${k}: ${v};`).join("\n")}\n}`;
+    navigator.clipboard.writeText(css).then(() => {
+      toast({ title: "Copied to clipboard", description: "CSS token definitions copied." });
+    });
+  }, [lightTokens, darkTokens, toast]);
+
   return (
     <TooltipProvider>
       <Card>
@@ -277,7 +342,65 @@ export function DesignTokenEditor() {
             )}
           </div>
 
-          {/* Live preview strip */}
+          {/* Cross-theme audit summary + one-click actions */}
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">Both Themes Audit</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="flex items-center gap-1">
+                  <Sun className="h-3 w-3" />
+                  {totalLightFail === 0 ? (
+                    <span className="text-success font-medium">✓ Pass</span>
+                  ) : (
+                    <span className="text-destructive font-medium">{totalLightFail} issues</span>
+                  )}
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="flex items-center gap-1">
+                  <Moon className="h-3 w-3" />
+                  {totalDarkFail === 0 ? (
+                    <span className="text-success font-medium">✓ Pass</span>
+                  ) : (
+                    <span className="text-destructive font-medium">{totalDarkFail} issues</span>
+                  )}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {totalIssues > 0 && (
+                <Button size="sm" variant="destructive" className="h-8 gap-1.5 text-xs" onClick={handleFixBothThemes}>
+                  <Zap className="h-3.5 w-3.5" />
+                  Fix All ({totalIssues} issues across both themes)
+                </Button>
+              )}
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                variant={applyStatus === "applied" ? "secondary" : "default"}
+                onClick={handleApplyToLive}
+              >
+                {applyStatus === "applied" ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                    Applied!
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-3.5 w-3.5" />
+                    Apply to Live App
+                  </>
+                )}
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={handleExportTokens}>
+                <Download className="h-3.5 w-3.5" />
+                Copy CSS
+              </Button>
+            </div>
+          </div>
+
           <div
             className="rounded-lg border overflow-hidden"
             style={{ backgroundColor: hslToCssColor(tokens["--background"] ?? "0 0% 100%") }}
