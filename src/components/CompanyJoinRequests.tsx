@@ -16,9 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Check, X, Loader2, Clock, XCircle, Wallet, ArrowLeftRight, Trash2, Users2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
+
+type MemberRole = "moderator" | "data_entry_operator" | "viewer";
 
 interface JoinRequest {
   id: string;
@@ -36,12 +39,19 @@ interface JoinRequest {
 interface ApproveData {
   request: JoinRequest;
   email: string;
+  role: MemberRole;
+  // moderator permissions
   canAddRevenue: boolean;
   canAddExpense: boolean;
   canAddExpenseSource: boolean;
   canTransfer: boolean;
   canViewReports: boolean;
   canManageStudents: boolean;
+  // DEO permissions
+  deoStudents: boolean;
+  deoPayments: boolean;
+  deoBatches: boolean;
+  deoFinance: boolean;
 }
 
 export default function CompanyJoinRequests() {
@@ -109,6 +119,29 @@ export default function CompanyJoinRequests() {
     return result;
   };
 
+  const buildPermissionsPayload = (data: ApproveData) => {
+    if (data.role === "viewer") return {};
+    if (data.role === "data_entry_operator") {
+      return {
+        deo_students: data.deoStudents,
+        deo_payments: data.deoPayments,
+        deo_batches: data.deoBatches,
+        deo_finance: data.deoFinance,
+      };
+    }
+    return {
+      can_add_revenue: data.canAddRevenue,
+      can_add_expense: data.canAddExpense,
+      can_add_expense_source: data.canAddExpenseSource,
+      can_transfer: data.canTransfer,
+      can_view_reports: data.canViewReports,
+      can_manage_students: data.canManageStudents,
+    };
+  };
+
+  const roleLabel = (role: MemberRole) =>
+    role === "data_entry_operator" ? "Data Entry Operator" : role === "viewer" ? "Viewer" : "Moderator";
+
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async (data: ApproveData) => {
@@ -116,18 +149,12 @@ export default function CompanyJoinRequests() {
         action: "approve-join-request",
         requestId: data.request.id,
         companyId: activeCompanyId,
-        permissions: {
-          can_add_revenue: data.canAddRevenue,
-          can_add_expense: data.canAddExpense,
-          can_add_expense_source: data.canAddExpenseSource,
-          can_transfer: data.canTransfer,
-          can_view_reports: data.canViewReports,
-          can_manage_students: data.canManageStudents,
-        },
+        role: data.role,
+        permissions: buildPermissionsPayload(data),
       });
     },
     onSuccess: () => {
-      toast({ title: "Join request approved", description: "User has been added to the business as a Moderator." });
+      toast({ title: "Join request approved", description: "User has been added to the business." });
       queryClient.invalidateQueries({ queryKey: ["company-join-requests-admin", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["company-members", activeCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["pending-join-requests-count"] });
@@ -168,14 +195,8 @@ export default function CompanyJoinRequests() {
         requestId: data.request.id,
         companyId: activeCompanyId,
         targetUserId: data.request.user_id,
-        permissions: {
-          can_add_revenue: data.canAddRevenue,
-          can_add_expense: data.canAddExpense,
-          can_add_expense_source: data.canAddExpenseSource,
-          can_transfer: data.canTransfer,
-          can_view_reports: data.canViewReports,
-          can_manage_students: data.canManageStudents,
-        },
+        role: data.role,
+        permissions: buildPermissionsPayload(data),
       });
     },
     onSuccess: () => {
@@ -189,31 +210,59 @@ export default function CompanyJoinRequests() {
     },
   });
 
+  const defaultApproveData = (request: JoinRequest, role: MemberRole = "moderator"): ApproveData => ({
+    request,
+    email: getEmail(request.user_id),
+    role,
+    canAddRevenue: false,
+    canAddExpense: false,
+    canAddExpenseSource: false,
+    canTransfer: false,
+    canViewReports: false,
+    canManageStudents: false,
+    deoStudents: false,
+    deoPayments: false,
+    deoBatches: false,
+    deoFinance: false,
+  });
+
   const openApproveDialog = (request: JoinRequest) => {
-    setApproveDialog({
-      request,
-      email: getEmail(request.user_id),
-      canAddRevenue: false,
-      canAddExpense: false,
-      canAddExpenseSource: false,
-      canTransfer: false,
-      canViewReports: false,
-      canManageStudents: false,
-    });
+    setApproveDialog(defaultApproveData(request));
   };
 
   const openAcceptRejectedDialog = (request: JoinRequest) => {
-    setAcceptRejectedDialog({
-      request,
-      email: getEmail(request.user_id),
-      canAddRevenue: true,
-      canAddExpense: true,
-      canAddExpenseSource: false,
-      canTransfer: false,
-      canViewReports: true,
-      canManageStudents: false,
-    });
+    setAcceptRejectedDialog(defaultApproveData(request));
   };
+
+  const handleRoleChange = (
+    newRole: MemberRole,
+    current: ApproveData,
+    setter: (d: ApproveData) => void,
+  ) => {
+    setter(defaultApproveData(current.request, newRole));
+  };
+
+  const RoleSelector = ({
+    data,
+    onRoleChange,
+  }: {
+    data: ApproveData;
+    onRoleChange: (role: MemberRole) => void;
+  }) => (
+    <div className="space-y-2 py-2">
+      <Label>Role</Label>
+      <Select value={data.role} onValueChange={(v) => onRoleChange(v as MemberRole)}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="moderator">Moderator</SelectItem>
+          <SelectItem value="data_entry_operator">Data Entry Operator</SelectItem>
+          <SelectItem value="viewer">Viewer</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   const PermissionToggles = ({
     data,
@@ -221,43 +270,77 @@ export default function CompanyJoinRequests() {
   }: {
     data: ApproveData;
     onChange: (updated: ApproveData) => void;
-  }) => (
-    <div className="space-y-4 py-4">
-      <div className="flex items-center justify-between">
-        <Label>Can Add Revenue</Label>
-        <Switch checked={data.canAddRevenue} onCheckedChange={(c) => onChange({ ...data, canAddRevenue: c })} />
-      </div>
-      <div className="flex items-center justify-between">
-        <Label>Can Add Expense</Label>
-        <Switch checked={data.canAddExpense} onCheckedChange={(c) => onChange({ ...data, canAddExpense: c })} />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-muted-foreground" />
-          <Label>Can Add Expense Sources</Label>
+  }) => {
+    if (data.role === "viewer") {
+      return (
+        <div className="py-4 text-sm text-muted-foreground">
+          Viewers have read-only access. No permissions to configure.
         </div>
-        <Switch checked={data.canAddExpenseSource} onCheckedChange={(c) => onChange({ ...data, canAddExpenseSource: c })} />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-          <Label>Can Transfer</Label>
+      );
+    }
+
+    if (data.role === "data_entry_operator") {
+      return (
+        <div className="space-y-4 py-4">
+          <div className="flex items-center justify-between">
+            <Label>Students</Label>
+            <Switch checked={data.deoStudents} onCheckedChange={(c) => onChange({ ...data, deoStudents: c })} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Payments</Label>
+            <Switch checked={data.deoPayments} onCheckedChange={(c) => onChange({ ...data, deoPayments: c })} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Batches</Label>
+            <Switch checked={data.deoBatches} onCheckedChange={(c) => onChange({ ...data, deoBatches: c })} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Finance</Label>
+            <Switch checked={data.deoFinance} onCheckedChange={(c) => onChange({ ...data, deoFinance: c })} />
+          </div>
         </div>
-        <Switch checked={data.canTransfer} onCheckedChange={(c) => onChange({ ...data, canTransfer: c })} />
-      </div>
-      <div className="flex items-center justify-between">
-        <Label>Can View Reports</Label>
-        <Switch checked={data.canViewReports} onCheckedChange={(c) => onChange({ ...data, canViewReports: c })} />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users2 className="h-4 w-4 text-muted-foreground" />
-          <Label>Can Manage Students</Label>
+      );
+    }
+
+    // Moderator
+    return (
+      <div className="space-y-4 py-4">
+        <div className="flex items-center justify-between">
+          <Label>Can Add Revenue</Label>
+          <Switch checked={data.canAddRevenue} onCheckedChange={(c) => onChange({ ...data, canAddRevenue: c })} />
         </div>
-        <Switch checked={data.canManageStudents} onCheckedChange={(c) => onChange({ ...data, canManageStudents: c })} />
+        <div className="flex items-center justify-between">
+          <Label>Can Add Expense</Label>
+          <Switch checked={data.canAddExpense} onCheckedChange={(c) => onChange({ ...data, canAddExpense: c })} />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+            <Label>Can Add Expense Sources</Label>
+          </div>
+          <Switch checked={data.canAddExpenseSource} onCheckedChange={(c) => onChange({ ...data, canAddExpenseSource: c })} />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+            <Label>Can Transfer</Label>
+          </div>
+          <Switch checked={data.canTransfer} onCheckedChange={(c) => onChange({ ...data, canTransfer: c })} />
+        </div>
+        <div className="flex items-center justify-between">
+          <Label>Can View Reports</Label>
+          <Switch checked={data.canViewReports} onCheckedChange={(c) => onChange({ ...data, canViewReports: c })} />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users2 className="h-4 w-4 text-muted-foreground" />
+            <Label>Can Manage Students</Label>
+          </div>
+          <Switch checked={data.canManageStudents} onCheckedChange={(c) => onChange({ ...data, canManageStudents: c })} />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (!activeCompanyId) {
     return (
@@ -275,7 +358,7 @@ export default function CompanyJoinRequests() {
         <CardHeader>
           <CardTitle>Business Join Requests</CardTitle>
           <CardDescription>
-            Review join requests for <span className="font-medium">{activeCompany?.name}</span>. Approved users will be added as Moderators with configurable permissions.
+            Review join requests for <span className="font-medium">{activeCompany?.name}</span>. Review join requests and assign roles with configurable permissions.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -457,10 +540,15 @@ export default function CompanyJoinRequests() {
           <DialogHeader>
             <DialogTitle>Approve Join Request</DialogTitle>
             <DialogDescription>
-              Configure permissions for <span className="font-medium">{approveDialog?.email}</span>. They will be added as a Moderator.
+              Configure role and permissions for <span className="font-medium">{approveDialog?.email}</span>. They will be added as a <strong>{approveDialog ? roleLabel(approveDialog.role) : "Moderator"}</strong>.
             </DialogDescription>
           </DialogHeader>
-          {approveDialog && <PermissionToggles data={approveDialog} onChange={setApproveDialog} />}
+          {approveDialog && (
+            <>
+              <RoleSelector data={approveDialog} onRoleChange={(r) => handleRoleChange(r, approveDialog, setApproveDialog)} />
+              <PermissionToggles data={approveDialog} onChange={setApproveDialog} />
+            </>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveDialog(null)} disabled={approveMutation.isPending}>
               Cancel
@@ -489,10 +577,15 @@ export default function CompanyJoinRequests() {
           <DialogHeader>
             <DialogTitle>Accept Rejected User</DialogTitle>
             <DialogDescription>
-              Re-accept <span className="font-medium">{acceptRejectedDialog?.email}</span> and add them as a Moderator. The ban will be lifted.
+              Re-accept <span className="font-medium">{acceptRejectedDialog?.email}</span> and add them as a <strong>{acceptRejectedDialog ? roleLabel(acceptRejectedDialog.role) : "Moderator"}</strong>. The ban will be lifted.
             </DialogDescription>
           </DialogHeader>
-          {acceptRejectedDialog && <PermissionToggles data={acceptRejectedDialog} onChange={setAcceptRejectedDialog} />}
+          {acceptRejectedDialog && (
+            <>
+              <RoleSelector data={acceptRejectedDialog} onRoleChange={(r) => handleRoleChange(r, acceptRejectedDialog, setAcceptRejectedDialog)} />
+              <PermissionToggles data={acceptRejectedDialog} onChange={setAcceptRejectedDialog} />
+            </>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAcceptRejectedDialog(null)} disabled={acceptRejectedMutation.isPending}>
               Cancel

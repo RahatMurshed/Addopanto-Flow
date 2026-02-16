@@ -86,11 +86,21 @@ const generateInviteSchema = z.object({
   companyId: uuidField,
 });
 
+const roleEnum = z.enum(["moderator", "data_entry_operator", "viewer"]).default("moderator");
+
+const deoPermissionsSchema = z.object({
+  deo_students: z.boolean().optional().default(false),
+  deo_payments: z.boolean().optional().default(false),
+  deo_batches: z.boolean().optional().default(false),
+  deo_finance: z.boolean().optional().default(false),
+}).optional();
+
 const approveJoinSchema = z.object({
   action: z.literal("approve-join-request"),
   requestId: uuidField,
   companyId: uuidField,
-  permissions: permissionsSchema,
+  role: roleEnum,
+  permissions: z.any().optional(),
 });
 
 const rejectJoinSchema = z.object({
@@ -105,7 +115,8 @@ const acceptRejectedSchema = z.object({
   requestId: uuidField,
   companyId: uuidField,
   targetUserId: uuidField,
-  permissions: permissionsSchema,
+  role: roleEnum,
+  permissions: z.any().optional(),
 });
 
 const cipherJoinSchema = z.object({
@@ -329,7 +340,7 @@ Deno.serve(async (req) => {
     if (action === "approve-join-request") {
       const parsed = approveJoinSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-      const { requestId, companyId, permissions: perms } = parsed.data;
+      const { requestId, companyId, role, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
@@ -343,13 +354,27 @@ Deno.serve(async (req) => {
         status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user.id,
       }).eq("id", requestId);
 
-      const { error: memberError } = await adminClient.from("company_memberships").insert({
-        user_id: joinReq.user_id, company_id: companyId, role: "moderator", status: "active",
+      const memberData: Record<string, unknown> = {
+        user_id: joinReq.user_id, company_id: companyId, role, status: "active",
         approved_by: user.id,
-        can_add_revenue: p.can_add_revenue ?? false, can_add_expense: p.can_add_expense ?? false,
-        can_add_expense_source: p.can_add_expense_source ?? false, can_transfer: p.can_transfer ?? false,
-        can_view_reports: p.can_view_reports ?? false, can_manage_students: p.can_manage_students ?? false,
-      });
+      };
+
+      if (role === "moderator") {
+        memberData.can_add_revenue = p.can_add_revenue ?? false;
+        memberData.can_add_expense = p.can_add_expense ?? false;
+        memberData.can_add_expense_source = p.can_add_expense_source ?? false;
+        memberData.can_transfer = p.can_transfer ?? false;
+        memberData.can_view_reports = p.can_view_reports ?? false;
+        memberData.can_manage_students = p.can_manage_students ?? false;
+      } else if (role === "data_entry_operator") {
+        memberData.deo_students = p.deo_students ?? false;
+        memberData.deo_payments = p.deo_payments ?? false;
+        memberData.deo_batches = p.deo_batches ?? false;
+        memberData.deo_finance = p.deo_finance ?? false;
+      }
+      // viewer: all defaults to false, no extra fields needed
+
+      const { error: memberError } = await adminClient.from("company_memberships").insert(memberData);
       if (memberError) return json(500, { error: "Failed to create membership: " + memberError.message });
       return json(200, { success: true });
     }
@@ -379,7 +404,7 @@ Deno.serve(async (req) => {
     if (action === "accept-rejected-join-request") {
       const parsed = acceptRejectedSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-      const { requestId, companyId, targetUserId, permissions: perms } = parsed.data;
+      const { requestId, companyId, targetUserId, role, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
       const p = perms || {};
@@ -388,13 +413,26 @@ Deno.serve(async (req) => {
         status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user.id, banned_until: null,
       }).eq("id", requestId).eq("company_id", companyId).eq("status", "rejected");
 
-      const { error: memberError } = await adminClient.from("company_memberships").insert({
-        user_id: targetUserId, company_id: companyId, role: "moderator", status: "active",
+      const memberData: Record<string, unknown> = {
+        user_id: targetUserId, company_id: companyId, role, status: "active",
         approved_by: user.id,
-        can_add_revenue: p.can_add_revenue ?? false, can_add_expense: p.can_add_expense ?? false,
-        can_add_expense_source: p.can_add_expense_source ?? false, can_transfer: p.can_transfer ?? false,
-        can_view_reports: p.can_view_reports ?? false, can_manage_students: p.can_manage_students ?? false,
-      });
+      };
+
+      if (role === "moderator") {
+        memberData.can_add_revenue = p.can_add_revenue ?? false;
+        memberData.can_add_expense = p.can_add_expense ?? false;
+        memberData.can_add_expense_source = p.can_add_expense_source ?? false;
+        memberData.can_transfer = p.can_transfer ?? false;
+        memberData.can_view_reports = p.can_view_reports ?? false;
+        memberData.can_manage_students = p.can_manage_students ?? false;
+      } else if (role === "data_entry_operator") {
+        memberData.deo_students = p.deo_students ?? false;
+        memberData.deo_payments = p.deo_payments ?? false;
+        memberData.deo_batches = p.deo_batches ?? false;
+        memberData.deo_finance = p.deo_finance ?? false;
+      }
+
+      const { error: memberError } = await adminClient.from("company_memberships").insert(memberData);
       if (memberError) return json(500, { error: "Failed to create membership: " + memberError.message });
       return json(200, { success: true });
     }
