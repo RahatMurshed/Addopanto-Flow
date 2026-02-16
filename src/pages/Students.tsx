@@ -36,6 +36,7 @@ import { useSavedSearchPresets, useCreatePreset, useDeletePreset } from "@/hooks
 import StudentsDashboard from "@/components/students/StudentsDashboard";
 import StudentProfileDialog from "@/components/dialogs/StudentProfileDialog";
 import { useBatches } from "@/hooks/useBatches";
+import PiiRestrictionBanner from "@/components/shared/PiiRestrictionBanner";
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -77,7 +78,7 @@ export default function Students() {
   const { data: allStudentsRaw = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { data: batchesData = [] } = useBatches({ status: "all" });
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, activeCompanyId } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, canViewStudentPII, activeCompanyId } = useCompany();
   const { user } = useAuth();
   
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
@@ -304,6 +305,7 @@ export default function Students() {
 
   return (
     <div className="space-y-6">
+      {!canViewStudentPII && <PiiRestrictionBanner />}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">

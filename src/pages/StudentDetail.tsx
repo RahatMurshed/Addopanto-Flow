@@ -39,7 +39,7 @@ import StudentMonthGrid from "@/components/students/StudentMonthGrid";
 import MonthlyBreakdownList from "@/components/finance/MonthlyBreakdownList";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/shared/TablePagination";
-
+import PiiRestrictionBanner from "@/components/shared/PiiRestrictionBanner";
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -296,6 +296,8 @@ export default function StudentDetail() {
           )}
         </div>
       </div>
+
+      {!canViewStudentPII && <PiiRestrictionBanner />}
 
       {/* Batch Info */}
       {batch && (
