@@ -17,8 +17,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
 
-    /* Orange darkened from 50% → 42% lightness for 4.6:1 contrast with white */
-    --primary: 30 100% 42%;
+    /* Orange darkened from 42% → 35% for 4.8:1 contrast with white */
+    --primary: 30 100% 35%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 217 70% 25%;
@@ -31,25 +31,25 @@ All colors MUST be HSL.
     --accent: 210 40% 96%;
     --accent-foreground: 220 20% 10%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 84% 45%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 76% 30%;
     --success-foreground: 0 0% 100%;
 
-    /* Warning darkened from 50% → 40% for 4.8:1 with white */
-    --warning: 38 92% 40%;
+    /* Warning darkened from 40% → 32% for 5.0:1 with white */
+    --warning: 38 92% 32%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 30 100% 42%;
+    --border: 214 32% 82%;
+    --input: 214 32% 82%;
+    --ring: 30 100% 35%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 217 70% 18%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 30 100% 50%;
+    --sidebar-primary: 30 100% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 50% 25%;
     --sidebar-accent-foreground: 210 40% 98%;
