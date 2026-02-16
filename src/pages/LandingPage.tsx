@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SkipLink } from "@/components/SkipLink";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -89,6 +90,7 @@ const steps = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SkipLink targetId="landing-main" />
       {/* Navbar */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -113,7 +115,7 @@ export default function LandingPage() {
       </motion.header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden py-20 sm:py-28">
+      <section id="landing-main" tabIndex={-1} className="relative overflow-hidden py-20 sm:py-28 focus:outline-none">
         <div className="pointer-events-none absolute -top-32 left-1/2 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]" />
         <div className="pointer-events-none absolute -bottom-40 right-0 h-[400px] w-[500px] rounded-full bg-secondary/10 blur-[100px]" />
 
