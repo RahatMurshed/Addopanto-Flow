@@ -1,18 +1,16 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, subDays, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, isWithinInterval, parse } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Users, GraduationCap, UserMinus, CalendarPlus,
-  Plus, Upload, Download, Filter,
-  TrendingUp, TrendingDown, BarChart3, CalendarIcon,
+  Plus, Upload, Download, Filter, CalendarIcon,
+  TrendingUp, TrendingDown, BarChart3,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import MonthYearPicker from "@/components/MonthYearPicker";
 import type { Student } from "@/hooks/useStudents";
 import type { Batch } from "@/hooks/useBatches";
 import type { defaultFilters, StudentFilterValues } from "@/components/StudentFilters";
@@ -49,7 +47,7 @@ export default function StudentsDashboard({
 }: StudentsDashboardProps) {
   const navigate = useNavigate();
 
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
 
   const totalStudents = allStudents.length;
   const enrolledStudents = allStudents.filter((s) => s.batch_id != null);
@@ -59,8 +57,9 @@ export default function StudentsDashboard({
   const enrolledPct = totalStudents > 0 ? Math.round((enrolledCount / totalStudents) * 100) : 0;
   const unenrolledPct = totalStudents > 0 ? Math.round((unenrolledCount / totalStudents) * 100) : 0;
 
-  const selectedMonthStart = startOfMonth(selectedMonth);
-  const selectedMonthEnd = endOfMonth(selectedMonth);
+  const selectedMonthDate = parse(selectedMonth, "yyyy-MM", new Date());
+  const selectedMonthStart = startOfMonth(selectedMonthDate);
+  const selectedMonthEnd = endOfMonth(selectedMonthDate);
   const addedInSelectedMonth = allStudents.filter(
     (s) => {
       const d = new Date(s.created_at);
@@ -169,26 +168,15 @@ export default function StudentsDashboard({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Added in {format(selectedMonth, "MMM yyyy")}
+                Added in {format(selectedMonthDate, "MMM yyyy")}
               </CardTitle>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedMonth}
-                    onSelect={(date) => date && setSelectedMonth(date)}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+              <MonthYearPicker
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+                className="h-6 w-auto border-0 bg-transparent px-1 text-xs text-muted-foreground hover:bg-accent"
+              />
             </div>
             <div className="rounded-lg bg-secondary/10 p-2">
               <CalendarPlus className="h-4 w-4 text-secondary" />
