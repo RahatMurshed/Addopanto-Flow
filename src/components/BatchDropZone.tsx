@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useBatches, type Batch, useBatchStudentCount } from "@/hooks/useBatches";
-import { useUpdateStudent } from "@/hooks/useStudents";
+import { useUpdateStudent, useAllStudents } from "@/hooks/useStudents";
+import { useCreateBatchHistory } from "@/hooks/useStudentBatchHistory";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -14,18 +15,20 @@ interface BatchDropZoneProps {
   onSuccess?: () => void;
 }
 
-function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSuccess }: {
+function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSuccess, allStudents }: {
   batch: Batch;
   selectedIds: Set<string>;
   dragStudentId: string | null;
   studentNameMap: Map<string, string>;
   onSuccess?: () => void;
+  allStudents: any[];
 }) {
   const [over, setOver] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [justAssigned, setJustAssigned] = useState(false);
   const { data: count = 0 } = useBatchStudentCount(batch.id);
   const updateStudent = useUpdateStudent();
+  const createHistory = useCreateBatchHistory();
   const { toast } = useToast();
 
   const atCapacity = batch.max_capacity ? count >= batch.max_capacity : false;
@@ -53,9 +56,20 @@ function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSucce
       : [droppedId];
 
     setAssigning(true);
+    const studentMap = new Map(allStudents.map((s: any) => [s.id, s]));
     try {
       await Promise.all(
-        idsToAssign.map((id) => updateStudent.mutateAsync({ id, batch_id: batch.id } as any))
+        idsToAssign.map(async (id) => {
+          const currentStudent = studentMap.get(id);
+          const fromBatchId = currentStudent?.batch_id || null;
+          await updateStudent.mutateAsync({ id, batch_id: batch.id } as any);
+          await createHistory.mutateAsync({
+            student_id: id,
+            from_batch_id: fromBatchId,
+            to_batch_id: batch.id,
+            reason: fromBatchId ? "Drag-and-drop batch reassignment" : "Drag-and-drop batch assignment",
+          });
+        })
       );
       toast({
         title: "Assigned to batch",
@@ -109,9 +123,8 @@ function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSucce
 
 export default function BatchDropZone({ selectedIds, studentNameMap, onSuccess }: BatchDropZoneProps) {
   const { data: batches = [] } = useBatches({ status: "active" });
+  const { data: allStudents = [] } = useAllStudents();
   const [isDragging, setIsDragging] = useState(false);
-  // We track dragging globally via a custom event so the zone shows/hides
-  // The parent will set a data attribute; we listen for dragstart/dragend on the document
   
   if (batches.length === 0) return null;
 
@@ -136,6 +149,7 @@ export default function BatchDropZone({ selectedIds, studentNameMap, onSuccess }
               dragStudentId={null}
               studentNameMap={studentNameMap}
               onSuccess={onSuccess}
+              allStudents={allStudents}
             />
           ))}
         </div>

@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useBatches, type Batch } from "@/hooks/useBatches";
 import { useBatchStudentCount } from "@/hooks/useBatches";
-import { useUpdateStudent } from "@/hooks/useStudents";
+import { useUpdateStudent, useAllStudents } from "@/hooks/useStudents";
+import { useCreateBatchHistory } from "@/hooks/useStudentBatchHistory";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -65,7 +66,9 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const { data: batches = [] } = useBatches({ status: "active" });
+  const { data: allStudents = [] } = useAllStudents();
   const updateStudent = useUpdateStudent();
+  const createHistory = useCreateBatchHistory();
   const { toast } = useToast();
 
   const filteredBatches = useMemo(() => {
@@ -82,11 +85,23 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
     if (!selectedBatchId || studentIds.length === 0) return;
     setAssigning(true);
     try {
-      // Update all students in parallel
+      // Get current batch_ids for history tracking
+      const studentMap = new Map(allStudents.map(s => [s.id, s]));
+
+      // Update all students and record history in parallel
       await Promise.all(
-        studentIds.map((id) =>
-          updateStudent.mutateAsync({ id, batch_id: selectedBatchId } as any)
-        )
+        studentIds.map(async (id) => {
+          const currentStudent = studentMap.get(id);
+          const fromBatchId = currentStudent?.batch_id || null;
+          await updateStudent.mutateAsync({ id, batch_id: selectedBatchId } as any);
+          // Record transfer history
+          await createHistory.mutateAsync({
+            student_id: id,
+            from_batch_id: fromBatchId,
+            to_batch_id: selectedBatchId,
+            reason: fromBatchId ? "Batch reassignment" : "Initial batch assignment",
+          });
+        })
       );
       const batch = batches.find((b) => b.id === selectedBatchId);
       toast({
