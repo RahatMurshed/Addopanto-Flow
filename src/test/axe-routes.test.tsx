@@ -68,6 +68,8 @@ const PROTECTED: RouteSpec[] = [
   { label: "CompanyMembers", load: () => import("@/pages/CompanyMembers") },
   { label: "PresetsManagement", load: () => import("@/pages/PresetsManagement") },
   { label: "CompanyCreationRequests", load: () => import("@/pages/CompanyCreationRequests") },
+  { label: "Batches", load: () => import("@/pages/Batches") },
+  { label: "AddStudent", load: () => import("@/pages/AddStudent") },
 ];
 
 async function runAxeCheck(spec: RouteSpec) {
@@ -116,6 +118,6 @@ describe("axe-core — Route Coverage", () => {
   it("covers all application routes", () => {
     const all = [...PUBLIC, ...PROTECTED].map((r) => r.label);
     expect(new Set(all).size).toBe(all.length);
-    expect(all.length).toBeGreaterThanOrEqual(18);
+    expect(all.length).toBeGreaterThanOrEqual(22);
   });
 });
