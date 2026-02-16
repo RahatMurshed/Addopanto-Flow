@@ -5,7 +5,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, X, SlidersHorizontal } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, X, SlidersHorizontal, ChevronDown, Filter } from "lucide-react";
+import { useBatches } from "@/hooks/useBatches";
 
 export interface StudentFilterValues {
   search: string;
@@ -14,6 +16,12 @@ export interface StudentFilterValues {
   monthlyStatus: "all" | "paid" | "pending" | "overdue";
   sortBy: "name" | "enrollment_date" | "monthly_fee_amount";
   sortOrder: "asc" | "desc";
+  // Advanced filters
+  batchId: "all" | string;
+  gender: "all" | string;
+  classGrade: string;
+  addressCity: string;
+  academicYear: string;
 }
 
 const defaultFilters: StudentFilterValues = {
@@ -23,6 +31,11 @@ const defaultFilters: StudentFilterValues = {
   monthlyStatus: "all",
   sortBy: "name",
   sortOrder: "asc",
+  batchId: "all",
+  gender: "all",
+  classGrade: "",
+  addressCity: "",
+  academicYear: "",
 };
 
 interface Props {
@@ -36,6 +49,8 @@ export { defaultFilters };
 
 export default function StudentFilters({ filters, onChange, totalResults, totalStudents }: Props) {
   const [searchInput, setSearchInput] = useState(filters.search);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const { data: batches = [] } = useBatches();
 
   // Debounce search input
   useEffect(() => {
@@ -52,9 +67,48 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
     setSearchInput(filters.search);
   }, [filters.search]);
 
+  // Debounced text filters for classGrade, addressCity, academicYear
+  const [classInput, setClassInput] = useState(filters.classGrade);
+  const [cityInput, setCityInput] = useState(filters.addressCity);
+  const [yearInput, setYearInput] = useState(filters.academicYear);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (classInput !== filters.classGrade) onChange({ ...filters, classGrade: classInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [classInput]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (cityInput !== filters.addressCity) onChange({ ...filters, addressCity: cityInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [cityInput]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (yearInput !== filters.academicYear) onChange({ ...filters, academicYear: yearInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [yearInput]);
+
+  // Sync external changes back
+  useEffect(() => { setClassInput(filters.classGrade); }, [filters.classGrade]);
+  useEffect(() => { setCityInput(filters.addressCity); }, [filters.addressCity]);
+  useEffect(() => { setYearInput(filters.academicYear); }, [filters.academicYear]);
+
   const update = (partial: Partial<StudentFilterValues>) => {
     onChange({ ...filters, ...partial });
   };
+
+  const advancedFilterCount = [
+    filters.batchId !== "all",
+    filters.gender !== "all",
+    filters.classGrade.length > 0,
+    filters.addressCity.length > 0,
+    filters.academicYear.length > 0,
+  ].filter(Boolean).length;
 
   const activeFilterCount = [
     filters.status !== "all",
@@ -62,15 +116,43 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
     filters.monthlyStatus !== "all",
     filters.search.length > 0,
     filters.sortBy !== "name" || filters.sortOrder !== "asc",
-  ].filter(Boolean).length;
+  ].filter(Boolean).length + advancedFilterCount;
 
-  const isDefault =
-    filters.search === "" &&
-    filters.status === "all" &&
-    filters.admissionStatus === "all" &&
-    filters.monthlyStatus === "all" &&
-    filters.sortBy === "name" &&
-    filters.sortOrder === "asc";
+  const isDefault = JSON.stringify(filters) === JSON.stringify(defaultFilters);
+
+  // Collect active advanced filter chips
+  const advancedChips: { label: string; key: keyof StudentFilterValues; resetValue: string }[] = [];
+  if (filters.batchId !== "all") {
+    const batch = batches.find(b => b.id === filters.batchId);
+    advancedChips.push({ label: `Batch: ${batch?.batch_name || "Unknown"}`, key: "batchId", resetValue: "all" });
+  }
+  if (filters.gender !== "all") {
+    advancedChips.push({ label: `Gender: ${filters.gender}`, key: "gender", resetValue: "all" });
+  }
+  if (filters.classGrade) {
+    advancedChips.push({ label: `Class: ${filters.classGrade}`, key: "classGrade", resetValue: "" });
+  }
+  if (filters.addressCity) {
+    advancedChips.push({ label: `City: ${filters.addressCity}`, key: "addressCity", resetValue: "" });
+  }
+  if (filters.academicYear) {
+    advancedChips.push({ label: `Year: ${filters.academicYear}`, key: "academicYear", resetValue: "" });
+  }
+
+  const clearChip = (key: keyof StudentFilterValues, resetValue: string) => {
+    if (key === "classGrade") setClassInput("");
+    if (key === "addressCity") setCityInput("");
+    if (key === "academicYear") setYearInput("");
+    update({ [key]: resetValue });
+  };
+
+  const resetAll = () => {
+    setSearchInput("");
+    setClassInput("");
+    setCityInput("");
+    setYearInput("");
+    onChange(defaultFilters);
+  };
 
   return (
     <div className="space-y-3">
@@ -79,7 +161,7 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name or student ID..."
+            placeholder="Search by name, ID, father name, phone..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9 pr-9"
@@ -157,7 +239,7 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setSearchInput(""); onChange(defaultFilters); }}
+              onClick={resetAll}
               className="text-muted-foreground"
             >
               <X className="mr-1 h-3.5 w-3.5" /> Reset
@@ -170,6 +252,107 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
           )}
         </div>
       </div>
+
+      {/* Advanced Filters Collapsible */}
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Filter className="h-3.5 w-3.5" />
+            Advanced Filters
+            {advancedFilterCount > 0 && (
+              <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
+                {advancedFilterCount}
+              </Badge>
+            )}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 rounded-lg border border-border bg-muted/30 p-4">
+            {/* Batch */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Batch</label>
+              <Select value={filters.batchId} onValueChange={(v) => update({ batchId: v })}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="All Batches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Batches</SelectItem>
+                  {batches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.batch_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Gender */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Gender</label>
+              <Select value={filters.gender} onValueChange={(v) => update({ gender: v })}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="All Genders" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Genders</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Class/Grade */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Class / Grade</label>
+              <Input
+                placeholder="e.g. 10th, XII"
+                value={classInput}
+                onChange={(e) => setClassInput(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
+            {/* City */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">City</label>
+              <Input
+                placeholder="Filter by city"
+                value={cityInput}
+                onChange={(e) => setCityInput(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
+            {/* Academic Year */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Academic Year</label>
+              <Input
+                placeholder="e.g. 2025-26"
+                value={yearInput}
+                onChange={(e) => setYearInput(e.target.value)}
+                className="h-9"
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Active filter chips */}
+      {advancedChips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {advancedChips.map((chip) => (
+            <Badge
+              key={chip.key}
+              variant="secondary"
+              className="gap-1 pr-1 cursor-pointer hover:bg-secondary/80"
+              onClick={() => clearChip(chip.key, chip.resetValue)}
+            >
+              {chip.label}
+              <X className="h-3 w-3" />
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* Results count when filtered */}
       {!isDefault && (
