@@ -383,7 +383,7 @@ export default function Revenue() {
               {filteredBySource.map((item) => (
                 <div key={item.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" style={getSourceBadgeStyle(item.name)}>{item.name}</Badge>
+                    <Badge variant="outline" style={getSourceBadgeStyle(item.name)}>{item.name}</Badge>
                     <span className="text-xs text-muted-foreground">({item.count} entries)</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -527,7 +527,7 @@ export default function Revenue() {
                           </TableCell>
                           <TableCell>
                             {rev.revenue_sources?.name ? (
-                              <Badge variant="secondary" style={getSourceBadgeStyle(rev.revenue_sources.name)}>{rev.revenue_sources.name}</Badge>
+                              <Badge variant="outline" style={getSourceBadgeStyle(rev.revenue_sources.name)}>{rev.revenue_sources.name}</Badge>
                             ) : (
                               <Badge variant="outline" style={getSourceBadgeStyle(null)}>Uncategorized</Badge>
                             )}
