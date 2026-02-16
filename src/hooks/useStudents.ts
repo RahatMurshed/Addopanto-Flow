@@ -176,17 +176,18 @@ export function useStudents(filters?: StudentFilters) {
   const page = filters?.page || 1;
   const pageSize = filters?.pageSize || 50;
 
-  const { activeCompanyId } = useCompany();
+  const { activeCompanyId, canViewStudentPII } = useCompany();
+  const table = canViewStudentPII ? "students" : "students_safe";
 
   return useQuery({
-    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear, page, pageSize }],
+    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear, page, pageSize, table }],
     queryFn: async (): Promise<PaginatedStudentsResult> => {
       if (!user) return { data: [], totalCount: 0 };
       if (!activeCompanyId) return { data: [], totalCount: 0 };
 
       // Build base query for both count and data
-      let countQuery = supabase.from("students").select("id", { count: "exact", head: true }).eq("company_id", activeCompanyId);
-      let dataQuery = supabase.from("students").select("*").eq("company_id", activeCompanyId);
+      let countQuery = supabase.from(table as any).select("id", { count: "exact", head: true }).eq("company_id", activeCompanyId);
+      let dataQuery = supabase.from(table as any).select("*").eq("company_id", activeCompanyId);
 
       // Apply filters to both queries
       if (status !== "all") {
@@ -216,10 +217,31 @@ export function useStudents(filters?: StudentFilters) {
         dataQuery = dataQuery.ilike("class_grade", `%${sanitizedClass}%`);
       }
 
-      if (addressCity) {
-        const sanitizedCity = addressCity.replace(/[%_\\]/g, '\\$&');
-        countQuery = countQuery.ilike("address_city", `%${sanitizedCity}%`);
-        dataQuery = dataQuery.ilike("address_city", `%${sanitizedCity}%`);
+      // Address filters only apply when user can view PII (columns exist only in full table)
+      if (canViewStudentPII) {
+        if (addressCity) {
+          const sanitizedCity = addressCity.replace(/[%_\\]/g, '\\$&');
+          countQuery = countQuery.ilike("address_city", `%${sanitizedCity}%`);
+          dataQuery = dataQuery.ilike("address_city", `%${sanitizedCity}%`);
+        }
+
+        if (addressState) {
+          const s = addressState.replace(/[%_\\]/g, '\\$&');
+          countQuery = countQuery.ilike("address_state", `%${s}%`);
+          dataQuery = dataQuery.ilike("address_state", `%${s}%`);
+        }
+
+        if (addressArea) {
+          const s = addressArea.replace(/[%_\\]/g, '\\$&');
+          countQuery = countQuery.ilike("address_area", `%${s}%`);
+          dataQuery = dataQuery.ilike("address_area", `%${s}%`);
+        }
+
+        if (addressPinZip) {
+          const s = addressPinZip.replace(/[%_\\]/g, '\\$&');
+          countQuery = countQuery.ilike("address_pin_zip", `%${s}%`);
+          dataQuery = dataQuery.ilike("address_pin_zip", `%${s}%`);
+        }
       }
 
       if (academicYear) {
@@ -228,34 +250,18 @@ export function useStudents(filters?: StudentFilters) {
         dataQuery = dataQuery.ilike("academic_year", `%${sanitizedYear}%`);
       }
 
-      if (addressState) {
-        const s = addressState.replace(/[%_\\]/g, '\\$&');
-        countQuery = countQuery.ilike("address_state", `%${s}%`);
-        dataQuery = dataQuery.ilike("address_state", `%${s}%`);
-      }
-
-      if (addressArea) {
-        const s = addressArea.replace(/[%_\\]/g, '\\$&');
-        countQuery = countQuery.ilike("address_area", `%${s}%`);
-        dataQuery = dataQuery.ilike("address_area", `%${s}%`);
-      }
-
-      if (addressPinZip) {
-        const s = addressPinZip.replace(/[%_\\]/g, '\\$&');
-        countQuery = countQuery.ilike("address_pin_zip", `%${s}%`);
-        dataQuery = dataQuery.ilike("address_pin_zip", `%${s}%`);
-      }
-
       if (search) {
         const sanitized = search.replace(/[%_\\]/g, '\\$&');
         const includeAltContact = filters?.includeAltContact;
-        const fields = [
-          "name", "student_id_number", "father_name", "phone",
-          "mother_name", "whatsapp_number",
+        // Only search fields available in current table
+        const safeFields = ["name", "student_id_number", "class_grade"];
+        const piiFields = [
+          "father_name", "phone", "mother_name", "whatsapp_number",
           ...(includeAltContact !== false ? ["alt_contact_number"] : []),
           "email", "address_house", "address_street",
           "address_area", "address_city", "address_state", "address_pin_zip"
         ];
+        const fields = canViewStudentPII ? [...safeFields, ...piiFields] : safeFields;
         const searchFilter = fields.map(f => `${f}.ilike.%${sanitized}%`).join(",");
         countQuery = countQuery.or(searchFilter);
         dataQuery = dataQuery.or(searchFilter);
@@ -276,7 +282,7 @@ export function useStudents(filters?: StudentFilters) {
       if (dataResult.error) throw dataResult.error;
 
       return {
-        data: dataResult.data as Student[],
+        data: (dataResult.data as unknown) as Student[],
         totalCount: countResult.count || 0,
       };
     },
@@ -286,18 +292,20 @@ export function useStudents(filters?: StudentFilters) {
 
 export function useStudent(id: string | undefined) {
   const { user } = useAuth();
+  const { canViewStudentPII } = useCompany();
+  const table = canViewStudentPII ? "students" : "students_safe";
 
   return useQuery({
-    queryKey: ["students", id],
+    queryKey: ["students", id, table],
     queryFn: async () => {
       if (!user || !id) return null;
       const { data, error } = await supabase
-        .from("students")
+        .from(table as any)
         .select("*")
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data as Student;
+      return data as unknown as Student;
     },
     enabled: !!user && !!id,
   });
@@ -404,25 +412,25 @@ export function useDeleteStudent() {
  */
 export function useAllStudents() {
   const { user } = useAuth();
-  const { activeCompanyId } = useCompany();
+  const { activeCompanyId, canViewStudentPII } = useCompany();
+  const table = canViewStudentPII ? "students" : "students_safe";
 
   return useQuery({
-    queryKey: ["students", "all", activeCompanyId],
+    queryKey: ["students", "all", activeCompanyId, table],
     queryFn: async () => {
       if (!user || !activeCompanyId) return [];
-      // Fetch in batches of 1000 to handle large datasets
       let allData: Student[] = [];
       let from = 0;
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore) {
         const { data, error } = await supabase
-          .from("students")
+          .from(table as any)
           .select("*")
           .eq("company_id", activeCompanyId)
           .range(from, from + batchSize - 1);
         if (error) throw error;
-        allData = allData.concat(data as Student[]);
+        allData = allData.concat((data as unknown) as Student[]);
         hasMore = data.length === batchSize;
         from += batchSize;
       }
@@ -438,15 +446,17 @@ export function useAllStudents() {
  */
 export async function fetchFilteredStudentsForExport(
   activeCompanyId: string,
-  filters: StudentFilters
+  filters: StudentFilters,
+  canViewPII: boolean = true
 ): Promise<Student[]> {
   let allData: Student[] = [];
   let from = 0;
   const batchSize = 1000;
   let hasMore = true;
+  const table = canViewPII ? "students" : "students_safe";
 
   while (hasMore) {
-    let query = supabase.from("students").select("*").eq("company_id", activeCompanyId);
+    let query = supabase.from(table as any).select("*").eq("company_id", activeCompanyId);
 
     const status = filters.status || "all";
     if (status !== "all") query = query.eq("status", status);
@@ -467,21 +477,23 @@ export async function fetchFilteredStudentsForExport(
       const s = filters.classGrade.trim().replace(/[%_\\]/g, '\\$&');
       query = query.ilike("class_grade", `%${s}%`);
     }
-    if (filters.addressCity?.trim()) {
-      const s = filters.addressCity.trim().replace(/[%_\\]/g, '\\$&');
-      query = query.ilike("address_city", `%${s}%`);
-    }
-    if (filters.addressState?.trim()) {
-      const s = filters.addressState.trim().replace(/[%_\\]/g, '\\$&');
-      query = query.ilike("address_state", `%${s}%`);
-    }
-    if (filters.addressArea?.trim()) {
-      const s = filters.addressArea.trim().replace(/[%_\\]/g, '\\$&');
-      query = query.ilike("address_area", `%${s}%`);
-    }
-    if (filters.addressPinZip?.trim()) {
-      const s = filters.addressPinZip.trim().replace(/[%_\\]/g, '\\$&');
-      query = query.ilike("address_pin_zip", `%${s}%`);
+    if (canViewPII) {
+      if (filters.addressCity?.trim()) {
+        const s = filters.addressCity.trim().replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("address_city", `%${s}%`);
+      }
+      if (filters.addressState?.trim()) {
+        const s = filters.addressState.trim().replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("address_state", `%${s}%`);
+      }
+      if (filters.addressArea?.trim()) {
+        const s = filters.addressArea.trim().replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("address_area", `%${s}%`);
+      }
+      if (filters.addressPinZip?.trim()) {
+        const s = filters.addressPinZip.trim().replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("address_pin_zip", `%${s}%`);
+      }
     }
     if (filters.academicYear?.trim()) {
       const s = filters.academicYear.trim().replace(/[%_\\]/g, '\\$&');
@@ -490,13 +502,14 @@ export async function fetchFilteredStudentsForExport(
 
     if (filters.search?.trim()) {
       const sanitized = filters.search.trim().replace(/[%_\\]/g, '\\$&');
-      const fields = [
-        "name", "student_id_number", "father_name", "phone",
-        "mother_name", "whatsapp_number",
+      const safeFields = ["name", "student_id_number", "class_grade"];
+      const piiFields = [
+        "father_name", "phone", "mother_name", "whatsapp_number",
         ...(filters.includeAltContact !== false ? ["alt_contact_number"] : []),
         "email", "address_house", "address_street",
         "address_area", "address_city", "address_state", "address_pin_zip"
       ];
+      const fields = canViewPII ? [...safeFields, ...piiFields] : safeFields;
       query = query.or(fields.map(f => `${f}.ilike.%${sanitized}%`).join(","));
     }
 
@@ -504,7 +517,7 @@ export async function fetchFilteredStudentsForExport(
 
     const { data, error } = await query;
     if (error) throw error;
-    allData = allData.concat(data as Student[]);
+    allData = allData.concat((data as unknown) as Student[]);
     hasMore = data.length === batchSize;
     from += batchSize;
   }

@@ -109,6 +109,7 @@ interface CompanyContextType {
   canDeleteExpense: boolean;
   canViewRevenue: boolean;
   canViewExpense: boolean;
+  canViewStudentPII: boolean;
 
   // Actions
   switchCompany: (companyId: string) => Promise<void>;
@@ -268,6 +269,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canViewMembers = isCompanyAdmin || isCompanyModerator;
   const canViewRevenue = isCompanyAdmin || isCompanyModerator || isCompanyViewer || (isDataEntryOperator && deoFinance);
   const canViewExpense = isCompanyAdmin || isCompanyModerator || isCompanyViewer || (isDataEntryOperator && deoFinance);
+  const canViewStudentPII = isCompanyAdmin; // isCipher is already included in isCompanyAdmin
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -340,6 +342,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canDeleteExpense,
       canViewRevenue,
       canViewExpense,
+      canViewStudentPII,
       switchCompany,
       refetch,
     }}>

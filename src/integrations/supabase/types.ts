@@ -868,6 +868,13 @@ export type Database = {
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "monthly_fee_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       registration_requests: {
@@ -1134,6 +1141,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "student_batch_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "student_batch_history_to_batch_id_fkey"
             columns: ["to_batch_id"]
             isOneToOne: false
@@ -1217,6 +1231,13 @@ export type Database = {
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "student_payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       student_siblings: {
@@ -1270,6 +1291,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_siblings_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1651,6 +1679,100 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      students_safe: {
+        Row: {
+          academic_year: string | null
+          admission_fee_total: number | null
+          batch_id: string | null
+          billing_start_month: string | null
+          class_grade: string | null
+          company_id: string | null
+          course_end_month: string | null
+          course_start_month: string | null
+          created_at: string | null
+          enrollment_date: string | null
+          gender: string | null
+          id: string | null
+          monthly_fee_amount: number | null
+          name: string | null
+          notes: string | null
+          roll_number: string | null
+          section_division: string | null
+          status: Database["public"]["Enums"]["student_status"] | null
+          student_id_number: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          academic_year?: string | null
+          admission_fee_total?: number | null
+          batch_id?: string | null
+          billing_start_month?: string | null
+          class_grade?: string | null
+          company_id?: string | null
+          course_end_month?: string | null
+          course_start_month?: string | null
+          created_at?: string | null
+          enrollment_date?: string | null
+          gender?: string | null
+          id?: string | null
+          monthly_fee_amount?: number | null
+          name?: string | null
+          notes?: string | null
+          roll_number?: string | null
+          section_division?: string | null
+          status?: Database["public"]["Enums"]["student_status"] | null
+          student_id_number?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          academic_year?: string | null
+          admission_fee_total?: number | null
+          batch_id?: string | null
+          billing_start_month?: string | null
+          class_grade?: string | null
+          company_id?: string | null
+          course_end_month?: string | null
+          course_start_month?: string | null
+          created_at?: string | null
+          enrollment_date?: string | null
+          gender?: string | null
+          id?: string | null
+          monthly_fee_amount?: number | null
+          name?: string | null
+          notes?: string | null
+          roll_number?: string | null
+          section_division?: string | null
+          status?: Database["public"]["Enums"]["student_status"] | null
+          student_id_number?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
