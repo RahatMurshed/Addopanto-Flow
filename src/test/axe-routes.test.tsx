@@ -87,11 +87,8 @@ async function runAxeCheck(spec: RouteSpec) {
     return;
   }
   const results = await axe(container, AXE_OPTS);
-  const critical = results.violations.filter(
-    (v) => v.impact === "critical" || v.impact === "serious"
-  );
-  if (critical.length > 0) {
-    const summary = critical
+  if (results.violations.length > 0) {
+    const summary = results.violations
       .map(
         (v) =>
           `[${v.impact}] ${v.id}: ${v.description} (${v.nodes.length} node(s))\n` +
