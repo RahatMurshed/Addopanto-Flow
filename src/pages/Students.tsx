@@ -9,6 +9,7 @@ import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -17,13 +18,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
 import StudentWizardDialog from "@/components/StudentWizardDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import BulkImportDialog from "@/components/BulkImportDialog";
+import BatchAssignDialog from "@/components/BatchAssignDialog";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
@@ -32,6 +34,8 @@ import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/comp
 
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchAssignOpen, setBatchAssignOpen] = useState(false);
 
   // Server-side filters passed to hook
   const { data: rawStudents = [], isLoading } = useStudents({
@@ -52,8 +56,6 @@ export default function Students() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  
 
   const students = useMemo(() => {
     if (!isDataEntryOperator) return rawStudents;
@@ -127,8 +129,44 @@ export default function Students() {
     pagination.goToPage(1);
   }, [filters]);
 
+  // Clear selection when filtered results change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filteredStudents.length, filters]);
 
+  // Selection helpers
+  const currentPageIds = useMemo(() => pagination.paginatedItems.map(s => s.id), [pagination.paginatedItems]);
+  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
+  const somePageSelected = currentPageIds.some(id => selectedIds.has(id));
 
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedStudentNames = useMemo(() => {
+    return filteredStudents.filter(s => selectedIds.has(s.id)).map(s => s.name);
+  }, [filteredStudents, selectedIds]);
 
   const handleCreate = async (data: StudentInsert) => {
     try {
@@ -268,6 +306,31 @@ export default function Students() {
               totalResults={filteredStudents.length}
               totalStudents={totalStudents}
             />
+
+            {/* Bulk action bar */}
+            {selectedIds.size > 0 && effectiveCanEdit && (
+              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} student{selectedIds.size > 1 ? "s" : ""} selected
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBatchAssignOpen(true)}
+                >
+                  <Layers className="mr-1.5 h-3.5 w-3.5" />
+                  Assign to Batch
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {filteredStudents.length === 0 ? (
@@ -286,6 +349,15 @@ export default function Students() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {effectiveCanEdit && (
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                            onCheckedChange={toggleAll}
+                            aria-label="Select all on page"
+                          />
+                        </TableHead>
+                      )}
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Student ID</TableHead>
                       <TableHead>Status</TableHead>
@@ -299,8 +371,18 @@ export default function Students() {
                   <TableBody>
                     {pagination.paginatedItems.map((s) => {
                       const sum = studentSummaries.get(s.id)!;
+                      const isSelected = selectedIds.has(s.id);
                       return (
-                        <TableRow key={s.id}>
+                        <TableRow key={s.id} className={isSelected ? "bg-primary/5" : undefined}>
+                          {effectiveCanEdit && (
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleOne(s.id)}
+                                aria-label={`Select ${s.name}`}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="font-medium">{s.name}</TableCell>
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{s.student_id_number || "—"}</TableCell>
                           <TableCell>
@@ -390,6 +472,15 @@ export default function Students() {
 
       {/* Bulk Import Dialog */}
       <BulkImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
+
+      {/* Batch Assignment Dialog */}
+      <BatchAssignDialog
+        open={batchAssignOpen}
+        onOpenChange={setBatchAssignOpen}
+        studentIds={Array.from(selectedIds)}
+        studentNames={selectedStudentNames}
+        onSuccess={() => setSelectedIds(new Set())}
+      />
 
       {/* Payment Dialog */}
       {selectedStudent && (
