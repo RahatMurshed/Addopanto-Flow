@@ -7,7 +7,7 @@
  */
 
 const UNCATEGORIZED_STYLE = {
-  light: { bg: "hsla(220, 30%, 50%, 0.12)", text: "hsl(220, 25%, 45%)", border: "hsla(220, 30%, 50%, 0.25)" },
+  light: { bg: "transparent", text: "hsl(220, 25%, 45%)", border: "hsla(220, 30%, 50%, 0.25)" },
   dark: { bg: "hsl(220, 12%, 16%)", text: "hsl(220, 10%, 62%)", border: "hsl(220, 12%, 28%)" },
 };
 
@@ -38,11 +38,11 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
       border: `hsl(${hue}, 35%, 28%)`,
     };
   }
-  // Light: neon highlighted pill — vivid saturation matching amount column intensity
+  // Light: neon text with no background, vivid per-source hue
   return {
-    bg: `hsla(${hue}, 80%, 50%, 0.12)`,
-    text: `hsl(${hue}, 75%, 38%)`,
-    border: `hsla(${hue}, 80%, 50%, 0.25)`,
+    bg: "transparent",
+    text: `hsl(${hue}, 85%, 40%)`,
+    border: `hsla(${hue}, 85%, 45%, 0.30)`,
   };
 }
 
