@@ -32,6 +32,12 @@ const TABLE_OPTIONS = [
   { value: "expenses", label: "Expenses" },
   { value: "expense_accounts", label: "Expense Sources" },
   { value: "khata_transfers", label: "Transfers" },
+  { value: "company_memberships", label: "Members" },
+  { value: "revenue_sources", label: "Revenue Sources" },
+  { value: "company_join_requests", label: "Join Requests" },
+  { value: "moderator_permissions", label: "Permissions" },
+  { value: "student_batch_history", label: "Batch Transfers" },
+  { value: "companies", label: "Company Settings" },
 ];
 
 const ACTION_OPTIONS = [
@@ -63,6 +69,12 @@ function getActionLabel(table: string, action: string): { label: string; color: 
     expense_accounts: { INSERT: "Source Created", UPDATE: "Source Updated", DELETE: "Source Deleted" },
     khata_transfers: { INSERT: "Transfer Made", UPDATE: "Transfer Updated", DELETE: "Transfer Deleted" },
     courses: { INSERT: "Course Created", UPDATE: "Course Updated", DELETE: "Course Deleted" },
+    company_memberships: { INSERT: "Member Added", UPDATE: "Member Updated", DELETE: "Member Removed" },
+    revenue_sources: { INSERT: "Source Created", UPDATE: "Source Updated", DELETE: "Source Deleted" },
+    company_join_requests: { INSERT: "Request Submitted", UPDATE: "Request Updated", DELETE: "Request Deleted" },
+    moderator_permissions: { INSERT: "Permissions Set", UPDATE: "Permissions Updated", DELETE: "Permissions Removed" },
+    student_batch_history: { INSERT: "Batch Transfer Recorded", UPDATE: "Batch Transfer Updated", DELETE: "Batch Transfer Deleted" },
+    companies: { INSERT: "Company Created", UPDATE: "Company Updated", DELETE: "Company Deleted" },
   };
   const label = map[table]?.[action] || `${action}`;
   const color = action === "INSERT" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
@@ -116,6 +128,34 @@ function getDescription(log: AuditLogType): string {
   }
   if (log.table_name === "khata_transfers" && d.amount) {
     return `Amount: ${d.amount}${d.description ? ` — ${d.description}` : ""}`;
+  }
+  if (log.table_name === "company_memberships") {
+    const parts: string[] = [];
+    if (d.role) parts.push(`Role: ${d.role}`);
+    if (d.status) parts.push(`Status: ${d.status}`);
+    return parts.join(" · ");
+  }
+  if (log.table_name === "revenue_sources") {
+    return d.name ? `Source: ${d.name}` : "";
+  }
+  if (log.table_name === "company_join_requests") {
+    const parts: string[] = [];
+    if (d.status) parts.push(`Status: ${d.status}`);
+    if (d.message) parts.push(`Message: ${String(d.message).slice(0, 60)}`);
+    return parts.join(" · ");
+  }
+  if (log.table_name === "moderator_permissions") {
+    const flags = ["can_add_revenue", "can_add_expense", "can_add_expense_source", "can_transfer", "can_view_reports"] as const;
+    const enabled = flags.filter(f => d[f] === true).map(f => f.replace("can_", "").replace(/_/g, " "));
+    return enabled.length > 0 ? `Enabled: ${enabled.join(", ")}` : "All permissions disabled";
+  }
+  if (log.table_name === "student_batch_history") {
+    const parts: string[] = [];
+    if (d.reason) parts.push(`Reason: ${d.reason}`);
+    return parts.join(" · ") || "Batch transfer";
+  }
+  if (log.table_name === "companies") {
+    return d.name ? `Company: ${d.name}` : "";
   }
   return "";
 }
