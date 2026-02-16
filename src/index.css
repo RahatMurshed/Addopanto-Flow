@@ -92,8 +92,9 @@ All colors MUST be HSL.
     --warning: 38 92% 55%;
     --warning-foreground: 220 20% 8%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
+    /* Border/input slightly lighter than muted for visible separation */
+    --border: 217 30% 22%;
+    --input: 217 30% 22%;
     --ring: 30 100% 55%;
 
     --sidebar-background: 217 60% 12%;
