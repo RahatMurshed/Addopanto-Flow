@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { format, parse } from "date-fns";
 import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
 import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
+import { useCourse } from "@/hooks/useCourses";
 import { useStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -19,7 +20,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -41,6 +45,8 @@ export default function BatchDetail() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: batch, isLoading: batchLoading } = useBatch(id);
+  const courseId = (batch as any)?.course_id;
+  const { data: course } = useCourse(courseId);
   const { data: allStudents = [], isLoading: studentsLoading } = useStudents();
   const { data: allPayments = [] } = useStudentPayments();
 
@@ -66,7 +72,7 @@ export default function BatchDetail() {
   // Redirect DEO without edit permission
   useEffect(() => {
     if (!companyLoading && isDataEntryOperator && !canEditBatch) {
-      navigate("/batches", { replace: true });
+      navigate("/courses", { replace: true });
     }
   }, [companyLoading, isDataEntryOperator, canEditBatch, navigate]);
 
@@ -346,17 +352,39 @@ export default function BatchDetail() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Batch not found</p>
-        <Button variant="link" onClick={() => navigate("/batches")}>Back to Batches</Button>
+        <Button variant="link" onClick={() => navigate("/courses")}>Back to Courses</Button>
       </div>
     );
   }
 
+  const backUrl = courseId && course ? `/courses/${courseId}` : "/courses";
+
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild><Link to="/courses">Courses</Link></BreadcrumbLink>
+          </BreadcrumbItem>
+          {course && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild><Link to={`/courses/${courseId}`}>{course.course_name}</Link></BreadcrumbLink>
+              </BreadcrumbItem>
+            </>
+          )}
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{batch.batch_name}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/batches")}><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate(backUrl)}><ArrowLeft className="h-4 w-4" /></Button>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{batch.batch_name}</h1>

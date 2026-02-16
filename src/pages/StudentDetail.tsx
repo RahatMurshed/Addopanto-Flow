@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudent, useUpdateStudent, type StudentInsert } from "@/hooks/useStudents";
 import {
@@ -7,6 +7,7 @@ import {
   useMonthlyFeeHistory, computeStudentSummary,
 } from "@/hooks/useStudentPayments";
 import { useBatch } from "@/hooks/useBatches";
+import { useCourse } from "@/hooks/useCourses";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info, Search, X, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info, Search, X, SlidersHorizontal, BookOpen } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import StudentDialog from "@/components/StudentDialog";
@@ -47,6 +51,8 @@ export default function StudentDetail() {
   const { data: feeHistory = [] } = useMonthlyFeeHistory(id);
   const batchId = (student as any)?.batch_id;
   const { data: batch } = useBatch(batchId);
+  const courseId = (batch as any)?.course_id;
+  const { data: course } = useCourse(courseId);
 
   const updateMutation = useUpdateStudent();
   const createPaymentMutation = useCreateStudentPayment();
@@ -215,7 +221,7 @@ export default function StudentDetail() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground">Student not found</p>
-        <Button variant="link" onClick={() => navigate("/batches")}>Back to Batches</Button>
+        <Button variant="link" onClick={() => navigate("/courses")}>Back to Courses</Button>
       </div>
     );
   }
@@ -231,10 +237,39 @@ export default function StudentDetail() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild><Link to="/courses">Courses</Link></BreadcrumbLink>
+          </BreadcrumbItem>
+          {course && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild><Link to={`/courses/${courseId}`}>{course.course_name}</Link></BreadcrumbLink>
+              </BreadcrumbItem>
+            </>
+          )}
+          {batch && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild><Link to={`/batches/${batchId}`}>{batch.batch_name}</Link></BreadcrumbLink>
+              </BreadcrumbItem>
+            </>
+          )}
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{student.name}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => batchId ? navigate(`/batches/${batchId}`) : navigate("/batches")}><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => batchId ? navigate(`/batches/${batchId}`) : navigate("/courses")}><ArrowLeft className="h-4 w-4" /></Button>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{student.name}</h1>

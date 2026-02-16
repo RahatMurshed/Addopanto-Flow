@@ -6,6 +6,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 export interface Batch {
   id: string;
   company_id: string;
+  course_id: string | null;
   batch_name: string;
   batch_code: string;
   description: string | null;
@@ -25,6 +26,7 @@ export interface Batch {
 export interface BatchInsert {
   batch_name: string;
   batch_code: string;
+  course_id?: string | null;
   description?: string | null;
   start_date: string;
   end_date?: string | null;
