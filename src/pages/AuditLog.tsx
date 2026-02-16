@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Eye, Search, ClipboardList, Plus, Minus, ArrowRight } from "lucide-react";
+import { Eye, Search, ClipboardList, Plus, Minus, ArrowRight, Download } from "lucide-react";
+import { toast } from "sonner";
 import TablePagination from "@/components/TablePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuditLog as AuditLogType } from "@/hooks/useAuditLogs";
@@ -220,7 +221,7 @@ function DataView({ data, variant }: { data: Record<string, unknown>; variant: "
 
 export default function AuditLog() {
   const navigate = useNavigate();
-  const { isCompanyAdmin, isCipher, isLoading: companyLoading } = useCompany();
+  const { isCompanyAdmin, isCipher, isLoading: companyLoading, activeCompanyId } = useCompany();
 
   const [tableFilter, setTableFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
@@ -267,14 +268,134 @@ export default function AuditLog() {
   });
   const getProfile = (userId: string) => logProfiles.find(p => p.user_id === userId);
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportCSV = async () => {
+    if (!activeCompanyId) return;
+    setIsExporting(true);
+    try {
+      // Fetch ALL matching audit logs (not just current page)
+      let allLogs: AuditLogType[] = [];
+      const batchSize = 1000;
+      let fetchOffset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = supabase
+          .from("audit_logs" as any)
+          .select("*")
+          .eq("company_id", activeCompanyId)
+          .order("created_at", { ascending: false })
+          .range(fetchOffset, fetchOffset + batchSize - 1);
+
+        if (tableFilter !== "all") query = query.eq("table_name", tableFilter);
+        if (actionFilter !== "all") query = query.eq("action", actionFilter);
+        if (emailSearch.trim()) {
+          const sanitized = emailSearch.trim().replace(/[%_\\]/g, "\\$&");
+          query = query.ilike("user_email", `%${sanitized}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        const batch = (data ?? []) as unknown as AuditLogType[];
+        allLogs = [...allLogs, ...batch];
+        hasMore = batch.length === batchSize;
+        fetchOffset += batchSize;
+      }
+
+      if (allLogs.length === 0) {
+        toast.info("No audit entries to export");
+        return;
+      }
+
+      // Fetch memberships for role + approver info
+      const userIds = [...new Set(allLogs.map(l => l.user_id))];
+      const { data: memberships } = await supabase
+        .from("company_memberships")
+        .select("user_id, role, approved_by")
+        .eq("company_id", activeCompanyId)
+        .in("user_id", userIds);
+
+      const memberMap = new Map<string, { role: string; approved_by: string | null }>();
+      (memberships ?? []).forEach(m => memberMap.set(m.user_id, { role: m.role, approved_by: m.approved_by }));
+
+      // Fetch approver names
+      const approverIds = [...new Set((memberships ?? []).map(m => m.approved_by).filter(Boolean))] as string[];
+      const approverMap = new Map<string, string>();
+      if (approverIds.length > 0) {
+        const { data: approverProfiles } = await supabase
+          .from("user_profiles")
+          .select("user_id, full_name, email")
+          .in("user_id", approverIds);
+        (approverProfiles ?? []).forEach(p => approverMap.set(p.user_id, p.full_name || p.email || p.user_id));
+      }
+
+      // Fetch actor names
+      const { data: actorProfiles } = await supabase
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+      const actorMap = new Map<string, string>();
+      (actorProfiles ?? []).forEach(p => actorMap.set(p.user_id, p.full_name || ""));
+
+      // Build CSV
+      const roleLabelMap: Record<string, string> = { admin: "Admin", moderator: "Moderator", data_entry_operator: "DEO", viewer: "Viewer" };
+      const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+      const headers = ["Timestamp", "User Email", "User Name", "Role", "Approved By", "Action", "Table", "Entity", "Description"];
+      const rows = allLogs.map(log => {
+        const membership = memberMap.get(log.user_id);
+        const approver = membership?.approved_by ? approverMap.get(membership.approved_by) || "" : "";
+        const actorName = actorMap.get(log.user_id) || "";
+        const { label } = getActionLabel(log.table_name, log.action);
+        const entityName = getEntityName(log);
+        const desc = getDescription(log);
+
+        return [
+          escCsv(format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss")),
+          escCsv(log.user_email || ""),
+          escCsv(actorName),
+          escCsv(membership ? (roleLabelMap[membership.role] || membership.role) : "Unknown"),
+          escCsv(approver),
+          escCsv(label),
+          escCsv(log.table_name),
+          escCsv(entityName),
+          escCsv(desc),
+        ].join(",");
+      });
+
+      const csv = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `audit_log_${format(new Date(), "yyyy-MM-dd")}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`Exported ${allLogs.length} audit entries`);
+    } catch (err) {
+      console.error("Export failed:", err);
+      toast.error("Failed to export audit logs");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <ClipboardList className="h-6 w-6 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-          <p className="text-sm text-muted-foreground">Track all data changes across your business</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ClipboardList className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+            <p className="text-sm text-muted-foreground">Track all data changes across your business</p>
+          </div>
         </div>
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCSV} disabled={isExporting || totalCount === 0}>
+          <Download className="h-4 w-4" />
+          {isExporting ? "Exporting..." : "Export CSV"}
+        </Button>
       </div>
 
       {/* Filters */}
