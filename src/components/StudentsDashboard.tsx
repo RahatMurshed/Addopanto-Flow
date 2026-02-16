@@ -120,7 +120,7 @@ export default function StudentsDashboard({
     <div className="space-y-6">
       {/* Primary Stats */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onSetFilters({ status: "all" })}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onSetFilters({ status: "all", batchId: "all" })}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
             <div className="rounded-lg bg-primary/10 p-2">
@@ -132,7 +132,7 @@ export default function StudentsDashboard({
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-green-500/20" onClick={() => onSetFilters({ status: "active" })}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-green-500/20" onClick={() => onSetFilters({ batchId: "enrolled", status: "all" })}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Enrolled</CardTitle>
             <div className="rounded-lg bg-green-500/10 p-2">
@@ -145,7 +145,7 @@ export default function StudentsDashboard({
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-orange-500/20" onClick={() => onSetFilters({ batchId: "none" })}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-orange-500/20" onClick={() => onSetFilters({ batchId: "none", status: "all" })}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Unenrolled</CardTitle>
             <div className="rounded-lg bg-orange-500/10 p-2">
@@ -253,7 +253,7 @@ export default function StudentsDashboard({
             <Button variant="outline" onClick={onExport}>
               <Download className="mr-2 h-4 w-4" /> Export All Students
             </Button>
-            <Button variant="outline" onClick={() => onSetFilters({ status: "active" })}>
+            <Button variant="outline" onClick={() => onSetFilters({ batchId: "enrolled", status: "all" })}>
               <Filter className="mr-2 h-4 w-4" /> View Enrolled
             </Button>
           </>
