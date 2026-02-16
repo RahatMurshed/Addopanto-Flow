@@ -7,6 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { Search, X, SlidersHorizontal, ChevronDown, Filter, Bookmark } from "lucide-react";
 import { useBatches } from "@/hooks/useBatches";
 import type { SavedSearchPreset } from "@/hooks/useSavedSearchPresets";
@@ -27,6 +28,7 @@ export interface StudentFilterValues {
   addressArea: string;
   addressPinZip: string;
   academicYear: string;
+  includeAltContact: boolean;
 }
 
 const defaultFilters: StudentFilterValues = {
@@ -44,6 +46,7 @@ const defaultFilters: StudentFilterValues = {
   addressArea: "",
   addressPinZip: "",
   academicYear: "",
+  includeAltContact: true,
 };
 
 interface Props {
@@ -505,6 +508,18 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Search options */}
+            <div className="flex items-center gap-2">
+              <Switch
+                id="include-alt-contact"
+                checked={filters.includeAltContact}
+                onCheckedChange={(v) => onChange({ ...filters, includeAltContact: v })}
+              />
+              <label htmlFor="include-alt-contact" className="text-sm text-muted-foreground cursor-pointer">
+                Include alternate contact in search
+              </label>
             </div>
           </div>
         </CollapsibleContent>
