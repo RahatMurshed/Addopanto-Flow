@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.reset-company-data]
 verify_jwt = false
+
+[functions.bulk-import-students]
+verify_jwt = false

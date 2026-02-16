@@ -17,12 +17,13 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
 import StudentWizardDialog from "@/components/StudentWizardDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
+import BulkImportDialog from "@/components/BulkImportDialog";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
@@ -60,6 +61,7 @@ export default function Students() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -184,9 +186,14 @@ export default function Students() {
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>
         {effectiveCanAdd && (
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Student
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Student
+            </Button>
+          </div>
         )}
       </div>
 
@@ -375,6 +382,9 @@ export default function Students() {
 
       {/* Create Student Wizard */}
       <StudentWizardDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleCreate} />
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
 
       {/* Payment Dialog */}
       {selectedStudent && (
