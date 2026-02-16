@@ -278,3 +278,117 @@ describe("Contrast Validator Fuzz Testing", () => {
     }
   });
 });
+
+// ── Visual Regression: Red/Green Color Token Stability ──────────
+
+describe("Color Token Regression — Success (Green) tokens", () => {
+  const expectedLight = { token: "--success", value: "142 76% 30%" };
+  const expectedLightFg = { token: "--success-foreground", value: "0 0% 100%" };
+  const expectedDark = { token: "--success", value: "142 76% 42%" };
+  const expectedDarkFg = { token: "--success-foreground", value: "220 20% 8%" };
+
+  it("light --success matches snapshot", () => {
+    expect(LIGHT_TOKENS["--success"]).toBe(expectedLight.value);
+  });
+  it("light --success-foreground matches snapshot", () => {
+    expect(LIGHT_TOKENS["--success-foreground"]).toBe(expectedLightFg.value);
+  });
+  it("dark --success matches snapshot", () => {
+    expect(DARK_TOKENS["--success"]).toBe(expectedDark.value);
+  });
+  it("dark --success-foreground matches snapshot", () => {
+    expect(DARK_TOKENS["--success-foreground"]).toBe(expectedDarkFg.value);
+  });
+
+  it("light success has WCAG AA contrast on background", () => {
+    const fg = parseHSL(LIGHT_TOKENS["--success"]);
+    const bg = parseHSL(LIGHT_TOKENS["--background"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+  it("dark success has WCAG AA contrast on background", () => {
+    const fg = parseHSL(DARK_TOKENS["--success"]);
+    const bg = parseHSL(DARK_TOKENS["--background"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+  it("light success-foreground has WCAG AA contrast on success", () => {
+    const fg = parseHSL(LIGHT_TOKENS["--success-foreground"]);
+    const bg = parseHSL(LIGHT_TOKENS["--success"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+  it("dark success-foreground has WCAG AA contrast on success", () => {
+    const fg = parseHSL(DARK_TOKENS["--success-foreground"]);
+    const bg = parseHSL(DARK_TOKENS["--success"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+
+  it("success hue stays green (120–160) in both themes", () => {
+    const lightH = parseHSL(LIGHT_TOKENS["--success"])!.h;
+    const darkH = parseHSL(DARK_TOKENS["--success"])!.h;
+    expect(lightH >= 120 && lightH <= 160, `Light success hue ${lightH} out of green range`).toBe(true);
+    expect(darkH >= 120 && darkH <= 160, `Dark success hue ${darkH} out of green range`).toBe(true);
+  });
+});
+
+describe("Color Token Regression — Destructive (Red) tokens", () => {
+  const expectedLight = { token: "--destructive", value: "0 84% 45%" };
+  const expectedLightFg = { token: "--destructive-foreground", value: "0 0% 100%" };
+  const expectedDark = { token: "--destructive", value: "0 72% 45%" };
+  const expectedDarkFg = { token: "--destructive-foreground", value: "0 0% 100%" };
+
+  it("light --destructive matches snapshot", () => {
+    expect(LIGHT_TOKENS["--destructive"]).toBe(expectedLight.value);
+  });
+  it("light --destructive-foreground matches snapshot", () => {
+    expect(LIGHT_TOKENS["--destructive-foreground"]).toBe(expectedLightFg.value);
+  });
+  it("dark --destructive matches snapshot", () => {
+    expect(DARK_TOKENS["--destructive"]).toBe(expectedDark.value);
+  });
+  it("dark --destructive-foreground matches snapshot", () => {
+    expect(DARK_TOKENS["--destructive-foreground"]).toBe(expectedDarkFg.value);
+  });
+
+  it("light destructive has WCAG AA contrast on background", () => {
+    const fg = parseHSL(LIGHT_TOKENS["--destructive"]);
+    const bg = parseHSL(LIGHT_TOKENS["--background"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+  it("dark destructive has WCAG AA contrast on background", () => {
+    const fg = parseHSL(DARK_TOKENS["--destructive"]);
+    const bg = parseHSL(DARK_TOKENS["--background"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+  it("light destructive-foreground has WCAG AA contrast on destructive", () => {
+    const fg = parseHSL(LIGHT_TOKENS["--destructive-foreground"]);
+    const bg = parseHSL(LIGHT_TOKENS["--destructive"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+  it("dark destructive-foreground has WCAG AA contrast on destructive", () => {
+    const fg = parseHSL(DARK_TOKENS["--destructive-foreground"]);
+    const bg = parseHSL(DARK_TOKENS["--destructive"]);
+    expect(fg && bg && contrastRatio(fg, bg) >= 4.5).toBe(true);
+  });
+
+  it("destructive hue stays red (0 or 345–360) in both themes", () => {
+    const lightH = parseHSL(LIGHT_TOKENS["--destructive"])!.h;
+    const darkH = parseHSL(DARK_TOKENS["--destructive"])!.h;
+    const isRed = (h: number) => h <= 15 || h >= 345;
+    expect(isRed(lightH), `Light destructive hue ${lightH} out of red range`).toBe(true);
+    expect(isRed(darkH), `Dark destructive hue ${darkH} out of red range`).toBe(true);
+  });
+});
+
+describe("Color Token Regression — Warning (Amber) tokens", () => {
+  it("light --warning matches snapshot", () => {
+    expect(LIGHT_TOKENS["--warning"]).toBe("38 92% 32%");
+  });
+  it("dark --warning matches snapshot", () => {
+    expect(DARK_TOKENS["--warning"]).toBe("38 92% 55%");
+  });
+  it("warning hue stays amber (25–50) in both themes", () => {
+    const lightH = parseHSL(LIGHT_TOKENS["--warning"])!.h;
+    const darkH = parseHSL(DARK_TOKENS["--warning"])!.h;
+    expect(lightH >= 25 && lightH <= 50, `Light warning hue ${lightH}`).toBe(true);
+    expect(darkH >= 25 && darkH <= 50, `Dark warning hue ${darkH}`).toBe(true);
+  });
+});
