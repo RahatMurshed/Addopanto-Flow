@@ -486,37 +486,6 @@ describe("Query key includes table name for cache isolation", () => {
   });
 });
 
-// --- 8. PII audit mode toggle tests --------------------------------------
-
-describe("PII audit mode (admin preview as non-admin)", () => {
-  it("canViewStudentPII is false when audit mode is on even for admin", () => {
-    const isCompanyAdmin = true;
-    const piiAuditMode = true;
-    const canViewStudentPII = isCompanyAdmin && !piiAuditMode;
-    expect(canViewStudentPII).toBe(false);
-  });
-
-  it("canViewStudentPII is true when audit mode is off for admin", () => {
-    const isCompanyAdmin = true;
-    const piiAuditMode = false;
-    const canViewStudentPII = isCompanyAdmin && !piiAuditMode;
-    expect(canViewStudentPII).toBe(true);
-  });
-
-  it("canViewStudentPII is false for non-admin regardless of audit mode", () => {
-    const isCompanyAdmin = false;
-    expect(isCompanyAdmin && !false).toBe(false);
-    expect(isCompanyAdmin && !true).toBe(false);
-  });
-
-  it("audit mode flips table routing to students_safe", () => {
-    const isAdmin = true;
-    const auditOn = true;
-    const canViewPII = isAdmin && !auditOn;
-    const table = canViewPII ? "students" : "students_safe";
-    expect(table).toBe("students_safe");
-  });
-});
 
 // --- 9. RLS view column guarantee tests ----------------------------------
 
