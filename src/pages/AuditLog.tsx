@@ -40,6 +40,14 @@ const ACTION_OPTIONS = [
   { value: "DELETE", label: "Deleted" },
 ];
 
+const ROLE_OPTIONS = [
+  { value: "all", label: "All Roles" },
+  { value: "admin", label: "Admin" },
+  { value: "moderator", label: "Moderator" },
+  { value: "data_entry_operator", label: "DEO" },
+  { value: "viewer", label: "Viewer" },
+];
+
 const DEFAULT_PAGE_SIZE = 25;
 
 /* ── Helpers ── */
@@ -216,6 +224,7 @@ export default function AuditLog() {
 
   const [tableFilter, setTableFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [emailSearch, setEmailSearch] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -231,6 +240,7 @@ export default function AuditLog() {
     table_name: tableFilter === "all" ? "" : tableFilter,
     action: actionFilter === "all" ? "" : actionFilter,
     user_email: emailSearch,
+    role: roleFilter === "all" ? "" : roleFilter,
     limit: pageSize,
     offset: page * pageSize,
   });
@@ -296,6 +306,16 @@ export default function AuditLog() {
               </SelectTrigger>
               <SelectContent>
                 {ACTION_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(0); }}>
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue placeholder="All Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLE_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                 ))}
               </SelectContent>
