@@ -425,6 +425,80 @@ export function useAllStudents() {
   });
 }
 
+/**
+ * Fetch ALL students matching filters (no pagination) for CSV export.
+ * Fetches in batches of 1000 to bypass the default Supabase limit.
+ */
+export async function fetchFilteredStudentsForExport(
+  activeCompanyId: string,
+  filters: StudentFilters
+): Promise<Student[]> {
+  let allData: Student[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabase.from("students").select("*").eq("company_id", activeCompanyId);
+
+    const status = filters.status || "all";
+    if (status !== "all") query = query.eq("status", status);
+
+    const batchId = filters.batchId || "all";
+    if (batchId !== "all") query = query.eq("batch_id", batchId);
+
+    const gender = filters.gender || "all";
+    if (gender !== "all") query = query.eq("gender", gender);
+
+    if (filters.classGrade?.trim()) {
+      const s = filters.classGrade.trim().replace(/[%_\\]/g, '\\$&');
+      query = query.ilike("class_grade", `%${s}%`);
+    }
+    if (filters.addressCity?.trim()) {
+      const s = filters.addressCity.trim().replace(/[%_\\]/g, '\\$&');
+      query = query.ilike("address_city", `%${s}%`);
+    }
+    if (filters.addressState?.trim()) {
+      const s = filters.addressState.trim().replace(/[%_\\]/g, '\\$&');
+      query = query.ilike("address_state", `%${s}%`);
+    }
+    if (filters.addressArea?.trim()) {
+      const s = filters.addressArea.trim().replace(/[%_\\]/g, '\\$&');
+      query = query.ilike("address_area", `%${s}%`);
+    }
+    if (filters.addressPinZip?.trim()) {
+      const s = filters.addressPinZip.trim().replace(/[%_\\]/g, '\\$&');
+      query = query.ilike("address_pin_zip", `%${s}%`);
+    }
+    if (filters.academicYear?.trim()) {
+      const s = filters.academicYear.trim().replace(/[%_\\]/g, '\\$&');
+      query = query.ilike("academic_year", `%${s}%`);
+    }
+
+    if (filters.search?.trim()) {
+      const sanitized = filters.search.trim().replace(/[%_\\]/g, '\\$&');
+      const fields = [
+        "name", "student_id_number", "father_name", "phone",
+        "mother_name", "whatsapp_number",
+        ...(filters.includeAltContact !== false ? ["alt_contact_number"] : []),
+        "email", "address_house", "address_street",
+        "address_area", "address_city", "address_state", "address_pin_zip"
+      ];
+      query = query.or(fields.map(f => `${f}.ilike.%${sanitized}%`).join(","));
+    }
+
+    query = query.order("name", { ascending: true }).range(from, from + batchSize - 1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    allData = allData.concat(data as Student[]);
+    hasMore = data.length === batchSize;
+    from += batchSize;
+  }
+
+  return allData;
+}
+
 export function useBulkDeleteStudents() {
   const queryClient = useQueryClient();
 
