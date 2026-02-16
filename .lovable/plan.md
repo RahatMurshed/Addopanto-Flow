@@ -1,253 +1,260 @@
 
-# Comprehensive Student Management System
 
-## Overview
-This plan enhances the existing student module with detailed profiles (30+ new fields), a 5-step wizard form, CSV/Excel bulk import, advanced search/filtering, batch assignment capabilities, and a global command palette -- all optimized for 10,000-20,000 records.
+# Student Management System - Audit Report
 
-Due to the massive scope, this will be implemented in **4 phases** across multiple messages.
+This audit compares the specification against the current implementation, organized by section. Each item is marked as Implemented, Partially Implemented, or Not Implemented.
 
 ---
 
-## Phase 1: Database Schema + Extended Student Fields
+## 1. Detailed Student Information Fields
 
-### 1A. Database Migration -- New Columns on `students` Table
+| Feature | Status |
+|---------|--------|
+| Personal Info (Name, DOB, Gender, Blood Group, Religion, Nationality, Aadhar) | Implemented |
+| Contact Info (Mobile, WhatsApp, Alt Contact, Email, Current Address with split fields) | Implemented |
+| Permanent Address with "Same as Current" checkbox | Implemented |
+| Family Info (Father/Mother/Guardian details, Father's Income) | Implemented |
+| Siblings (Dynamic add/remove rows with Name, Age, Occupation, Contact) | Implemented |
+| Academic Info (Previous School, Class, Roll Number, Academic Year, Section, etc.) | Implemented |
+| Additional Info (Special Needs, Emergency Contact, Transportation, etc.) | Implemented |
 
-Add the following columns (all nullable except where noted):
-
-**Personal:**
-- `date_of_birth` (date)
-- `gender` (text)
-- `blood_group` (text)
-- `religion_category` (text)
-- `nationality` (text)
-- `aadhar_id_number` (text)
-
-**Contact:**
-- `whatsapp_number` (text)
-- `alt_contact_number` (text)
-- `address_house` (text)
-- `address_street` (text)
-- `address_area` (text)
-- `address_city` (text)
-- `address_state` (text)
-- `address_pin_zip` (text)
-- `permanent_address_same` (boolean, default true)
-- `perm_address_house`, `perm_address_street`, `perm_address_area`, `perm_address_city`, `perm_address_state`, `perm_address_pin_zip` (text)
-
-**Family:**
-- `father_name` (text)
-- `father_occupation` (text)
-- `father_contact` (text)
-- `father_annual_income` (numeric)
-- `mother_name` (text)
-- `mother_occupation` (text)
-- `mother_contact` (text)
-- `guardian_name` (text)
-- `guardian_contact` (text)
-- `guardian_relationship` (text)
-
-**Academic:**
-- `previous_school` (text)
-- `class_grade` (text)
-- `roll_number` (text)
-- `academic_year` (text)
-- `section_division` (text)
-- `previous_qualification` (text)
-- `previous_percentage` (text)
-- `board_university` (text)
-
-**Additional:**
-- `special_needs_medical` (text)
-- `emergency_contact_name` (text)
-- `emergency_contact_number` (text)
-- `transportation_mode` (text)
-- `distance_from_institution` (text)
-- `extracurricular_interests` (text)
-- `language_proficiency` (text)
-
-### 1B. New `student_siblings` Table
-
-```text
-student_siblings
-  id (uuid PK)
-  student_id (uuid FK -> students.id ON DELETE CASCADE)
-  company_id (uuid FK -> companies.id)
-  name (text)
-  age (integer)
-  occupation_school (text)
-  contact (text)
-  created_at (timestamptz)
-```
-
-RLS: Same pattern as students table -- company member can view, authorized users can insert/update/delete.
-
-### 1C. Database Indexes for Performance
-
-```text
-CREATE INDEX idx_students_company_name ON students(company_id, name);
-CREATE INDEX idx_students_company_father ON students(company_id, father_name);
-CREATE INDEX idx_students_company_phone ON students(company_id, phone);
-CREATE INDEX idx_students_company_class ON students(company_id, class_grade);
-CREATE INDEX idx_students_company_batch ON students(company_id, batch_id);
-CREATE INDEX idx_students_company_created ON students(company_id, created_at);
-CREATE INDEX idx_students_company_status ON students(company_id, status);
-```
+**Verdict: Fully Implemented** -- All 50+ student fields exist in the database, Student interface, wizard, and edit dialog.
 
 ---
 
-## Phase 2: 5-Step Student Wizard Form
+## 2. Bulk Import via CSV/Excel
 
-Replace the current `StudentDialog` with a multi-step wizard dialog:
+| Feature | Status |
+|---------|--------|
+| "Import Students" button with modal | Implemented |
+| Download CSV template | Implemented |
+| File upload (.csv) | Implemented (.csv only, not .xlsx/.xls) |
+| Preview first 10 rows | Implemented |
+| Auto-detect column mapping (fuzzy matching) | Implemented |
+| Column mapping dropdowns | Implemented |
+| Server-side validation (via edge function) | Implemented |
+| Import summary (success/failed/duplicates) | Implemented |
+| Progress bar during import | Implemented |
+| Error log download | Implemented |
+| Assign to batch during import | Implemented |
+| Audit trail logging | Partially -- edge function handles import, audit triggers fire on inserts |
 
-### Step 1: Personal Information
-- Full Name (required), Date of Birth (required, calendar picker), Gender (select), Blood Group (select), Religion/Category, Nationality, Aadhar/ID Number
-
-### Step 2: Contact Information
-- Mobile Number (required), WhatsApp Number, Alt Contact, Email
-- Current Address fields (House/Flat, Street, Area, City, State, PIN/ZIP)
-- Checkbox "Same as Current Address" for permanent address
-- Conditional permanent address fields
-
-### Step 3: Family Information
-- Father's Name (required), Occupation, Contact, Annual Income
-- Mother's Name (required), Occupation, Contact
-- Guardian section (if different)
-- Dynamic siblings rows with Add/Remove buttons
-
-### Step 4: Academic Information
-- Previous School, Class/Grade, Roll Number/Student ID, Academic Year, Section
-- Previous Qualification, Percentage/Grade, Board/University
-- Batch selector (existing), enrollment date, billing/course months, fees
-- Status selector
-
-### Step 5: Review and Submit
-- Read-only summary of all entered data grouped by section
-- Edit buttons per section to jump back
-- Notes/Remarks textarea
-- Initial payment section (existing)
-- Submit button with loading state
-
-### Technical Details
-- New component: `StudentWizardDialog.tsx` (replaces `StudentDialog` in new-student flow)
-- Auto-save draft to localStorage keyed by `student-draft-{companyId}`
-- Progress indicator showing current step (1 of 5)
-- Form validation per step using zod
-- Edit mode remains a single scrollable form (sections with accordions)
-- Update `useStudents` hook interfaces (`StudentInsert`, `Student`) with new fields
+**Verdict: Mostly Implemented** -- Only missing .xlsx/.xls support (CSV only).
 
 ---
 
-## Phase 3: CSV/Excel Bulk Import
+## 3. Security and Permission System
 
-### 3A. Edge Function: `bulk-import-students`
-- Accepts CSV text + column mapping + company_id + batch_id (optional)
-- Validates rows: required fields, date formats, duplicates (by student_id_number)
-- Inserts valid rows in batches of 100
-- Returns: success count, failed rows with reasons, duplicate count
+| Feature | Status |
+|---------|--------|
+| Company data isolation (company_id filter + RLS) | Implemented |
+| Row-level security on students table | Implemented |
+| Admin full access | Implemented |
+| Moderator configurable permissions (add/edit/delete students, batches, payments) | Implemented |
+| DEO category-based permissions (own entries only via created_by filter) | Implemented |
+| Server-side validation (RLS + security definer functions) | Implemented |
+| Frontend permission checks (RoleGuard, PermissionGuard, AccessGuard) | Implemented |
 
-### 3B. Frontend: `BulkImportDialog.tsx`
-- File upload accepting .csv, .xlsx, .xls
-- "Download Template" button generating a sample CSV with all field headers
-- After upload: parse file client-side (using built-in FileReader for CSV; for XLSX, use a lightweight parser)
-- Preview table showing first 10 rows
-- Auto-detect column mapping (case-insensitive fuzzy match on header names)
-- Manual mapping UI: source columns on left, target fields dropdown on right
-- Validation summary: X valid, Y errors, Z duplicates
-- Option to proceed with valid rows only
-- Progress bar during import
-- Post-import report with download error log option
-- Optional batch assignment during import
-- Audit log entry for bulk imports
-
-### 3C. Integration
-- "Import Students" button on Students page header (permission-gated: admin + moderators with add student permission)
+**Verdict: Fully Implemented**
 
 ---
 
-## Phase 4: Advanced Search, Filtering, Batch Assignment, and Global Search
+## 4. Student List Page with Advanced Features
 
-### 4A. Enhanced Student Filters
-- Extend `StudentFilters.tsx` with new filter criteria:
-  - Batch dropdown (all batches), Class/Grade, Gender, Blood Group, Academic Year
-  - Date of Birth range (from-to)
-  - City, State, Transportation Mode
-  - Assigned to Batch (Yes/No/Specific)
-  - Father's Occupation, Income Range
-- Collapsible advanced filter panel
-- Active filters shown as removable chips
-- Filter presets saved to localStorage
+### Table Display
+| Feature | Status |
+|---------|--------|
+| Columns: Name, Student ID, Status, Admission, Monthly, Total Paid, Total Pending, Actions | Implemented |
+| Customizable columns (show/hide) | Not Implemented |
+| Sticky header | Not Implemented |
+| Row hover styling | Implemented |
 
-### 4B. Enhanced Student Table
-- Column customization (show/hide columns via popover checklist)
-- Bulk selection with checkboxes
-- Bulk actions: Assign to Batch, Export Selected, Delete Selected
-- Server-side pagination with configurable page sizes (25, 50, 100, 200)
-- Sort by any column header
+### Advanced Filtering
+| Feature | Status |
+|---------|--------|
+| Search by Name, ID, Father Name, Phone (debounced 300ms) | Implemented |
+| Filter by Status, Batch, Gender, Class/Grade, City, Academic Year | Implemented |
+| Admission status filter (paid/partial/pending) | Implemented |
+| Monthly status filter (paid/pending/overdue) | Implemented |
+| Collapsible advanced filter panel | Implemented |
+| Active filter chips (removable) | Implemented |
+| Clear all filters button | Implemented |
+| Save filter presets | Not Implemented |
+| Search by WhatsApp, Email, Address, Mother Name | Not Implemented (search only covers name, ID, father name, phone) |
+| Date of Birth range filter | Not Implemented |
+| Transportation Mode, Siblings count, Income range filters | Not Implemented |
 
-### 4C. Batch Assignment
-- From Students page: select students -> "Assign to Batch" -> modal with batch search + capacity check
-- From Batch Detail page: "Add Students" button -> search modal with:
-  - Multi-field search (name, ID, father name, contact, email)
-  - Exclude already-enrolled students
-  - Capacity indicator
-  - Select + assign flow
+### Sorting
+| Feature | Status |
+|---------|--------|
+| Sort by Name, Enrollment Date, Fee Amount (asc/desc) | Implemented |
+| Multi-column sorting (Shift+Click) | Not Implemented |
+| Sort by Student ID, DOB, Class, Batch, Date Added | Partially (only name, enrollment_date, monthly_fee_amount) |
 
-### 4D. Global Command Palette (Cmd+K)
-- New component: `CommandPalette.tsx` using existing `cmdk` dependency
-- Searches across: Students (name, ID), Batches (name, code), Courses (name, code)
-- Results grouped by type with icons
-- Click navigates to detail page
-- Keyboard shortcut Cmd/Ctrl+K registered in `AppLayout`
+### Search
+| Feature | Status |
+|---------|--------|
+| Global search with debounce | Implemented |
+| Highlight matching terms | Not Implemented |
+| Search suggestions/recent searches | Not Implemented |
+| Advanced field-specific operators | Not Implemented |
 
-### 4E. Export Enhancements
-- Export button with CSV/PDF options
-- Column selection for export
-- Export respects current filters
-- File includes metadata (filters, timestamp, generated by)
+### Pagination and Performance
+| Feature | Status |
+|---------|--------|
+| Client-side pagination with configurable page size | Implemented (via usePagination hook) |
+| Page size selector (configurable) | Implemented |
+| Showing X-Y of Z students | Implemented |
+| Skeleton loaders | Implemented |
+| Debounced search | Implemented |
+| Server-side pagination | Not Implemented (client loads all, paginates in-browser) |
+| Virtual scrolling | Not Implemented |
+| Database indexes | Not verified (likely partially implemented) |
+| Response caching (2-3 min) | Partially (React Query default staleTime) |
+
+### Bulk Actions
+| Feature | Status |
+|---------|--------|
+| Select all / individual checkboxes | Implemented |
+| Bulk assign to batch | Implemented |
+| Bulk delete selected | Not Implemented |
+| Bulk export selected | Not Implemented |
+| Confirmation dialogs for destructive actions | Implemented |
+
+### Export
+| Feature | Status |
+|---------|--------|
+| Export CSV/PDF (from overdue section) | Implemented |
+| Export from main student list | Not Implemented |
+| Select columns for export | Not Implemented |
 
 ---
 
-## Files to Create
-| File | Purpose |
-|------|---------|
-| `src/components/StudentWizardDialog.tsx` | 5-step student creation wizard |
-| `src/components/StudentWizardSteps/PersonalStep.tsx` | Step 1 |
-| `src/components/StudentWizardSteps/ContactStep.tsx` | Step 2 |
-| `src/components/StudentWizardSteps/FamilyStep.tsx` | Step 3 (includes siblings) |
-| `src/components/StudentWizardSteps/AcademicStep.tsx` | Step 4 |
-| `src/components/StudentWizardSteps/ReviewStep.tsx` | Step 5 |
-| `src/components/BulkImportDialog.tsx` | CSV import modal |
-| `src/components/BulkAssignBatchDialog.tsx` | Batch assignment modal |
-| `src/components/AddStudentToBatchDialog.tsx` | Search + add from batch detail |
-| `src/components/CommandPalette.tsx` | Global Cmd+K search |
-| `src/components/ColumnCustomizer.tsx` | Column show/hide popover |
-| `src/hooks/useStudentSiblings.ts` | CRUD for siblings table |
-| `src/utils/csvImportUtils.ts` | CSV parsing, field mapping, validation |
-| `supabase/functions/bulk-import-students/index.ts` | Server-side bulk import |
+## 5. Batch Assignment
 
-## Files to Modify
-| File | Changes |
-|------|---------|
-| `src/hooks/useStudents.ts` | Extended interfaces, new filter params, server-side pagination |
-| `src/pages/Students.tsx` | Bulk selection, new filters, column customizer, import button |
-| `src/pages/StudentDetail.tsx` | Display all new profile fields in sections |
-| `src/pages/BatchDetail.tsx` | Add "Add Students" button + dialog integration |
-| `src/components/StudentFilters.tsx` | Extended filter controls, chips, presets |
-| `src/components/StudentDialog.tsx` | Keep for edit mode (accordion sections with new fields) |
-| `src/components/AppLayout.tsx` | Register Cmd+K shortcut, render CommandPalette |
-| `src/components/ExportButtons.tsx` | Column selection, filter metadata |
+| Feature | Status |
+|---------|--------|
+| Checkbox selection + "Assign to Batch" button | Implemented |
+| Modal with batch search, capacity check | Implemented |
+| Drag-and-drop batch assignment from student list | Implemented |
+| Add student from Batch Details page | Implemented |
+| Batch capacity indicator | Implemented |
+| Advanced student search from batch detail (fuzzy matching, relevance scoring) | Not Implemented |
+| "Unassigned students" quick filter | Not Implemented |
+| Intelligent suggestions (same class, recently added) | Not Implemented |
 
-## Security Considerations
-- All new columns inherit existing RLS policies on `students` table (no changes needed)
-- `student_siblings` table gets matching RLS policies
-- Bulk import edge function validates auth token + company membership
-- CSV import rate-limited to prevent abuse
-- No sensitive data exposed without proper company membership
+---
 
-## Performance Optimizations
-- Database indexes on frequently searched/filtered columns
-- Server-side pagination (offset-based with configurable page size)
-- Debounced search (300ms)
-- React.memo on table rows and filter components
-- Query key includes all filter params to leverage TanStack Query caching
-- Bulk operations use batched inserts (100 per batch)
+## 6. Global Search / Command Palette
+
+| Feature | Status |
+|---------|--------|
+| Cmd/Ctrl+K command palette | Implemented |
+| Search across Students, Batches, Courses, Pages | Implemented |
+| Results grouped by type | Implemented |
+| Click navigates to detail page | Implemented |
+
+**Verdict: Implemented**
+
+---
+
+## 7. UI/UX Enhancements
+
+| Feature | Status |
+|---------|--------|
+| Empty states with CTA | Implemented |
+| Loading skeletons | Implemented |
+| Status badges (color-coded) | Implemented |
+| Multi-step wizard (5 steps with progress) | Implemented |
+| Auto-save draft to localStorage | Implemented |
+| Inline validation with error messages | Implemented |
+| Review step before submission | Implemented |
+| Required field indicators | Implemented |
+| Student Detail page with organized cards | Implemented |
+| Payment history with filtering/pagination | Implemented |
+| Payment Notes timeline | Implemented |
+| Monthly Fee Visual Grid | Implemented |
+| Breadcrumb navigation | Implemented |
+| Mobile responsive (table on mobile) | Partially (responsive columns hidden on small screens, but no card view) |
+| Floating labels on inputs | Not Implemented |
+| Address autocomplete | Not Implemented |
+| Phone country code selector | Not Implemented |
+| Print profile option | Not Implemented |
+| Activity timeline (enrollment, batch changes) | Not Implemented |
+
+---
+
+## 8. Additional Features
+
+| Feature | Status |
+|---------|--------|
+| Student Status Management (Active/Inactive/Graduated) | Implemented (missing Dropout, Transferred statuses) |
+| Student Attendance Tracking | Not Implemented |
+| Parent Portal Access | Not Implemented |
+| Fee Payment Integration (linked to student profile) | Implemented |
+| Document Management (upload/verify) | Not Implemented |
+| Smart Notifications (birthday, fee due, attendance) | Not Implemented |
+| Student Demographics Analytics | Not Implemented (no dedicated demographics dashboard) |
+| Student Notes/Remarks (single notes field) | Partially Implemented (single text field, not timestamped/categorized) |
+| Student Transfer Between Batches | Partially (can reassign batch, but no transfer history/fee adjustment tracking) |
+| Duplicate Detection | Not Implemented |
+| Student Tags/Labels | Not Implemented |
+| Academic Performance Tracking | Not Implemented |
+
+---
+
+## Summary of What Needs Implementation
+
+### High Priority (Core SMS features)
+1. **Server-side pagination** -- Currently loads all students client-side; will not scale to 20k records
+2. **Expanded search fields** -- Add WhatsApp, email, address, mother name to server search
+3. **More sort options** -- Sort by Student ID, DOB, Class, Batch
+4. **Export from student list** -- CSV/PDF export of filtered student table
+5. **Bulk delete selected** -- Already have selection UI, just missing the action
+6. **Student status expansion** -- Add "dropout" and "transferred" statuses
+7. **Student transfer history** -- Track batch changes with reason and timestamps
+
+### Medium Priority (Usability improvements)
+8. **Sticky table header** -- Keep headers visible while scrolling
+9. **Customizable columns** -- Show/hide columns in student table
+10. **Search highlight** -- Highlight matching text in results
+11. **DOB range filter** -- Filter students by date of birth range
+12. **Save filter presets** -- Allow saving and loading filter combinations
+13. **Duplicate detection** -- Warn on similar name+DOB or matching phone/ID during student creation
+14. **Student notes system** -- Timestamped, categorized notes instead of single text field
+
+### Lower Priority (Nice-to-have features)
+15. **.xlsx/.xls import support** -- Currently CSV only
+16. **Student tags/labels** -- Custom color-coded tags
+17. **Attendance tracking** -- Per-batch session attendance
+18. **Document management** -- Upload student documents
+19. **Demographics analytics** -- Gender distribution, age groups, geographic spread
+20. **Academic performance tracking** -- Test scores, grade tracking
+21. **Smart notifications** -- Birthday alerts, fee reminders
+22. **Parent portal** -- Separate access for parents
+23. **Print student profile** -- Printable layout
+24. **Activity timeline** -- Track all changes to student record
+
+### Technical Debt
+25. **Database indexes** -- Verify composite indexes exist on company_id + name, phone, batch_id, class_grade, status
+26. **Multi-column sorting** -- Shift+Click column headers
+27. **Fuzzy search with relevance scoring** -- For batch detail "Add Students" modal
+
+---
+
+## Technical Implementation Notes
+
+**Server-side pagination** is the most critical gap. The current `useStudents` hook fetches all records with `select("*")` and paginates client-side. For 20k records this will cause:
+- Slow initial load (fetching all rows)
+- High memory usage in browser
+- Hitting Supabase's 1000-row default limit
+
+Implementation would require:
+- Adding `.range()` to the Supabase query
+- A separate count query for total
+- Passing page/limit from the UI to the hook
+
+**Student transfer history** would need a new `student_batch_history` table to track when students move between batches, with columns for: student_id, from_batch_id, to_batch_id, transferred_at, reason, transferred_by.
+
+**Duplicate detection** would run during student creation, querying for existing students with matching name+DOB, phone, or Aadhar number, and showing warnings before save.
+
