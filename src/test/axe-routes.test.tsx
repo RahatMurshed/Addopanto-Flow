@@ -66,7 +66,7 @@ const PROTECTED: RouteSpec[] = [
   { label: "AuditLog", load: () => import("@/pages/AuditLog") },
   { label: "UserManagement", load: () => import("@/pages/UserManagement") },
   { label: "CompanyMembers", load: () => import("@/pages/CompanyMembers") },
-  { label: "PresetsManagement", load: () => import("@/pages/PresetsManagement") },
+  
   { label: "CompanyCreationRequests", load: () => import("@/pages/CompanyCreationRequests") },
   { label: "Batches", load: () => import("@/pages/Batches") },
   { label: "AddStudent", load: () => import("@/pages/AddStudent") },
