@@ -48,7 +48,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { PermissionGuard } from "@/components/auth/RoleGuard";
 import { useCreateStudent } from "@/hooks/useStudents";
 import { useCreateBatch } from "@/hooks/useBatches";
-import { useDashboardAccessLogger } from "@/hooks/useDashboardAccessLogger";
+
 
 const CHART_COLORS = [
   "hsl(var(--primary))", "hsl(142, 76%, 36%)", "hsl(38, 92%, 50%)", "hsl(262, 83%, 58%)",
@@ -64,17 +64,6 @@ export default function Dashboard() {
     forceFullDashboard, toggleForceFullDashboard,
   } = useCompany();
 
-  // Audit: log dashboard access to database with anomaly detection
-  useDashboardAccessLogger({
-    userId: user?.id || "",
-    userEmail: user?.email,
-    companyId: activeCompanyId || undefined,
-    membershipRole: membership?.role ?? undefined,
-    isCipher,
-    isCompanyAdmin,
-    isModerator,
-    forceFullDashboard,
-  });
   const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
