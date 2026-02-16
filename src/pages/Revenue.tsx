@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { PermissionDenied } from "@/components/PermissionDenied";
 import {
   useRevenues,
   useCreateRevenue,
@@ -81,12 +82,7 @@ export default function Revenue() {
   const { user } = useAuth();
   const showHistory = !isDataEntryOperator || canViewRevenue;
   
-  // DEO route guard: redirect if no revenue permissions
-  useEffect(() => {
-    if (isDataEntryOperator && !canAddRevenue && !canViewRevenue) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isDataEntryOperator, canAddRevenue, canViewRevenue, navigate]);
+  const deoBlocked = isDataEntryOperator && !canAddRevenue && !canViewRevenue;
 
   const { data: rawRevenues = [], isLoading } = useRevenues();
   const revenues = useMemo(() => {
@@ -108,12 +104,8 @@ export default function Revenue() {
   const activeAccounts = accounts.filter((a) => a.is_active);
   const totalAllocationPercent = activeAccounts.reduce((sum, a) => sum + Number(a.allocation_percentage), 0);
 
-  // DEO route guard: redirect if no revenue permissions
-  useEffect(() => {
-    if (isDataEntryOperator && !canAddRevenue && !canViewRevenue) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isDataEntryOperator, canAddRevenue, canViewRevenue, navigate]);
+
+
 
   // Debounce search
   useEffect(() => {
@@ -225,6 +217,11 @@ export default function Revenue() {
 
     return bySource;
   }, [sources, filteredRevenues]);
+
+  // DEO access check: show permission denied if no revenue permissions
+  if (deoBlocked) {
+    return <PermissionDenied message="You don't have permission to access revenue data. Contact your company admin to request revenue access." />;
+  }
 
   // Export handlers
   const handleExportCSV = () => {

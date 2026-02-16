@@ -5,6 +5,7 @@ import { useBatches } from "@/hooks/useBatches";
 import { useStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
+import { PermissionDenied } from "@/components/PermissionDenied";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -43,12 +44,7 @@ export default function Courses() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // DEO route guard: redirect if no batch/course permissions
-  useEffect(() => {
-    if (isDataEntryOperator && !canAddBatch && !canEditBatch && !canDeleteBatch) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch, navigate]);
+  const deoBlocked = isDataEntryOperator && !canAddBatch && !canEditBatch && !canDeleteBatch;
 
   const createMutation = useCreateCourse();
   const updateMutation = useUpdateCourse();
@@ -132,6 +128,11 @@ export default function Courses() {
     }
     return { courses: filteredCourses.length, students, revenue, pending };
   }, [courseAnalytics, filteredCourses]);
+
+  // DEO access check: show permission denied if no batch/course permissions
+  if (deoBlocked) {
+    return <PermissionDenied message="You don't have permission to access courses or batches. Contact your company admin to request access." />;
+  }
 
   const handleCreate = async (data: CourseInsert) => {
     try {
