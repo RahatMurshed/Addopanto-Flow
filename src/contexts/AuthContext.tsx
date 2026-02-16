@@ -50,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           filter: `user_id=eq.${user.id}`,
         },
         async () => {
-          console.log('User role deleted, forcing logout');
           await supabase.auth.signOut({ scope: 'local' });
         }
       )
