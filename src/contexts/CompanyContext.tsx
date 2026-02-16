@@ -195,7 +195,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const membership = memberships.find((m) => m.company_id === activeCompanyId) ?? null;
 
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
-  const isModerator = membership?.role === "moderator";
+  const isModerator = membership?.role === "moderator" && !isCompanyAdmin;
 
   // Moderator category permissions
   const deoStudents = membership?.deo_students ?? false;
