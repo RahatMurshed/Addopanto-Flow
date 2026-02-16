@@ -76,6 +76,8 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
   const [selectedMonth, setSelectedMonth] = useState<string>(prevMonth);
   const [filterMode, setFilterMode] = useState<"specific" | "all">("specific");
   const [severityFilter, setSeverityFilter] = useState<"all" | OverdueRow["severity"]>("all");
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Build overdue rows
   const overdueRows = useMemo<OverdueRow[]>(() => {
@@ -121,6 +123,7 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
 
   // Apply severity filter
   const filteredRows = useMemo(() => {
+    setCurrentPage(1);
     if (severityFilter === "all") return overdueRows;
     return overdueRows.filter(r => r.severity === severityFilter);
   }, [overdueRows, severityFilter]);
@@ -280,7 +283,7 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((r, i) => (
+                {filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((r, i) => (
                   <TableRow key={`${r.studentId}-${r.overdueMonth}`} className={`border-l-4 ${severityStyles[r.severity].border}`}>
                     <TableCell>
                       <button
@@ -303,6 +306,21 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
                 ))}
               </TableBody>
             </Table>
+            {filteredRows.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between border-t px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRows.length)} of {filteredRows.length}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                    Previous
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={currentPage * PAGE_SIZE >= filteredRows.length} onClick={() => setCurrentPage(p => p + 1)}>
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
