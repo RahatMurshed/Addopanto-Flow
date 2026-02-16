@@ -39,6 +39,7 @@ const TABLE_OPTIONS = [
   { value: "moderator_permissions", label: "Permissions" },
   { value: "student_batch_history", label: "Batch Transfers" },
   { value: "companies", label: "Company Settings" },
+  { value: "user_roles", label: "Role Changes" },
 ];
 
 const ACTION_OPTIONS = [
@@ -61,6 +62,13 @@ const DEFAULT_PAGE_SIZE = 25;
 /* ── Helpers ── */
 
 function getActionLabel(table: string, action: string, log?: AuditLogType): { label: string; color: string } {
+  // Smart labels for user_roles
+  if (table === "user_roles") {
+    if (action === "INSERT") return { label: "Role Assigned", color: "bg-violet-500/15 text-violet-600 border-violet-500/20 dark:text-violet-400" };
+    if (action === "UPDATE") return { label: "Role Changed", color: "bg-violet-500/15 text-violet-600 border-violet-500/20 dark:text-violet-400" };
+    if (action === "DELETE") return { label: "Role Revoked", color: "bg-destructive/15 text-destructive border-destructive/20" };
+  }
+
   // Smart labels for company_memberships based on what changed
   if (table === "company_memberships" && action === "UPDATE" && log?.old_data && log?.new_data) {
     const o = log.old_data as Record<string, unknown>;
@@ -72,7 +80,6 @@ function getActionLabel(table: string, action: string, log?: AuditLogType): { la
       const statusLabel = n.status === "active" ? "Member Activated" : "Member Deactivated";
       return { label: statusLabel, color: "bg-amber-500/15 text-amber-600 border-amber-500/20 dark:text-amber-400" };
     }
-    // Check if any permission flags changed
     const permKeys = ["deo_students", "deo_payments", "deo_batches", "deo_finance",
       "mod_students_add", "mod_students_edit", "mod_students_delete",
       "mod_payments_add", "mod_payments_edit", "mod_payments_delete",
@@ -114,6 +121,7 @@ function getActionLabel(table: string, action: string, log?: AuditLogType): { la
     moderator_permissions: { INSERT: "Permissions Set", UPDATE: "Permissions Updated", DELETE: "Permissions Removed" },
     student_batch_history: { INSERT: "Batch Transfer Recorded", UPDATE: "Batch Transfer Updated", DELETE: "Batch Transfer Deleted" },
     companies: { INSERT: "Company Created", UPDATE: "Company Updated", DELETE: "Company Deleted" },
+    user_roles: { INSERT: "Role Assigned", UPDATE: "Role Changed", DELETE: "Role Revoked" },
   };
   const label = map[table]?.[action] || `${action}`;
   const color = action === "INSERT" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
@@ -137,6 +145,10 @@ function getEntityName(log: AuditLogType): string {
   // Moderator permissions — show target user
   if (log.table_name === "moderator_permissions") {
     return log.user_email || "Moderator";
+  }
+  // User role changes — show target user email
+  if (log.table_name === "user_roles") {
+    return log.user_email || "User";
   }
   // Batch transfers — reference student
   if (log.table_name === "student_batch_history") {
@@ -303,6 +315,25 @@ function getDescription(log: AuditLogType): string {
       return changes.length > 0 ? changes.join(" · ") : `Company: ${d.name || ""}`;
     }
     return d.name ? `Company: ${d.name}` : "";
+  }
+  if (log.table_name === "user_roles") {
+    const ROLE_DISPLAY: Record<string, string> = { cipher: "Cipher (Super Admin)", admin: "Admin", moderator: "Moderator", user: "User" };
+    const roleName = (r: unknown) => ROLE_DISPLAY[String(r)] || String(r);
+    if (log.action === "INSERT") {
+      return `🛡️ Assigned platform role: ${roleName(d.role)}`;
+    }
+    if (log.action === "DELETE") {
+      return `🛡️ Revoked platform role: ${roleName(d.role)}`;
+    }
+    if (log.action === "UPDATE" && log.old_data && log.new_data) {
+      const o = log.old_data as Record<string, unknown>;
+      const n = log.new_data as Record<string, unknown>;
+      if (o.role !== n.role) {
+        return `🛡️ Role changed: ${roleName(o.role)} → ${roleName(n.role)}`;
+      }
+      return "🛡️ Role record updated";
+    }
+    return `Role: ${roleName(d.role)}`;
   }
   return "";
 }
