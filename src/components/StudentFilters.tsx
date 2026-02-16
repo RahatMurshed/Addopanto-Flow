@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { Search, X, SlidersHorizontal, ChevronDown, Filter, Bookmark, MapPin } from "lucide-react";
+import { Search, X, SlidersHorizontal, ChevronDown, Filter, Bookmark, MapPin, Loader2 } from "lucide-react";
 import { useBatches } from "@/hooks/useBatches";
 import type { SavedSearchPreset } from "@/hooks/useSavedSearchPresets";
 
@@ -69,13 +69,17 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   const [presetPopoverOpen, setPresetPopoverOpen] = useState(false);
   const { data: batches = [] } = useBatches();
 
-  // Debounce search input
+  // Debounce search input (500ms, min 3 chars)
   useEffect(() => {
+    if (searchInput.length > 0 && searchInput.length < 3) {
+      // Don't trigger search yet
+      return;
+    }
     const timer = setTimeout(() => {
       if (searchInput !== filters.search) {
         onChange({ ...filters, search: searchInput });
       }
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
@@ -95,42 +99,42 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   useEffect(() => {
     const timer = setTimeout(() => {
       if (classInput !== filters.classGrade) onChange({ ...filters, classGrade: classInput });
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [classInput]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (cityInput !== filters.addressCity) onChange({ ...filters, addressCity: cityInput });
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [cityInput]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (stateInput !== filters.addressState) onChange({ ...filters, addressState: stateInput });
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [stateInput]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (areaInput !== filters.addressArea) onChange({ ...filters, addressArea: areaInput });
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [areaInput]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (pinInput !== filters.addressPinZip) onChange({ ...filters, addressPinZip: pinInput });
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [pinInput]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (yearInput !== filters.academicYear) onChange({ ...filters, academicYear: yearInput });
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [yearInput]);
 
@@ -223,11 +227,19 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search name, ID, father, mother, phone, WhatsApp, email, city..."
+            placeholder="Search name, ID, father, phone... (min 3 chars)"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9 pr-9"
           />
+          {searchInput.length > 0 && searchInput.length < 3 && (
+            <span className="absolute right-10 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+              {3 - searchInput.length} more
+            </span>
+          )}
+          {searchInput.length >= 3 && searchInput !== filters.search && (
+            <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          )}
           {searchInput && (
             <button
               onClick={() => { setSearchInput(""); update({ search: "" }); }}
