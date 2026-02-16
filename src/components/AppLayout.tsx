@@ -18,7 +18,7 @@ import {
 import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
-  ShieldCheck, Layers, ClipboardList, UserCircle,
+  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -84,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     ...baseNavItems,
-    ...(showBatches ? [{ label: "Batches", href: "/batches", icon: Layers }] : []),
+    ...(showBatches ? [{ label: "Courses", href: "/courses", icon: BookOpen }] : []),
     ...(showStudents ? [{ label: "Students", href: "/students", icon: GraduationCap }] : []),
     ...(showKhatas ? [{ label: "Expense Sources", href: "/khatas", icon: Wallet }] : []),
     ...(showRevenue ? [{ label: "Revenue", href: "/revenue", icon: TrendingUp }] : []),

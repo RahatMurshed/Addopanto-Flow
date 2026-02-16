@@ -40,6 +40,8 @@ const UserManagement = lazy(() => import("@/pages/UserManagement"));
 const CompanyMembers = lazy(() => import("@/pages/CompanyMembers"));
 const Batches = lazy(() => import("@/pages/Batches"));
 const BatchDetail = lazy(() => import("@/pages/BatchDetail"));
+const Courses = lazy(() => import("@/pages/Courses"));
+const CourseDetail = lazy(() => import("@/pages/CourseDetail"));
 const AuditLog = lazy(() => import("@/pages/AuditLog"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const CompanyCreationRequests = lazy(() => import("@/pages/CompanyCreationRequests"));
@@ -150,7 +152,9 @@ const App = () => (
                   <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                   <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
                   <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
-                  <Route path="/batches" element={<ProtectedRoute><Batches /></ProtectedRoute>} />
+                  <Route path="/courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
+                  <Route path="/courses/:id" element={<ProtectedRoute><CourseDetail /></ProtectedRoute>} />
+                  <Route path="/batches" element={<Navigate to="/courses" replace />} />
                   <Route path="/batches/:id" element={<ProtectedRoute><BatchDetail /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />

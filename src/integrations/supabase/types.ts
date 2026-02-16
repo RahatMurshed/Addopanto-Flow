@@ -133,6 +133,7 @@ export type Database = {
           batch_name: string
           company_id: string
           course_duration_months: number | null
+          course_id: string | null
           created_at: string
           created_by: string
           default_admission_fee: number
@@ -151,6 +152,7 @@ export type Database = {
           batch_name: string
           company_id: string
           course_duration_months?: number | null
+          course_id?: string | null
           created_at?: string
           created_by: string
           default_admission_fee?: number
@@ -169,6 +171,7 @@ export type Database = {
           batch_name?: string
           company_id?: string
           course_duration_months?: number | null
+          course_id?: string | null
           created_at?: string
           created_by?: string
           default_admission_fee?: number
@@ -195,6 +198,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
             referencedColumns: ["id"]
           },
         ]
@@ -474,6 +484,69 @@ export type Database = {
           },
           {
             foreignKeyName: "company_memberships_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          category: string | null
+          company_id: string
+          course_code: string
+          course_name: string
+          cover_image_url: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_months: number | null
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          company_id: string
+          course_code: string
+          course_name: string
+          cover_image_url?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_months?: number | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          company_id?: string
+          course_code?: string
+          course_name?: string
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_months?: number | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "courses_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_public"

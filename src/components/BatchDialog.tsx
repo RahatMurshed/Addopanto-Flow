@@ -44,6 +44,8 @@ interface BatchDialogProps {
   onOpenChange: (open: boolean) => void;
   batch?: Batch | null;
   onSave: (data: BatchInsert) => Promise<any>;
+  courseId?: string;
+  courseDurationMonths?: number | null;
 }
 
 function generateBatchCode(name: string): string {
@@ -52,7 +54,7 @@ function generateBatchCode(name: string): string {
   return `${slug}-${year}`;
 }
 
-export default function BatchDialog({ open, onOpenChange, batch, onSave }: BatchDialogProps) {
+export default function BatchDialog({ open, onOpenChange, batch, onSave, courseId, courseDurationMonths }: BatchDialogProps) {
   const [saving, setSaving] = useState(false);
   const [startCalOpen, setStartCalOpen] = useState(false);
   const [endCalOpen, setEndCalOpen] = useState(false);
@@ -82,7 +84,7 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave }: Batch
         description: batch?.description || null,
         start_date: batch?.start_date || format(new Date(), "yyyy-MM-dd"),
         end_date: batch?.end_date || "",
-        course_duration_months: batch?.course_duration_months ?? null,
+        course_duration_months: batch?.course_duration_months ?? courseDurationMonths ?? null,
         default_admission_fee: batch ? Number(batch.default_admission_fee) : 0,
         default_monthly_fee: batch ? Number(batch.default_monthly_fee) : 0,
         max_capacity: batch?.max_capacity ?? null,
