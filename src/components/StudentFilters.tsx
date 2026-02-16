@@ -21,6 +21,9 @@ export interface StudentFilterValues {
   gender: "all" | string;
   classGrade: string;
   addressCity: string;
+  addressState: string;
+  addressArea: string;
+  addressPinZip: string;
   academicYear: string;
 }
 
@@ -35,6 +38,9 @@ const defaultFilters: StudentFilterValues = {
   gender: "all",
   classGrade: "",
   addressCity: "",
+  addressState: "",
+  addressArea: "",
+  addressPinZip: "",
   academicYear: "",
 };
 
@@ -67,9 +73,12 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
     setSearchInput(filters.search);
   }, [filters.search]);
 
-  // Debounced text filters for classGrade, addressCity, academicYear
+  // Debounced text filters for classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear
   const [classInput, setClassInput] = useState(filters.classGrade);
   const [cityInput, setCityInput] = useState(filters.addressCity);
+  const [stateInput, setStateInput] = useState(filters.addressState);
+  const [areaInput, setAreaInput] = useState(filters.addressArea);
+  const [pinInput, setPinInput] = useState(filters.addressPinZip);
   const [yearInput, setYearInput] = useState(filters.academicYear);
 
   useEffect(() => {
@@ -88,6 +97,27 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (stateInput !== filters.addressState) onChange({ ...filters, addressState: stateInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [stateInput]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (areaInput !== filters.addressArea) onChange({ ...filters, addressArea: areaInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [areaInput]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (pinInput !== filters.addressPinZip) onChange({ ...filters, addressPinZip: pinInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pinInput]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
       if (yearInput !== filters.academicYear) onChange({ ...filters, academicYear: yearInput });
     }, 300);
     return () => clearTimeout(timer);
@@ -96,6 +126,9 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   // Sync external changes back
   useEffect(() => { setClassInput(filters.classGrade); }, [filters.classGrade]);
   useEffect(() => { setCityInput(filters.addressCity); }, [filters.addressCity]);
+  useEffect(() => { setStateInput(filters.addressState); }, [filters.addressState]);
+  useEffect(() => { setAreaInput(filters.addressArea); }, [filters.addressArea]);
+  useEffect(() => { setPinInput(filters.addressPinZip); }, [filters.addressPinZip]);
   useEffect(() => { setYearInput(filters.academicYear); }, [filters.academicYear]);
 
   const update = (partial: Partial<StudentFilterValues>) => {
@@ -107,6 +140,9 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
     filters.gender !== "all",
     filters.classGrade.length > 0,
     filters.addressCity.length > 0,
+    filters.addressState.length > 0,
+    filters.addressArea.length > 0,
+    filters.addressPinZip.length > 0,
     filters.academicYear.length > 0,
   ].filter(Boolean).length;
 
@@ -135,6 +171,15 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   if (filters.addressCity) {
     advancedChips.push({ label: `City: ${filters.addressCity}`, key: "addressCity", resetValue: "" });
   }
+  if (filters.addressState) {
+    advancedChips.push({ label: `State: ${filters.addressState}`, key: "addressState", resetValue: "" });
+  }
+  if (filters.addressArea) {
+    advancedChips.push({ label: `Area: ${filters.addressArea}`, key: "addressArea", resetValue: "" });
+  }
+  if (filters.addressPinZip) {
+    advancedChips.push({ label: `PIN: ${filters.addressPinZip}`, key: "addressPinZip", resetValue: "" });
+  }
   if (filters.academicYear) {
     advancedChips.push({ label: `Year: ${filters.academicYear}`, key: "academicYear", resetValue: "" });
   }
@@ -142,6 +187,9 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   const clearChip = (key: keyof StudentFilterValues, resetValue: string) => {
     if (key === "classGrade") setClassInput("");
     if (key === "addressCity") setCityInput("");
+    if (key === "addressState") setStateInput("");
+    if (key === "addressArea") setAreaInput("");
+    if (key === "addressPinZip") setPinInput("");
     if (key === "academicYear") setYearInput("");
     update({ [key]: resetValue });
   };
@@ -150,6 +198,9 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
     setSearchInput("");
     setClassInput("");
     setCityInput("");
+    setStateInput("");
+    setAreaInput("");
+    setPinInput("");
     setYearInput("");
     onChange(defaultFilters);
   };
@@ -275,70 +326,105 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 rounded-lg border border-border bg-muted/30 p-4">
-            {/* Batch */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Batch</label>
-              <Select value={filters.batchId} onValueChange={(v) => update({ batchId: v })}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="All Batches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Batches</SelectItem>
-                  {batches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.batch_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+            {/* Row 1: General filters */}
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+              {/* Batch */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Batch</label>
+                <Select value={filters.batchId} onValueChange={(v) => update({ batchId: v })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All Batches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Batches</SelectItem>
+                    {batches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.batch_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Gender */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Gender</label>
+                <Select value={filters.gender} onValueChange={(v) => update({ gender: v })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All Genders" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Genders</SelectItem>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Class/Grade */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Class / Grade</label>
+                <Input
+                  placeholder="e.g. 10th, XII"
+                  value={classInput}
+                  onChange={(e) => setClassInput(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+
+              {/* Academic Year */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Academic Year</label>
+                <Input
+                  placeholder="e.g. 2025-26"
+                  value={yearInput}
+                  onChange={(e) => setYearInput(e.target.value)}
+                  className="h-9"
+                />
+              </div>
             </div>
 
-            {/* Gender */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Gender</label>
-              <Select value={filters.gender} onValueChange={(v) => update({ gender: v })}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="All Genders" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Genders</SelectItem>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Class/Grade */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Class / Grade</label>
-              <Input
-                placeholder="e.g. 10th, XII"
-                value={classInput}
-                onChange={(e) => setClassInput(e.target.value)}
-                className="h-9"
-              />
-            </div>
-
-            {/* City */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">City</label>
-              <Input
-                placeholder="Filter by city"
-                value={cityInput}
-                onChange={(e) => setCityInput(e.target.value)}
-                className="h-9"
-              />
-            </div>
-
-            {/* Academic Year */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Academic Year</label>
-              <Input
-                placeholder="e.g. 2025-26"
-                value={yearInput}
-                onChange={(e) => setYearInput(e.target.value)}
-                className="h-9"
-              />
+            {/* Row 2: Address group */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Address</p>
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">City</label>
+                  <Input
+                    placeholder="Filter by city"
+                    value={cityInput}
+                    onChange={(e) => setCityInput(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">State</label>
+                  <Input
+                    placeholder="Filter by state"
+                    value={stateInput}
+                    onChange={(e) => setStateInput(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Area / Locality</label>
+                  <Input
+                    placeholder="Filter by area"
+                    value={areaInput}
+                    onChange={(e) => setAreaInput(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">PIN / ZIP</label>
+                  <Input
+                    placeholder="Filter by PIN/ZIP"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </CollapsibleContent>
