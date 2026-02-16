@@ -17,9 +17,23 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
+import { useCompany } from "@/contexts/CompanyContext";
 import { exportToPDF } from "@/utils/exportUtils";
 import type { StudentFilterValues } from "@/components/students/StudentFilters";
 import type { computeStudentSummary } from "@/hooks/useStudentPayments";
+
+// PII column keys that should be hidden from non-admin users
+const PII_COLUMN_KEYS = new Set([
+  "phone", "whatsapp_number", "alt_contact_number", "email",
+  "address_city", "address_state", "address_area", "address_pin_zip", "address_full",
+  "date_of_birth", "blood_group", "nationality", "religion_category", "aadhar_id_number",
+  "father_name", "father_contact", "father_occupation", "father_annual_income",
+  "mother_name", "mother_contact", "mother_occupation",
+  "guardian_name", "guardian_contact",
+  "board_university", "previous_school", "previous_qualification", "previous_percentage",
+  "emergency_contact_name", "emergency_contact_number",
+  "transportation_mode", "special_needs_medical",
+]);
 
 // All possible export columns
 const ALL_COLUMNS = [
@@ -120,6 +134,15 @@ export default function StudentExportDialog({
   const [exportProgress, setExportProgress] = useState("");
   const { toast } = useToast();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
+  const { canViewStudentPII } = useCompany();
+
+  // Filter columns based on PII access
+  const availableColumns = useMemo(() => {
+    if (canViewStudentPII) return ALL_COLUMNS;
+    return ALL_COLUMNS.filter(c => !PII_COLUMN_KEYS.has(c.key));
+  }, [canViewStudentPII]);
+
+  const availableGroups = useMemo(() => [...new Set(availableColumns.map(c => c.group))], [availableColumns]);
 
   const toggleColumn = (key: ColumnKey) => {
     setSelectedColumns(prev => {
@@ -131,7 +154,7 @@ export default function StudentExportDialog({
   };
 
   const toggleGroup = (group: string) => {
-    const groupCols = ALL_COLUMNS.filter(c => c.group === group);
+    const groupCols = availableColumns.filter(c => c.group === group);
     const allSelected = groupCols.every(c => selectedColumns.has(c.key));
     setSelectedColumns(prev => {
       const next = new Set(prev);
@@ -145,7 +168,11 @@ export default function StudentExportDialog({
 
   const applyPreset = (presetId: string) => {
     const preset = PRESETS.find(p => p.id === presetId);
-    if (preset) setSelectedColumns(new Set(preset.columns));
+    if (preset) {
+      // Filter out PII columns if user can't view them
+      const filtered = preset.columns.filter(k => !PII_COLUMN_KEYS.has(k) || canViewStudentPII);
+      setSelectedColumns(new Set(filtered as ColumnKey[]));
+    }
   };
 
   // Get active filter description
@@ -185,7 +212,7 @@ export default function StudentExportDialog({
     }
     setIsExporting(true);
     try {
-      const cols = ALL_COLUMNS.filter(c => selectedColumns.has(c.key));
+      const cols = availableColumns.filter(c => selectedColumns.has(c.key));
 
       if (exportFormat === "csv") {
         // Fetch ALL matching students server-side for CSV (not just current page)
@@ -204,7 +231,7 @@ export default function StudentExportDialog({
             addressPinZip: filters.addressPinZip,
             academicYear: filters.academicYear,
             includeAltContact: filters.includeAltContact,
-          });
+          }, canViewStudentPII);
           setExportProgress(`Exporting ${exportStudents.length} records...`);
         }
 
@@ -296,19 +323,19 @@ export default function StudentExportDialog({
               className="h-6 text-xs"
               onClick={() =>
                 setSelectedColumns(prev =>
-                  prev.size === ALL_COLUMNS.length
-                    ? new Set(ALL_COLUMNS.filter(c => c.default).map(c => c.key))
-                    : new Set(ALL_COLUMNS.map(c => c.key))
+                  prev.size === availableColumns.length
+                    ? new Set(availableColumns.filter(c => c.default).map(c => c.key))
+                    : new Set(availableColumns.map(c => c.key))
                 )
               }
             >
-              {selectedColumns.size === ALL_COLUMNS.length ? "Reset to Default" : "Select All"}
+              {selectedColumns.size === availableColumns.length ? "Reset to Default" : "Select All"}
             </Button>
           </div>
           <ScrollArea className="h-56 rounded-md border border-border p-3">
             <div className="space-y-4">
-              {GROUPS.map(group => {
-                const groupCols = ALL_COLUMNS.filter(c => c.group === group);
+              {availableGroups.map(group => {
+                const groupCols = availableColumns.filter(c => c.group === group);
                 const allGroupSelected = groupCols.every(c => selectedColumns.has(c.key));
                 const someGroupSelected = groupCols.some(c => selectedColumns.has(c.key));
                 return (

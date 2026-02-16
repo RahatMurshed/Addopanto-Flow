@@ -44,7 +44,7 @@ export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete, isDataEntryOperator, canEditStudent, isLoading: companyLoading } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isDataEntryOperator, canEditStudent, canViewStudentPII, isLoading: companyLoading } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: student, isLoading: studentLoading } = useStudent(id);
@@ -281,7 +281,7 @@ export default function StudentDetail() {
             <p className="text-sm text-muted-foreground">
               {student.student_id_number && `ID: ${student.student_id_number} · `}
               Enrolled {format(new Date(student.enrollment_date), "MMM d, yyyy")}
-              {student.email && ` · ${student.email}`}
+              {canViewStudentPII && student.email && ` · ${student.email}`}
             </p>
           </div>
         </div>
