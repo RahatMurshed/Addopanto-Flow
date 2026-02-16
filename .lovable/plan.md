@@ -1,52 +1,61 @@
 
 
-# Add Toggle to Include/Exclude Alternate Contact Number in Search
+# Add Address-Based Filters to Exports for Large Datasets
 
-## Overview
-The global search bar currently searches across 14 fields including `alt_contact_number`. This change adds a toggle (switch) in the Advanced Filters panel that lets admins opt in or out of searching the alternate contact number field. It defaults to **included** (preserving current behavior).
+## Problem
+1. The export dialog's "Active Filters" summary only shows City but not the new State, Area, or PIN/ZIP filters.
+2. CSV export only exports the current page of students (e.g., 50 of 5,000 matching records), which is insufficient for large datasets.
 
-## Changes
+## Plan
 
-### 1. `src/components/StudentFilters.tsx`
-- Add `includeAltContact: boolean` to the `StudentFilterValues` interface (default: `true`).
-- Add a `Switch` + label row inside the Advanced Filters panel (below the address group), labeled "Include alternate contact in search".
-- Wire the switch to update `filters.includeAltContact`.
-- No chip needed since this is a boolean toggle with a sensible default.
+### 1. Update filter summary in `StudentExportDialog.tsx`
+Add the missing address filters to `activeFilterDescription`:
+- `addressState` -> "State: {value}"
+- `addressArea` -> "Area: {value}"
+- `addressPinZip` -> "PIN/ZIP: {value}"
+- `includeAltContact === false` -> "Alt contact excluded"
 
-### 2. `src/hooks/useStudents.ts`
-- Accept `includeAltContact` from filters.
-- Conditionally include `alt_contact_number.ilike.%...%` in the `.or()` search filter string only when `includeAltContact` is `true` (or undefined, for backward compatibility).
+### 2. Add server-side full export for CSV (large datasets)
+Currently the dialog receives only the current page's students. For CSV exports, fetch ALL matching records server-side using the same filters.
 
-### 3. `src/pages/Students.tsx`
-- No changes needed beyond what already flows through the existing `filters` state object.
+**Changes in `src/hooks/useStudents.ts`:**
+- Export a new `fetchFilteredStudentsForExport` async function that accepts the same filter parameters but fetches ALL matching rows (no pagination), using `.range()` in batches of 1000 to bypass the default limit.
 
-## Technical Details
+**Changes in `src/components/StudentExportDialog.tsx`:**
+- Import and call `fetchFilteredStudentsForExport` when exporting CSV, instead of using the passed-in `students` prop (which is only the current page).
+- Show a progress indicator during the fetch ("Fetching all records...").
+- The `students` prop continues to be used for PDF export (which captures the visible table).
 
-**Search filter construction** (useStudents.ts, ~line 242-246):
-```typescript
-const fields = [
-  "name", "student_id_number", "father_name", "phone",
-  "mother_name", "whatsapp_number",
-  ...(includeAltContact !== false ? ["alt_contact_number"] : []),
-  "email", "address_house", "address_street",
-  "address_area", "address_city", "address_state", "address_pin_zip"
-];
-const searchFilter = fields.map(f => `${f}.ilike.%${sanitized}%`).join(",");
-```
+**Changes in `src/pages/Students.tsx`:**
+- Pass the current `activeCompanyId` to the export dialog so the export function can scope queries correctly.
 
-**UI toggle** (StudentFilters.tsx, inside Advanced Filters):
-```tsx
-<div className="flex items-center gap-2">
-  <Switch
-    checked={filters.includeAltContact}
-    onCheckedChange={(v) => onChange({ ...filters, includeAltContact: v })}
-  />
-  <span className="text-sm">Include alternate contact in search</span>
-</div>
-```
+### 3. Files changed
 
 | File | Change |
 |------|--------|
-| `src/components/StudentFilters.tsx` | Add `includeAltContact` to interface/defaults, add Switch in Advanced Filters |
-| `src/hooks/useStudents.ts` | Conditionally include `alt_contact_number` in search filter |
+| `src/components/StudentExportDialog.tsx` | Add missing address filters to summary; use server-side fetch for CSV export |
+| `src/hooks/useStudents.ts` | Add `fetchFilteredStudentsForExport()` function |
+| `src/pages/Students.tsx` | Pass `activeCompanyId` to export dialog |
+
+### Technical Details
+
+**Batch fetching for export** (useStudents.ts):
+```typescript
+export async function fetchFilteredStudentsForExport(
+  activeCompanyId: string,
+  filters: { search, status, batchId, gender, classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear, includeAltContact }
+): Promise<Student[]> {
+  // Build query with same filter logic as useStudents
+  // Fetch in batches of 1000 using .range(from, to) to bypass default limit
+  // Return concatenated results
+}
+```
+
+**Updated filter summary** (StudentExportDialog.tsx):
+```typescript
+if (filters.addressState) parts.push(`State: ${filters.addressState}`);
+if (filters.addressArea) parts.push(`Area: ${filters.addressArea}`);
+if (filters.addressPinZip) parts.push(`PIN/ZIP: ${filters.addressPinZip}`);
+if (filters.includeAltContact === false) parts.push("Alt contact excluded");
+```
 
