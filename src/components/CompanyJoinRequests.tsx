@@ -574,6 +574,15 @@ export default function CompanyJoinRequests() {
             <>
               <RoleSelector data={approveDialog} onRoleChange={(r) => handleRoleChange(r, approveDialog, setApproveDialog)} />
               <PermissionToggles data={approveDialog} onChange={setApproveDialog} />
+              <div className="rounded-md border border-border bg-muted/50 p-3 text-sm space-y-1">
+                <p className="font-medium text-foreground">Summary</p>
+                <p className="text-muted-foreground">
+                  <strong>{approveDialog.email}</strong> will be added as <strong>{roleLabel(approveDialog.role)}</strong>
+                </p>
+                <p className="text-muted-foreground">
+                  Permissions: {buildPermissionsSummary(approveDialog)}
+                </p>
+              </div>
             </>
           )}
           <DialogFooter>
@@ -611,6 +620,15 @@ export default function CompanyJoinRequests() {
             <>
               <RoleSelector data={acceptRejectedDialog} onRoleChange={(r) => handleRoleChange(r, acceptRejectedDialog, setAcceptRejectedDialog)} />
               <PermissionToggles data={acceptRejectedDialog} onChange={setAcceptRejectedDialog} />
+              <div className="rounded-md border border-border bg-muted/50 p-3 text-sm space-y-1">
+                <p className="font-medium text-foreground">Summary</p>
+                <p className="text-muted-foreground">
+                  <strong>{acceptRejectedDialog.email}</strong> will be added as <strong>{roleLabel(acceptRejectedDialog.role)}</strong>
+                </p>
+                <p className="text-muted-foreground">
+                  Permissions: {buildPermissionsSummary(acceptRejectedDialog)}
+                </p>
+              </div>
             </>
           )}
           <DialogFooter>
