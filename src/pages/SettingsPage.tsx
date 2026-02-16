@@ -399,7 +399,7 @@ export default function SettingsPage() {
 
         <DesignTokenEditor />
 
-        <DataManagementSection />
+        {isCipher && <DataManagementSection />}
       </div>
 
       <UnsavedChangesDialog blocker={blocker} />

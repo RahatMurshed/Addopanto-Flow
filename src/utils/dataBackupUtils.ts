@@ -1,11 +1,22 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface BackupMetadata {
+  companyId: string;
+  companyName: string;
+  backupDate: string;
+  recordCounts: Record<string, number>;
+  totalRecords: number;
+}
+
 export interface BackupData {
   version: string;
   exportedAt: string;
   userEmail: string;
   companyName?: string;
+  metadata?: BackupMetadata;
   data: {
+    company_settings?: any[];
+    courses?: any[];
     expense_accounts: any[];
     revenue_sources: any[];
     revenues: any[];
@@ -16,6 +27,12 @@ export interface BackupData {
     students: any[];
     student_payments: any[];
     monthly_fee_history: any[];
+    student_siblings?: any[];
+    student_batch_history?: any[];
+    company_memberships?: any[];
+    audit_logs?: any[];
+    currency_change_logs?: any[];
+    [key: string]: any[] | undefined;
   };
 }
 
@@ -30,9 +47,15 @@ export interface BackupPreview {
   studentsCount: number;
   studentPaymentsCount: number;
   monthlyFeeHistoryCount: number;
+  coursesCount: number;
+  siblingsCount: number;
+  membershipsCount: number;
+  auditLogsCount: number;
+  totalRecords: number;
   exportedAt: string;
   userEmail: string;
   companyName?: string;
+  version: string;
 }
 
 export async function exportCompanyData(companyId: string): Promise<BackupData["data"]> {
@@ -74,11 +97,6 @@ export async function exportCompanyData(companyId: string): Promise<BackupData["
   };
 }
 
-/** @deprecated Use exportCompanyData instead */
-export async function exportUserData(userId: string): Promise<BackupData["data"]> {
-  return exportCompanyData(userId);
-}
-
 export function downloadBackup(data: BackupData["data"], userEmail: string, companyName?: string): void {
   const backup: BackupData = {
     version: "2.0",
@@ -116,13 +134,17 @@ export function parseBackupFile(file: File): Promise<BackupData> {
           reject(new Error(validation.error));
           return;
         }
-        // Normalize v1.0 backups to include empty arrays for new tables
-        if (parsed.version === "1.0") {
-          parsed.data.batches = parsed.data.batches || [];
-          parsed.data.students = parsed.data.students || [];
-          parsed.data.student_payments = parsed.data.student_payments || [];
-          parsed.data.monthly_fee_history = parsed.data.monthly_fee_history || [];
-        }
+        // Normalize older backups
+        parsed.data.batches = parsed.data.batches || [];
+        parsed.data.students = parsed.data.students || [];
+        parsed.data.student_payments = parsed.data.student_payments || [];
+        parsed.data.monthly_fee_history = parsed.data.monthly_fee_history || [];
+        parsed.data.courses = parsed.data.courses || [];
+        parsed.data.student_siblings = parsed.data.student_siblings || [];
+        parsed.data.student_batch_history = parsed.data.student_batch_history || [];
+        parsed.data.company_memberships = parsed.data.company_memberships || [];
+        parsed.data.audit_logs = parsed.data.audit_logs || [];
+        parsed.data.currency_change_logs = parsed.data.currency_change_logs || [];
         resolve(parsed as BackupData);
       } catch (err) {
         reject(new Error("Invalid JSON file"));
@@ -138,7 +160,7 @@ export function validateBackupData(data: any): { valid: boolean; error?: string 
     return { valid: false, error: "Invalid backup format" };
   }
 
-  if (!data.version || (data.version !== "1.0" && data.version !== "2.0")) {
+  if (!data.version || !["1.0", "2.0", "3.0"].includes(data.version)) {
     return { valid: false, error: "Unsupported backup version" };
   }
 
@@ -169,19 +191,29 @@ export function validateBackupData(data: any): { valid: boolean; error?: string 
 }
 
 export function getBackupPreview(backup: BackupData): BackupPreview {
-  return {
-    expenseAccountsCount: backup.data.expense_accounts.length,
-    revenueSourcesCount: backup.data.revenue_sources.length,
-    revenuesCount: backup.data.revenues.length,
-    allocationsCount: backup.data.allocations.length,
-    expensesCount: backup.data.expenses.length,
-    khataTransfersCount: backup.data.khata_transfers.length,
+  const counts = {
+    expenseAccountsCount: (backup.data.expense_accounts || []).length,
+    revenueSourcesCount: (backup.data.revenue_sources || []).length,
+    revenuesCount: (backup.data.revenues || []).length,
+    allocationsCount: (backup.data.allocations || []).length,
+    expensesCount: (backup.data.expenses || []).length,
+    khataTransfersCount: (backup.data.khata_transfers || []).length,
     batchesCount: (backup.data.batches || []).length,
     studentsCount: (backup.data.students || []).length,
     studentPaymentsCount: (backup.data.student_payments || []).length,
     monthlyFeeHistoryCount: (backup.data.monthly_fee_history || []).length,
+    coursesCount: (backup.data.courses || []).length,
+    siblingsCount: (backup.data.student_siblings || []).length,
+    membershipsCount: (backup.data.company_memberships || []).length,
+    auditLogsCount: (backup.data.audit_logs || []).length,
+  };
+
+  return {
+    ...counts,
+    totalRecords: Object.values(counts).reduce((s, c) => s + c, 0),
     exportedAt: backup.exportedAt,
     userEmail: backup.userEmail,
     companyName: backup.companyName,
+    version: backup.version,
   };
 }
