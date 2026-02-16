@@ -90,6 +90,17 @@ Deno.serve(async (req) => {
         return jsonResp(403, { error: "Admins can only delete moderators" });
       }
 
+      // Audit log for cipher-on-cipher deletion
+      if (targetUserRole === "cipher") {
+        console.warn("[CIPHER DELETE]", {
+          callerId: user.id,
+          callerEmail: user.email,
+          targetId: userId,
+          targetRole: targetUserRole,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const { error: roleDeleteError } = await adminClient.from("user_roles").delete().eq("user_id", userId);
       if (roleDeleteError) console.warn("Failed to delete user_roles:", roleDeleteError);
 
