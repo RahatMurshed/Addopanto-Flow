@@ -775,6 +775,8 @@ export default function BatchDetail() {
           onSave={handlePayment}
           batchDefaultAdmissionFee={Number(batch?.default_admission_fee) || 0}
           batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
+          courseName={course?.course_name}
+          batchName={batch?.batch_name}
         />
       )}
 
