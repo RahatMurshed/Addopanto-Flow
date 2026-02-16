@@ -252,11 +252,13 @@ export default function CompanyJoinRequests() {
   });
 
   const openApproveDialog = (request: JoinRequest) => {
-    setApproveDialog(defaultApproveData(request));
+    // Password join requests default to Moderator
+    setApproveDialog(defaultApproveData(request, "moderator"));
   };
 
   const openAcceptRejectedDialog = (request: JoinRequest) => {
-    setAcceptRejectedDialog(defaultApproveData(request));
+    // Re-accepting rejected users defaults to Viewer (least privilege)
+    setAcceptRejectedDialog(defaultApproveData(request, "viewer"));
   };
 
   const handleRoleChange = (
