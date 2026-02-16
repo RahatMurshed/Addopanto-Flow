@@ -25,7 +25,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { CompanyRoleBadge } from "@/components/UserRoleBadge";
 import { PermissionAssignmentModal } from "@/components/PermissionAssignmentModal";
 import { UserProfileSheet } from "@/components/UserProfileSheet";
-import { PermissionDenied } from "@/components/PermissionDenied";
+
 
 function getPermissionsSummary(member: CompanyMembership): string {
   if (member.role === "admin") return "Full access";
@@ -224,10 +224,8 @@ export default function CompanyMembers() {
     });
   }, [members, search, profiles]);
 
-  // DEO access check: show denied page then auto-redirect
-  if (isDataEntryOperator) {
-    return <PermissionDenied message="You don't have permission to manage company members. Contact your company admin for assistance." autoRedirectSeconds={5} />;
-  }
+
+
 
   if (!canViewMembers) return <Navigate to="/" replace />;
 

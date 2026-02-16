@@ -11,6 +11,7 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { RoleGuard } from "@/components/RoleGuard";
+import { AccessGuard, ACCESS_RULES } from "@/components/AccessGuard";
 import AppLayout from "@/components/AppLayout";
 
 function AccessDenied() {
@@ -148,18 +149,18 @@ const App = () => (
 
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/khatas" element={<ProtectedRoute><Khatas /></ProtectedRoute>} />
-                  <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
+                  <Route path="/revenue" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoRevenue]}><Revenue /></AccessGuard></ProtectedRoute>} />
                   <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-                  <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+                  <Route path="/students" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><Students /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
-                  <Route path="/courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
+                  <Route path="/courses" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCourses]}><Courses /></AccessGuard></ProtectedRoute>} />
                   <Route path="/courses/:id" element={<ProtectedRoute><CourseDetail /></ProtectedRoute>} />
                   <Route path="/batches" element={<Navigate to="/courses" replace />} />
                   <Route path="/batches/:id" element={<ProtectedRoute><BatchDetail /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/users" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><UserManagement /></RoleGuard></ProtectedRoute>} />
-                  <Route path="/company/members" element={<ProtectedRoute><CompanyMembers /></ProtectedRoute>} />
+                  <Route path="/company/members" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoMembers]}><CompanyMembers /></AccessGuard></ProtectedRoute>} />
                   <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
