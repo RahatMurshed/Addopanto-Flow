@@ -1,11 +1,14 @@
 /**
  * Deterministic color palette for revenue/expense source badges.
  * Each source name always maps to the same color across the entire app.
+ *
+ * Light mode: outlined badges with tinted border and text, near-white bg.
+ * Dark mode: subtle filled badges with muted tones.
  */
 
 const UNCATEGORIZED_STYLE = {
-  light: { bg: "hsl(220, 15%, 92%)", text: "hsl(220, 10%, 45%)", border: "hsl(220, 15%, 75%)" },
-  dark: { bg: "hsl(220, 15%, 20%)", text: "hsl(220, 10%, 65%)", border: "hsl(220, 15%, 35%)" },
+  light: { bg: "transparent", text: "hsl(220, 10%, 50%)", border: "hsl(220, 12%, 78%)" },
+  dark: { bg: "hsl(220, 12%, 16%)", text: "hsl(220, 10%, 62%)", border: "hsl(220, 12%, 28%)" },
 };
 
 function hashString(str: string): number {
@@ -13,7 +16,6 @@ function hashString(str: string): number {
   for (let i = 0; i < str.length; i++) {
     hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0;
   }
-  // Mix the bits for better distribution
   hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
   hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
   hash = (hash >> 16) ^ hash;
@@ -29,16 +31,18 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
   }
   const hue = hashString(name) % 360;
   if (isDark) {
+    // Dark: subtle filled with moderate contrast
     return {
-      bg: `hsl(${hue}, 45%, 20%)`,
-      text: `hsl(${hue}, 70%, 70%)`,
-      border: `hsl(${hue}, 45%, 35%)`,
+      bg: `hsl(${hue}, 30%, 15%)`,
+      text: `hsl(${hue}, 50%, 68%)`,
+      border: `hsl(${hue}, 35%, 28%)`,
     };
   }
+  // Light: outlined style — transparent bg, colored border + text
   return {
-    bg: `hsl(${hue}, 70%, 92%)`,
-    text: `hsl(${hue}, 70%, 35%)`,
-    border: `hsl(${hue}, 60%, 65%)`,
+    bg: "transparent",
+    text: `hsl(${hue}, 55%, 40%)`,
+    border: `hsl(${hue}, 45%, 65%)`,
   };
 }
 
