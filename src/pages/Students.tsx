@@ -33,7 +33,7 @@ import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import TablePagination from "@/components/TablePagination";
 import StudentOverdueSection from "@/components/StudentOverdueSection";
 import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/components/StudentFilters";
-
+import { useSavedSearchPresets, useCreatePreset, useDeletePreset } from "@/hooks/useSavedSearchPresets";
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -97,6 +97,11 @@ export default function Students() {
   const deleteMutation = useDeleteStudent();
   const bulkDeleteMutation = useBulkDeleteStudents();
   const createPaymentMutation = useCreateStudentPayment();
+
+  // Saved search presets
+  const { data: savedPresets = [] } = useSavedSearchPresets();
+  const createPresetMutation = useCreatePreset();
+  const deletePresetMutation = useDeletePreset();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -383,6 +388,12 @@ export default function Students() {
               onChange={setFilters}
               totalResults={filteredStudents.length}
               totalStudents={totalStudents}
+              savedPresets={savedPresets}
+              onSavePreset={(name) => createPresetMutation.mutate({ name, filters })}
+              onDeletePreset={(id) => deletePresetMutation.mutate(id)}
+              onLoadPreset={(presetFilters) => {
+                setFilters({ ...defaultFilters, ...presetFilters });
+              }}
             />
 
             {/* Bulk action bar */}

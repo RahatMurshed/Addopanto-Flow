@@ -1031,6 +1031,48 @@ export type Database = {
           },
         ]
       }
+      saved_search_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          filters: Json
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_search_presets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_search_presets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_batch_history: {
         Row: {
           company_id: string
