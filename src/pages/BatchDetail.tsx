@@ -667,10 +667,7 @@ export default function BatchDetail() {
                                   ) : sum.admissionStatus === "partial" ? (
                                     <span className="block text-xs text-orange-600 dark:text-orange-400 font-medium">{formatCurrency(sum.admissionPaid, currency)}/{formatCurrency(effAdm, currency)}</span>
                                   ) : (
-                                    <>
-                                      <span className="block text-xs text-muted-foreground">{formatCurrency(effAdm, currency)}</span>
-                                      <Badge variant="destructive" className="block w-fit">Pending</Badge>
-                                    </>
+                                    <span className="block text-xs font-medium text-orange-600 dark:text-orange-400">{formatCurrency(0, currency)}/{formatCurrency(effAdm, currency)}</span>
                                   )}
                                 </div>
                               );
