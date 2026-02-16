@@ -275,19 +275,31 @@ function getDescription(log: AuditLogType): string {
     return parts.join(" · ") || "Batch transfer";
   }
   if (log.table_name === "companies") {
+    const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     if (log.action === "UPDATE" && log.old_data && log.new_data) {
       const o = log.old_data as Record<string, unknown>;
       const n = log.new_data as Record<string, unknown>;
       const changes: string[] = [];
       if (o.name !== n.name) changes.push(`Name: ${o.name} → ${n.name}`);
-      if (o.currency !== n.currency) changes.push(`Currency: ${o.currency} → ${n.currency}`);
-      if (o.base_currency !== n.base_currency) changes.push(`Base Currency: ${o.base_currency} → ${n.base_currency}`);
-      if (o.exchange_rate !== n.exchange_rate) changes.push(`Exchange Rate: ${o.exchange_rate} → ${n.exchange_rate}`);
-      if (o.fiscal_year_start_month !== n.fiscal_year_start_month) changes.push(`Fiscal Year Start: Month ${o.fiscal_year_start_month} → ${n.fiscal_year_start_month}`);
+      if (o.currency !== n.currency || o.exchange_rate !== n.exchange_rate || o.base_currency !== n.base_currency) {
+        const currParts: string[] = [];
+        if (o.currency !== n.currency) currParts.push(`Display: ${o.currency} → ${n.currency}`);
+        if (o.base_currency !== n.base_currency) currParts.push(`Base: ${o.base_currency} → ${n.base_currency}`);
+        if (o.exchange_rate !== n.exchange_rate) {
+          const dispCurr = (n.currency || o.currency) as string;
+          currParts.push(`Rate: 1 ${dispCurr} = ${o.exchange_rate} BDT → ${n.exchange_rate} BDT`);
+        }
+        changes.push(`💱 Currency — ${currParts.join(", ")}`);
+      }
+      if (o.fiscal_year_start_month !== n.fiscal_year_start_month) {
+        const oldMonth = MONTH_NAMES[(Number(o.fiscal_year_start_month) || 1) - 1] || String(o.fiscal_year_start_month);
+        const newMonth = MONTH_NAMES[(Number(n.fiscal_year_start_month) || 1) - 1] || String(n.fiscal_year_start_month);
+        changes.push(`📅 Fiscal Year Start: ${oldMonth} → ${newMonth}`);
+      }
       if (o.description !== n.description) changes.push("Description updated");
       if (o.logo_url !== n.logo_url) changes.push("Logo updated");
-      if (o.join_password !== n.join_password) changes.push("Join password changed");
-      if (o.invite_code !== n.invite_code) changes.push("Invite code changed");
+      if (o.join_password !== n.join_password) changes.push("🔑 Join password changed");
+      if (o.invite_code !== n.invite_code) changes.push("🔗 Invite code changed");
       return changes.length > 0 ? changes.join(" · ") : `Company: ${d.name || ""}`;
     }
     return d.name ? `Company: ${d.name}` : "";
