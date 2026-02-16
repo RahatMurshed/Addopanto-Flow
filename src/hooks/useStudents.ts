@@ -21,6 +21,54 @@ export interface Student {
   company_id: string;
   created_at: string;
   updated_at: string;
+  // Extended fields
+  date_of_birth: string | null;
+  gender: string | null;
+  blood_group: string | null;
+  religion_category: string | null;
+  nationality: string | null;
+  aadhar_id_number: string | null;
+  whatsapp_number: string | null;
+  alt_contact_number: string | null;
+  address_house: string | null;
+  address_street: string | null;
+  address_area: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_pin_zip: string | null;
+  permanent_address_same: boolean | null;
+  perm_address_house: string | null;
+  perm_address_street: string | null;
+  perm_address_area: string | null;
+  perm_address_city: string | null;
+  perm_address_state: string | null;
+  perm_address_pin_zip: string | null;
+  father_name: string | null;
+  father_occupation: string | null;
+  father_contact: string | null;
+  father_annual_income: number | null;
+  mother_name: string | null;
+  mother_occupation: string | null;
+  mother_contact: string | null;
+  guardian_name: string | null;
+  guardian_contact: string | null;
+  guardian_relationship: string | null;
+  previous_school: string | null;
+  class_grade: string | null;
+  roll_number: string | null;
+  academic_year: string | null;
+  section_division: string | null;
+  previous_qualification: string | null;
+  previous_percentage: string | null;
+  board_university: string | null;
+  special_needs_medical: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_number: string | null;
+  transportation_mode: string | null;
+  distance_from_institution: string | null;
+  extracurricular_interests: string | null;
+  language_proficiency: string | null;
+  batch_id: string | null;
 }
 
 export interface StudentInsert {
@@ -37,6 +85,53 @@ export interface StudentInsert {
   status?: "active" | "inactive" | "graduated";
   notes?: string | null;
   batch_id?: string | null;
+  // Extended fields
+  date_of_birth?: string | null;
+  gender?: string | null;
+  blood_group?: string | null;
+  religion_category?: string | null;
+  nationality?: string | null;
+  aadhar_id_number?: string | null;
+  whatsapp_number?: string | null;
+  alt_contact_number?: string | null;
+  address_house?: string | null;
+  address_street?: string | null;
+  address_area?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  address_pin_zip?: string | null;
+  permanent_address_same?: boolean | null;
+  perm_address_house?: string | null;
+  perm_address_street?: string | null;
+  perm_address_area?: string | null;
+  perm_address_city?: string | null;
+  perm_address_state?: string | null;
+  perm_address_pin_zip?: string | null;
+  father_name?: string | null;
+  father_occupation?: string | null;
+  father_contact?: string | null;
+  father_annual_income?: number | null;
+  mother_name?: string | null;
+  mother_occupation?: string | null;
+  mother_contact?: string | null;
+  guardian_name?: string | null;
+  guardian_contact?: string | null;
+  guardian_relationship?: string | null;
+  previous_school?: string | null;
+  class_grade?: string | null;
+  roll_number?: string | null;
+  academic_year?: string | null;
+  section_division?: string | null;
+  previous_qualification?: string | null;
+  previous_percentage?: string | null;
+  board_university?: string | null;
+  special_needs_medical?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_number?: string | null;
+  transportation_mode?: string | null;
+  distance_from_institution?: string | null;
+  extracurricular_interests?: string | null;
+  language_proficiency?: string | null;
 }
 
 export interface StudentFilters {

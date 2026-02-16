@@ -1108,66 +1108,259 @@ export type Database = {
           },
         ]
       }
+      student_siblings: {
+        Row: {
+          age: number | null
+          company_id: string
+          contact: string | null
+          created_at: string
+          id: string
+          name: string | null
+          occupation_school: string | null
+          student_id: string
+        }
+        Insert: {
+          age?: number | null
+          company_id: string
+          contact?: string | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          occupation_school?: string | null
+          student_id: string
+        }
+        Update: {
+          age?: number | null
+          company_id?: string
+          contact?: string | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          occupation_school?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_siblings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_siblings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_siblings_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
+          aadhar_id_number: string | null
+          academic_year: string | null
+          address_area: string | null
+          address_city: string | null
+          address_house: string | null
+          address_pin_zip: string | null
+          address_state: string | null
+          address_street: string | null
           admission_fee_total: number
+          alt_contact_number: string | null
           batch_id: string | null
           billing_start_month: string
+          blood_group: string | null
+          board_university: string | null
+          class_grade: string | null
           company_id: string
           course_end_month: string | null
           course_start_month: string | null
           created_at: string
+          date_of_birth: string | null
+          distance_from_institution: string | null
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_number: string | null
           enrollment_date: string
+          extracurricular_interests: string | null
+          father_annual_income: number | null
+          father_contact: string | null
+          father_name: string | null
+          father_occupation: string | null
+          gender: string | null
+          guardian_contact: string | null
+          guardian_name: string | null
+          guardian_relationship: string | null
           id: string
+          language_proficiency: string | null
           monthly_fee_amount: number
+          mother_contact: string | null
+          mother_name: string | null
+          mother_occupation: string | null
           name: string
+          nationality: string | null
           notes: string | null
+          perm_address_area: string | null
+          perm_address_city: string | null
+          perm_address_house: string | null
+          perm_address_pin_zip: string | null
+          perm_address_state: string | null
+          perm_address_street: string | null
+          permanent_address_same: boolean | null
           phone: string | null
+          previous_percentage: string | null
+          previous_qualification: string | null
+          previous_school: string | null
+          religion_category: string | null
+          roll_number: string | null
+          section_division: string | null
+          special_needs_medical: string | null
           status: Database["public"]["Enums"]["student_status"]
           student_id_number: string | null
+          transportation_mode: string | null
           updated_at: string
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
+          aadhar_id_number?: string | null
+          academic_year?: string | null
+          address_area?: string | null
+          address_city?: string | null
+          address_house?: string | null
+          address_pin_zip?: string | null
+          address_state?: string | null
+          address_street?: string | null
           admission_fee_total?: number
+          alt_contact_number?: string | null
           batch_id?: string | null
           billing_start_month: string
+          blood_group?: string | null
+          board_university?: string | null
+          class_grade?: string | null
           company_id: string
           course_end_month?: string | null
           course_start_month?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          distance_from_institution?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
           enrollment_date: string
+          extracurricular_interests?: string | null
+          father_annual_income?: number | null
+          father_contact?: string | null
+          father_name?: string | null
+          father_occupation?: string | null
+          gender?: string | null
+          guardian_contact?: string | null
+          guardian_name?: string | null
+          guardian_relationship?: string | null
           id?: string
+          language_proficiency?: string | null
           monthly_fee_amount?: number
+          mother_contact?: string | null
+          mother_name?: string | null
+          mother_occupation?: string | null
           name: string
+          nationality?: string | null
           notes?: string | null
+          perm_address_area?: string | null
+          perm_address_city?: string | null
+          perm_address_house?: string | null
+          perm_address_pin_zip?: string | null
+          perm_address_state?: string | null
+          perm_address_street?: string | null
+          permanent_address_same?: boolean | null
           phone?: string | null
+          previous_percentage?: string | null
+          previous_qualification?: string | null
+          previous_school?: string | null
+          religion_category?: string | null
+          roll_number?: string | null
+          section_division?: string | null
+          special_needs_medical?: string | null
           status?: Database["public"]["Enums"]["student_status"]
           student_id_number?: string | null
+          transportation_mode?: string | null
           updated_at?: string
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
+          aadhar_id_number?: string | null
+          academic_year?: string | null
+          address_area?: string | null
+          address_city?: string | null
+          address_house?: string | null
+          address_pin_zip?: string | null
+          address_state?: string | null
+          address_street?: string | null
           admission_fee_total?: number
+          alt_contact_number?: string | null
           batch_id?: string | null
           billing_start_month?: string
+          blood_group?: string | null
+          board_university?: string | null
+          class_grade?: string | null
           company_id?: string
           course_end_month?: string | null
           course_start_month?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          distance_from_institution?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
           enrollment_date?: string
+          extracurricular_interests?: string | null
+          father_annual_income?: number | null
+          father_contact?: string | null
+          father_name?: string | null
+          father_occupation?: string | null
+          gender?: string | null
+          guardian_contact?: string | null
+          guardian_name?: string | null
+          guardian_relationship?: string | null
           id?: string
+          language_proficiency?: string | null
           monthly_fee_amount?: number
+          mother_contact?: string | null
+          mother_name?: string | null
+          mother_occupation?: string | null
           name?: string
+          nationality?: string | null
           notes?: string | null
+          perm_address_area?: string | null
+          perm_address_city?: string | null
+          perm_address_house?: string | null
+          perm_address_pin_zip?: string | null
+          perm_address_state?: string | null
+          perm_address_street?: string | null
+          permanent_address_same?: boolean | null
           phone?: string | null
+          previous_percentage?: string | null
+          previous_qualification?: string | null
+          previous_school?: string | null
+          religion_category?: string | null
+          roll_number?: string | null
+          section_division?: string | null
+          special_needs_medical?: string | null
           status?: Database["public"]["Enums"]["student_status"]
           student_id_number?: string | null
+          transportation_mode?: string | null
           updated_at?: string
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: [
           {
