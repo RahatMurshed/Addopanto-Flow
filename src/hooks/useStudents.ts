@@ -148,6 +148,7 @@ export interface StudentFilters {
   addressArea?: string;
   addressPinZip?: string;
   academicYear?: string;
+  includeAltContact?: boolean;
   // Server-side pagination
   page?: number;
   pageSize?: number;
@@ -241,7 +242,15 @@ export function useStudents(filters?: StudentFilters) {
 
       if (search) {
         const sanitized = search.replace(/[%_\\]/g, '\\$&');
-        const searchFilter = `name.ilike.%${sanitized}%,student_id_number.ilike.%${sanitized}%,father_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%,mother_name.ilike.%${sanitized}%,whatsapp_number.ilike.%${sanitized}%,alt_contact_number.ilike.%${sanitized}%,email.ilike.%${sanitized}%,address_house.ilike.%${sanitized}%,address_street.ilike.%${sanitized}%,address_area.ilike.%${sanitized}%,address_city.ilike.%${sanitized}%,address_state.ilike.%${sanitized}%,address_pin_zip.ilike.%${sanitized}%`;
+        const includeAltContact = filters?.includeAltContact;
+        const fields = [
+          "name", "student_id_number", "father_name", "phone",
+          "mother_name", "whatsapp_number",
+          ...(includeAltContact !== false ? ["alt_contact_number"] : []),
+          "email", "address_house", "address_street",
+          "address_area", "address_city", "address_state", "address_pin_zip"
+        ];
+        const searchFilter = fields.map(f => `${f}.ilike.%${sanitized}%`).join(",");
         countQuery = countQuery.or(searchFilter);
         dataQuery = dataQuery.or(searchFilter);
       }
