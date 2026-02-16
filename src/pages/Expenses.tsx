@@ -584,7 +584,7 @@ export default function Expenses() {
                           </TableCell>
                           <TableCell>
                             {exp.expense_accounts ? (
-                              <Badge variant="secondary" style={getSourceBadgeStyle(exp.expense_accounts.name)}>
+                              <Badge variant="outline" style={getSourceBadgeStyle(exp.expense_accounts.name)}>
                                 {exp.expense_accounts.name}
                               </Badge>
                             ) : (

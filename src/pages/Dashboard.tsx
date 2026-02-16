@@ -862,7 +862,7 @@ export default function Dashboard() {
                       <TableCell>
                         {tx.type === "expense" && tx.category ? (
                           <Badge 
-                            variant="secondary" 
+                            variant="outline" 
                             className="text-xs"
                             style={getSourceBadgeStyle(tx.category)}
                           >
@@ -875,7 +875,7 @@ export default function Dashboard() {
                       <TableCell>
                         {tx.type === "revenue" && tx.category ? (
                           <Badge 
-                            variant="secondary" 
+                            variant="outline" 
                             className="text-xs"
                             style={getSourceBadgeStyle(tx.category)}
                           >
