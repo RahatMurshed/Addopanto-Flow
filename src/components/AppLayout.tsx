@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { SkipLink } from "@/components/SkipLink";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -126,8 +127,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <SkipLink />
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-col bg-sidebar md:flex">
+      <aside className="hidden w-64 flex-col bg-sidebar md:flex" role="navigation" aria-label="Main navigation">
         <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-4 py-4">
           <Link to="/">
             <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
@@ -286,7 +288,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 md:p-6 focus:outline-none">{children}</main>
       </div>
 
       {/* Command Palette */}
