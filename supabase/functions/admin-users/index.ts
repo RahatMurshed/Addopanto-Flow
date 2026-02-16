@@ -193,6 +193,7 @@ Deno.serve(async (req) => {
 
       // Cannot change own role
       if (userId === user.id) {
+        await writeAuditLog("ROLE_CHANGE_BLOCKED", userId, { reason: "self_change", attempted_role: newRole, caller: user.email }, null);
         return jsonResp(400, { error: "Cannot change your own role" });
       }
 
@@ -201,18 +202,34 @@ Deno.serve(async (req) => {
         .from("user_roles").select("id, role").eq("user_id", userId).maybeSingle();
       const currentRole = targetRoleData?.role || "user";
 
-      // If promoting TO cipher or demoting FROM cipher, require password re-authentication
-      if (newRole === "cipher" || currentRole === "cipher") {
+      // CIPHER DOWNGRADE LOCK: Prevent demoting a Cipher to any lower role
+      if (currentRole === "cipher" && newRole !== "cipher") {
+        await writeAuditLog(
+          "ROLE_CHANGE_BLOCKED",
+          targetRoleData?.id || userId,
+          { user_id: userId, current_role: currentRole, attempted_role: newRole, reason: "cipher_downgrade_locked", caller_id: user.id, caller_email: user.email },
+          null
+        );
+        console.warn("[ROLE CHANGE BLOCKED] Cipher downgrade attempted", {
+          callerId: user.id, callerEmail: user.email, targetId: userId,
+          fromRole: currentRole, attemptedRole: newRole, timestamp: new Date().toISOString(),
+        });
+        return jsonResp(403, { error: "Cipher role is locked. Downgrading a Cipher user is not permitted." });
+      }
+
+      // If promoting TO cipher, require password re-authentication
+      if (newRole === "cipher") {
         if (!password) {
+          await writeAuditLog("ROLE_CHANGE_BLOCKED", targetRoleData?.id || userId, { user_id: userId, current_role: currentRole, attempted_role: newRole, reason: "missing_password", caller_id: user.id, caller_email: user.email }, null);
           return jsonResp(400, { error: "Password required for Cipher role changes" });
         }
 
-        // Verify caller's password
         const { error: authError } = await adminClient.auth.signInWithPassword({
           email: user.email!,
           password,
         });
         if (authError) {
+          await writeAuditLog("ROLE_CHANGE_BLOCKED", targetRoleData?.id || userId, { user_id: userId, current_role: currentRole, attempted_role: newRole, reason: "password_failed", caller_id: user.id, caller_email: user.email }, null);
           return jsonResp(403, { error: "Password verification failed" });
         }
       }
@@ -223,13 +240,11 @@ Deno.serve(async (req) => {
       }
 
       // Perform the role change via service_role (bypasses RLS)
-      // First delete existing role
       if (targetRoleData) {
         const { error: delErr } = await adminClient.from("user_roles").delete().eq("user_id", userId);
         if (delErr) return jsonResp(500, { error: "Failed to remove old role", details: delErr.message });
       }
 
-      // Insert new role
       const { data: newRoleData, error: insErr } = await adminClient
         .from("user_roles")
         .insert({ user_id: userId, role: newRole, assigned_by: user.id })
@@ -237,7 +252,6 @@ Deno.serve(async (req) => {
         .single();
       if (insErr) return jsonResp(500, { error: "Failed to assign new role", details: insErr.message });
 
-      // Write explicit audit log via service role
       await writeAuditLog(
         "ROLE_CHANGE",
         newRoleData.id,
@@ -246,12 +260,8 @@ Deno.serve(async (req) => {
       );
 
       console.info("[ROLE CHANGE]", {
-        callerId: user.id,
-        callerEmail: user.email,
-        targetId: userId,
-        fromRole: currentRole,
-        toRole: newRole,
-        timestamp: new Date().toISOString(),
+        callerId: user.id, callerEmail: user.email, targetId: userId,
+        fromRole: currentRole, toRole: newRole, timestamp: new Date().toISOString(),
       });
 
       return jsonResp(200, { success: true, fromRole: currentRole, toRole: newRole });
