@@ -47,6 +47,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { PermissionGuard } from "@/components/auth/RoleGuard";
 import { useCreateStudent } from "@/hooks/useStudents";
 import { useCreateBatch } from "@/hooks/useBatches";
+import { useDashboardAccessLogger } from "@/hooks/useDashboardAccessLogger";
 
 const CHART_COLORS = [
   "hsl(var(--primary))", "hsl(142, 76%, 36%)", "hsl(38, 92%, 50%)", "hsl(262, 83%, 58%)",
@@ -61,28 +62,16 @@ export default function Dashboard() {
     canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense,
   } = useCompany();
 
-  // Audit: detect if a Cipher/Admin ever lands on the moderator view path
-  useEffect(() => {
-    if (!user?.id) return;
-    const viewPath = isModerator ? "moderator" : "full";
-    const meta = {
-      userId: user.id,
-      isCipher,
-      isCompanyAdmin,
-      membershipRole: membership?.role ?? null,
-      isModerator,
-      activeCompanyId,
-      viewPath,
-      timestamp: new Date().toISOString(),
-    };
-
-    if (isCipher && isModerator) {
-      // This should NEVER happen — log an error for investigation
-      console.error("[DASHBOARD AUDIT] ❌ Cipher user routed to moderator view!", meta);
-    } else if (isCipher) {
-      console.info("[DASHBOARD AUDIT] ✓ Cipher viewing full dashboard", meta);
-    }
-  }, [user?.id, isCipher, isCompanyAdmin, isModerator, membership?.role, activeCompanyId]);
+  // Audit: log dashboard access to database with anomaly detection
+  useDashboardAccessLogger({
+    userId: user?.id || "",
+    userEmail: user?.email,
+    companyId: activeCompanyId || undefined,
+    membershipRole: membership?.role ?? undefined,
+    isCipher,
+    isCompanyAdmin,
+    isModerator,
+  });
   const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);

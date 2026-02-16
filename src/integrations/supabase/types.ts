@@ -602,6 +602,45 @@ export type Database = {
           },
         ]
       }
+      dashboard_access_logs: {
+        Row: {
+          anomaly_reason: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          is_anomaly: boolean
+          is_cipher: boolean
+          membership_role: string | null
+          user_email: string | null
+          user_id: string
+          view_path: string
+        }
+        Insert: {
+          anomaly_reason?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_anomaly?: boolean
+          is_cipher?: boolean
+          membership_role?: string | null
+          user_email?: string | null
+          user_id: string
+          view_path?: string
+        }
+        Update: {
+          anomaly_reason?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_anomaly?: boolean
+          is_cipher?: boolean
+          membership_role?: string | null
+          user_email?: string | null
+          user_id?: string
+          view_path?: string
+        }
+        Relationships: []
+      }
       expense_accounts: {
         Row: {
           allocation_percentage: number

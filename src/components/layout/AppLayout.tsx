@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
-  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, EyeOff,
+  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, EyeOff, ScanEye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -111,6 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     
     ...(isCipher ? [{ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount }] : []),
     ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
+    ...(isCipher ? [{ label: "Access Audit", href: "/access-audit", icon: ScanEye }] : []),
     ...((isCompanyAdmin || isCipher) && !isModerator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
   ];
 
