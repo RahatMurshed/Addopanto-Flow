@@ -57,9 +57,32 @@ const CHART_COLORS = [
 export default function Dashboard() {
   const { user } = useAuth();
   const {
-    activeCompanyId, activeCompany, isModerator,
+    activeCompanyId, activeCompany, isModerator, isCipher, isCompanyAdmin, membership,
     canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense,
   } = useCompany();
+
+  // Audit: detect if a Cipher/Admin ever lands on the moderator view path
+  useEffect(() => {
+    if (!user?.id) return;
+    const viewPath = isModerator ? "moderator" : "full";
+    const meta = {
+      userId: user.id,
+      isCipher,
+      isCompanyAdmin,
+      membershipRole: membership?.role ?? null,
+      isModerator,
+      activeCompanyId,
+      viewPath,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (isCipher && isModerator) {
+      // This should NEVER happen — log an error for investigation
+      console.error("[DASHBOARD AUDIT] ❌ Cipher user routed to moderator view!", meta);
+    } else if (isCipher) {
+      console.info("[DASHBOARD AUDIT] ✓ Cipher viewing full dashboard", meta);
+    }
+  }, [user?.id, isCipher, isCompanyAdmin, isModerator, membership?.role, activeCompanyId]);
   const { fc: formatCurrencyFn, fcp: formatCurrencyPreciseFn } = useCompanyCurrency();
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
