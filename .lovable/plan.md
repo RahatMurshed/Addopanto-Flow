@@ -1,35 +1,52 @@
 
 
-# Fix Monthly Column: Duration Cap and Partial Display
+# Add Advanced Address Filters to Student Search Panel
 
-## Problem
-1. **Wrong month count**: Monthly column shows 6 months instead of the actual 4-month course duration because the billing month generator extends beyond `course_end_month` to `currentMonth`.
-2. **No partial detail**: When monthly status is partial, it just shows "X months pending" instead of showing paid/total like "250/1250 Partial".
+## Current State
+The Advanced Filters panel has 5 fields: Batch, Gender, Class/Grade, City, and Academic Year. The "City" field is the only address filter, but the server-side search already supports all address fields via the global search bar.
 
-## Changes
+## Plan
 
-### File 1: `src/hooks/useStudentPayments.ts` (line 217)
-**Fix**: When `course_end_month` is set, cap month generation at that boundary instead of extending to `currentMonth`.
+### 1. Expand `StudentFilterValues` interface (StudentFilters.tsx)
+Add new filter fields:
+- `addressState: string`
+- `addressArea: string`
+- `addressPinZip: string`
 
-Current logic:
+Update `defaultFilters` with empty strings for each.
+
+### 2. Add debounced inputs for new fields (StudentFilters.tsx)
+Follow the existing pattern used for `cityInput`/`classInput`:
+- Add `stateInput`, `areaInput`, `pinInput` state variables
+- Add debounce `useEffect` hooks (300ms) for each
+- Add sync-back `useEffect` hooks for external changes
+
+### 3. Update the Advanced Filters grid (StudentFilters.tsx)
+Reorganize the grid from 5 columns to 2 rows:
+- Row 1: Batch, Gender, Class/Grade, Academic Year
+- Row 2 (Address group): City, State, Area/Locality, PIN/ZIP
+
+The address group will have a subtle "Address" label/divider to visually group them.
+
+### 4. Update filter counting and chips (StudentFilters.tsx)
+- Include new fields in `advancedFilterCount`
+- Add chips for State, Area, PIN/ZIP (like existing City chip)
+- Update `clearChip` and `resetAll` to handle new fields
+
+### 5. Add server-side filtering (useStudents.ts)
+Apply `.ilike()` filters for `address_state`, `address_area`, and `address_pin_zip` following the same pattern as `addressCity`:
 ```
-const endBound = courseEnd > currentMonth ? courseEnd : currentMonth;
+if (addressState) {
+  const s = addressState.replace(/[%_\\]/g, '\\$&');
+  countQuery = countQuery.ilike("address_state", `%${s}%`);
+  dataQuery = dataQuery.ilike("address_state", `%${s}%`);
+}
 ```
-This takes the MAX, so months keep generating past the course end date.
+Add these to the query key array as well.
 
-Fixed logic:
-```
-const endBound = student.course_end_month ? courseEnd : currentMonth;
-```
-When the course has a defined end, stop there. Only use `currentMonth` as fallback when no end is set.
-
-### File 2: `src/pages/Students.tsx` (lines 517-528)
-**Fix**: Replace the generic "X months pending" badge with differentiated statuses:
-
-- **Partial**: Show `paid/total Partial` in amber (e.g., "250/1,250 Partial") using `fc()` for currency formatting
-- **Overdue**: Show `X/Y Overdue` in red (e.g., "2/4 Overdue")
-- **Pending** (future only): Show `X months pending` in orange
-- **Paid**: Green "Paid" badge (unchanged)
-
-Priority order: Partial > Overdue > Pending > Paid
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/components/StudentFilters.tsx` | Add state/area/PIN inputs, debounce hooks, chips, grid layout update |
+| `src/hooks/useStudents.ts` | Add `addressState`, `addressArea`, `addressPinZip` to filters interface and query logic |
 
