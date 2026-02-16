@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { PermissionDenied } from "@/components/PermissionDenied";
 import { useStudents, useCreateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -47,7 +46,7 @@ export default function Students() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const deoBlocked = isDataEntryOperator && !canAddStudent && !canEditStudent && !canDeleteStudent;
+  
 
   const students = useMemo(() => {
     if (!isDataEntryOperator) return rawStudents;
@@ -120,10 +119,8 @@ export default function Students() {
     pagination.goToPage(1);
   }, [filters]);
 
-  // DEO access check: show permission denied if no student permissions
-  if (deoBlocked) {
-    return <PermissionDenied message="You don't have permission to access student data. Contact your company admin to request student access." />;
-  }
+
+
 
   const handleCreate = async (data: StudentInsert) => {
     try {

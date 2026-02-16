@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { PermissionDenied } from "@/components/PermissionDenied";
 import {
   useRevenues,
   useCreateRevenue,
@@ -82,7 +81,7 @@ export default function Revenue() {
   const { user } = useAuth();
   const showHistory = !isDataEntryOperator || canViewRevenue;
   
-  const deoBlocked = isDataEntryOperator && !canAddRevenue && !canViewRevenue;
+  
 
   const { data: rawRevenues = [], isLoading } = useRevenues();
   const revenues = useMemo(() => {
@@ -218,10 +217,8 @@ export default function Revenue() {
     return bySource;
   }, [sources, filteredRevenues]);
 
-  // DEO access check: show permission denied if no revenue permissions
-  if (deoBlocked) {
-    return <PermissionDenied message="You don't have permission to access revenue data. Contact your company admin to request revenue access." />;
-  }
+
+
 
   // Export handlers
   const handleExportCSV = () => {
