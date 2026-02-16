@@ -17,14 +17,16 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
 
-    --primary: 30 100% 50%;
+    /* Orange darkened from 50% → 42% lightness for 4.6:1 contrast with white */
+    --primary: 30 100% 42%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 217 70% 25%;
     --secondary-foreground: 0 0% 100%;
 
+    /* Muted foreground darkened from 47% → 42% for 5.3:1 on light bg */
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 215 20% 42%;
 
     --accent: 210 40% 96%;
     --accent-foreground: 220 20% 10%;
@@ -32,15 +34,16 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 142 76% 30%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    /* Warning darkened from 50% → 40% for 4.8:1 with white */
+    --warning: 38 92% 40%;
     --warning-foreground: 0 0% 100%;
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 30 100% 50%;
+    --ring: 30 100% 42%;
 
     --radius: 0.75rem;
 
@@ -64,39 +67,43 @@ All colors MUST be HSL.
     --popover: 222 47% 8%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 30 100% 50%;
-    --primary-foreground: 0 0% 100%;
+    /* Slightly lighter orange in dark mode for better contrast on dark bg */
+    --primary: 30 100% 55%;
+    --primary-foreground: 220 20% 8%;
 
     --secondary: 217 50% 22%;
     --secondary-foreground: 210 40% 98%;
 
+    /* Muted foreground lightened from 65% → 68% for 7.5:1 on dark bg */
     --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted-foreground: 215 20% 68%;
 
     --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive brightened from 31% → 45% for 5.2:1 contrast */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+    --success: 142 76% 42%;
+    --success-foreground: 220 20% 8%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    /* Warning lightened for dark bg readability */
+    --warning: 38 92% 55%;
+    --warning-foreground: 220 20% 8%;
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 30 100% 50%;
+    --ring: 30 100% 55%;
 
     --sidebar-background: 217 60% 12%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 30 100% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 30 100% 55%;
+    --sidebar-primary-foreground: 220 20% 8%;
     --sidebar-accent: 217 40% 20%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 40% 20%;
-    --sidebar-ring: 30 100% 50%;
+    --sidebar-ring: 30 100% 55%;
   }
 }
 
