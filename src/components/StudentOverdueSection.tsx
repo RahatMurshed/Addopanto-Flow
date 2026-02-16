@@ -74,6 +74,7 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
 
   const [selectedMonth, setSelectedMonth] = useState<string>(prevMonth);
   const [filterMode, setFilterMode] = useState<"specific" | "all">("specific");
+  const [severityFilter, setSeverityFilter] = useState<"all" | OverdueRow["severity"]>("all");
 
   // Build overdue rows
   const overdueRows = useMemo<OverdueRow[]>(() => {
@@ -117,11 +118,17 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
     return rows.sort((a, b) => b.daysOverdue - a.daysOverdue);
   }, [students, studentSummaries, selectedMonth, filterMode]);
 
-  // Summary metrics
-  const totalOverdueStudents = new Set(overdueRows.map(r => r.studentId)).size;
-  const totalOverdueAmount = overdueRows.reduce((s, r) => s + r.amountRemaining, 0);
-  const avgDaysOverdue = overdueRows.length > 0
-    ? Math.round(overdueRows.reduce((s, r) => s + r.daysOverdue, 0) / overdueRows.length)
+  // Apply severity filter
+  const filteredRows = useMemo(() => {
+    if (severityFilter === "all") return overdueRows;
+    return overdueRows.filter(r => r.severity === severityFilter);
+  }, [overdueRows, severityFilter]);
+
+  // Summary metrics (from filtered rows)
+  const totalOverdueStudents = new Set(filteredRows.map(r => r.studentId)).size;
+  const totalOverdueAmount = filteredRows.reduce((s, r) => s + r.amountRemaining, 0);
+  const avgDaysOverdue = filteredRows.length > 0
+    ? Math.round(filteredRows.reduce((s, r) => s + r.daysOverdue, 0) / filteredRows.length)
     : 0;
 
   // Export CSV
@@ -129,7 +136,7 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
     const headers = ["Student Name", "Student ID", "Monthly Fee", "Amount Paid", "Amount Remaining", "Overdue Month", "Days Overdue", "Severity"];
     const csvRows = [
       headers.join(","),
-      ...overdueRows.map(r => [
+      ...filteredRows.map(r => [
         `"${r.studentName}"`,
         `"${r.studentIdNumber || ""}"`,
         r.monthlyFee,
@@ -172,10 +179,22 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
           {filterMode === "specific" && (
             <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} minYear={2020} maxYear={2030} />
           )}
+          <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as any)}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Severity</SelectItem>
+              <SelectItem value="Low">Low</SelectItem>
+              <SelectItem value="Medium">Medium</SelectItem>
+              <SelectItem value="High">High</SelectItem>
+              <SelectItem value="Critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
           <ExportButtons
             onExportCSV={handleExportCSV}
             onExportPDF={handleExportPDF}
-            disabled={overdueRows.length === 0}
+            disabled={filteredRows.length === 0}
           />
         </div>
       </CardHeader>
@@ -212,7 +231,7 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
         </div>
 
         {/* Overdue Table */}
-        {overdueRows.length === 0 ? (
+        {filteredRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="mb-3 rounded-full bg-muted p-3">
               <AlertTriangle className="h-6 w-6 text-muted-foreground" />
@@ -237,7 +256,7 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {overdueRows.map((r, i) => (
+                {filteredRows.map((r, i) => (
                   <TableRow key={`${r.studentId}-${r.overdueMonth}`} className={`border-l-4 ${severityStyles[r.severity].border}`}>
                     <TableCell>
                       <button
