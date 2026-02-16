@@ -1,100 +1,140 @@
 
 
-## Restrict Student PII Access to Admin and Cipher Only
+# Role Simplification: Rename DEO to Moderator, Remove Old Moderator and Viewer
 
-### The Problem
+## Overview
 
-The `students` table has 60+ columns including highly sensitive PII:
-- National ID (`aadhar_id_number`)
-- Contact info (`email`, `phone`, `whatsapp_number`, `alt_contact_number`)
-- Full address (house, street, area, city, state, PIN)
-- Family details (`father_contact`, `mother_contact`, `guardian_contact`, `father_annual_income`)
-- Medical info (`special_needs_medical`, `blood_group`)
-- Emergency contacts
+The current system has 4 company roles: Admin, Moderator, Viewer, and Data Entry Operator (DEO). This change simplifies it to just 2 company roles:
 
-Currently, **all company members** (including DEOs and Viewers) can query every column via the SELECT policy. Only Admins and Ciphers should see the sensitive fields.
+- **Admin** -- unchanged, full access
+- **Moderator** -- replaces DEO, keeps all DEO permission controls (Students, Payments, Batches, Finance categories), "own entries only" restriction stays
 
-### Solution: Database View + Conditional Frontend Fetching
+The old Moderator (with mod_* granular permissions) and Viewer (read-only) roles are removed entirely.
 
-**Approach:** Create a `students_safe` view that exposes only non-sensitive columns. Non-admin roles query this view; Admins/Ciphers continue querying the full table.
+## Data Migration
 
----
+There is currently 1 viewer and 1 moderator member in the database. Both will be migrated to the new "moderator" role (which is actually the old DEO role behavior). The old moderator's legacy permissions will be mapped to the DEO-style category toggles.
 
-### Step 1: Create `students_safe` View
+## Technical Plan
 
-A new database view that excludes sensitive columns:
+### 1. Database Migration
 
-**Included (safe) columns:**
-`id`, `name`, `student_id_number`, `enrollment_date`, `billing_start_month`, `admission_fee_total`, `monthly_fee_amount`, `status`, `notes`, `user_id`, `created_at`, `updated_at`, `course_start_month`, `course_end_month`, `company_id`, `batch_id`, `class_grade`, `roll_number`, `academic_year`, `section_division`, `gender`
+- Migrate existing `viewer` members to `moderator` role (with all deo_* permissions set to false -- effectively read-only until admin grants access)
+- Migrate existing `moderator` members to `data_entry_operator` temporarily, then rename
+- Actually, since we're keeping the `moderator` enum value but changing its meaning:
+  - Convert `data_entry_operator` rows to `moderator` (keeping their deo_* permissions)
+  - Convert `viewer` rows to `moderator` (with deo_* all false)
+  - Drop the `viewer` and `data_entry_operator` enum values
+  - But you can't drop enum values in Postgres easily. Instead:
+    1. Update all `data_entry_operator` memberships to `moderator`, copying deo_* permissions
+    2. Update all `viewer` memberships to `moderator` (deo_* already false by default)
+    3. The old moderator rows keep `moderator` role -- clear their mod_* permissions and set deo_* from their old mod_* permissions as best mapping
+    4. Leave the enum as-is (unused values won't cause issues)
+- Update all security-definer functions that reference `data_entry_operator` or `viewer` to use `moderator` instead
+- Update the default role in `company_memberships` from `viewer` to `moderator`
 
-**Excluded (sensitive) columns:**
-`email`, `phone`, `whatsapp_number`, `alt_contact_number`, `date_of_birth`, `blood_group`, `religion_category`, `nationality`, `aadhar_id_number`, all address fields (12 columns), all family fields (8 columns), `special_needs_medical`, `emergency_contact_name`, `emergency_contact_number`, `previous_school`, `previous_qualification`, `previous_percentage`, `board_university`, `transportation_mode`, `distance_from_institution`, `extracurricular_interests`, `language_proficiency`
+### 2. Edge Function: `company-join/index.ts`
 
-The view uses `security_invoker=on` so it inherits the caller's RLS context.
+- Remove `viewer` and `data_entry_operator` from role enum validation -- only allow `moderator`
+- Remove viewer-specific logic (invite code auto-assigns viewer)
+- Invite code joins now assign `moderator` role (with no permissions by default)
+- Remove old moderator permission handling (can_add_revenue, etc.)
+- Keep DEO permission handling but under the `moderator` role
+- Clean up `buildPermissionsPayload` and `roleLabel` functions
 
-### Step 2: Modify RLS on `students` Table
+### 3. `CompanyContext.tsx`
 
-- **Keep** the existing SELECT policy for company members (needed for the view to work)
-- **Add** a new restrictive SELECT policy that limits full-table access to Admin/Cipher only
-- **Replace** the current broad SELECT policy so non-admin direct table queries return no rows
-- The safe view continues to work because it only exposes non-sensitive columns
+- Remove `isCompanyViewer` and `isCompanyModerator` flags
+- Add `isModerator` (replaces `isDataEntryOperator`)
+- Remove `viewerBlock` logic
+- Remove mod_* permission calculations
+- Keep deo_* permission logic but apply it to `moderator` role
+- Update all derived permissions (canAddStudent, canEditStudent, etc.) to use new moderator check
+- Remove `isCompanyViewer` and `isCompanyModerator` from the context type and provider
 
-Alternatively (simpler, less disruptive):
-- Leave the base table RLS unchanged
-- Only change the **frontend code** to route non-admin users to the `students_safe` view
-- This is a defense-in-depth approach: even if a non-admin somehow queries the base table, RLS still requires company membership, but they won't get PII through the app
+### 4. UI Components
 
-### Step 3: Update Frontend Data Fetching
+**`CompanyMembers.tsx`:**
+- Role dropdown: only show Admin and Moderator
+- Update `getPermissionsSummary` to remove viewer/old moderator branches
+- Permission editing: show DEO-style permissions for moderator role
 
-Modify `useStudents.ts` to check the user's role:
-- If the user is **Admin** or **Cipher**: query `students` table (full access)
-- Otherwise: query `students_safe` view (no PII columns)
+**`CompanyJoinRequests.tsx`:**
+- Role selector: only Moderator option (Admin assigned separately by Cipher)
+- Remove viewer permission toggles section
+- Remove old moderator permission toggles (can_add_revenue, etc.)
+- Keep DEO-style category toggles for moderator
 
-This requires passing the company role into the hook or reading it from context.
+**`PermissionAssignmentModal.tsx`:**
+- Remove the old moderator section (MOD_CATEGORIES with Add/Edit/Delete matrix)
+- Show DEO_CATEGORIES when role is `moderator`
+- Update dialog title/description
 
-### Step 4: Conditionally Hide PII in UI
+**`UserRoleBadge.tsx`:**
+- Remove `viewer` and `data_entry_operator` from `CompanyRole` type
+- Keep `moderator` with DEO-style styling (teal gradient)
+- Update label from "Data Entry Operator" to "Moderator"
 
-Update these components to hide sensitive fields for non-admin users:
-- `StudentProfileDialog` -- hide contact/family/address tabs
-- `StudentDetail` page -- hide PII sections
-- `StudentExportDialog` -- exclude PII columns from exports for non-admins
-- `ReviewStep` in the wizard -- no changes needed (only admins can add students with full data)
+**`OperatorPermissionMatrix.tsx`:**
+- Rename title from "Data Entry Operator Permissions" to "Moderator Permissions"
 
----
+### 5. Pages Using `isCompanyViewer`
 
-### Risk Assessment
+Update these pages to remove viewer badge and viewer checks:
+- `Students.tsx` -- remove `isCompanyViewer` badge, rename DEO badge
+- `Expenses.tsx` -- same
+- `Khatas.tsx` -- remove viewer badge
+- `Batches.tsx` -- same
+- `Courses.tsx` -- same
 
-| Area | Risk | Mitigation |
-|---|---|---|
-| View creation | None -- additive change | View is read-only, base table unaffected |
-| Frontend routing | Low -- conditional query target | Fallback to safe view if role unknown |
-| Student creation/editing | None -- only admins can do full edits | DEOs already restricted by existing permissions |
-| Exports/backups | Low -- must filter columns | Check role before including PII in exports |
-| Existing features | None -- admin/cipher experience unchanged | They continue seeing everything |
+Replace `isDataEntryOperator` references with `isModerator` (or whatever the renamed flag is).
 
-### Technical Details
+### 6. Access Guards
 
-**Migration SQL:**
-```sql
-CREATE VIEW public.students_safe
-WITH (security_invoker=on) AS
-  SELECT id, name, student_id_number, enrollment_date, billing_start_month,
-         admission_fee_total, monthly_fee_amount, status, notes, user_id,
-         created_at, updated_at, course_start_month, course_end_month,
-         company_id, batch_id, class_grade, roll_number, academic_year,
-         section_division, gender
-  FROM public.students;
-```
+**`AccessGuard.tsx`:**
+- Update `isDenied` checks: replace `isDataEntryOperator` with the new moderator check
+- Rules stay the same conceptually (moderators with no permissions are blocked from those routes)
 
-**Frontend changes:**
-- `src/hooks/useStudents.ts` -- add role-based table selection
-- `src/components/dialogs/StudentProfileDialog.tsx` -- conditionally render PII sections
-- `src/components/dialogs/StudentExportDialog.tsx` -- filter export columns by role
-- `src/pages/StudentDetail.tsx` -- hide sensitive sections for non-admin roles
+### 7. Audit Log
 
-**No changes to:**
-- Student creation/editing flows (already permission-gated)
-- Payment flows (no PII involved)
-- Batch/course management
-- Any existing RLS policies
+- Update role filter options: remove "Viewer", rename "DEO" to "Moderator"
+- Update `roleLabelMap` export mapping
+
+### 8. Tests
+
+- Update `useUserRole.test.ts` -- remove moderator from platform role hierarchy (it was already separate)
+- Update `AccessGuard.test.tsx` -- replace `isDataEntryOperator` with new flag name
+- Update `pii-redaction.test.tsx` -- remove `isCompanyViewer` mocks
+- Update `useStudentsSafeView.test.ts` -- adjust mocks
+
+### 9. `useModeratorPermissions.ts`
+
+- This hook queries the legacy `moderator_permissions` table. Since old moderator role is being removed, this hook and its table can be deleted (permissions are now on `company_memberships` via deo_* columns).
+
+### 10. `LandingPage.tsx`
+
+- Update marketing text from "admins, moderators, and viewers" to "admins and moderators"
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| New migration SQL | Role data migration + function updates |
+| `supabase/functions/company-join/index.ts` | Remove viewer/old-moderator logic |
+| `src/contexts/CompanyContext.tsx` | Simplify role checks |
+| `src/pages/CompanyMembers.tsx` | Simplify role dropdown + permissions |
+| `src/components/auth/CompanyJoinRequests.tsx` | Remove viewer/old-moderator options |
+| `src/components/dialogs/PermissionAssignmentModal.tsx` | Remove old moderator section |
+| `src/components/auth/UserRoleBadge.tsx` | Remove viewer/DEO entries |
+| `src/components/shared/OperatorPermissionMatrix.tsx` | Rename labels |
+| `src/components/auth/AccessGuard.tsx` | Update role checks |
+| `src/pages/Students.tsx` | Remove viewer badge |
+| `src/pages/Expenses.tsx` | Remove viewer badge |
+| `src/pages/Khatas.tsx` | Remove viewer badge |
+| `src/pages/Batches.tsx` | Remove viewer badge |
+| `src/pages/Courses.tsx` | Remove viewer badge |
+| `src/pages/AuditLog.tsx` | Update role filters |
+| `src/pages/LandingPage.tsx` | Update marketing copy |
+| `src/hooks/useModeratorPermissions.ts` | Delete (legacy) |
+| Test files (4) | Update mocks and assertions |
 
