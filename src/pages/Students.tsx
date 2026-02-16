@@ -34,6 +34,7 @@ import TablePagination from "@/components/TablePagination";
 import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/components/StudentFilters";
 import { useSavedSearchPresets, useCreatePreset, useDeletePreset } from "@/hooks/useSavedSearchPresets";
 import StudentsDashboard from "@/components/StudentsDashboard";
+import StudentProfileDialog from "@/components/StudentProfileDialog";
 import { useBatches } from "@/hooks/useBatches";
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
@@ -111,6 +112,8 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [profileStudent, setProfileStudent] = useState<any>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // Compute summaries for all students (for summary cards)
   const allStudentSummaries = useMemo(() => {
@@ -499,7 +502,7 @@ export default function Students() {
                           <TableCell>
                             <div className="flex gap-1">
                               {!isDataEntryOperator && (
-                                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/students/${s.id}`)}>
+                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setProfileStudent(s); setProfileOpen(true); }}>
                                   <Eye className="h-3.5 w-3.5" />
                                   <span className="hidden lg:inline">View</span>
                                 </Button>
@@ -611,6 +614,19 @@ export default function Students() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Student Profile Dialog */}
+      <StudentProfileDialog
+        student={profileStudent}
+        open={profileOpen}
+        onOpenChange={(o) => { setProfileOpen(o); if (!o) setProfileStudent(null); }}
+        canEdit={effectiveCanEdit}
+        batchName={profileStudent?.batch_id ? batchNameMap.get(profileStudent.batch_id) || "—" : "—"}
+        onEdit={() => {
+          setProfileOpen(false);
+          if (profileStudent) navigate(`/students/${profileStudent.id}`);
+        }}
+      />
     </div>
   );
 }
