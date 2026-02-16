@@ -1,6 +1,7 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { validateAndFixContrast } from "@/utils/contrastValidator";
 
 export function ThemeToggle() {
   const [isDark, setIsDark] = useState(false);
@@ -11,6 +12,8 @@ export function ThemeToggle() {
     const dark = stored === "dark" || (!stored && prefersDark);
     setIsDark(dark);
     document.documentElement.classList.toggle("dark", dark);
+    // Auto-validate & fix contrast after initial theme is applied
+    requestAnimationFrame(() => validateAndFixContrast());
   }, []);
 
   const toggleTheme = () => {
@@ -18,6 +21,8 @@ export function ThemeToggle() {
     setIsDark(newDark);
     document.documentElement.classList.toggle("dark", newDark);
     localStorage.setItem("theme", newDark ? "dark" : "light");
+    // Auto-validate & fix contrast after theme switch
+    requestAnimationFrame(() => validateAndFixContrast());
   };
 
   return (
