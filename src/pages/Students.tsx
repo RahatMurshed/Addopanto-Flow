@@ -42,13 +42,21 @@ export default function Students() {
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment } = useCompany();
   const { user } = useAuth();
   
+  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // DEO route guard: redirect if no student permissions
+  useEffect(() => {
+    if (isDataEntryOperator && !canAddStudent && !canEditStudent && !canDeleteStudent) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, navigate]);
+
   const students = useMemo(() => {
     if (!isDataEntryOperator) return rawStudents;
     return rawStudents.filter(s => s.user_id === user?.id);
   }, [rawStudents, isDataEntryOperator, user?.id]);
-  const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
-  const navigate = useNavigate();
-  const { toast } = useToast();
 
   const createMutation = useCreateStudent();
   const deleteMutation = useDeleteStudent();

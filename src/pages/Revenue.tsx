@@ -81,6 +81,13 @@ export default function Revenue() {
   const { user } = useAuth();
   const showHistory = !isDataEntryOperator || canViewRevenue;
   
+  // DEO route guard: redirect if no revenue permissions
+  useEffect(() => {
+    if (isDataEntryOperator && !canAddRevenue && !canViewRevenue) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isDataEntryOperator, canAddRevenue, canViewRevenue, navigate]);
+
   const { data: rawRevenues = [], isLoading } = useRevenues();
   const revenues = useMemo(() => {
     if (!isDataEntryOperator) return rawRevenues;
