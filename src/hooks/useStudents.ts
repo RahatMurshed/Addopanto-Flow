@@ -333,6 +333,7 @@ export function useCreateStudent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["monthly_fee_history"] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
