@@ -37,7 +37,7 @@ export default function Courses() {
   const { data: allBatches = [] } = useBatches();
   const { data: allStudents = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
   const { user } = useAuth();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
@@ -55,9 +55,9 @@ export default function Courses() {
 
   // Filter courses for DEO
   const filteredCourses = useMemo(() => {
-    if (!isDataEntryOperator) return courses;
+    if (!isModerator) return courses;
     return courses.filter(c => c.user_id === user?.id);
-  }, [courses, isDataEntryOperator, user?.id]);
+  }, [courses, isModerator, user?.id]);
 
   // Course analytics
   const courseAnalytics = useMemo(() => {
@@ -193,8 +193,7 @@ export default function Courses() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Courses</h1>
-            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
-            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Data Entry</Badge>}
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Moderator</Badge>}
           </div>
           <p className="text-muted-foreground">Organize batches under courses and track course-level analytics</p>
         </div>
@@ -206,7 +205,7 @@ export default function Courses() {
       </div>
 
       {/* Summary Cards */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -297,7 +296,7 @@ export default function Courses() {
                       <TableHead className="hidden md:table-cell">Category</TableHead>
                       <TableHead>Batches</TableHead>
                       <TableHead>Students</TableHead>
-                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
+                      {!isModerator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
                       <TableHead>Status</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
@@ -315,7 +314,7 @@ export default function Courses() {
                           <TableCell className="hidden md:table-cell text-muted-foreground">{c.category || "—"}</TableCell>
                           <TableCell><Badge variant="secondary">{analytics?.batchCount || 0}</Badge></TableCell>
                           <TableCell><Badge variant="secondary">{analytics?.studentCount || 0}</Badge></TableCell>
-                          {!isDataEntryOperator && (
+                          {!isModerator && (
                             <TableCell className="hidden lg:table-cell">
                               <span className="font-semibold text-green-600 dark:text-green-400">
                                 {formatCurrency(analytics?.revenue || 0, currency)}
@@ -325,7 +324,7 @@ export default function Courses() {
                           <TableCell>{statusBadge(c.status)}</TableCell>
                           <TableCell>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              {!isDataEntryOperator && (
+                              {!isModerator && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/courses/${c.id}`)}>
                                   <Eye className="h-4 w-4" />
                                 </Button>

@@ -34,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
   const {
     activeCompany, companies, switchCompany, isCompanyAdmin, isCipher,
-    canManageMembers, canViewMembers, isDataEntryOperator,
+    canManageMembers, canViewMembers, isModerator,
     canAddStudent, canEditStudent, canDeleteStudent,
     canAddBatch, canEditBatch, canDeleteBatch,
     canAddRevenue, canEditRevenue, canDeleteRevenue,
@@ -91,12 +91,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
-  const showStudents = !isDataEntryOperator || canAddStudent || canEditStudent || canDeleteStudent;
-  const showBatches = !isDataEntryOperator || canAddBatch || canEditBatch || canDeleteBatch;
-  const showRevenue = !isDataEntryOperator || canAddRevenue || canEditRevenue || canDeleteRevenue;
-  const showExpenses = !isDataEntryOperator || canAddExpense || canEditExpense || canDeleteExpense;
-  const showKhatas = !isDataEntryOperator || canAddExpenseSource;
-  const showReports = !isDataEntryOperator;
+  const showStudents = !isModerator || canAddStudent || canEditStudent || canDeleteStudent;
+  const showBatches = !isModerator || canAddBatch || canEditBatch || canDeleteBatch;
+  const showRevenue = !isModerator || canAddRevenue || canEditRevenue || canDeleteRevenue;
+  const showExpenses = !isModerator || canAddExpense || canEditExpense || canDeleteExpense;
+  const showKhatas = !isModerator || canAddExpenseSource;
+  const showReports = !isModerator;
 
   const navItems = [
     ...baseNavItems,
@@ -106,12 +106,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(showRevenue ? [{ label: "Revenue", href: "/revenue", icon: TrendingUp }] : []),
     ...(showExpenses ? [{ label: "Expenses", href: "/expenses", icon: Receipt }] : []),
     ...(showReports ? [{ label: "Reports", href: "/reports", icon: FileText }] : []),
-    ...(canViewMembers && !isDataEntryOperator ? [{ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 }] : []),
-    ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Audit Log", href: "/audit-log", icon: ClipboardList }] : []),
+    ...(canViewMembers && !isModerator ? [{ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 }] : []),
+    ...((isCompanyAdmin || isCipher) && !isModerator ? [{ label: "Audit Log", href: "/audit-log", icon: ClipboardList }] : []),
     
     ...(isCipher ? [{ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount }] : []),
     ...(isCipher ? [{ label: "Platform Users", href: "/users", icon: ShieldCheck }] : []),
-    ...((isCompanyAdmin || isCipher) && !isDataEntryOperator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
+    ...((isCompanyAdmin || isCipher) && !isModerator ? [{ label: "Settings", href: "/settings", icon: Settings }] : []),
   ];
 
   const handleLogout = async () => {
@@ -134,7 +134,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/">
             <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
           </Link>
-          {!isDataEntryOperator ? (
+          {!isModerator ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">

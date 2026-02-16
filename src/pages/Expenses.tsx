@@ -81,15 +81,15 @@ export default function Expenses() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddExpense, canEdit, canDelete, canTransfer, isCompanyViewer, activeCompany, isDataEntryOperator, canEditExpense, canDeleteExpense, canViewExpense } = useCompany();
+  const { canAddExpense, canEdit, canDelete, canTransfer, activeCompany, isModerator, canEditExpense, canDeleteExpense, canViewExpense } = useCompany();
   const { user } = useAuth();
-  const showHistory = !isDataEntryOperator || canViewExpense;
+  const showHistory = !isModerator || canViewExpense;
   
   const { data: rawExpenses = [], isLoading } = useExpenses();
   const expenses = useMemo(() => {
-    if (!isDataEntryOperator) return rawExpenses;
+    if (!isModerator) return rawExpenses;
     return rawExpenses.filter(e => e.user_id === user?.id);
-  }, [rawExpenses, isDataEntryOperator, user?.id]);
+  }, [rawExpenses, isModerator, user?.id]);
   const { data: accounts = [] } = useAccountBalances();
   const { data: transfers = [] } = useKhataTransfers();
   const createMutation = useCreateExpense();
@@ -106,10 +106,10 @@ export default function Expenses() {
 
   // DEO route guard: redirect if no expense permissions
   useEffect(() => {
-    if (isDataEntryOperator && !canAddExpense && !canViewExpense) {
+    if (isModerator && !canAddExpense && !canViewExpense) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isDataEntryOperator, canAddExpense, canViewExpense, navigate]);
+  }, [isModerator, canAddExpense, canViewExpense, navigate]);
 
   // Debounce search
   useEffect(() => {
@@ -290,13 +290,12 @@ export default function Expenses() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
-            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Your Entries ({expenses.length})</Badge>}
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Your Entries ({expenses.length})</Badge>}
           </div>
-          <p className="text-muted-foreground">{isDataEntryOperator ? "View and manage your expense entries" : "Record and track your spending by expense source"}</p>
+          <p className="text-muted-foreground">{isModerator ? "View and manage your expense entries" : "Record and track your spending by expense source"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!isDataEntryOperator && (
+          {!isModerator && (
             <ExportButtons
               onExportCSV={handleExportCSV}
               onExportPDF={handleExportPDF}
@@ -339,7 +338,7 @@ export default function Expenses() {
       )}
 
       {/* Deficit Warnings - hidden for DEO */}
-      {!isDataEntryOperator && accountsWithDeficit.length > 0 && (
+      {!isModerator && accountsWithDeficit.length > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -353,7 +352,7 @@ export default function Expenses() {
         </Alert>
       )}
 
-      {!isDataEntryOperator && accountsNearLimit.length > 0 && (
+      {!isModerator && accountsNearLimit.length > 0 && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -368,7 +367,7 @@ export default function Expenses() {
       )}
 
       {/* Summary Cards - hidden for DEO */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -405,7 +404,7 @@ export default function Expenses() {
       )}
 
       {/* Selected Period Breakdown - hidden for DEO */}
-      {!isDataEntryOperator && filteredBreakdown.length > 0 && dateRange && (
+      {!isModerator && filteredBreakdown.length > 0 && dateRange && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Spending by Expense Source - {dateRange.label}</CardTitle>
@@ -437,7 +436,7 @@ export default function Expenses() {
       )}
 
       {/* Account Balances - hidden for DEO */}
-      {!isDataEntryOperator && accounts.length > 0 && (
+      {!isModerator && accounts.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Expense Source Balances</CardTitle>
@@ -649,7 +648,7 @@ export default function Expenses() {
       ))}
 
       {/* Transfer History - hidden for DEO */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <TransferHistoryCard
           transfers={transfers}
           accounts={accounts}

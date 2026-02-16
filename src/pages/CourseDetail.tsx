@@ -33,7 +33,7 @@ export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete, isDataEntryOperator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: course, isLoading: courseLoading } = useCourse(id);
@@ -249,7 +249,7 @@ export default function CourseDetail() {
       )}
 
       {/* Summary Cards */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -306,8 +306,8 @@ export default function CourseDetail() {
                       <TableHead className="hidden sm:table-cell">Code</TableHead>
                       <TableHead className="hidden md:table-cell">Start Date</TableHead>
                       <TableHead>Students</TableHead>
-                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
-                      {!isDataEntryOperator && <TableHead className="hidden lg:table-cell">Pending</TableHead>}
+                      {!isModerator && <TableHead className="hidden lg:table-cell">Revenue</TableHead>}
+                      {!isModerator && <TableHead className="hidden lg:table-cell">Pending</TableHead>}
                       <TableHead>Status</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
@@ -321,12 +321,12 @@ export default function CourseDetail() {
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{b.batch_code}</TableCell>
                           <TableCell className="hidden md:table-cell">{format(new Date(b.start_date), "MMM d, yyyy")}</TableCell>
                           <TableCell><Badge variant="secondary">{analytics?.studentCount || 0}{b.max_capacity ? `/${b.max_capacity}` : ""}</Badge></TableCell>
-                          {!isDataEntryOperator && (
+                          {!isModerator && (
                             <TableCell className="hidden lg:table-cell">
                               <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(analytics?.revenue || 0, currency)}</span>
                             </TableCell>
                           )}
-                          {!isDataEntryOperator && (
+                          {!isModerator && (
                             <TableCell className="hidden lg:table-cell">
                               {(analytics?.pending || 0) > 0 ? (
                                 <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(analytics?.pending || 0, currency)}</span>

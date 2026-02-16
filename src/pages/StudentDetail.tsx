@@ -44,7 +44,7 @@ export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete, isDataEntryOperator, canEditStudent, canViewStudentPII, isLoading: companyLoading } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canEditStudent, canViewStudentPII, isLoading: companyLoading } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: student, isLoading: studentLoading } = useStudent(id);
@@ -82,10 +82,10 @@ export default function StudentDetail() {
 
   // Redirect DEO without edit permission
   useEffect(() => {
-    if (!companyLoading && isDataEntryOperator && !canEditStudent) {
+    if (!companyLoading && isModerator && !canEditStudent) {
       navigate("/students", { replace: true });
     }
-  }, [companyLoading, isDataEntryOperator, canEditStudent, navigate]);
+  }, [companyLoading, isModerator, canEditStudent, navigate]);
 
   const batchCourseStartMonth = useMemo(() => {
     if (!batch?.start_date) return "";

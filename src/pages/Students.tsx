@@ -78,7 +78,7 @@ export default function Students() {
   const { data: allStudentsRaw = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { data: batchesData = [] } = useBatches({ status: "all" });
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, canViewStudentPII, activeCompanyId } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, canViewStudentPII, activeCompanyId } = useCompany();
   const { user } = useAuth();
   
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
@@ -87,15 +87,15 @@ export default function Students() {
 
   // DEO filter for all students (summary cards)
   const allStudents = useMemo(() => {
-    if (!isDataEntryOperator) return allStudentsRaw;
+    if (!isModerator) return allStudentsRaw;
     return allStudentsRaw.filter(s => s.user_id === user?.id);
-  }, [allStudentsRaw, isDataEntryOperator, user?.id]);
+  }, [allStudentsRaw, isModerator, user?.id]);
 
   // DEO filter for paginated students
   const students = useMemo(() => {
-    if (!isDataEntryOperator) return serverStudents;
+    if (!isModerator) return serverStudents;
     return serverStudents.filter(s => s.user_id === user?.id);
-  }, [serverStudents, isDataEntryOperator, user?.id]);
+  }, [serverStudents, isModerator, user?.id]);
 
   const createMutation = useCreateStudent();
   const deleteMutation = useDeleteStudent();
@@ -308,8 +308,7 @@ export default function Students() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Students</h1>
-            {isCompanyViewer && <Badge variant="secondary" className="text-xs">View Only</Badge>}
-            {isDataEntryOperator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Data Entry</Badge>}
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Moderator</Badge>}
           </div>
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>
@@ -333,7 +332,7 @@ export default function Students() {
       </div>
 
       {/* Dashboard - hidden for DEO */}
-      {!isDataEntryOperator && (
+      {!isModerator && (
         <StudentsDashboard
           allStudents={allStudents}
           batches={batchesData}

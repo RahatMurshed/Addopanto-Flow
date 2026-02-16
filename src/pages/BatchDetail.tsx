@@ -43,7 +43,7 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, isDataEntryOperator, canEditBatch, isLoading: companyLoading } = useCompany();
+  const { canAddRevenue, canEdit, isModerator, canEditBatch, isLoading: companyLoading } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: batch, isLoading: batchLoading } = useBatch(id);
@@ -74,10 +74,10 @@ export default function BatchDetail() {
 
   // Redirect DEO without edit permission
   useEffect(() => {
-    if (!companyLoading && isDataEntryOperator && !canEditBatch) {
+    if (!companyLoading && isModerator && !canEditBatch) {
       navigate("/courses", { replace: true });
     }
-  }, [companyLoading, isDataEntryOperator, canEditBatch, navigate]);
+  }, [companyLoading, isModerator, canEditBatch, navigate]);
 
   // Debounce student search with 500ms
   useEffect(() => {
