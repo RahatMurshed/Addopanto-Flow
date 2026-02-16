@@ -636,6 +636,8 @@ export default function BatchDetail() {
                       let overdueMonthCount = 0;
                       let partialMonthCount = 0;
                       let purelyPendingCount = 0;
+                      let partialPaidAmount = 0;
+                      let partialTotalAmount = 0;
 
                       if (sum && effMonthly > 0) {
                         const allMonths = [...sum.monthlyPaidMonths, ...sum.monthlyPartialMonths, ...sum.monthlyOverdueMonths, ...sum.monthlyPendingMonths];
@@ -656,6 +658,12 @@ export default function BatchDetail() {
                           overdueMonthCount = overdueMonths.length;
                           partialMonthCount = partialMonths.length;
                           purelyPendingCount = pendingMonths.length;
+
+                          // Compute paid/total for partial months
+                          for (const m of partialMonths) {
+                            partialPaidAmount += sum.monthlyPaymentsByMonth.get(m) || 0;
+                            partialTotalAmount += effMonthly;
+                          }
                         }
                       }
 
@@ -702,7 +710,9 @@ export default function BatchDetail() {
                                   ) : worstStatus === "overdue" ? (
                                     <Badge className="block w-fit bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{overdueMonthCount}/{pendingMonthCount} Overdue</Badge>
                                   ) : worstStatus === "partial" ? (
-                                    <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{partialMonthCount}/{pendingMonthCount} Partial</Badge>
+                                    <Badge className="block w-fit bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                                      {formatCurrency(partialPaidAmount, currency)}/{formatCurrency(partialTotalAmount, currency)} Partial
+                                    </Badge>
                                   ) : worstStatus === "pending" ? (
                                     <Badge className="block w-fit bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{purelyPendingCount} months pending</Badge>
                                   ) : (
