@@ -7,7 +7,7 @@
  */
 
 const UNCATEGORIZED_STYLE = {
-  light: { bg: "transparent", text: "hsl(220, 10%, 50%)", border: "hsl(220, 12%, 78%)" },
+  light: { bg: "hsla(220, 20%, 50%, 0.15)", text: "hsl(220, 10%, 50%)", border: "hsla(220, 20%, 50%, 0.30)" },
   dark: { bg: "hsl(220, 12%, 16%)", text: "hsl(220, 10%, 62%)", border: "hsl(220, 12%, 28%)" },
 };
 
@@ -38,11 +38,11 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
       border: `hsl(${hue}, 35%, 28%)`,
     };
   }
-  // Light: outlined with subtle tinted background
+  // Light: highlighted pill matching enrollment column style
   return {
-    bg: `hsl(${hue}, 50%, 96%)`,
+    bg: `hsla(${hue}, 60%, 50%, 0.15)`,
     text: `hsl(${hue}, 55%, 35%)`,
-    border: `hsl(${hue}, 45%, 70%)`,
+    border: `hsla(${hue}, 60%, 50%, 0.30)`,
   };
 }
 
