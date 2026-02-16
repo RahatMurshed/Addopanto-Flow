@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen } from "lucide-react";
+import StudentOverdueSection from "@/components/StudentOverdueSection";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -266,6 +267,15 @@ export default function BatchDetail() {
     };
   }, [allSummaries, allBatchStudents, batch, filterValue]);
 
+  // Students with effective fee amounts for overdue section
+  const effectiveBatchStudents = useMemo(() => {
+    return allBatchStudents.map(s => ({
+      ...s,
+      monthly_fee_amount: Number(s.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0,
+      admission_fee_total: Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0,
+    }));
+  }, [allBatchStudents, batch]);
+
   const pagination = usePagination(batchStudents);
 
   useEffect(() => {
@@ -507,6 +517,14 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Overdue Report */}
+      {allBatchStudents.length > 0 && (
+        <StudentOverdueSection
+          students={effectiveBatchStudents}
+          studentSummaries={allSummaries}
+        />
+      )}
 
       {/* Students Table */}
       <Card>
