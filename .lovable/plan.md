@@ -1,31 +1,38 @@
 
-## Fix Course RLS Policies - Swapped Arguments
+## Auto-Set Revenue Source Based on Payment Type
 
-### Problem
-Course creation fails with "new row violates row-level security policy" because all three write RLS policies on the `courses` table have the function arguments in the wrong order.
+### What Changes
+When recording a student payment, the Revenue Source will automatically update based on the selected Payment Type and include short course/batch context:
 
-The functions `company_can_add_batch`, `company_can_edit_batch`, and `company_can_delete_batch` all expect `(user_id, company_id)`, but the policies pass `(company_id, user_id)`.
+- **Admission Fee** selected --> Revenue Source auto-set to: `Admission - [CourseName] [BatchName]`  
+- **Monthly Fee** selected --> Revenue Source auto-set to: `Monthly Fees - [CourseName] [BatchName]`
 
-### Root Cause
-In the original migration, the policies were written as:
-```sql
-company_can_add_batch(company_id, auth.uid())  -- WRONG
-```
-But the function signature is:
-```sql
-company_can_add_batch(_user_id uuid, _company_id uuid)  -- expects user first
-```
+The source will be auto-created if it doesn't already exist, and the user can still manually override it.
 
-### Fix
-A single database migration to drop and recreate the three policies with corrected argument order:
+### Technical Details
 
-**New migration file:**
+**File: `src/components/StudentPaymentDialog.tsx`**
 
-| Policy | Current (broken) | Fixed |
-|---|---|---|
-| INSERT | `company_can_add_batch(company_id, auth.uid())` | `company_can_add_batch(auth.uid(), company_id)` |
-| UPDATE | `company_can_edit_batch(company_id, auth.uid())` | `company_can_edit_batch(auth.uid(), company_id)` |
-| DELETE | `company_can_delete_batch(company_id, auth.uid())` | `company_can_delete_batch(auth.uid(), company_id)` |
+1. Add new props to receive course and batch names:
+   - `courseName?: string`
+   - `batchName?: string`
 
-### Files Changed
-Only a new SQL migration file. No application code changes needed.
+2. Build dynamic source names based on payment type:
+   - `"Admission - English Mastery Batch-1"` (when admission)
+   - `"Monthly Fees - English Mastery Batch-1"` (when monthly)
+
+3. When payment type changes or dialog opens, auto-find or auto-create the matching revenue source:
+   - Search existing `revenueSources` for a match by name
+   - If found, set `selectedSourceId` to that source
+   - If not found, auto-create it via `createSourceMutation` and set the ID
+
+4. Remove the old hardcoded "Student Fees" default logic (line 144)
+
+5. Update the Select dropdown default label from `"Auto (Student Fees)"` to reflect the dynamic source name
+
+**Files: `src/pages/BatchDetail.tsx`, `src/pages/StudentDetail.tsx`, `src/pages/Students.tsx`**
+
+Pass the new `courseName` and `batchName` props to `StudentPaymentDialog` from each caller:
+- **BatchDetail**: has `batch.batch_name` and `course?.course_name` available
+- **StudentDetail**: has student's batch/course info from joined data
+- **Students**: may need to look up batch/course from student record; if unavailable, will fall back to generic names
