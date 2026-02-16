@@ -700,9 +700,14 @@ export default function BatchDetail() {
                             ) : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            {worstStatus !== "na" && filteredPending > 0 ? (
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(filteredPending, currency)}</span>
-                            ) : <span className="text-muted-foreground">—</span>}
+                            {(() => {
+                              const effAdm = Number(s.admission_fee_total) || Number(batch?.default_admission_fee) || 0;
+                              const admPending = Math.max(0, effAdm - (sum?.admissionPaid || 0));
+                              const overallPending = filteredPending + admPending;
+                              return overallPending > 0 ? (
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(overallPending, currency)}</span>
+                              ) : <span className="text-muted-foreground">—</span>;
+                            })()}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                             {lastPayment ? format(new Date(lastPayment.payment_date), "MMM d, yyyy") : "—"}
