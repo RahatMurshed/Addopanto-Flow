@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -22,7 +23,7 @@ interface TablePaginationProps {
   canGoPrev: boolean;
 }
 
-export default function TablePagination({
+const TablePagination = memo(function TablePagination({
   currentPage,
   totalPages,
   totalItems,
@@ -97,4 +98,6 @@ export default function TablePagination({
       </div>
     </div>
   );
-}
+});
+
+export default TablePagination;

@@ -122,29 +122,22 @@ export function useAccountBalances() {
 
       if (!activeCompanyId) return [];
 
-      const { data: accounts, error: accountsError } = await supabase
-        .from("expense_accounts")
-        .select("*")
-        .eq("company_id", activeCompanyId);
-      if (accountsError) throw accountsError;
+      const [accountsRes, allocationsRes, expensesRes, transfersRes] = await Promise.all([
+        supabase.from("expense_accounts").select("*").eq("company_id", activeCompanyId),
+        supabase.from("allocations").select("expense_account_id, amount").eq("company_id", activeCompanyId),
+        supabase.from("expenses").select("expense_account_id, amount").eq("company_id", activeCompanyId),
+        supabase.from("khata_transfers").select("from_account_id, to_account_id, amount").eq("company_id", activeCompanyId),
+      ]);
 
-      const { data: allocations, error: allocationsError } = await supabase
-        .from("allocations")
-        .select("expense_account_id, amount")
-        .eq("company_id", activeCompanyId);
-      if (allocationsError) throw allocationsError;
+      if (accountsRes.error) throw accountsRes.error;
+      if (allocationsRes.error) throw allocationsRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+      if (transfersRes.error) throw transfersRes.error;
 
-      const { data: expenses, error: expensesError } = await supabase
-        .from("expenses")
-        .select("expense_account_id, amount")
-        .eq("company_id", activeCompanyId);
-      if (expensesError) throw expensesError;
-
-      const { data: transfers, error: transfersError } = await supabase
-        .from("khata_transfers")
-        .select("from_account_id, to_account_id, amount")
-        .eq("company_id", activeCompanyId);
-      if (transfersError) throw transfersError;
+      const accounts = accountsRes.data;
+      const allocations = allocationsRes.data;
+      const expenses = expensesRes.data;
+      const transfers = transfersRes.data;
 
       const balances: AccountBalance[] = accounts.map((account) => {
         const totalAllocated = allocations

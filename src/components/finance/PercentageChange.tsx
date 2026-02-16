@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +10,7 @@ interface PercentageChangeProps {
   className?: string;
 }
 
-export default function PercentageChange({
+const PercentageChange = memo(function PercentageChange({
   current,
   previous,
   label,
@@ -51,4 +52,6 @@ export default function PercentageChange({
       {label && <span className="text-muted-foreground">vs {label}</span>}
     </div>
   );
-}
+});
+
+export default PercentageChange;
