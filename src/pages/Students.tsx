@@ -74,7 +74,7 @@ export default function Students() {
   // All students for summary cards & overdue section (uses separate cached query)
   const { data: allStudentsRaw = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, activeCompanyId } = useCompany();
   const { user } = useAuth();
   
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
@@ -628,6 +628,7 @@ export default function Students() {
         studentSummaries={studentSummaries}
         filters={filters}
         totalCount={serverTotalCount}
+        activeCompanyId={activeCompanyId}
       />
 
       {/* Bulk Import Dialog */}

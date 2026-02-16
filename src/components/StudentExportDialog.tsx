@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { Download, FileText, Loader2, Check } from "lucide-react";
+import { fetchFilteredStudentsForExport } from "@/hooks/useStudents";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -104,16 +106,18 @@ interface StudentExportDialogProps {
   studentSummaries: Map<string, ReturnType<typeof computeStudentSummary>>;
   filters: StudentFilterValues;
   totalCount: number;
+  activeCompanyId: string | null;
 }
 
 export default function StudentExportDialog({
-  open, onOpenChange, students, studentSummaries, filters, totalCount,
+  open, onOpenChange, students, studentSummaries, filters, totalCount, activeCompanyId,
 }: StudentExportDialogProps) {
   const [selectedColumns, setSelectedColumns] = useState<Set<ColumnKey>>(
     new Set(ALL_COLUMNS.filter(c => c.default).map(c => c.key))
   );
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState("");
   const { toast } = useToast();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
@@ -152,7 +156,11 @@ export default function StudentExportDialog({
     if (filters.gender !== "all") parts.push(`Gender: ${filters.gender}`);
     if (filters.classGrade) parts.push(`Class: ${filters.classGrade}`);
     if (filters.addressCity) parts.push(`City: ${filters.addressCity}`);
+    if (filters.addressState) parts.push(`State: ${filters.addressState}`);
+    if (filters.addressArea) parts.push(`Area: ${filters.addressArea}`);
+    if (filters.addressPinZip) parts.push(`PIN/ZIP: ${filters.addressPinZip}`);
     if (filters.academicYear) parts.push(`Year: ${filters.academicYear}`);
+    if (filters.includeAltContact === false) parts.push("Alt contact excluded");
     if (filters.search) parts.push(`Search: "${filters.search}"`);
     return parts.length > 0 ? parts.join(", ") : "No filters applied";
   }, [filters]);
@@ -180,8 +188,28 @@ export default function StudentExportDialog({
       const cols = ALL_COLUMNS.filter(c => selectedColumns.has(c.key));
 
       if (exportFormat === "csv") {
+        // Fetch ALL matching students server-side for CSV (not just current page)
+        let exportStudents = students;
+        if (activeCompanyId) {
+          setExportProgress("Fetching all matching records...");
+          exportStudents = await fetchFilteredStudentsForExport(activeCompanyId, {
+            search: filters.search,
+            status: filters.status as any,
+            batchId: filters.batchId,
+            gender: filters.gender,
+            classGrade: filters.classGrade,
+            addressCity: filters.addressCity,
+            addressState: filters.addressState,
+            addressArea: filters.addressArea,
+            addressPinZip: filters.addressPinZip,
+            academicYear: filters.academicYear,
+            includeAltContact: filters.includeAltContact,
+          });
+          setExportProgress(`Exporting ${exportStudents.length} records...`);
+        }
+
         const headers = cols.map(c => c.label);
-        const rows = students.map(s =>
+        const rows = exportStudents.map(s =>
           cols.map(c => `"${getStudentValue(s, c.key).replace(/"/g, '""')}"`)
         );
         const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
@@ -199,12 +227,13 @@ export default function StudentExportDialog({
           format(new Date(), "MMMM yyyy")
         );
       }
-      toast({ title: `Exported ${students.length} students as ${exportFormat.toUpperCase()}` });
+      toast({ title: `Export complete (${exportFormat.toUpperCase()})` });
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
       setIsExporting(false);
+      setExportProgress("");
     }
   };
 
@@ -214,7 +243,9 @@ export default function StudentExportDialog({
         <DialogHeader>
           <DialogTitle>Export Students</DialogTitle>
           <DialogDescription>
-            Exporting {students.length} of {totalCount} students (filtered view)
+            {exportFormat === "csv"
+              ? `CSV will export all ${totalCount} matching students`
+              : `PDF exports the ${students.length} students on the current page`}
           </DialogDescription>
         </DialogHeader>
 
@@ -321,6 +352,13 @@ export default function StudentExportDialog({
           <p className="text-xs text-muted-foreground">
             PDF exports the currently visible table. Column selection applies to CSV exports only.
           </p>
+        )}
+
+        {isExporting && exportProgress && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">{exportProgress}</p>
+            <Progress value={undefined} className="h-1.5" />
+          </div>
         )}
 
         <DialogFooter>
