@@ -248,9 +248,11 @@ Deno.serve(async (req) => {
         .eq("id", companyId)
         .single();
 
-      if (!company || !company.join_password) {
-        console.log("No company or no join_password", { companyId, hasCompany: !!company, hasPassword: !!company?.join_password });
-        return json(400, { error: "Company does not accept password joins" });
+      if (!company) {
+        return json(400, { error: "Company not found" });
+      }
+      if (!company.join_password) {
+        return json(400, { error: "This business has not set a join password yet. Please contact the business admin to set one, or use an invite code instead." });
       }
       
       console.log("Password verification attempt", { companyId, storedFormat: company.join_password.includes(':') ? 'hashed' : 'plaintext', inputLength: password.length });
