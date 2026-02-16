@@ -819,7 +819,7 @@ export default function Reports() {
       <Tabs defaultValue="monthly" className="space-y-4">
         <TabsList>
           <TabsTrigger value="monthly">Monthly Summary</TabsTrigger>
-          <TabsTrigger value="accounts">By Khata</TabsTrigger>
+          <TabsTrigger value="accounts">By Expense Sources</TabsTrigger>
           <TabsTrigger value="sources">By Source</TabsTrigger>
           <TabsTrigger value="transfers">
             <ArrowLeftRight className="mr-1 h-4 w-4" />
