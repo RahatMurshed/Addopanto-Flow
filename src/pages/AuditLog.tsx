@@ -131,13 +131,27 @@ function getActionLabel(table: string, action: string, log?: AuditLogType): { la
   return { label, color };
 }
 
-function getEntityName(log: AuditLogType): string {
+function getEntityName(log: AuditLogType, studentNameMap?: Map<string, string>): string {
   const d = log.new_data || log.old_data;
   if (!d) return log.record_id.slice(0, 8);
   // Named entities
   if (typeof d.name === "string") return d.name;
   if (typeof d.batch_name === "string") return d.batch_name;
   if (typeof d.course_name === "string") return d.course_name;
+  // Student payments — show student name
+  if (log.table_name === "student_payments") {
+    if (typeof d.student_id === "string" && studentNameMap?.has(d.student_id)) {
+      return studentNameMap.get(d.student_id)!;
+    }
+    return "Payment";
+  }
+  // Revenues — show description
+  if (log.table_name === "revenues") {
+    if (typeof d.description === "string" && d.description.length > 0) {
+      return d.description.length > 60 ? d.description.slice(0, 57) + "…" : d.description;
+    }
+    return "Revenue";
+  }
   // Email-based entities (memberships, join requests)
   if (log.table_name === "company_memberships" || log.table_name === "company_join_requests") {
     return log.user_email || (typeof d.user_id === "string" ? d.user_id.slice(0, 8) : log.record_id.slice(0, 8));
@@ -584,6 +598,37 @@ export default function AuditLog() {
   });
   const getProfile = (userId: string) => logProfiles.find(p => p.user_id === userId);
 
+  // Build student name lookup for payment audit entries
+  const paymentStudentIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const log of logs) {
+      if (log.table_name === "student_payments") {
+        const d = log.new_data || log.old_data;
+        if (d && typeof d.student_id === "string") ids.add(d.student_id);
+      }
+    }
+    return [...ids];
+  }, [logs]);
+
+  const { data: studentNames = [] } = useQuery({
+    queryKey: ["audit-student-names", paymentStudentIds],
+    queryFn: async () => {
+      if (paymentStudentIds.length === 0) return [];
+      const { data } = await supabase
+        .from("students")
+        .select("id, name")
+        .in("id", paymentStudentIds);
+      return data ?? [];
+    },
+    enabled: paymentStudentIds.length > 0,
+  });
+
+  const studentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of studentNames) map.set(s.id, s.name);
+    return map;
+  }, [studentNames]);
+
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportCSV = async () => {
@@ -664,7 +709,7 @@ export default function AuditLog() {
         const approver = membership?.approved_by ? approverMap.get(membership.approved_by) || "" : "";
         const actorName = actorMap.get(log.user_id) || "";
         const { label } = getActionLabel(log.table_name, log.action, log);
-        const entityName = getEntityName(log);
+        const entityName = getEntityName(log, studentNameMap);
         const desc = getDescription(log);
 
         return [
@@ -845,7 +890,7 @@ export default function AuditLog() {
                     {logs.map((log) => {
                       const profile = getProfile(log.user_id);
                       const { label: actionLabel, color: actionColor } = getActionLabel(log.table_name, log.action, log);
-                      const entityName = getEntityName(log);
+                      const entityName = getEntityName(log, studentNameMap);
                       const entityLink = getEntityLink(log);
                       const desc = getDescription(log);
 
@@ -950,7 +995,7 @@ export default function AuditLog() {
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-xs text-muted-foreground">Entity</p>
-                  <p className="font-medium">{getEntityName(detail)}</p>
+                  <p className="font-medium">{getEntityName(detail, studentNameMap)}</p>
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-xs text-muted-foreground">Record ID</p>
