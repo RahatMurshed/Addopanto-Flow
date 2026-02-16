@@ -20,7 +20,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen, Loader2, UserPlus } from "lucide-react";
 import StudentOverdueSection from "@/components/StudentOverdueSection";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
@@ -34,7 +34,7 @@ import BatchDialog from "@/components/BatchDialog";
 import StudentDialog from "@/components/StudentDialog";
 import BatchEnrollDialog from "@/components/BatchEnrollDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
-import { useCreateStudent, useUpdateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
+import { useUpdateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/TablePagination";
@@ -53,7 +53,7 @@ export default function BatchDetail() {
   const { data: allPayments = [] } = useStudentPayments();
 
   const updateMutation = useUpdateBatch();
-  const createStudentMutation = useCreateStudent();
+  
   const updateStudentMutation = useUpdateStudent();
   const deleteStudentMutation = useDeleteStudent();
   const createPaymentMutation = useCreateStudentPayment();
@@ -321,16 +321,8 @@ export default function BatchDetail() {
     }
   };
 
-  const handleCreateStudent = async (data: StudentInsert) => {
-    try {
-      const result = await createStudentMutation.mutateAsync({ ...data, batch_id: id } as any);
-      toast({ title: "Student added to batch" });
-      return result;
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-      throw err;
-    }
-  };
+
+
 
   const handlePayment = async (data: any) => {
     try {
@@ -433,7 +425,12 @@ export default function BatchDetail() {
             maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
           />
           {canEdit && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
-          {canAddRevenue && <Button onClick={() => setStudentDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Student</Button>}
+          {canAddRevenue && (
+            <>
+              <Button onClick={() => setStudentDialogOpen(true)}><UserPlus className="mr-2 h-4 w-4" />Enroll Student</Button>
+              <Button variant="outline" onClick={() => navigate(`/students/new?batch=${id}`)}><Plus className="mr-2 h-4 w-4" />New Student</Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -631,7 +628,12 @@ export default function BatchDetail() {
               ) : (
                 <>
                   <p className="text-muted-foreground">No students in this batch yet.</p>
-                  {canAddRevenue && <Button variant="link" onClick={() => setStudentDialogOpen(true)}>Add Student</Button>}
+                  {canAddRevenue && (
+                    <div className="flex gap-2 mt-2">
+                      <Button variant="link" onClick={() => setStudentDialogOpen(true)}>Enroll Existing Student</Button>
+                      <Button variant="link" onClick={() => navigate(`/students/new?batch=${id}`)}>Create New Student</Button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
