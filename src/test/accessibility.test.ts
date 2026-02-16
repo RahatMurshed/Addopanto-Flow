@@ -166,6 +166,10 @@ describe("WCAG AA Source Badge Colors", () => {
     "Salaries", "Utilities", "Rent", "Marketing",
   ];
 
+  // Light mode uses transparent bg, so check text against white (page bg)
+  const WHITE_BG = { h: 0, s: 0, l: 100 };
+  const DARK_PAGE_BG = { h: 222, s: 47, l: 6 };
+
   for (const mode of ["light", "dark"] as const) {
     describe(`${mode} mode`, () => {
       for (const source of testSources) {
@@ -173,15 +177,21 @@ describe("WCAG AA Source Badge Colors", () => {
           const isDark = mode === "dark";
           const { bg, text } = getSourceColor(source, isDark);
 
-          const bgMatch = bg.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
           const textMatch = text.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-          expect(bgMatch, `Cannot parse bg: ${bg}`).not.toBeNull();
           expect(textMatch, `Cannot parse text: ${text}`).not.toBeNull();
-
-          const bgHSL = { h: +bgMatch![1], s: +bgMatch![2], l: +bgMatch![3] };
           const textHSL = { h: +textMatch![1], s: +textMatch![2], l: +textMatch![3] };
-          const ratio = contrastRatio(textHSL, bgHSL);
 
+          let bgHSL: { h: number; s: number; l: number };
+          if (bg === "transparent") {
+            // Use page background for contrast check
+            bgHSL = isDark ? DARK_PAGE_BG : WHITE_BG;
+          } else {
+            const bgMatch = bg.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+            expect(bgMatch, `Cannot parse bg: ${bg}`).not.toBeNull();
+            bgHSL = { h: +bgMatch![1], s: +bgMatch![2], l: +bgMatch![3] };
+          }
+
+          const ratio = contrastRatio(textHSL, bgHSL);
           expect(ratio >= 3, `"${source}" ${mode}: ${ratio.toFixed(2)}:1 < 3:1`).toBe(true);
         });
       }
@@ -191,12 +201,19 @@ describe("WCAG AA Source Badge Colors", () => {
   it("Uncategorized badge has sufficient contrast in both modes", () => {
     for (const isDark of [false, true]) {
       const { bg, text } = getSourceColor("Uncategorized", isDark);
-      const bgMatch = bg.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
       const textMatch = text.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-      expect(bgMatch).not.toBeNull();
       expect(textMatch).not.toBeNull();
-      const bgHSL = { h: +bgMatch![1], s: +bgMatch![2], l: +bgMatch![3] };
       const textHSL = { h: +textMatch![1], s: +textMatch![2], l: +textMatch![3] };
+
+      let bgHSL: { h: number; s: number; l: number };
+      if (bg === "transparent") {
+        bgHSL = isDark ? DARK_PAGE_BG : WHITE_BG;
+      } else {
+        const bgMatch = bg.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+        expect(bgMatch).not.toBeNull();
+        bgHSL = { h: +bgMatch![1], s: +bgMatch![2], l: +bgMatch![3] };
+      }
+
       const ratio = contrastRatio(textHSL, bgHSL);
       expect(ratio >= 3, `Uncategorized ${isDark ? "dark" : "light"}: ${ratio.toFixed(2)}:1`).toBe(true);
     }
