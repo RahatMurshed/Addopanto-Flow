@@ -235,6 +235,12 @@ export default function CompanyJoinRequests() {
     },
   });
 
+  // Track suggestion context for each dialog
+  const [approveHint, setApproveHint] = useState<string>("");
+  const [acceptHint, setAcceptHint] = useState<string>("");
+  const [approvePrevRole, setApprovePrevRole] = useState<string | null>(null);
+  const [acceptPrevRole, setAcceptPrevRole] = useState<string | null>(null);
+
   const defaultApproveData = (request: JoinRequest, role: MemberRole = "moderator"): ApproveData => ({
     request,
     email: getEmail(request.user_id),
@@ -251,14 +257,37 @@ export default function CompanyJoinRequests() {
     deoFinance: false,
   });
 
-  const openApproveDialog = (request: JoinRequest) => {
-    // Password join requests default to Moderator
-    setApproveDialog(defaultApproveData(request, "moderator"));
+  // Lookup previous membership role for a user
+  const lookupPreviousRole = async (userId: string): Promise<string | null> => {
+    if (!activeCompanyId) return null;
+    // Check audit logs for a previous membership deletion
+    const { data } = await supabase
+      .from("company_memberships")
+      .select("role")
+      .eq("company_id", activeCompanyId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (data) return data.role;
+    return null;
   };
 
-  const openAcceptRejectedDialog = (request: JoinRequest) => {
+  const openApproveDialog = async (request: JoinRequest) => {
+    // Password join requests default to Moderator
+    setApproveHint("Suggested: Moderator (password join)");
+    setApprovePrevRole(null);
+    setApproveDialog(defaultApproveData(request, "moderator"));
+    // Check for previous role asynchronously
+    const prev = await lookupPreviousRole(request.user_id);
+    if (prev && prev !== "admin") setApprovePrevRole(prev);
+  };
+
+  const openAcceptRejectedDialog = async (request: JoinRequest) => {
     // Re-accepting rejected users defaults to Viewer (least privilege)
+    setAcceptHint("Suggested: Viewer (re-accepting rejected user)");
+    setAcceptPrevRole(null);
     setAcceptRejectedDialog(defaultApproveData(request, "viewer"));
+    const prev = await lookupPreviousRole(request.user_id);
+    if (prev && prev !== "admin") setAcceptPrevRole(prev);
   };
 
   const handleRoleChange = (
@@ -272,11 +301,15 @@ export default function CompanyJoinRequests() {
   const RoleSelector = ({
     data,
     onRoleChange,
+    hint,
+    previousRole,
   }: {
     data: ApproveData;
     onRoleChange: (role: MemberRole) => void;
+    hint?: string;
+    previousRole?: string | null;
   }) => (
-    <div className="space-y-2 py-2">
+    <div className="space-y-1.5 py-2">
       <Label>Role</Label>
       <Select value={data.role} onValueChange={(v) => onRoleChange(v as MemberRole)}>
         <SelectTrigger>
@@ -288,6 +321,14 @@ export default function CompanyJoinRequests() {
           <SelectItem value="viewer">Viewer</SelectItem>
         </SelectContent>
       </Select>
+      {hint && (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
+      {previousRole && (
+        <p className="text-xs text-muted-foreground italic">
+          Previously assigned as: {roleLabel(previousRole as MemberRole)}
+        </p>
+      )}
     </div>
   );
 
@@ -572,7 +613,7 @@ export default function CompanyJoinRequests() {
           </DialogHeader>
           {approveDialog && (
             <>
-              <RoleSelector data={approveDialog} onRoleChange={(r) => handleRoleChange(r, approveDialog, setApproveDialog)} />
+              <RoleSelector data={approveDialog} onRoleChange={(r) => handleRoleChange(r, approveDialog, setApproveDialog)} hint={approveHint} previousRole={approvePrevRole} />
               <PermissionToggles data={approveDialog} onChange={setApproveDialog} />
               <div className="rounded-md border border-border bg-muted/50 p-3 text-sm space-y-1">
                 <p className="font-medium text-foreground">Summary</p>
@@ -618,7 +659,7 @@ export default function CompanyJoinRequests() {
           </DialogHeader>
           {acceptRejectedDialog && (
             <>
-              <RoleSelector data={acceptRejectedDialog} onRoleChange={(r) => handleRoleChange(r, acceptRejectedDialog, setAcceptRejectedDialog)} />
+              <RoleSelector data={acceptRejectedDialog} onRoleChange={(r) => handleRoleChange(r, acceptRejectedDialog, setAcceptRejectedDialog)} hint={acceptHint} previousRole={acceptPrevRole} />
               <PermissionToggles data={acceptRejectedDialog} onChange={setAcceptRejectedDialog} />
               <div className="rounded-md border border-border bg-muted/50 p-3 text-sm space-y-1">
                 <p className="font-medium text-foreground">Summary</p>
