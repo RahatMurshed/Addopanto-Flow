@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +62,8 @@ const defaultPayment: InitialPaymentData = {
 
 export default function AddStudent() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const presetBatchId = searchParams.get("batch");
   const { toast } = useToast();
   const { activeCompanyId } = useCompany();
   const createMutation = useCreateStudent();
@@ -76,7 +78,10 @@ export default function AddStudent() {
   const [personal, setPersonal] = useState<PersonalData>(defaultPersonal);
   const [contact, setContact] = useState<ContactData>(defaultContact);
   const [family, setFamily] = useState<FamilyData>(defaultFamily);
-  const [academic, setAcademic] = useState<AcademicData>(defaultAcademic);
+  const [academic, setAcademic] = useState<AcademicData>(() => ({
+    ...defaultAcademic,
+    ...(presetBatchId ? { batch_id: presetBatchId } : {}),
+  }));
   const [initialPayment, setInitialPayment] = useState<InitialPaymentData>(defaultPayment);
 
   // Auto-save draft
@@ -254,7 +259,7 @@ export default function AddStudent() {
 
       localStorage.removeItem(draftKey);
       toast({ title: "Student added successfully" });
-      navigate("/students");
+      navigate(presetBatchId ? `/batches/${presetBatchId}` : "/students");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -269,7 +274,7 @@ export default function AddStudent() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/students")} disabled={saving}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(presetBatchId ? `/batches/${presetBatchId}` : "/students")} disabled={saving}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -331,7 +336,7 @@ export default function AddStudent() {
           )}
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="ghost" onClick={() => navigate("/students")} disabled={saving}>
+          <Button type="button" variant="ghost" onClick={() => navigate(presetBatchId ? `/batches/${presetBatchId}` : "/students")} disabled={saving}>
             Cancel
           </Button>
           {step < STEPS.length - 1 ? (
