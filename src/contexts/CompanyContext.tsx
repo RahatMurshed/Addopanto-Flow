@@ -22,20 +22,20 @@ export interface CompanyMembership {
   id: string;
   user_id: string;
   company_id: string;
-  role: "admin" | "moderator" | "viewer" | "data_entry_operator";
-  // Legacy moderator permissions (kept for backward compat on can_transfer/can_view_reports)
+  role: "admin" | "moderator";
+  // Legacy fields kept for backward compat
   can_add_revenue: boolean;
   can_add_expense: boolean;
   can_add_expense_source: boolean;
   can_transfer: boolean;
   can_view_reports: boolean;
   can_manage_students: boolean;
-  // DEO category permissions
+  // Moderator category permissions (formerly DEO permissions)
   deo_students: boolean;
   deo_payments: boolean;
   deo_batches: boolean;
   deo_finance: boolean;
-  // Moderator granular permissions (5 categories x 3 actions)
+  // Legacy mod_* fields (no longer used but kept in DB)
   mod_students_add: boolean;
   mod_students_edit: boolean;
   mod_students_delete: boolean;
@@ -71,9 +71,7 @@ interface CompanyContextType {
 
   // Company-level role checks
   isCompanyAdmin: boolean;
-  isCompanyModerator: boolean;
-  isCompanyViewer: boolean;
-  isDataEntryOperator: boolean;
+  isModerator: boolean;
 
   // Granular permissions
   canAddRevenue: boolean;
@@ -87,7 +85,7 @@ interface CompanyContextType {
   canManageMembers: boolean;
   canViewMembers: boolean;
 
-  // DEO category permissions
+  // Moderator category permissions
   deoStudents: boolean;
   deoPayments: boolean;
   deoBatches: boolean;
@@ -197,81 +195,45 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const membership = memberships.find((m) => m.company_id === activeCompanyId) ?? null;
 
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
-  const isCompanyModerator = membership?.role === "moderator";
-  const isCompanyViewer = membership?.role === "viewer";
-  const isDataEntryOperator = membership?.role === "data_entry_operator";
+  const isModerator = membership?.role === "moderator";
 
-  // Moderator granular permissions
-  const modStudents = isCompanyModerator ? {
-    add: membership?.mod_students_add ?? false,
-    edit: membership?.mod_students_edit ?? false,
-    del: membership?.mod_students_delete ?? false,
-  } : { add: false, edit: false, del: false };
-
-  const modPayments = isCompanyModerator ? {
-    add: membership?.mod_payments_add ?? false,
-    edit: membership?.mod_payments_edit ?? false,
-    del: membership?.mod_payments_delete ?? false,
-  } : { add: false, edit: false, del: false };
-
-  const modBatches = isCompanyModerator ? {
-    add: membership?.mod_batches_add ?? false,
-    edit: membership?.mod_batches_edit ?? false,
-    del: membership?.mod_batches_delete ?? false,
-  } : { add: false, edit: false, del: false };
-
-  const modRevenue = isCompanyModerator ? {
-    add: membership?.mod_revenue_add ?? false,
-    edit: membership?.mod_revenue_edit ?? false,
-    del: membership?.mod_revenue_delete ?? false,
-  } : { add: false, edit: false, del: false };
-
-  const modExpenses = isCompanyModerator ? {
-    add: membership?.mod_expenses_add ?? false,
-    edit: membership?.mod_expenses_edit ?? false,
-    del: membership?.mod_expenses_delete ?? false,
-  } : { add: false, edit: false, del: false };
-
-  // DEO category permissions
+  // Moderator category permissions
   const deoStudents = membership?.deo_students ?? false;
   const deoPayments = membership?.deo_payments ?? false;
   const deoBatches = membership?.deo_batches ?? false;
   const deoFinance = membership?.deo_finance ?? false;
 
-  // Viewer has no mutation permissions
-  const viewerBlock = isCompanyViewer;
+  // Derived granular permissions (simplified: admin = full, moderator = per-category)
+  const canAddStudent = isCompanyAdmin || (isModerator && deoStudents);
+  const canEditStudent = isCompanyAdmin || (isModerator && deoStudents);
+  const canDeleteStudent = isCompanyAdmin || (isModerator && deoStudents);
 
-  // Derived granular permissions
-  const canAddStudent = !viewerBlock && (isCompanyAdmin || modStudents.add || (isDataEntryOperator && deoStudents));
-  const canEditStudent = !viewerBlock && (isCompanyAdmin || modStudents.edit || (isDataEntryOperator && deoStudents));
-  const canDeleteStudent = !viewerBlock && (isCompanyAdmin || modStudents.del || (isDataEntryOperator && deoStudents));
+  const canAddPayment = isCompanyAdmin || (isModerator && deoPayments);
+  const canEditPayment = isCompanyAdmin || (isModerator && deoPayments);
+  const canDeletePayment = isCompanyAdmin || (isModerator && deoPayments);
 
-  const canAddPayment = !viewerBlock && (isCompanyAdmin || modPayments.add || (isDataEntryOperator && deoPayments));
-  const canEditPayment = !viewerBlock && (isCompanyAdmin || modPayments.edit || (isDataEntryOperator && deoPayments));
-  const canDeletePayment = !viewerBlock && (isCompanyAdmin || modPayments.del || (isDataEntryOperator && deoPayments));
+  const canAddBatch = isCompanyAdmin || (isModerator && deoBatches);
+  const canEditBatch = isCompanyAdmin || (isModerator && deoBatches);
+  const canDeleteBatch = isCompanyAdmin || (isModerator && deoBatches);
 
-  const canAddBatch = !viewerBlock && (isCompanyAdmin || modBatches.add || (isDataEntryOperator && deoBatches));
-  const canEditBatch = !viewerBlock && (isCompanyAdmin || modBatches.edit || (isDataEntryOperator && deoBatches));
-  const canDeleteBatch = !viewerBlock && (isCompanyAdmin || modBatches.del || (isDataEntryOperator && deoBatches));
+  const canAddRevenue = isCompanyAdmin || (isModerator && deoFinance);
+  const canEditRevenue = isCompanyAdmin || (isModerator && deoFinance);
+  const canDeleteRevenue = isCompanyAdmin || (isModerator && deoFinance);
 
-  const canAddRevenue = !viewerBlock && (isCompanyAdmin || modRevenue.add || (isDataEntryOperator && deoFinance));
-  const canEditRevenue = !viewerBlock && (isCompanyAdmin || modRevenue.edit || (isDataEntryOperator && deoFinance));
-  const canDeleteRevenue = !viewerBlock && (isCompanyAdmin || modRevenue.del || (isDataEntryOperator && deoFinance));
+  const canAddExpense = isCompanyAdmin || (isModerator && deoFinance);
+  const canEditExpense = isCompanyAdmin || (isModerator && deoFinance);
+  const canDeleteExpense = isCompanyAdmin || (isModerator && deoFinance);
 
-  const canAddExpense = !viewerBlock && (isCompanyAdmin || modExpenses.add || (isDataEntryOperator && deoFinance));
-  const canEditExpense = !viewerBlock && (isCompanyAdmin || modExpenses.edit || (isDataEntryOperator && deoFinance));
-  const canDeleteExpense = !viewerBlock && (isCompanyAdmin || modExpenses.del || (isDataEntryOperator && deoFinance));
-
-  const canAddExpenseSource = !viewerBlock && (isCompanyAdmin || modExpenses.add);
-  const canTransfer = !viewerBlock && (isCompanyAdmin || (isCompanyModerator && (membership?.can_transfer ?? false)));
-  const canViewReports = isCompanyAdmin || isCompanyModerator || isCompanyViewer;
-  const canManageStudents = !viewerBlock && (isCompanyAdmin || modStudents.add);
+  const canAddExpenseSource = isCompanyAdmin;
+  const canTransfer = isCompanyAdmin || (isModerator && (membership?.can_transfer ?? false));
+  const canViewReports = isCompanyAdmin || isModerator;
+  const canManageStudents = isCompanyAdmin || (isModerator && deoStudents);
   const canEdit = isCompanyAdmin;
   const canDelete = isCompanyAdmin;
   const canManageMembers = isCompanyAdmin;
-  const canViewMembers = isCompanyAdmin || isCompanyModerator;
-  const canViewRevenue = isCompanyAdmin || isCompanyModerator || isCompanyViewer || (isDataEntryOperator && deoFinance);
-  const canViewExpense = isCompanyAdmin || isCompanyModerator || isCompanyViewer || (isDataEntryOperator && deoFinance);
+  const canViewMembers = isCompanyAdmin || isModerator;
+  const canViewRevenue = isCompanyAdmin || (isModerator && deoFinance);
+  const canViewExpense = isCompanyAdmin || (isModerator && deoFinance);
   const [piiAuditMode, setPiiAuditMode] = useState(false);
   const togglePiiAuditMode = useCallback(() => setPiiAuditMode(prev => !prev), []);
   const canViewStudentPII = isCompanyAdmin && !piiAuditMode;
@@ -315,9 +277,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       hasCompanies: companies.length > 0,
       isCipher,
       isCompanyAdmin,
-      isCompanyModerator,
-      isCompanyViewer,
-      isDataEntryOperator,
+      isModerator,
       canAddRevenue,
       canAddExpense,
       canAddExpenseSource,

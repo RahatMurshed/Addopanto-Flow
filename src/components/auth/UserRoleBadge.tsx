@@ -46,7 +46,7 @@ export function UserRoleBadge({ role, size = "md", showIcon = true }: UserRoleBa
 }
 
 // Company role badge for member pages
-type CompanyRole = "admin" | "moderator" | "viewer" | "data_entry_operator";
+type CompanyRole = "admin" | "moderator";
 
 const companyRoleConfig: Record<CompanyRole, { label: string; className: string }> = {
   admin: {
@@ -55,20 +55,12 @@ const companyRoleConfig: Record<CompanyRole, { label: string; className: string 
   },
   moderator: {
     label: "Moderator",
-    className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
-  },
-  viewer: {
-    label: "Viewer",
-    className: "bg-muted text-muted-foreground",
-  },
-  data_entry_operator: {
-    label: "Data Entry Operator",
     className: "bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30",
   },
 };
 
-export function CompanyRoleBadge({ role, size = "md" }: { role: CompanyRole; size?: "sm" | "md" }) {
-  const config = companyRoleConfig[role];
+export function CompanyRoleBadge({ role, size = "md" }: { role: string; size?: "sm" | "md" }) {
+  const config = companyRoleConfig[role as CompanyRole] ?? companyRoleConfig.moderator;
   return (
     <Badge className={cn(config.className, size === "sm" ? "text-xs px-1.5 py-0" : "text-xs px-2 py-0.5")}>
       {config.label}
