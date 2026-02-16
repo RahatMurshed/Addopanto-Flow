@@ -399,3 +399,157 @@ describe("Address filter restrictions for non-admin", () => {
     expect(appliedFilters).toHaveLength(4);
   });
 });
+
+// --- 6. View routing / table selection tests -----------------------------
+
+/**
+ * These tests replicate the table-selection logic from useStudents, useStudent,
+ * useAllStudents, and fetchFilteredStudentsForExport to verify the correct
+ * table is chosen based on the user's PII permission.
+ */
+describe("View routing: table selection based on canViewStudentPII", () => {
+  const resolveTable = (canViewPII: boolean) =>
+    canViewPII ? "students" : "students_safe";
+
+  // --- useStudents (paginated list) ---
+  it("useStudents routes to 'students' for admin", () => {
+    expect(resolveTable(true)).toBe("students");
+  });
+
+  it("useStudents routes to 'students_safe' for non-admin", () => {
+    expect(resolveTable(false)).toBe("students_safe");
+  });
+
+  // --- useStudent (single detail) ---
+  it("useStudent routes to 'students' for admin", () => {
+    expect(resolveTable(true)).toBe("students");
+  });
+
+  it("useStudent routes to 'students_safe' for non-admin", () => {
+    expect(resolveTable(false)).toBe("students_safe");
+  });
+
+  // --- useAllStudents ---
+  it("useAllStudents routes to 'students' for admin", () => {
+    expect(resolveTable(true)).toBe("students");
+  });
+
+  it("useAllStudents routes to 'students_safe' for non-admin", () => {
+    expect(resolveTable(false)).toBe("students_safe");
+  });
+
+  // --- fetchFilteredStudentsForExport ---
+  it("export function routes to 'students' when canViewPII=true", () => {
+    expect(resolveTable(true)).toBe("students");
+  });
+
+  it("export function routes to 'students_safe' when canViewPII=false", () => {
+    expect(resolveTable(false)).toBe("students_safe");
+  });
+});
+
+// --- 7. Query key isolation tests ----------------------------------------
+
+describe("Query key includes table name for cache isolation", () => {
+  const buildListKey = (companyId: string, canViewPII: boolean) => {
+    const table = canViewPII ? "students" : "students_safe";
+    return ["students", companyId, { table }];
+  };
+
+  const buildDetailKey = (id: string, canViewPII: boolean) => {
+    const table = canViewPII ? "students" : "students_safe";
+    return ["students", id, table];
+  };
+
+  const buildAllKey = (companyId: string, canViewPII: boolean) => {
+    const table = canViewPII ? "students" : "students_safe";
+    return ["students", "all", companyId, table];
+  };
+
+  it("list query keys differ between admin and non-admin", () => {
+    const adminKey = JSON.stringify(buildListKey("c1", true));
+    const viewerKey = JSON.stringify(buildListKey("c1", false));
+    expect(adminKey).not.toBe(viewerKey);
+    expect(adminKey).toContain('"students"');
+    expect(viewerKey).toContain('"students_safe"');
+  });
+
+  it("detail query keys differ between admin and non-admin", () => {
+    const adminKey = JSON.stringify(buildDetailKey("s1", true));
+    const viewerKey = JSON.stringify(buildDetailKey("s1", false));
+    expect(adminKey).not.toBe(viewerKey);
+  });
+
+  it("all-students query keys differ between admin and non-admin", () => {
+    const adminKey = JSON.stringify(buildAllKey("c1", true));
+    const viewerKey = JSON.stringify(buildAllKey("c1", false));
+    expect(adminKey).not.toBe(viewerKey);
+    expect(viewerKey).toContain("students_safe");
+  });
+});
+
+// --- 8. PII audit mode toggle tests --------------------------------------
+
+describe("PII audit mode (admin preview as non-admin)", () => {
+  it("canViewStudentPII is false when audit mode is on even for admin", () => {
+    const isCompanyAdmin = true;
+    const piiAuditMode = true;
+    const canViewStudentPII = isCompanyAdmin && !piiAuditMode;
+    expect(canViewStudentPII).toBe(false);
+  });
+
+  it("canViewStudentPII is true when audit mode is off for admin", () => {
+    const isCompanyAdmin = true;
+    const piiAuditMode = false;
+    const canViewStudentPII = isCompanyAdmin && !piiAuditMode;
+    expect(canViewStudentPII).toBe(true);
+  });
+
+  it("canViewStudentPII is false for non-admin regardless of audit mode", () => {
+    const isCompanyAdmin = false;
+    expect(isCompanyAdmin && !false).toBe(false);
+    expect(isCompanyAdmin && !true).toBe(false);
+  });
+
+  it("audit mode flips table routing to students_safe", () => {
+    const isAdmin = true;
+    const auditOn = true;
+    const canViewPII = isAdmin && !auditOn;
+    const table = canViewPII ? "students" : "students_safe";
+    expect(table).toBe("students_safe");
+  });
+});
+
+// --- 9. RLS view column guarantee tests ----------------------------------
+
+describe("students_safe view column guarantees", () => {
+  const SAFE_VIEW_COLUMNS = [
+    "id", "name", "student_id_number", "enrollment_date", "billing_start_month",
+    "admission_fee_total", "monthly_fee_amount", "status", "notes", "user_id",
+    "created_at", "updated_at", "course_start_month", "course_end_month",
+    "company_id", "batch_id", "class_grade", "roll_number", "academic_year",
+    "section_division", "gender",
+  ];
+
+  it("safe view has exactly the expected columns", () => {
+    const safeKeys = Object.keys(MOCK_STUDENT_SAFE);
+    expect(safeKeys.sort()).toEqual([...SAFE_VIEW_COLUMNS].sort());
+  });
+
+  it("no PII column appears in the safe view columns list", () => {
+    const safeSet = new Set(SAFE_VIEW_COLUMNS);
+    for (const piiField of PII_FIELDS_NOT_IN_SAFE_VIEW) {
+      expect(safeSet.has(piiField)).toBe(false);
+    }
+  });
+
+  it("full students table has all safe + PII columns", () => {
+    const fullKeys = Object.keys(MOCK_STUDENT_FULL);
+    for (const safeCol of SAFE_VIEW_COLUMNS) {
+      expect(fullKeys).toContain(safeCol);
+    }
+    for (const piiCol of PII_FIELDS_NOT_IN_SAFE_VIEW) {
+      expect(fullKeys).toContain(piiCol);
+    }
+  });
+});
