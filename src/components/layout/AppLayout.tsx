@@ -20,7 +20,7 @@ import {
 import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
-  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen,
+  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -41,6 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     canAddRevenue, canEditRevenue, canDeleteRevenue,
     canAddExpense, canEditExpense, canDeleteExpense,
     canAddExpenseSource,
+    piiAuditMode, togglePiiAuditMode,
   } = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
@@ -206,6 +207,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
+          {isCompanyAdmin && (
+            <button
+              onClick={togglePiiAuditMode}
+              className={cn(
+                "mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all",
+                piiAuditMode
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+                  : "text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground/70"
+              )}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              {piiAuditMode ? "PII Hidden (Audit)" : "Preview as Non-Admin"}
+            </button>
+          )}
           <div className="mb-2 flex items-center justify-between px-2">
             <span className="text-xs font-medium text-sidebar-foreground/60">Theme</span>
             <ThemeToggle />

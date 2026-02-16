@@ -110,6 +110,9 @@ interface CompanyContextType {
   canViewRevenue: boolean;
   canViewExpense: boolean;
   canViewStudentPII: boolean;
+  /** When true, admin is simulating non-admin PII view for auditing */
+  piiAuditMode: boolean;
+  togglePiiAuditMode: () => void;
 
   // Actions
   switchCompany: (companyId: string) => Promise<void>;
@@ -269,7 +272,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canViewMembers = isCompanyAdmin || isCompanyModerator;
   const canViewRevenue = isCompanyAdmin || isCompanyModerator || isCompanyViewer || (isDataEntryOperator && deoFinance);
   const canViewExpense = isCompanyAdmin || isCompanyModerator || isCompanyViewer || (isDataEntryOperator && deoFinance);
-  const canViewStudentPII = isCompanyAdmin; // isCipher is already included in isCompanyAdmin
+  const [piiAuditMode, setPiiAuditMode] = useState(false);
+  const togglePiiAuditMode = useCallback(() => setPiiAuditMode(prev => !prev), []);
+  const canViewStudentPII = isCompanyAdmin && !piiAuditMode;
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -343,6 +348,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canViewRevenue,
       canViewExpense,
       canViewStudentPII,
+      piiAuditMode,
+      togglePiiAuditMode,
       switchCompany,
       refetch,
     }}>
