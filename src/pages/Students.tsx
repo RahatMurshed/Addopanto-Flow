@@ -576,8 +576,9 @@ export default function Students() {
                           <TableCell>
                             <div className="flex gap-1">
                               {!isDataEntryOperator && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
-                                  <Eye className="h-4 w-4" />
+                                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/students/${s.id}`)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                  <span className="hidden lg:inline">View</span>
                                 </Button>
                               )}
                               {effectiveCanPayment && (

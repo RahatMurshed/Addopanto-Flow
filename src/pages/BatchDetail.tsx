@@ -20,7 +20,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen, Loader2 } from "lucide-react";
 import StudentOverdueSection from "@/components/StudentOverdueSection";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
@@ -32,6 +32,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import BatchDialog from "@/components/BatchDialog";
 import StudentDialog from "@/components/StudentDialog";
+import BatchEnrollDialog from "@/components/BatchEnrollDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import { useCreateStudent, useUpdateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
@@ -66,6 +67,7 @@ export default function BatchDetail() {
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
   const [studentStatusFilter, setStudentStatusFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [studentSort, setStudentSort] = useState("name-asc");
@@ -76,6 +78,20 @@ export default function BatchDetail() {
       navigate("/courses", { replace: true });
     }
   }, [companyLoading, isDataEntryOperator, canEditBatch, navigate]);
+
+  // Debounce student search with 500ms
+  useEffect(() => {
+    if (studentSearch.length < 3 && studentSearch.length > 0) {
+      setDebouncedStudentSearch("");
+      return;
+    }
+    if (studentSearch.length === 0) {
+      setDebouncedStudentSearch("");
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedStudentSearch(studentSearch), 500);
+    return () => clearTimeout(timer);
+  }, [studentSearch]);
 
   const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
 
@@ -148,12 +164,14 @@ export default function BatchDetail() {
     if (!id) return [];
     let students = allBatchStudents;
 
-    // Name search
-    if (studentSearch.trim()) {
-      const q = studentSearch.toLowerCase();
+    // Name search (debounced)
+    if (debouncedStudentSearch.trim()) {
+      const q = debouncedStudentSearch.toLowerCase();
       students = students.filter((s) =>
         s.name.toLowerCase().includes(q) ||
-        (s.student_id_number && s.student_id_number.toLowerCase().includes(q))
+        (s.student_id_number && s.student_id_number.toLowerCase().includes(q)) ||
+        (s.father_name && s.father_name.toLowerCase().includes(q)) ||
+        (s.phone && s.phone.includes(q))
       );
     }
 
@@ -179,7 +197,7 @@ export default function BatchDetail() {
     });
 
     return students;
-  }, [allBatchStudents, id, studentSearch, studentStatusFilter, paymentStatusFilter, studentWorstStatuses, studentSort]);
+  }, [allBatchStudents, id, debouncedStudentSearch, studentStatusFilter, paymentStatusFilter, studentWorstStatuses, studentSort]);
 
   const studentSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
@@ -280,12 +298,13 @@ export default function BatchDetail() {
 
   useEffect(() => {
     pagination.goToPage(1);
-  }, [studentSearch, studentStatusFilter, paymentStatusFilter, studentSort]);
+  }, [debouncedStudentSearch, studentStatusFilter, paymentStatusFilter, studentSort]);
 
   const activeFilterCount = (studentStatusFilter !== "all" ? 1 : 0) + (paymentStatusFilter !== "all" ? 1 : 0) + (studentSort !== "name-asc" ? 1 : 0);
 
   const resetStudentFilters = () => {
     setStudentSearch("");
+    setDebouncedStudentSearch("");
     setStudentStatusFilter("all");
     setPaymentStatusFilter("all");
     setStudentSort("name-asc");
@@ -541,13 +560,21 @@ export default function BatchDetail() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search students in this batch..."
+                placeholder="Search by name, ID, father name, phone... (min 3 chars)"
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 className="pl-9 pr-9"
               />
+              {studentSearch.length > 0 && studentSearch.length < 3 && (
+                <span className="absolute right-10 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                  {3 - studentSearch.length} more
+                </span>
+              )}
+              {studentSearch.length >= 3 && debouncedStudentSearch !== studentSearch && (
+                <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              )}
               {studentSearch && (
-                <button onClick={() => setStudentSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button onClick={() => { setStudentSearch(""); setDebouncedStudentSearch(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -742,8 +769,9 @@ export default function BatchDetail() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/students/${s.id}`)}>
-                                <Eye className="h-4 w-4" />
+                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/students/${s.id}`)}>
+                                <Eye className="h-3.5 w-3.5" />
+                                <span className="hidden lg:inline">View</span>
                               </Button>
                               {canEdit && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingStudent(s); setEditStudentDialogOpen(true); }}>
@@ -789,7 +817,7 @@ export default function BatchDetail() {
 
       {/* Dialogs */}
       <BatchDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} batch={batch} onSave={handleUpdate} />
-      <StudentDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} onSave={handleCreateStudent} defaultBatchId={id} lockedBatch />
+      <BatchEnrollDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} batchId={id!} batchName={batch.batch_name} onCreateStudent={handleCreateStudent} />
       <StudentDialog
         open={editStudentDialogOpen}
         onOpenChange={(o) => { setEditStudentDialogOpen(o); if (!o) setEditingStudent(null); }}

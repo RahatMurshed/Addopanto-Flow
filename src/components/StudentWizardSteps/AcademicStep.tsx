@@ -139,32 +139,35 @@ export default function AcademicStep({ data, onChange, errors, disabled, lockedB
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Enrollment Details</h4>
 
-        <div className="space-y-2">
-          <Label>Batch</Label>
-          <Select value={data.batch_id} onValueChange={(v) => {
-            const batch = batches.find(b => b.id === v);
-            const updates: Partial<AcademicData> = { batch_id: v };
-            if (batch) {
-              updates.admission_fee_total = Number(batch.default_admission_fee);
-              updates.monthly_fee_amount = Number(batch.default_monthly_fee);
-              const sd = new Date(batch.start_date);
-              updates.course_start_month = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}`;
-              if (batch.course_duration_months) {
-                sd.setMonth(sd.getMonth() + batch.course_duration_months - 1);
-                updates.course_end_month = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}`;
+        {/* Only show batch selector when adding from Batch Details page (lockedBatch or defaultBatchId) */}
+        {(lockedBatch || defaultBatchId) && (
+          <div className="space-y-2">
+            <Label>Batch</Label>
+            <Select value={data.batch_id} onValueChange={(v) => {
+              const batch = batches.find(b => b.id === v);
+              const updates: Partial<AcademicData> = { batch_id: v };
+              if (batch) {
+                updates.admission_fee_total = Number(batch.default_admission_fee);
+                updates.monthly_fee_amount = Number(batch.default_monthly_fee);
+                const sd = new Date(batch.start_date);
+                updates.course_start_month = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}`;
+                if (batch.course_duration_months) {
+                  sd.setMonth(sd.getMonth() + batch.course_duration_months - 1);
+                  updates.course_end_month = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}`;
+                }
               }
-            }
-            update(updates);
-          }} disabled={disabled || lockedBatch}>
-            <SelectTrigger><SelectValue placeholder="Select batch" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Batch</SelectItem>
-              {batches.map((b) => <SelectItem key={b.id} value={b.id}>{b.batch_name} ({b.batch_code})</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+              update(updates);
+            }} disabled={disabled || lockedBatch}>
+              <SelectTrigger><SelectValue placeholder="Select batch" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Batch</SelectItem>
+                {batches.map((b) => <SelectItem key={b.id} value={b.id}>{b.batch_name} ({b.batch_code})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        {hasBatch && (
+        {hasBatch && (lockedBatch || defaultBatchId) && (
           <div className="rounded-md border bg-muted/50 p-3 space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Info className="h-3.5 w-3.5" /> Inherited from batch
