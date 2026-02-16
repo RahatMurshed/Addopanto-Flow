@@ -1,91 +1,77 @@
 
+# Force Full Dashboard Toggle for Cipher Users
 
-# Real-Time Dashboard Access Audit for Ciphers
+## Problem
+If the role guards ever misfire (e.g., a Cipher user has a "moderator" membership row in a company), `isModerator` could become `true` and lock them into the limited quick-actions-only dashboard (line 461 of Dashboard.tsx). We need an escape hatch.
 
-## Overview
-Create a new Cipher-only page that shows a live audit trail of dashboard/page access events across all companies, with anomaly detection (e.g., a Cipher routed to moderator view, unusual access patterns, or role mismatches).
+## Solution
+Add a "Force Full Dashboard" toggle in the CompanyContext that only Cipher users can activate. When enabled, it overrides `isModerator` to `false` and `isCompanyAdmin` to `true`, ensuring full dashboard access regardless of the membership row.
 
-## What Gets Built
+## Changes
 
-### 1. New `dashboard_access_logs` Table
-A lightweight table to record every dashboard page load, replacing the current console-only logging:
+### 1. CompanyContext.tsx -- Add forceFullDashboard state
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| id | uuid | Primary key |
-| user_id | uuid | Who accessed |
-| user_email | text | Cached for display |
-| company_id | uuid | Which company context |
-| membership_role | text | Role in that company |
-| is_cipher | boolean | Platform superadmin flag |
-| view_path | text | "full" or "moderator" |
-| is_anomaly | boolean | True if role/view mismatch |
-| anomaly_reason | text | Description of the anomaly |
-| created_at | timestamptz | When it happened |
+- Add `forceFullDashboard` boolean state (default: `false`)
+- Add `toggleForceFullDashboard` callback
+- Modify the derived role flags so that when `isCipher && forceFullDashboard`:
+  - `isCompanyAdmin` stays `true` (already true for Cipher, this is a safety net)
+  - `isModerator` is forced to `false`
+- Expose both values on the context type
+- Log activation to console for audit trail
 
-RLS: Only Cipher users can SELECT. INSERT allowed for authenticated users (own records only).
+### 2. Dashboard.tsx -- Show toggle UI for Ciphers
 
-Realtime enabled on this table so the audit dashboard updates live.
+- Add a small banner/toggle at the top of the dashboard (only visible to Cipher users)
+- When `isCipher` is true, show a Switch with label "Force Full Dashboard"
+- Toggling it calls `toggleForceFullDashboard` from context
+- Visual indicator: a subtle warning badge when the override is active
+- The toggle also gets logged by the existing `useDashboardAccessLogger` since the `isModerator` value will change, triggering a new audit log entry
 
-### 2. Hook: `useDashboardAccessLogger`
-A small hook used in `Dashboard.tsx` that:
-- Replaces the current `console.error`/`console.info` useEffect
-- Inserts a row into `dashboard_access_logs` on every dashboard mount
-- Flags anomalies automatically (Cipher seeing moderator view, Admin seeing moderator view, role mismatch between membership and computed flags)
+### 3. useDashboardAccessLogger.ts -- Log override activation
 
-### 3. Hook: `useDashboardAccessAudit`
-A query + realtime subscription hook for the new audit page:
-- Fetches recent access logs with pagination
-- Subscribes to realtime inserts for live updates
-- Supports filtering by anomaly-only, user email, company
-
-### 4. New Page: `/access-audit` (Cipher-only)
-A dedicated dashboard with:
-
-**Summary Cards:**
-- Total accesses (last 24h)
-- Unique users (last 24h)
-- Anomalies detected (last 24h) -- highlighted in red if > 0
-- Active companies accessed
-
-**Anomaly Alert Banner:**
-- Shows at the top if any unresolved anomalies exist in the last 24h
-- Lists each anomaly with user, company, timestamp, and reason
-
-**Access Log Table (real-time):**
-- Columns: Time, User, Company, Role, View, Anomaly
-- Anomaly rows highlighted in red/destructive
-- Auto-updates via realtime subscription
-- Pagination + email search filter
-- "Anomalies only" toggle filter
-
-### 5. Route & Navigation
-- Add `/access-audit` route in `App.tsx`, protected by `RoleGuard` for Cipher only
-- Add nav link in sidebar (visible to Ciphers only)
-
-## Anomaly Detection Rules
-1. **Cipher in moderator view**: `is_cipher === true && view_path === "moderator"` -- should never happen
-2. **Admin in moderator view**: `isCompanyAdmin === true && view_path === "moderator"` -- should never happen
-3. **Role mismatch**: membership role is "admin" but computed `isModerator` is true
+- Add `forceFullDashboard` to the params interface
+- When `forceFullDashboard` is true, include it in the log entry so the audit trail captures when the override was used
 
 ## Technical Details
 
-### Files to Create
-| File | Purpose |
-|------|---------|
-| `src/hooks/useDashboardAccessLogger.ts` | Logs access on dashboard mount |
-| `src/hooks/useDashboardAccessAudit.ts` | Fetches + subscribes to access logs |
-| `src/pages/AccessAuditDashboard.tsx` | The Cipher-only audit UI |
+### CompanyContext.tsx changes
+
+```
+// New state
+const [forceFullDashboard, setForceFullDashboard] = useState(false);
+const toggleForceFullDashboard = useCallback(() => {
+  setForceFullDashboard(prev => {
+    const next = !prev;
+    if (next) console.warn("[CIPHER OVERRIDE] Force full dashboard activated");
+    else console.info("[CIPHER OVERRIDE] Force full dashboard deactivated");
+    return next;
+  });
+}, []);
+
+// Modified guards (lines 197-198)
+const isCompanyAdmin = membership?.role === "admin" || isCipher;
+const isModerator = membership?.role === "moderator" && !isCompanyAdmin 
+  && !(isCipher && forceFullDashboard);
+```
+
+Since `isCipher` already makes `isCompanyAdmin = true`, the override is technically redundant in the happy path. But as a defense-in-depth measure against any future refactoring that might break the `isCipher` check, it provides an explicit manual override.
+
+### Dashboard.tsx changes
+
+Add a Cipher-only toggle bar between the page heading and the content:
+
+```text
++--------------------------------------------------+
+| [!] Cipher Override: Force Full Dashboard  [ON]  |
++--------------------------------------------------+
+```
+
+Only rendered when `isCipher` is true. Uses the existing Switch component.
 
 ### Files to Modify
+
 | File | Change |
 |------|--------|
-| `src/pages/Dashboard.tsx` | Replace console audit useEffect with `useDashboardAccessLogger` hook |
-| `src/App.tsx` | Add `/access-audit` route with Cipher RoleGuard |
-| `src/components/layout/AppLayout.tsx` | Add sidebar nav link for Ciphers |
-
-### Database Migration
-- Create `dashboard_access_logs` table with indexes on `created_at`, `user_id`, `is_anomaly`
-- Enable RLS with Cipher-only SELECT and self-INSERT policies
-- Enable realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE public.dashboard_access_logs`
-
+| src/contexts/CompanyContext.tsx | Add forceFullDashboard state, toggle, context exposure |
+| src/pages/Dashboard.tsx | Add Cipher-only toggle UI |
+| src/hooks/useDashboardAccessLogger.ts | Include forceFullDashboard flag in log entry |
