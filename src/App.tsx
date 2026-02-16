@@ -47,7 +47,6 @@ const CourseDetail = lazy(() => import("@/pages/CourseDetail"));
 const AuditLog = lazy(() => import("@/pages/AuditLog"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const CompanyCreationRequests = lazy(() => import("@/pages/CompanyCreationRequests"));
-const PresetsManagement = lazy(() => import("@/pages/PresetsManagement"));
 const AddStudent = lazy(() => import("@/pages/AddStudent"));
 
 const queryClient = new QueryClient({
@@ -178,7 +177,7 @@ const App = () => (
                   <Route path="/company/members" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoMembers]}><CompanyMembers /></AccessGuard></ProtectedRoute>} />
                   <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
-                  <Route path="/presets" element={<ProtectedRoute><PresetsManagement /></ProtectedRoute>} />
+                  
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                   
                   {/* Redirect old routes */}

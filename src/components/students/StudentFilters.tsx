@@ -6,11 +6,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import { Switch } from "@/components/ui/switch";
-import { Search, X, SlidersHorizontal, ChevronDown, Filter, Bookmark, MapPin, Loader2 } from "lucide-react";
+import { Search, X, SlidersHorizontal, ChevronDown, Filter, MapPin, Loader2 } from "lucide-react";
 import { useBatches } from "@/hooks/useBatches";
-import type { SavedSearchPreset } from "@/hooks/useSavedSearchPresets";
 
 export interface StudentFilterValues {
   search: string;
@@ -54,19 +53,13 @@ interface Props {
   onChange: (filters: StudentFilterValues) => void;
   totalResults: number;
   totalStudents: number;
-  savedPresets?: SavedSearchPreset[];
-  onSavePreset?: (name: string) => void;
-  onDeletePreset?: (id: string) => void;
-  onLoadPreset?: (filters: StudentFilterValues) => void;
 }
 
 export { defaultFilters };
 
-export default function StudentFilters({ filters, onChange, totalResults, totalStudents, savedPresets = [], onSavePreset, onDeletePreset, onLoadPreset }: Props) {
+export default function StudentFilters({ filters, onChange, totalResults, totalStudents }: Props) {
   const [searchInput, setSearchInput] = useState(filters.search);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [presetName, setPresetName] = useState("");
-  const [presetPopoverOpen, setPresetPopoverOpen] = useState(false);
   const { data: batches = [] } = useBatches();
 
   // Debounce search input (500ms, min 3 chars)
@@ -334,77 +327,6 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
         </div>
       </div>
 
-      {/* Saved Search Presets */}
-      {(savedPresets.length > 0 || onSavePreset) && (
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {onSavePreset && (
-            <Popover open={presetPopoverOpen} onOpenChange={setPresetPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 shrink-0"
-                  disabled={isDefault}
-                >
-                  <Bookmark className="h-3.5 w-3.5" />
-                  Save Current
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-3" align="start">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Save filter preset</p>
-                  <Input
-                    placeholder="e.g. Active Males in Delhi"
-                    value={presetName}
-                    onChange={(e) => setPresetName(e.target.value)}
-                    className="h-8 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && presetName.trim()) {
-                        onSavePreset(presetName.trim());
-                        setPresetName("");
-                        setPresetPopoverOpen(false);
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    disabled={!presetName.trim()}
-                    onClick={() => {
-                      onSavePreset(presetName.trim());
-                      setPresetName("");
-                      setPresetPopoverOpen(false);
-                    }}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-          {savedPresets.map((preset) => (
-            <Badge
-              key={preset.id}
-              variant="outline"
-              className="gap-1 pr-1 cursor-pointer hover:bg-accent shrink-0"
-              onClick={() => onLoadPreset?.(preset.filters)}
-            >
-              {preset.name}
-              {onDeletePreset && (
-                <button
-                  className="ml-0.5 rounded-full p-0.5 hover:bg-muted"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeletePreset(preset.id);
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       {/* Advanced Filters Collapsible */}
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
