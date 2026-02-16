@@ -305,7 +305,50 @@ const HIDDEN_FIELDS = new Set(["id", "user_id", "company_id", "created_at", "upd
 
 /* ── Diff View ── */
 
-function DiffView({ oldData, newData }: { oldData: Record<string, unknown>; newData: Record<string, unknown> }) {
+const FIELD_LABELS: Record<string, Record<string, string>> = {
+  company_memberships: {
+    role: "Role", status: "Status", approved_by: "Approved By",
+    deo_students: "Student Management", deo_payments: "Payment Recording", deo_batches: "Batch Management", deo_finance: "Revenue & Expenses",
+    mod_students_add: "Students — Add", mod_students_edit: "Students — Edit", mod_students_delete: "Students — Delete",
+    mod_payments_add: "Payments — Add", mod_payments_edit: "Payments — Edit", mod_payments_delete: "Payments — Delete",
+    mod_batches_add: "Batches — Add", mod_batches_edit: "Batches — Edit", mod_batches_delete: "Batches — Delete",
+    mod_expenses_add: "Expenses — Add", mod_expenses_edit: "Expenses — Edit", mod_expenses_delete: "Expenses — Delete",
+    mod_revenue_add: "Revenue — Add", mod_revenue_edit: "Revenue — Edit", mod_revenue_delete: "Revenue — Delete",
+    can_add_expense: "Add Expense", can_add_expense_source: "Add Expense Source", can_add_revenue: "Add Revenue",
+    can_manage_students: "Manage Students", can_transfer: "Transfer", can_view_reports: "View Reports",
+  },
+  moderator_permissions: {
+    can_add_revenue: "Add Revenue", can_add_expense: "Add Expense",
+    can_add_expense_source: "Add Expense Source", can_transfer: "Transfer", can_view_reports: "View Reports",
+    controlled_by: "Controlled By",
+  },
+  companies: {
+    name: "Company Name", description: "Description", currency: "Currency", base_currency: "Base Currency",
+    exchange_rate: "Exchange Rate", fiscal_year_start_month: "Fiscal Year Start Month",
+    logo_url: "Logo", join_password: "Join Password", invite_code: "Invite Code", slug: "Slug",
+  },
+  user_roles: {
+    role: "Platform Role", assigned_by: "Assigned By",
+  },
+};
+
+const BOOLEAN_FIELD_TABLES = new Set(["company_memberships", "moderator_permissions"]);
+
+function formatFieldValue(val: unknown, key: string, tableName?: string): string {
+  if (val === null || val === undefined) return "—";
+  if (tableName && BOOLEAN_FIELD_TABLES.has(tableName) && typeof val === "boolean") {
+    return val ? "✅ Enabled" : "❌ Disabled";
+  }
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+function getFieldLabel(key: string, tableName?: string): string {
+  if (tableName && FIELD_LABELS[tableName]?.[key]) return FIELD_LABELS[tableName][key];
+  return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function DiffView({ oldData, newData, tableName }: { oldData: Record<string, unknown>; newData: Record<string, unknown>; tableName?: string }) {
   const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)]));
   const changed: { key: string; old: unknown; new: unknown }[] = [];
 
@@ -315,6 +358,11 @@ function DiffView({ oldData, newData }: { oldData: Record<string, unknown>; newD
       changed.push({ key, old: oldData[key], new: newData[key] });
     }
   }
+
+  // For permission tables, separate boolean permission changes from other changes
+  const isPermTable = tableName && BOOLEAN_FIELD_TABLES.has(tableName);
+  const permChanges = isPermTable ? changed.filter(c => typeof c.new === "boolean" || typeof c.old === "boolean") : [];
+  const otherChanges = isPermTable ? changed.filter(c => typeof c.new !== "boolean" && typeof c.old !== "boolean") : changed;
 
   const visibleKeys = allKeys.filter(k => !HIDDEN_FIELDS.has(k));
 
@@ -329,18 +377,40 @@ function DiffView({ oldData, newData }: { oldData: Record<string, unknown>; newD
           {changed.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">No field changes detected</p>
           ) : (
-            <div className="space-y-2">
-              {changed.map(({ key, old: oldVal, new: newVal }) => (
+            <div className="space-y-3">
+              {/* Permission summary for permission tables */}
+              {isPermTable && permChanges.length > 0 && (
+                <div className="rounded-md border border-border bg-background p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Permission Changes</p>
+                  <div className="grid gap-1.5">
+                    {permChanges.map(({ key, old: oldVal, new: newVal }) => (
+                      <div key={key} className={`flex items-center gap-2 text-xs rounded px-2 py-1.5 ${newVal === true ? "bg-emerald-500/10" : "bg-destructive/10"}`}>
+                        {newVal === true ? (
+                          <Plus className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        ) : (
+                          <Minus className="h-3.5 w-3.5 shrink-0 text-destructive" />
+                        )}
+                        <span className="font-medium">{getFieldLabel(key, tableName)}</span>
+                        <span className="ml-auto text-muted-foreground">
+                          {newVal === true ? "Granted" : "Revoked"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Other (non-boolean) changes */}
+              {(isPermTable ? otherChanges : changed).map(({ key, old: oldVal, new: newVal }) => (
                 <div key={key} className="rounded-md border border-border bg-background p-2">
-                  <p className="font-mono text-xs font-medium text-muted-foreground mb-1">{key}</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">{getFieldLabel(key, tableName)}</p>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-start gap-2 text-xs rounded px-2 py-1 bg-destructive/10">
                       <Minus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
-                      <span className="break-all">{formatValue(oldVal)}</span>
+                      <span className="break-all">{formatFieldValue(oldVal, key, tableName)}</span>
                     </div>
                     <div className="flex items-start gap-2 text-xs rounded px-2 py-1 bg-emerald-500/10">
                       <Plus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-500" />
-                      <span className="break-all">{formatValue(newVal)}</span>
+                      <span className="break-all">{formatFieldValue(newVal, key, tableName)}</span>
                     </div>
                   </div>
                 </div>
@@ -358,8 +428,8 @@ function DiffView({ oldData, newData }: { oldData: Record<string, unknown>; newD
               return (
                 <div key={key} className={`flex gap-2 text-xs py-0.5 px-1 rounded ${isChanged ? "bg-accent" : ""}`}>
                   {isChanged && <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />}
-                  <span className={`font-mono min-w-[140px] ${isChanged ? "text-primary font-medium" : "text-muted-foreground"}`}>{key}:</span>
-                  <span className="text-foreground break-all">{formatValue(val)}</span>
+                  <span className={`font-mono min-w-[140px] ${isChanged ? "text-primary font-medium" : "text-muted-foreground"}`}>{getFieldLabel(key, tableName)}:</span>
+                  <span className="text-foreground break-all">{formatFieldValue(val, key, tableName)}</span>
                 </div>
               );
             })}
@@ -857,7 +927,7 @@ export default function AuditLog() {
               {detail.action === "UPDATE" && detail.old_data && detail.new_data ? (
                 <div>
                   <p className="font-medium mb-2">Before → After</p>
-                  <DiffView oldData={detail.old_data} newData={detail.new_data} />
+                  <DiffView oldData={detail.old_data} newData={detail.new_data} tableName={detail.table_name} />
                 </div>
               ) : detail.action === "INSERT" && detail.new_data ? (
                 <div>
