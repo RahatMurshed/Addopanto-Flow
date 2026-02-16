@@ -13,6 +13,8 @@ const uuidField = z.string().uuid("Invalid ID format");
 const postBodySchema = z.object({
   action: z.enum(["delete"]).optional(),
   userId: uuidField,
+  password: z.string().min(1).optional(),
+  targetEmail: z.string().email().optional(),
 });
 
 const getParamsSchema = z.object({
@@ -106,27 +108,66 @@ Deno.serve(async (req) => {
       });
     };
 
-    const handleDeleteUser = async (userId: string) => {
+    const handleDeleteUser = async (userId: string, password?: string, targetEmail?: string) => {
       if (userId === user.id) return jsonResp(400, { error: "Cannot delete yourself" });
 
       const { data: targetRole } = await adminClient
-        .from("user_roles").select("role").eq("user_id", userId).single();
+        .from("user_roles").select("id, role").eq("user_id", userId).maybeSingle();
       const targetUserRole = targetRole?.role || "user";
+
+      // Get target user's email for verification
+      const { data: targetAuthData } = await adminClient.auth.admin.getUserById(userId);
+      const targetActualEmail = targetAuthData?.user?.email;
 
       if (!isCipher && targetUserRole !== "moderator") {
         return jsonResp(403, { error: "Admins can only delete moderators" });
       }
 
-      // Audit log for cipher-on-cipher deletion
+      // Server-side two-step verification for Cipher deletions
       if (targetUserRole === "cipher") {
-        console.warn("[CIPHER DELETE]", {
-          callerId: user.id,
-          callerEmail: user.email,
-          targetId: userId,
-          targetRole: targetUserRole,
-          timestamp: new Date().toISOString(),
+        // Step 1: Require target email match
+        if (!targetEmail || targetEmail !== targetActualEmail) {
+          return jsonResp(400, { error: "Target email verification failed. You must provide the exact email of the Cipher user." });
+        }
+
+        // Step 2: Require caller password re-authentication
+        if (!password) {
+          return jsonResp(400, { error: "Password required to delete a Cipher user" });
+        }
+
+        const { error: authError } = await adminClient.auth.signInWithPassword({
+          email: user.email!,
+          password,
         });
+        if (authError) {
+          return jsonResp(403, { error: "Password verification failed. Cannot delete Cipher user." });
+        }
       }
+
+      // Write audit log BEFORE deletion (so we capture the data)
+      await writeAuditLog(
+        "USER_DELETE",
+        targetRole?.id || userId,
+        {
+          deleted_user_id: userId,
+          deleted_user_email: targetActualEmail,
+          deleted_user_role: targetUserRole,
+          deleted_by: user.id,
+          deleted_by_email: user.email,
+          is_cipher_deletion: targetUserRole === "cipher",
+        },
+        null
+      );
+
+      console.warn("[USER DELETE]", {
+        callerId: user.id,
+        callerEmail: user.email,
+        targetId: userId,
+        targetEmail: targetActualEmail,
+        targetRole: targetUserRole,
+        isCipherDeletion: targetUserRole === "cipher",
+        timestamp: new Date().toISOString(),
+      });
 
       const { error: roleDeleteError } = await adminClient.from("user_roles").delete().eq("user_id", userId);
       if (roleDeleteError) console.warn("Failed to delete user_roles:", roleDeleteError);
@@ -267,7 +308,7 @@ Deno.serve(async (req) => {
       const rawBody = await req.json().catch(() => null);
       const parsed = postBodySchema.safeParse(rawBody);
       if (!parsed.success) return jsonResp(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-      return await handleDeleteUser(parsed.data.userId);
+      return await handleDeleteUser(parsed.data.userId, parsed.data.password, parsed.data.targetEmail);
     }
 
     // Handle DELETE
