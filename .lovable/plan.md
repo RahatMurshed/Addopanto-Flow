@@ -1,64 +1,52 @@
 
-# Saved Search Presets for Student List
+
+# Add Toggle to Include/Exclude Alternate Contact Number in Search
 
 ## Overview
-Add a "Saved Searches" feature that lets admins save the current filter combination as a named preset and recall it with one click. Presets are stored per-user per-company in a new database table, so they persist across sessions.
+The global search bar currently searches across 14 fields including `alt_contact_number`. This change adds a toggle (switch) in the Advanced Filters panel that lets admins opt in or out of searching the alternate contact number field. It defaults to **included** (preserving current behavior).
 
-## Database
+## Changes
 
-### New table: `saved_search_presets`
+### 1. `src/components/StudentFilters.tsx`
+- Add `includeAltContact: boolean` to the `StudentFilterValues` interface (default: `true`).
+- Add a `Switch` + label row inside the Advanced Filters panel (below the address group), labeled "Include alternate contact in search".
+- Wire the switch to update `filters.includeAltContact`.
+- No chip needed since this is a boolean toggle with a sensible default.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid (PK, default gen_random_uuid()) | |
-| `user_id` | uuid, NOT NULL, references auth.users(id) ON DELETE CASCADE | |
-| `company_id` | uuid, NOT NULL, references companies(id) ON DELETE CASCADE | |
-| `name` | text, NOT NULL | Display label (e.g. "Overdue Males in Delhi") |
-| `filters` | jsonb, NOT NULL | Serialized `StudentFilterValues` object |
-| `created_at` | timestamptz, default now() | |
+### 2. `src/hooks/useStudents.ts`
+- Accept `includeAltContact` from filters.
+- Conditionally include `alt_contact_number.ilike.%...%` in the `.or()` search filter string only when `includeAltContact` is `true` (or undefined, for backward compatibility).
 
-**RLS policies**: Users can only SELECT/INSERT/UPDATE/DELETE rows matching `auth.uid() = user_id`. An additional filter on `company_id` ensures presets are scoped to the active company.
-
-**Index**: Composite index on `(user_id, company_id)`.
-
-## New Hook: `src/hooks/useSavedSearchPresets.ts`
-
-- `useSavedSearchPresets()` -- fetches all presets for the current user and active company via React Query.
-- `useCreatePreset()` -- mutation to insert a new preset.
-- `useDeletePreset()` -- mutation to delete a preset by ID.
-- Uses `useActiveCompanyId()` and `useAuth()` for scoping.
-- Query key: `["saved-search-presets", companyId]`.
-
-## UI Changes: `src/components/StudentFilters.tsx`
-
-### New props
-- `savedPresets: Preset[]`
-- `onSavePreset: (name: string) => void`
-- `onDeletePreset: (id: string) => void`
-- `onLoadPreset: (filters: StudentFilterValues) => void`
-
-### Layout addition
-Add a row between the search bar and the Advanced Filters button:
-
-1. **"Save Current" button** (Bookmark icon) -- opens a small Popover with a text input for the preset name and a "Save" confirmation button. Only enabled when filters differ from defaults.
-2. **Preset chips** -- horizontal scrollable list of saved presets as `Badge` buttons. Clicking one calls `onLoadPreset(preset.filters)`. Each chip has a small X to delete.
-
-## Wiring: `src/pages/Students.tsx`
-
-- Import and call the new `useSavedSearchPresets` hook.
-- Pass preset data and handlers down to `StudentFilters`.
-- `onLoadPreset` sets the filter state, which triggers the existing `useEffect` page reset and server query.
+### 3. `src/pages/Students.tsx`
+- No changes needed beyond what already flows through the existing `filters` state object.
 
 ## Technical Details
 
-### Serialization
-`StudentFilterValues` is a flat object of strings, so it serializes to JSONB cleanly. When loading, cast values back to the `StudentFilterValues` type with a simple spread over `defaultFilters` to fill any missing keys from older presets.
+**Search filter construction** (useStudents.ts, ~line 242-246):
+```typescript
+const fields = [
+  "name", "student_id_number", "father_name", "phone",
+  "mother_name", "whatsapp_number",
+  ...(includeAltContact !== false ? ["alt_contact_number"] : []),
+  "email", "address_house", "address_street",
+  "address_area", "address_city", "address_state", "address_pin_zip"
+];
+const searchFilter = fields.map(f => `${f}.ilike.%${sanitized}%`).join(",");
+```
 
-### Files changed
+**UI toggle** (StudentFilters.tsx, inside Advanced Filters):
+```tsx
+<div className="flex items-center gap-2">
+  <Switch
+    checked={filters.includeAltContact}
+    onCheckedChange={(v) => onChange({ ...filters, includeAltContact: v })}
+  />
+  <span className="text-sm">Include alternate contact in search</span>
+</div>
+```
 
 | File | Change |
 |------|--------|
-| (migration) | Create `saved_search_presets` table + RLS + index |
-| `src/hooks/useSavedSearchPresets.ts` | New file -- query + mutations |
-| `src/components/StudentFilters.tsx` | Add preset save/load UI row |
-| `src/pages/Students.tsx` | Wire hook to filters component |
+| `src/components/StudentFilters.tsx` | Add `includeAltContact` to interface/defaults, add Switch in Advanced Filters |
+| `src/hooks/useStudents.ts` | Conditionally include `alt_contact_number` in search filter |
+
