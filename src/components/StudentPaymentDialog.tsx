@@ -45,9 +45,11 @@ interface StudentPaymentDialogProps {
   onUpdate?: (data: Partial<StudentPaymentInsert> & { id: string }) => Promise<void>;
   batchDefaultAdmissionFee?: number;
   batchDefaultMonthlyFee?: number;
+  courseName?: string;
+  batchName?: string;
 }
 
-export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee }: StudentPaymentDialogProps) {
+export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee, courseName, batchName }: StudentPaymentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -140,9 +142,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         });
         setSelectedMonths([]);
         setFeeError(null);
-        // Default to "Student Fees" source
-        const studentFeesSource = revenueSources.find(s => s.name === "Student Fees");
-        setSelectedSourceId(studentFeesSource?.id || null);
+        setSelectedSourceId(null);
       }
       setFeeError(null);
       setNewSourceName("");
@@ -156,6 +156,31 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
       form.setValue("amount", Math.max(0, effectiveAdmissionTotal - summary.admissionPaid));
     }
   }, [paymentType, isEditing, student.admission_fee_total, batchDefaultAdmissionFee, summary.admissionPaid, form]);
+
+  // Auto-set revenue source based on payment type + course/batch context
+  const dynamicSourceName = useMemo(() => {
+    const context = [courseName, batchName].filter(Boolean).join(" ");
+    if (paymentType === "admission") {
+      return context ? `Admission - ${context}` : "Admission";
+    }
+    return context ? `Monthly Fees - ${context}` : "Monthly Fees";
+  }, [paymentType, courseName, batchName]);
+
+  useEffect(() => {
+    if (!open || isEditing) return;
+    // Find existing source matching the dynamic name
+    const existing = revenueSources.find(s => s.name === dynamicSourceName);
+    if (existing) {
+      setSelectedSourceId(existing.id);
+    } else if (dynamicSourceName && revenueSources.length > 0) {
+      // Auto-create the source
+      createSourceMutation.mutateAsync(dynamicSourceName).then((created) => {
+        setSelectedSourceId(created.id);
+      }).catch(() => {
+        // Fallback: leave unset
+      });
+    }
+  }, [open, isEditing, dynamicSourceName, revenueSources]);
 
   // Auto-calculate amount when months change (only for new payments)
   useEffect(() => {
@@ -367,9 +392,9 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           <div className="space-y-2">
             <Label>Revenue Source</Label>
             <Select value={selectedSourceId || "auto"} onValueChange={(v) => setSelectedSourceId(v === "auto" ? null : v)} disabled={saving}>
-              <SelectTrigger><SelectValue placeholder="Auto (Student Fees)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={`Auto (${dynamicSourceName})`} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto (Student Fees)</SelectItem>
+                <SelectItem value="auto">Auto ({dynamicSourceName})</SelectItem>
                 {revenueSources.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
