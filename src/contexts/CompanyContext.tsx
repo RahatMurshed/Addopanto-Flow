@@ -73,6 +73,10 @@ interface CompanyContextType {
   isCompanyAdmin: boolean;
   isModerator: boolean;
 
+  // Cipher override
+  forceFullDashboard: boolean;
+  toggleForceFullDashboard: () => void;
+
   // Granular permissions
   canAddRevenue: boolean;
   canAddExpense: boolean;
@@ -194,8 +198,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const activeCompany = companies.find((c) => c.id === activeCompanyId) ?? null;
   const membership = memberships.find((m) => m.company_id === activeCompanyId) ?? null;
 
+  // Cipher force-full-dashboard override
+  const [forceFullDashboard, setForceFullDashboard] = useState(false);
+  const toggleForceFullDashboard = useCallback(() => {
+    setForceFullDashboard(prev => {
+      const next = !prev;
+      if (next) console.warn("[CIPHER OVERRIDE] Force full dashboard activated");
+      else console.info("[CIPHER OVERRIDE] Force full dashboard deactivated");
+      return next;
+    });
+  }, []);
+
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
-  const isModerator = membership?.role === "moderator" && !isCompanyAdmin;
+  const isModerator = membership?.role === "moderator" && !isCompanyAdmin && !(isCipher && forceFullDashboard);
 
   // Moderator category permissions
   const deoStudents = membership?.deo_students ?? false;
@@ -278,6 +293,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       isCipher,
       isCompanyAdmin,
       isModerator,
+      forceFullDashboard,
+      toggleForceFullDashboard,
       canAddRevenue,
       canAddExpense,
       canAddExpenseSource,
