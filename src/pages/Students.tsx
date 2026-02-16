@@ -18,7 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download, FileText } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
@@ -28,6 +28,7 @@ import BulkImportDialog from "@/components/BulkImportDialog";
 import BatchAssignDialog from "@/components/BatchAssignDialog";
 import BatchDropZone from "@/components/BatchDropZone";
 import ExportButtons from "@/components/ExportButtons";
+import StudentExportDialog from "@/components/StudentExportDialog";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import TablePagination from "@/components/TablePagination";
 import StudentOverdueSection from "@/components/StudentOverdueSection";
@@ -99,6 +100,7 @@ export default function Students() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Compute summaries for all students (for summary cards)
   const allStudentSummaries = useMemo(() => {
@@ -264,40 +266,7 @@ export default function Students() {
     }
   };
 
-  // Export functions
-  const handleExportCSV = () => {
-    const rows = filteredStudents.map(s => {
-      const sum = studentSummaries.get(s.id);
-      return {
-        Name: s.name,
-        "Student ID": s.student_id_number || "",
-        Status: s.status,
-        Phone: s.phone || "",
-        Email: s.email || "",
-        "Father Name": s.father_name || "",
-        "Class/Grade": s.class_grade || "",
-        "Admission Fee": s.admission_fee_total,
-        "Monthly Fee": s.monthly_fee_amount,
-        "Total Paid": sum?.totalPaid || 0,
-        "Total Pending": sum?.totalPending || 0,
-      };
-    });
-    const headers = Object.keys(rows[0] || {});
-    const csv = [
-      headers.join(","),
-      ...rows.map(r => headers.map(h => `"${String((r as any)[h]).replace(/"/g, '""')}"`).join(","))
-    ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `students_${format(new Date(), "yyyy-MM-dd")}.csv`;
-    link.click();
-  };
-
-  const handleExportPDF = async () => {
-    const { exportToPDF } = await import("@/utils/exportUtils");
-    await exportToPDF("students-table", `students_${format(new Date(), "yyyy-MM-dd")}`, "Student List", format(new Date(), "MMMM yyyy"));
-  };
+  // Export handled by StudentExportDialog
 
   if (isLoading) {
     return (
@@ -329,12 +298,9 @@ export default function Students() {
         </div>
         <div className="flex gap-2">
           {filteredStudents.length > 0 && (
-            <ExportButtons
-              onExportCSV={handleExportCSV}
-              onExportPDF={handleExportPDF}
-              csvLabel="Export CSV"
-              pdfLabel="Export PDF"
-            />
+            <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+              <Download className="mr-2 h-4 w-4" /> Export
+            </Button>
           )}
           {effectiveCanAdd && (
             <>
@@ -618,6 +584,16 @@ export default function Students() {
 
       {/* Create Student Wizard */}
       <StudentWizardDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleCreate} />
+
+      {/* Export Dialog */}
+      <StudentExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        students={filteredStudents}
+        studentSummaries={studentSummaries}
+        filters={filters}
+        totalCount={serverTotalCount}
+      />
 
       {/* Bulk Import Dialog */}
       <BulkImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
