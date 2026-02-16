@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { useCourse, useUpdateCourse, useDeleteCourse, type CourseInsert } from "@/hooks/useCourses";
 import { useBatches, useCreateBatch, useUpdateBatch, useDeleteBatch, type Batch, type BatchInsert } from "@/hooks/useBatches";
-import { useStudents } from "@/hooks/useStudents";
+import { useAllStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -38,7 +38,7 @@ export default function CourseDetail() {
 
   const { data: course, isLoading: courseLoading } = useCourse(id);
   const { data: allBatches = [], isLoading: batchesLoading } = useBatches();
-  const { data: allStudents = [] } = useStudents();
+  const { data: allStudents = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
 
   const updateCourseMutation = useUpdateCourse();

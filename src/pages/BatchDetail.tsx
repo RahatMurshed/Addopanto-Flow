@@ -4,7 +4,7 @@ import { format, parse } from "date-fns";
 import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
 import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
-import { useStudents } from "@/hooks/useStudents";
+import { useAllStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -48,7 +48,7 @@ export default function BatchDetail() {
   const { data: batch, isLoading: batchLoading } = useBatch(id);
   const courseId = (batch as any)?.course_id;
   const { data: course } = useCourse(courseId);
-  const { data: allStudents = [], isLoading: studentsLoading } = useStudents();
+  const { data: allStudents = [], isLoading: studentsLoading } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
 
   const updateMutation = useUpdateBatch();

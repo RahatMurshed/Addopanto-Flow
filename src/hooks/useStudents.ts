@@ -15,7 +15,7 @@ export interface Student {
   course_end_month: string | null;
   admission_fee_total: number;
   monthly_fee_amount: number;
-  status: "active" | "inactive" | "graduated";
+  status: "active" | "inactive" | "graduated" | "dropout" | "transferred";
   notes: string | null;
   user_id: string;
   company_id: string;
@@ -82,7 +82,7 @@ export interface StudentInsert {
   course_end_month?: string | null;
   admission_fee_total?: number;
   monthly_fee_amount?: number;
-  status?: "active" | "inactive" | "graduated";
+  status?: "active" | "inactive" | "graduated" | "dropout" | "transferred";
   notes?: string | null;
   batch_id?: string | null;
   // Extended fields
@@ -136,8 +136,8 @@ export interface StudentInsert {
 
 export interface StudentFilters {
   search?: string;
-  status?: "all" | "active" | "inactive" | "graduated";
-  sortBy?: "name" | "enrollment_date" | "monthly_fee_amount";
+  status?: "all" | "active" | "inactive" | "graduated" | "dropout" | "transferred";
+  sortBy?: "name" | "enrollment_date" | "monthly_fee_amount" | "student_id_number" | "date_of_birth" | "class_grade" | "created_at";
   sortOrder?: "asc" | "desc";
   // Advanced filters
   batchId?: "all" | string;
@@ -145,6 +145,14 @@ export interface StudentFilters {
   classGrade?: string;
   addressCity?: string;
   academicYear?: string;
+  // Server-side pagination
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedStudentsResult {
+  data: Student[];
+  totalCount: number;
 }
 
 export function useStudents(filters?: StudentFilters) {
@@ -158,54 +166,80 @@ export function useStudents(filters?: StudentFilters) {
   const classGrade = filters?.classGrade?.trim() || "";
   const addressCity = filters?.addressCity?.trim() || "";
   const academicYear = filters?.academicYear?.trim() || "";
+  const page = filters?.page || 1;
+  const pageSize = filters?.pageSize || 50;
 
   const { activeCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, academicYear }],
-    queryFn: async () => {
-      if (!user) return [];
-      if (!activeCompanyId) return [];
-      let query = supabase.from("students").select("*").eq("company_id", activeCompanyId);
+    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, academicYear, page, pageSize }],
+    queryFn: async (): Promise<PaginatedStudentsResult> => {
+      if (!user) return { data: [], totalCount: 0 };
+      if (!activeCompanyId) return { data: [], totalCount: 0 };
 
+      // Build base query for both count and data
+      let countQuery = supabase.from("students").select("id", { count: "exact", head: true }).eq("company_id", activeCompanyId);
+      let dataQuery = supabase.from("students").select("*").eq("company_id", activeCompanyId);
+
+      // Apply filters to both queries
       if (status !== "all") {
-        query = query.eq("status", status);
+        countQuery = countQuery.eq("status", status);
+        dataQuery = dataQuery.eq("status", status);
       }
 
       if (batchId !== "all") {
-        query = query.eq("batch_id", batchId);
+        countQuery = countQuery.eq("batch_id", batchId);
+        dataQuery = dataQuery.eq("batch_id", batchId);
       }
 
       if (gender !== "all") {
-        query = query.eq("gender", gender);
+        countQuery = countQuery.eq("gender", gender);
+        dataQuery = dataQuery.eq("gender", gender);
       }
 
       if (classGrade) {
         const sanitizedClass = classGrade.replace(/[%_\\]/g, '\\$&');
-        query = query.ilike("class_grade", `%${sanitizedClass}%`);
+        countQuery = countQuery.ilike("class_grade", `%${sanitizedClass}%`);
+        dataQuery = dataQuery.ilike("class_grade", `%${sanitizedClass}%`);
       }
 
       if (addressCity) {
         const sanitizedCity = addressCity.replace(/[%_\\]/g, '\\$&');
-        query = query.ilike("address_city", `%${sanitizedCity}%`);
+        countQuery = countQuery.ilike("address_city", `%${sanitizedCity}%`);
+        dataQuery = dataQuery.ilike("address_city", `%${sanitizedCity}%`);
       }
 
       if (academicYear) {
         const sanitizedYear = academicYear.replace(/[%_\\]/g, '\\$&');
-        query = query.ilike("academic_year", `%${sanitizedYear}%`);
+        countQuery = countQuery.ilike("academic_year", `%${sanitizedYear}%`);
+        dataQuery = dataQuery.ilike("academic_year", `%${sanitizedYear}%`);
       }
 
       if (search) {
-        // Escape special LIKE pattern characters to prevent pattern injection
         const sanitized = search.replace(/[%_\\]/g, '\\$&');
-        query = query.or(`name.ilike.%${sanitized}%,student_id_number.ilike.%${sanitized}%,father_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
+        const searchFilter = `name.ilike.%${sanitized}%,student_id_number.ilike.%${sanitized}%,father_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%,mother_name.ilike.%${sanitized}%,whatsapp_number.ilike.%${sanitized}%,email.ilike.%${sanitized}%,address_city.ilike.%${sanitized}%,address_area.ilike.%${sanitized}%`;
+        countQuery = countQuery.or(searchFilter);
+        dataQuery = dataQuery.or(searchFilter);
       }
 
-      query = query.order(sortBy, { ascending: sortOrder });
+      // Sort
+      dataQuery = dataQuery.order(sortBy, { ascending: sortOrder });
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Student[];
+      // Pagination with .range()
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      dataQuery = dataQuery.range(from, to);
+
+      // Execute both in parallel
+      const [countResult, dataResult] = await Promise.all([countQuery, dataQuery]);
+      
+      if (countResult.error) throw countResult.error;
+      if (dataResult.error) throw dataResult.error;
+
+      return {
+        data: dataResult.data as Student[],
+        totalCount: countResult.count || 0,
+      };
     },
     enabled: !!user && !!activeCompanyId,
   });
@@ -320,6 +354,58 @@ export function useDeleteStudent() {
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary"] });
+    },
+  });
+}
+
+/**
+ * Non-paginated hook for pages that need all students (Batches, Courses, CommandPalette, etc.)
+ * Returns Student[] for backward compatibility.
+ */
+export function useAllStudents() {
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["students", "all", activeCompanyId],
+    queryFn: async () => {
+      if (!user || !activeCompanyId) return [];
+      // Fetch in batches of 1000 to handle large datasets
+      let allData: Student[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("students")
+          .select("*")
+          .eq("company_id", activeCompanyId)
+          .range(from, from + batchSize - 1);
+        if (error) throw error;
+        allData = allData.concat(data as Student[]);
+        hasMore = data.length === batchSize;
+        from += batchSize;
+      }
+      return allData;
+    },
+    enabled: !!user && !!activeCompanyId,
+  });
+}
+
+export function useBulkDeleteStudents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("students").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["student_payments"] });
+      queryClient.invalidateQueries({ queryKey: ["revenues"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }

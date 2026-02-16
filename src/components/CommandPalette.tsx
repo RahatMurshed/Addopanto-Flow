@@ -9,7 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { useStudents } from "@/hooks/useStudents";
+import { useAllStudents } from "@/hooks/useStudents";
 import { useBatches } from "@/hooks/useBatches";
 import { useCourses } from "@/hooks/useCourses";
 import {
@@ -24,7 +24,7 @@ interface Props {
 
 export default function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
-  const { data: students = [] } = useStudents();
+  const { data: students = [] } = useAllStudents();
   const { data: batches = [] } = useBatches();
   const { data: courses = [] } = useCourses();
 
