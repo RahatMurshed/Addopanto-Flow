@@ -17,15 +17,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { UserRoleBadge } from "@/components/UserRoleBadge";
-import { RoleGuard } from "@/components/RoleGuard";
+import { UserRoleBadge } from "@/components/auth/UserRoleBadge";
+import { RoleGuard } from "@/components/auth/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown, Eye } from "lucide-react";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Navigate } from "react-router-dom";
-import { UserAvatar } from "@/components/UserAvatar";
-import { UserProfileSheet } from "@/components/UserProfileSheet";
+import { UserAvatar } from "@/components/auth/UserAvatar";
+import { UserProfileSheet } from "@/components/auth/UserProfileSheet";
 
 interface UserWithRole {
   user_id: string;

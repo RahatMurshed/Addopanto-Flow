@@ -28,11 +28,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, AlertTriangle, Loader2, Sparkles, ArrowLeftRight } from "lucide-react";
-import { SkeletonKhataCards } from "@/components/SkeletonLoaders";
+import { SkeletonKhataCards } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
-import KhataDialog from "@/components/KhataDialog";
-import TransferDialog from "@/components/TransferDialog";
-import TransferHistoryCard from "@/components/TransferHistoryCard";
+import KhataDialog from "@/components/dialogs/KhataDialog";
+import TransferDialog from "@/components/dialogs/TransferDialog";
+import TransferHistoryCard from "@/components/finance/TransferHistoryCard";
 
 export default function Khatas() {
   const navigate = useNavigate();

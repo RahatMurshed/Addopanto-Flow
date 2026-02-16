@@ -21,8 +21,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Check, X, Loader2, Building2, Clock, Eye, Users } from "lucide-react";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
-import { UserAvatar } from "@/components/UserAvatar";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
+import { UserAvatar } from "@/components/auth/UserAvatar";
 
 interface CreationRequest {
   id: string;

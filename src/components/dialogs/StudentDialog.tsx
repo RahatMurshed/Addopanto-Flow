@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
+import InitialPaymentSection, { type InitialPaymentData } from "@/components/finance/InitialPaymentSection";
 import { useToast } from "@/hooks/use-toast";
 import { useBatches, type Batch } from "@/hooks/useBatches";
 

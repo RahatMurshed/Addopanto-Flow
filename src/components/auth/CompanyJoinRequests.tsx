@@ -17,9 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Check, X, Loader2, Clock, XCircle, Wallet, ArrowLeftRight, Trash2, Users2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatar } from "@/components/auth/UserAvatar";
 
 type MemberRole = "moderator" | "data_entry_operator" | "viewer";
 

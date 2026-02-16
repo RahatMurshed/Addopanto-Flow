@@ -52,7 +52,7 @@ describe("Skip Link — LandingPage", () => {
 
 describe("Skip Link — AppLayout", () => {
   it("renders a skip link targeting #main-content", async () => {
-    const { default: AppLayout } = await import("@/components/AppLayout");
+    const { default: AppLayout } = await import("@/components/layout/AppLayout");
     let container: HTMLElement;
     try {
       const result = render(
@@ -163,7 +163,7 @@ describe("Focus Trap — Dialog Components", () => {
 
 describe("ARIA Roles — Navigation", () => {
   it("sidebar has navigation role with label", async () => {
-    const { default: AppLayout } = await import("@/components/AppLayout");
+    const { default: AppLayout } = await import("@/components/layout/AppLayout");
     let container: HTMLElement;
     try {
       const result = render(
@@ -229,7 +229,7 @@ describe("Focusable Elements — Public Pages", () => {
 describe("Button Accessibility", () => {
   it("icon-only buttons have accessible labels", async () => {
     // ThemeToggle is an icon-only button
-    const { ThemeToggle } = await import("@/components/ThemeToggle");
+    const { ThemeToggle } = await import("@/components/layout/ThemeToggle");
     const { container } = render(<Shell><ThemeToggle /></Shell>);
 
     const button = container.querySelector("button");
@@ -246,7 +246,7 @@ describe("Button Accessibility", () => {
 
 describe("SkipLink Component", () => {
   it("renders with default props", async () => {
-    const { SkipLink } = await import("@/components/SkipLink");
+    const { SkipLink } = await import("@/components/layout/SkipLink");
     const { container } = render(<SkipLink />);
 
     const link = container.querySelector("a");
@@ -256,7 +256,7 @@ describe("SkipLink Component", () => {
   });
 
   it("accepts custom targetId and label", async () => {
-    const { SkipLink } = await import("@/components/SkipLink");
+    const { SkipLink } = await import("@/components/layout/SkipLink");
     const { container } = render(
       <SkipLink targetId="custom-target" label="Jump to content" />
     );
@@ -267,7 +267,7 @@ describe("SkipLink Component", () => {
   });
 
   it("has sr-only class for visual hiding", async () => {
-    const { SkipLink } = await import("@/components/SkipLink");
+    const { SkipLink } = await import("@/components/layout/SkipLink");
     const { container } = render(<SkipLink />);
 
     const link = container.querySelector("a");
@@ -279,7 +279,7 @@ describe("SkipLink Component", () => {
 
 describe("Command Palette", () => {
   it("exports a valid component", async () => {
-    const mod = await import("@/components/CommandPalette");
+    const mod = await import("@/components/layout/CommandPalette");
     expect(mod.default).toBeDefined();
     expect(typeof mod.default).toBe("function");
   });

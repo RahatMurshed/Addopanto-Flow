@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
+import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/shared/BatchDateFilter";
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,10 +25,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Eye, Pencil, Trash2, Layers, Search, X, Loader2, TrendingUp, AlertTriangle, Users, SlidersHorizontal } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
-import BatchDialog from "@/components/BatchDialog";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
+import BatchDialog from "@/components/dialogs/BatchDialog";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 import type { Batch } from "@/hooks/useBatches";
 
 export default function Batches() {

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight, Percent, Calculator, Calendar, BarChart3 } from "lucide-react";
-import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/SkeletonLoaders";
+import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, endOfMonth, getYear, parseISO, startOfMonth, differenceInDays, eachDayOfInterval, eachMonthOfInterval } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -17,15 +17,15 @@ import { useKhataTransfers } from "@/hooks/useKhataTransfers";
 import { useAccountBalances } from "@/hooks/useExpenses";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useCompany } from "@/contexts/CompanyContext";
-import TransferHistoryCard from "@/components/TransferHistoryCard";
-import AdvancedDateFilter from "@/components/AdvancedDateFilter";
-import ExportButtons from "@/components/ExportButtons";
-import PercentageChange from "@/components/PercentageChange";
+import TransferHistoryCard from "@/components/finance/TransferHistoryCard";
+import AdvancedDateFilter from "@/components/shared/AdvancedDateFilter";
+import ExportButtons from "@/components/shared/ExportButtons";
+import PercentageChange from "@/components/finance/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue } from "@/utils/dateRangeUtils";
 import { exportAllTransactionsCSV, exportToPDF } from "@/utils/exportUtils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, ReferenceLine } from "recharts";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 // Chart colors using HSL values that work with both themes
 const CHART_COLORS = [

@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { SkipLink } from "@/components/SkipLink";
+import { SkipLink } from "@/components/layout/SkipLink";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { motion } from "framer-motion";
 import {
   TrendingUp,

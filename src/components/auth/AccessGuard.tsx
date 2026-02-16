@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
-import { PermissionDenied } from "@/components/PermissionDenied";
+import { PermissionDenied } from "@/components/auth/PermissionDenied";
 
 /**
  * Centralized route access configuration.

@@ -11,12 +11,12 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useSaveSiblings } from "@/hooks/useStudentSiblings";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
-import type { InitialPaymentData } from "@/components/InitialPaymentSection";
-import PersonalStep, { type PersonalData } from "./StudentWizardSteps/PersonalStep";
-import ContactStep, { type ContactData } from "./StudentWizardSteps/ContactStep";
-import FamilyStep, { type FamilyData } from "./StudentWizardSteps/FamilyStep";
-import AcademicStep, { type AcademicData } from "./StudentWizardSteps/AcademicStep";
-import ReviewStep from "./StudentWizardSteps/ReviewStep";
+import type { InitialPaymentData } from "@/components/finance/InitialPaymentSection";
+import PersonalStep, { type PersonalData } from "@/components/StudentWizardSteps/PersonalStep";
+import ContactStep, { type ContactData } from "@/components/StudentWizardSteps/ContactStep";
+import FamilyStep, { type FamilyData } from "@/components/StudentWizardSteps/FamilyStep";
+import AcademicStep, { type AcademicData } from "@/components/StudentWizardSteps/AcademicStep";
+import ReviewStep from "@/components/StudentWizardSteps/ReviewStep";
 
 const STEPS = ["Personal", "Contact", "Family", "Academic", "Review"];
 

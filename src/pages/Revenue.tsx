@@ -52,16 +52,16 @@ import {
   X,
   SlidersHorizontal,
 } from "lucide-react";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
-import RevenueDialog from "@/components/RevenueDialog";
-import AdvancedDateFilter from "@/components/AdvancedDateFilter";
-import ExportButtons from "@/components/ExportButtons";
-import PercentageChange from "@/components/PercentageChange";
+import RevenueDialog from "@/components/dialogs/RevenueDialog";
+import AdvancedDateFilter from "@/components/shared/AdvancedDateFilter";
+import ExportButtons from "@/components/shared/ExportButtons";
+import PercentageChange from "@/components/finance/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportRevenuesToCSV, exportToPDF } from "@/utils/exportUtils";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 export default function Revenue() {
   const navigate = useNavigate();

@@ -24,10 +24,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Pencil, Trash2, Plus, Eye, BookOpen, Users, TrendingUp, Layers, Loader2, CalendarDays, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import CourseDialog from "@/components/CourseDialog";
-import BatchDialog from "@/components/BatchDialog";
+import CourseDialog from "@/components/dialogs/CourseDialog";
+import BatchDialog from "@/components/dialogs/BatchDialog";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,9 +10,9 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { RoleProvider } from "@/contexts/RoleContext";
 import { NavigationBlockerProvider } from "@/contexts/NavigationBlockerContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { RoleGuard } from "@/components/RoleGuard";
-import { AccessGuard, ACCESS_RULES } from "@/components/AccessGuard";
-import AppLayout from "@/components/AppLayout";
+import { RoleGuard } from "@/components/auth/RoleGuard";
+import { AccessGuard, ACCESS_RULES } from "@/components/auth/AccessGuard";
+import AppLayout from "@/components/layout/AppLayout";
 
 function AccessDenied() {
   return (

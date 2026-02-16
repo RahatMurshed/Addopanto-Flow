@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatar } from "@/components/auth/UserAvatar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";

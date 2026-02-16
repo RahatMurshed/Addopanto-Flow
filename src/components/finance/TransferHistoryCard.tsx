@@ -17,8 +17,8 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import type { KhataTransfer } from "@/hooks/useKhataTransfers";
 import type { AccountBalance } from "@/hooks/useExpenses";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
-import AdvancedDateFilter from "@/components/AdvancedDateFilter";
+import TablePagination from "@/components/shared/TablePagination";
+import AdvancedDateFilter from "@/components/shared/AdvancedDateFilter";
 import type { DateRange, FilterType, FilterValue } from "@/utils/dateRangeUtils";
 
 interface TransferHistoryCardProps {

@@ -13,9 +13,9 @@ import { AlertTriangle, Users, DollarSign, Clock, RotateCcw } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { exportToPDF } from "@/utils/exportUtils";
-import ExportButtons from "@/components/ExportButtons";
-import MonthYearPicker from "@/components/MonthYearPicker";
-import TablePagination from "@/components/TablePagination";
+import ExportButtons from "@/components/shared/ExportButtons";
+import MonthYearPicker from "@/components/shared/MonthYearPicker";
+import TablePagination from "@/components/shared/TablePagination";
 import { usePagination } from "@/hooks/usePagination";
 import type { StudentSummary } from "@/hooks/useStudentPayments";
 

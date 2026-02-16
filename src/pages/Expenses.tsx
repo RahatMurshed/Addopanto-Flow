@@ -54,18 +54,18 @@ import {
   X,
   SlidersHorizontal,
 } from "lucide-react";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
-import ExpenseDialog from "@/components/ExpenseDialog";
-import TransferDialog from "@/components/TransferDialog";
-import TransferHistoryCard from "@/components/TransferHistoryCard";
-import AdvancedDateFilter from "@/components/AdvancedDateFilter";
-import ExportButtons from "@/components/ExportButtons";
-import PercentageChange from "@/components/PercentageChange";
+import ExpenseDialog from "@/components/dialogs/ExpenseDialog";
+import TransferDialog from "@/components/dialogs/TransferDialog";
+import TransferHistoryCard from "@/components/finance/TransferHistoryCard";
+import AdvancedDateFilter from "@/components/shared/AdvancedDateFilter";
+import ExportButtons from "@/components/shared/ExportButtons";
+import PercentageChange from "@/components/finance/PercentageChange";
 import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRange } from "@/utils/dateRangeUtils";
 import { exportExpensesToCSV, exportToPDF } from "@/utils/exportUtils";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 export default function Expenses() {
   const navigate = useNavigate();

@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuditLogs } from "@/hooks/useAuditLogs";
 import { format } from "date-fns";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatar } from "@/components/auth/UserAvatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Eye, Search, ClipboardList, Plus, Minus, ArrowRight, Download } from "lucide-react";
 import { toast } from "sonner";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuditLog as AuditLogType } from "@/hooks/useAuditLogs";
 import { useEffect } from "react";

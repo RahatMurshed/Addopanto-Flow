@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { SkipLink } from "@/components/SkipLink";
+import { SkipLink } from "@/components/layout/SkipLink";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Bookmark } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,8 +24,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
-import { UserAvatar } from "@/components/UserAvatar";
-import CommandPalette from "@/components/CommandPalette";
+import { UserAvatar } from "@/components/auth/UserAvatar";
+import CommandPalette from "@/components/layout/CommandPalette";
 
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
