@@ -1,15 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, subDays, startOfMonth } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Users, GraduationCap, UserMinus, CalendarPlus,
   Plus, Upload, Download, Filter,
-  TrendingUp, TrendingDown, BarChart3,
+  TrendingUp, TrendingDown, BarChart3, CalendarIcon,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import type { Student } from "@/hooks/useStudents";
 import type { Batch } from "@/hooks/useBatches";
 import type { defaultFilters, StudentFilterValues } from "@/components/StudentFilters";
@@ -46,6 +49,8 @@ export default function StudentsDashboard({
 }: StudentsDashboardProps) {
   const navigate = useNavigate();
 
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+
   const totalStudents = allStudents.length;
   const enrolledStudents = allStudents.filter((s) => s.batch_id != null);
   const unenrolledStudents = allStudents.filter((s) => s.batch_id == null);
@@ -54,9 +59,13 @@ export default function StudentsDashboard({
   const enrolledPct = totalStudents > 0 ? Math.round((enrolledCount / totalStudents) * 100) : 0;
   const unenrolledPct = totalStudents > 0 ? Math.round((unenrolledCount / totalStudents) * 100) : 0;
 
-  const thisMonthStart = startOfMonth(new Date());
-  const addedThisMonth = allStudents.filter(
-    (s) => new Date(s.created_at) >= thisMonthStart
+  const selectedMonthStart = startOfMonth(selectedMonth);
+  const selectedMonthEnd = endOfMonth(selectedMonth);
+  const addedInSelectedMonth = allStudents.filter(
+    (s) => {
+      const d = new Date(s.created_at);
+      return isWithinInterval(d, { start: selectedMonthStart, end: selectedMonthEnd });
+    }
   ).length;
 
   const lastWeek = subDays(new Date(), 7);
@@ -160,15 +169,35 @@ export default function StudentsDashboard({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Added This Month</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Added in {format(selectedMonth, "MMM yyyy")}
+              </CardTitle>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={selectedMonth}
+                    onSelect={(date) => date && setSelectedMonth(date)}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
             <div className="rounded-lg bg-secondary/10 p-2">
               <CalendarPlus className="h-4 w-4 text-secondary" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold">{addedThisMonth}</p>
-              {addedThisMonth > 0 && <TrendingUp className="h-4 w-4 text-green-600" />}
+              <p className="text-2xl font-bold">{addedInSelectedMonth}</p>
+              {addedInSelectedMonth > 0 && <TrendingUp className="h-4 w-4 text-green-600" />}
             </div>
           </CardContent>
         </Card>
