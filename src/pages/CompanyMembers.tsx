@@ -25,6 +25,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { CompanyRoleBadge } from "@/components/UserRoleBadge";
 import { PermissionAssignmentModal } from "@/components/PermissionAssignmentModal";
 import { UserProfileSheet } from "@/components/UserProfileSheet";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 function getPermissionsSummary(member: CompanyMembership): string {
   if (member.role === "admin") return "Full access";
@@ -56,12 +57,8 @@ export default function CompanyMembers() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // DEO route guard: DEOs cannot access member management
-  useEffect(() => {
-    if (isDataEntryOperator) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isDataEntryOperator, navigate]);
+
+
   const [search, setSearch] = useState("");
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [editingMember, setEditingMember] = useState<CompanyMembership | null>(null);
@@ -226,6 +223,11 @@ export default function CompanyMembers() {
       return name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
     });
   }, [members, search, profiles]);
+
+  // DEO access check: DEOs cannot access member management
+  if (isDataEntryOperator) {
+    return <PermissionDenied message="You don't have permission to manage company members. Contact your company admin for assistance." />;
+  }
 
   if (!canViewMembers) return <Navigate to="/" replace />;
 
