@@ -54,7 +54,9 @@ export default function UserManagement() {
     email: string;
     newRole: AppRole;
     currentRole: string;
+    requiresPassword: boolean;
   } | null>(null);
+  const [rolePasswordInput, setRolePasswordInput] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{
     userId: string;
     email: string;
@@ -109,24 +111,30 @@ export default function UserManagement() {
   // Simplified role display: only cipher and user
   const getDisplayRole = (rawRole: string): AppRole => rawRole === "cipher" ? "cipher" : "user";
 
-  // Change role mutation
+  // Change role mutation - now routes through edge function
   const changeRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
-      const { error: deleteError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
-      if (deleteError) throw deleteError;
-
-      const { error: insertError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: userId, role: newRole, assigned_by: currentUser?.id });
-      if (insertError) throw insertError;
+    mutationFn: async ({ userId, newRole, password }: { userId: string; newRole: AppRole; password?: string }) => {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId, newRole, ...(password ? { password } : {}) }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to change role");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Role updated successfully" });
       setRoleChangeConfirm(null);
+      setRolePasswordInput("");
     },
     onError: (error) => {
       toast({ title: "Failed to update role", description: error.message, variant: "destructive" });
@@ -172,7 +180,8 @@ export default function UserManagement() {
       toast({ title: "Cannot change your own role", variant: "destructive" });
       return;
     }
-    setRoleChangeConfirm({ userId, email: email || userId, newRole, currentRole });
+    const requiresPassword = newRole === "cipher" || currentRole === "cipher";
+    setRoleChangeConfirm({ userId, email: email || userId, newRole, currentRole, requiresPassword });
   };
 
   const handleDeleteUser = (userId: string, email: string | null, role: string) => {
@@ -252,7 +261,7 @@ export default function UserManagement() {
                     {filteredUsers.map((u) => {
                       const isCurrentUser = u.user_id === currentUser?.id;
                       const displayRole = getDisplayRole(u.role);
-                      const canChangeRole = !isCurrentUser && displayRole !== "cipher";
+                      const canChangeRole = !isCurrentUser;
                       const canDelete = !isCurrentUser;
 
                       return (
@@ -331,19 +340,47 @@ export default function UserManagement() {
       </RoleGuard>
 
       {/* Role Change Confirmation */}
-      <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open && !changeRoleMutation.isPending) setRoleChangeConfirm(null); }}>
+      <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open && !changeRoleMutation.isPending) { setRoleChangeConfirm(null); setRolePasswordInput(""); } }}>
         <AlertDialogContent onEscapeKeyDown={(e) => { if (changeRoleMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Role Change</AlertDialogTitle>
-            <AlertDialogDescription>
-              Change <strong>{roleChangeConfirm?.email}</strong>'s platform role to <strong>{roleChangeConfirm?.newRole}</strong>?
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Change <strong>{roleChangeConfirm?.email}</strong>'s platform role from{" "}
+                  <strong>{roleChangeConfirm?.currentRole}</strong> to <strong>{roleChangeConfirm?.newRole}</strong>?
+                </p>
+                {roleChangeConfirm?.requiresPassword && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Cipher role changes require password verification. Enter <strong className="text-foreground">your</strong> password:
+                    </p>
+                    <Input
+                      type="password"
+                      value={rolePasswordInput}
+                      onChange={(e) => setRolePasswordInput(e.target.value)}
+                      placeholder="Your password"
+                      autoComplete="current-password"
+                    />
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changeRoleMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); if (roleChangeConfirm) changeRoleMutation.mutate({ userId: roleChangeConfirm.userId, newRole: roleChangeConfirm.newRole }); }}
-              disabled={changeRoleMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (roleChangeConfirm) {
+                  changeRoleMutation.mutate({
+                    userId: roleChangeConfirm.userId,
+                    newRole: roleChangeConfirm.newRole,
+                    ...(roleChangeConfirm.requiresPassword ? { password: rolePasswordInput } : {}),
+                  });
+                }
+              }}
+              disabled={changeRoleMutation.isPending || (roleChangeConfirm?.requiresPassword && !rolePasswordInput.trim())}
             >
               {changeRoleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {changeRoleMutation.isPending ? "Updating..." : "Confirm"}

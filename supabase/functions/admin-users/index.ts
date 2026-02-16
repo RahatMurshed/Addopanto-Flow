@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
 };
 
 const uuidField = z.string().uuid("Invalid ID format");
@@ -22,6 +22,12 @@ const getParamsSchema = z.object({
 
 const deleteBodySchema = z.object({
   userId: uuidField,
+});
+
+const roleChangeSchema = z.object({
+  userId: uuidField,
+  newRole: z.enum(["cipher", "user"]),
+  password: z.string().min(1, "Password is required").optional(),
 });
 
 Deno.serve(async (req) => {
@@ -79,6 +85,27 @@ Deno.serve(async (req) => {
         status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
+    // Helper: write audit log entry via service role (bypasses RLS)
+    const writeAuditLog = async (action: string, recordId: string, oldData: unknown, newData: unknown) => {
+      // Get caller's active company for context
+      const { data: profile } = await adminClient
+        .from("user_profiles")
+        .select("active_company_id, email")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      await adminClient.from("audit_logs").insert({
+        company_id: profile?.active_company_id || "00000000-0000-0000-0000-000000000000",
+        user_id: user.id,
+        user_email: profile?.email || user.email || null,
+        table_name: "user_roles",
+        record_id: recordId,
+        action,
+        old_data: oldData ? JSON.parse(JSON.stringify(oldData)) : null,
+        new_data: newData ? JSON.parse(JSON.stringify(newData)) : null,
+      });
+    };
+
     const handleDeleteUser = async (userId: string) => {
       if (userId === user.id) return jsonResp(400, { error: "Cannot delete yourself" });
 
@@ -117,6 +144,80 @@ Deno.serve(async (req) => {
       }
       return jsonResp(200, { success: true });
     };
+
+    // Handle PATCH - Change role with granular Cipher validation
+    if (req.method === "PATCH") {
+      const rawBody = await req.json().catch(() => null);
+      const parsed = roleChangeSchema.safeParse(rawBody);
+      if (!parsed.success) return jsonResp(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+
+      const { userId, newRole, password } = parsed.data;
+
+      // Cannot change own role
+      if (userId === user.id) {
+        return jsonResp(400, { error: "Cannot change your own role" });
+      }
+
+      // Get target's current role
+      const { data: targetRoleData } = await adminClient
+        .from("user_roles").select("id, role").eq("user_id", userId).maybeSingle();
+      const currentRole = targetRoleData?.role || "user";
+
+      // If promoting TO cipher or demoting FROM cipher, require password re-authentication
+      if (newRole === "cipher" || currentRole === "cipher") {
+        if (!password) {
+          return jsonResp(400, { error: "Password required for Cipher role changes" });
+        }
+
+        // Verify caller's password
+        const { error: authError } = await adminClient.auth.signInWithPassword({
+          email: user.email!,
+          password,
+        });
+        if (authError) {
+          return jsonResp(403, { error: "Password verification failed" });
+        }
+      }
+
+      // No-op check
+      if (currentRole === newRole) {
+        return jsonResp(200, { success: true, message: "Role already set" });
+      }
+
+      // Perform the role change via service_role (bypasses RLS)
+      // First delete existing role
+      if (targetRoleData) {
+        const { error: delErr } = await adminClient.from("user_roles").delete().eq("user_id", userId);
+        if (delErr) return jsonResp(500, { error: "Failed to remove old role", details: delErr.message });
+      }
+
+      // Insert new role
+      const { data: newRoleData, error: insErr } = await adminClient
+        .from("user_roles")
+        .insert({ user_id: userId, role: newRole, assigned_by: user.id })
+        .select("id, user_id, role")
+        .single();
+      if (insErr) return jsonResp(500, { error: "Failed to assign new role", details: insErr.message });
+
+      // Write explicit audit log via service role
+      await writeAuditLog(
+        "ROLE_CHANGE",
+        newRoleData.id,
+        { user_id: userId, role: currentRole, changed_by: user.id, changed_by_email: user.email },
+        { user_id: userId, role: newRole, changed_by: user.id, changed_by_email: user.email }
+      );
+
+      console.info("[ROLE CHANGE]", {
+        callerId: user.id,
+        callerEmail: user.email,
+        targetId: userId,
+        fromRole: currentRole,
+        toRole: newRole,
+        timestamp: new Date().toISOString(),
+      });
+
+      return jsonResp(200, { success: true, fromRole: currentRole, toRole: newRole });
+    }
 
     // Handle GET - List users
     if (req.method === "GET") {
