@@ -214,7 +214,7 @@ export function computeStudentSummary(
   if (billingStart && student.monthly_fee_amount > 0) {
     let [year, month] = billingStart.split("-").map(Number);
     const courseEnd = student.course_end_month || currentMonth;
-    const endBound = courseEnd > currentMonth ? courseEnd : currentMonth;
+    const endBound = student.course_end_month ? courseEnd : currentMonth;
     let cursor = billingStart;
     while (cursor <= endBound) {
       allMonths.push(cursor);

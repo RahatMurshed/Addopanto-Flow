@@ -517,13 +517,34 @@ export default function Students() {
                               {Number(s.monthly_fee_amount) === 0 ? (
                                 <span className="text-muted-foreground text-sm">N/A</span>
                               ) : (() => {
-                                const totalPendingMonths = sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
-                                return totalPendingMonths > 0 ? (
-                                  <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">{totalPendingMonths} months pending</Badge>
-                                ) : sum.monthlyPaidMonths.length > 0 ? (
+                                const hasPartial = sum.monthlyPartialMonths.length > 0;
+                                const hasOverdue = sum.monthlyOverdueMonths.length > 0;
+                                const hasPending = sum.monthlyPendingMonths.length > 0;
+                                const totalMonths = sum.monthlyPaidMonths.length + sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
+
+                                if (hasPartial) {
+                                  return (
+                                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                                      {formatCurrency(sum.monthlyPaidTotal)}/{formatCurrency(sum.monthlyPaidTotal + sum.monthlyPendingTotal)} Partial
+                                    </Badge>
+                                  );
+                                }
+                                if (hasOverdue) {
+                                  return (
+                                    <Badge className="bg-destructive/15 text-destructive border-destructive/30">
+                                      {sum.monthlyOverdueMonths.length}/{totalMonths} Overdue
+                                    </Badge>
+                                  );
+                                }
+                                if (hasPending) {
+                                  return (
+                                    <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">
+                                      {sum.monthlyPendingMonths.length} months pending
+                                    </Badge>
+                                  );
+                                }
+                                return (
                                   <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                                ) : (
-                                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Current</Badge>
                                 );
                               })()}
                             </TableCell>
