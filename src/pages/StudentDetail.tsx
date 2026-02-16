@@ -6,8 +6,9 @@ import {
   useStudentPayments, useCreateStudentPayment, useUpdateStudentPayment, useDeleteStudentPayment,
   useMonthlyFeeHistory, computeStudentSummary,
 } from "@/hooks/useStudentPayments";
-import { useBatch } from "@/hooks/useBatches";
+import { useBatch, useBatches } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
+import { useStudentBatchHistory } from "@/hooks/useStudentBatchHistory";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info, Search, X, SlidersHorizontal, BookOpen } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Loader2, GraduationCap, CalendarDays, TrendingUp, StickyNote, MessageSquare, ChevronDown, Layers, Info, Search, X, SlidersHorizontal, BookOpen, ArrowRight, Clock, History } from "lucide-react";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -53,6 +54,8 @@ export default function StudentDetail() {
   const { data: batch } = useBatch(batchId);
   const courseId = (batch as any)?.course_id;
   const { data: course } = useCourse(courseId);
+  const { data: batchHistory = [] } = useStudentBatchHistory(id);
+  const { data: allBatches = [] } = useBatches();
 
   const updateMutation = useUpdateStudent();
   const createPaymentMutation = useCreateStudentPayment();
@@ -442,6 +445,67 @@ export default function StudentDetail() {
         </Card>
       )}
 
+      {/* Batch Transfer History */}
+      {batchHistory.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500/10">
+                <History className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Batch Transfer History</CardTitle>
+                <p className="text-xs text-muted-foreground">{batchHistory.length} transfer{batchHistory.length !== 1 ? "s" : ""} recorded</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="relative pl-6">
+              {/* Timeline line */}
+              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
+              <div className="space-y-4">
+                {batchHistory.map((entry, idx) => {
+                  const batchMap = new Map(allBatches.map(b => [b.id, b.batch_name]));
+                  const fromName = entry.from_batch_id ? batchMap.get(entry.from_batch_id) || "Unknown Batch" : null;
+                  const toName = entry.to_batch_id ? batchMap.get(entry.to_batch_id) || "Unknown Batch" : null;
+                  const isFirst = idx === 0;
+                  return (
+                    <div key={entry.id} className="relative flex gap-3">
+                      {/* Timeline dot */}
+                      <div className={`absolute -left-6 top-1 h-[10px] w-[10px] rounded-full border-2 ${
+                        isFirst ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                          {fromName ? (
+                            <>
+                              <Badge variant="outline" className="text-xs">{fromName}</Badge>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <Badge variant="secondary" className="text-xs">{toName || "Unassigned"}</Badge>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground text-xs">Assigned to</span>
+                              <Badge variant="secondary" className="text-xs">{toName || "Unknown"}</Badge>
+                            </>
+                          )}
+                        </div>
+                        {entry.reason && (
+                          <p className="text-sm text-muted-foreground mt-1">{entry.reason}</p>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>{format(new Date(entry.transferred_at), "MMM d, yyyy 'at' h:mm a")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Monthly Fee Visual Grid & Breakdown */}
       {effectiveMonthlyFee > 0 && (
         <Card>
