@@ -1,31 +1,25 @@
 
 
-## Fix: Make View Button Available to All Users
+## Make Revenue/Expense Source Badges Match Enrollment Column Style
 
-### Problem
-The View button in the Students table is currently hidden from Data Entry Operator users due to a guard condition (`!isDataEntryOperator`). The `StudentProfileDialog` already displays all student details (Personal, Contact, Address, Family, Academic, Additional info) -- it just needs to be accessible to everyone.
+### What Changes
+Update the source badge styling to match the enrollment column's highlighted pill look (`bg-color/15 text-color border-color/30`) — a soft, semi-transparent tinted background with a matching border and text, different color per source.
 
-### Change
+### Technical Details
 
-**File: `src/pages/Students.tsx` (line 504)**
+**File: `src/utils/sourceColors.ts`**
 
-Remove the `!isDataEntryOperator` condition wrapping the View button so all users (including Data Entry Operators) can click View to see the full student profile.
+Update the `getSourceColor` function to produce colors using the same opacity-based pattern as the enrollment badges:
 
-Before:
+- **Light mode**: Use `hsla()` with alpha transparency for background (15% opacity) and border (30% opacity), with a solid medium-dark text color — matching the `bg-green-500/15 text-green-700 border-green-500/30` pattern but with the deterministic hue per source.
+- **Dark mode**: Keep as-is (no changes).
+- **Uncategorized (light)**: Use a neutral gray version of the same pattern.
+
+The updated light-mode values will be:
 ```
-{!isDataEntryOperator && (
-  <Button variant="ghost" size="sm" ...>
-    <Eye /> View
-  </Button>
-)}
-```
-
-After:
-```
-<Button variant="ghost" size="sm" ...>
-  <Eye /> View
-</Button>
+bg:     hsla(hue, 60%, 50%, 0.15)   -- soft tinted background
+text:   hsl(hue, 55%, 35%)          -- readable dark text
+border: hsla(hue, 60%, 50%, 0.30)   -- subtle colored border
 ```
 
-This is a single-line change. The `StudentProfileDialog` already shows all details entered during student creation -- no modifications needed there.
-
+No changes needed to the Badge components in Revenue, Expenses, or Dashboard pages — they already use `variant="outline"` with `style={getSourceBadgeStyle(...)}`, so updating the color generator is sufficient.
