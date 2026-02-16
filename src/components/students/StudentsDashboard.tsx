@@ -36,7 +36,9 @@ const CHART_COLORS = [
   "hsl(340, 70%, 45%)",   // pink
 ];
 
-export default function StudentsDashboard({
+import { memo } from "react";
+
+const StudentsDashboard = memo(function StudentsDashboard({
   allStudents,
   batches,
   onSetFilters,
@@ -377,4 +379,6 @@ export default function StudentsDashboard({
       )}
     </div>
   );
-}
+});
+
+export default StudentsDashboard;

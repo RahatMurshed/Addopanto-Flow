@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ interface ExportButtonsProps {
   disabled?: boolean;
 }
 
-export default function ExportButtons({
+const ExportButtons = memo(function ExportButtons({
   onExportCSV,
   onExportPDF,
   csvLabel = "Export CSV",
@@ -60,4 +60,6 @@ export default function ExportButtons({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
+
+export default ExportButtons;
