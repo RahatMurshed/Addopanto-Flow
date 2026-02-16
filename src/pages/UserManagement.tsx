@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRoleBadge } from "@/components/auth/UserRoleBadge";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import type { AppRole } from "@/hooks/useUserRole";
-import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown, Eye } from "lucide-react";
+import { Loader2, Users, Search, ShieldAlert, Trash2, ChevronDown, Eye, Lock } from "lucide-react";
 import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Navigate } from "react-router-dom";
@@ -274,7 +274,14 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {canChangeRole ? (
+                            {isCurrentUser ? (
+                              <UserRoleBadge role={displayRole} />
+                            ) : displayRole === "cipher" ? (
+                              <div className="flex items-center gap-1.5">
+                                <UserRoleBadge role={displayRole} />
+                                <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-label="Cipher role is locked and cannot be downgraded" />
+                              </div>
+                            ) : (
                               <Select
                                 value={displayRole}
                                 onValueChange={(newRole: AppRole) => handleRoleChange(u.user_id, u.email, u.role, newRole)}
@@ -286,8 +293,6 @@ export default function UserManagement() {
                                   <SelectItem value="user">User</SelectItem>
                                 </SelectContent>
                               </Select>
-                            ) : (
-                              <UserRoleBadge role={displayRole} />
                             )}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
