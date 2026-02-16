@@ -21,6 +21,7 @@ import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loa
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/SkeletonLoaders";
 import StudentDialog from "@/components/StudentDialog";
+import StudentWizardDialog from "@/components/StudentWizardDialog";
 import StudentPaymentDialog from "@/components/StudentPaymentDialog";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
@@ -372,8 +373,8 @@ export default function Students() {
         </Card>
       )}
 
-      {/* Create Student Dialog */}
-      <StudentDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleCreate} />
+      {/* Create Student Wizard */}
+      <StudentWizardDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleCreate} />
 
       {/* Payment Dialog */}
       {selectedStudent && (
