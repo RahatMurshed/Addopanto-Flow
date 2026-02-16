@@ -31,9 +31,10 @@ import ExportButtons from "@/components/ExportButtons";
 import StudentExportDialog from "@/components/StudentExportDialog";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import TablePagination from "@/components/TablePagination";
-import StudentOverdueSection from "@/components/StudentOverdueSection";
 import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/components/StudentFilters";
 import { useSavedSearchPresets, useCreatePreset, useDeletePreset } from "@/hooks/useSavedSearchPresets";
+import StudentsDashboard from "@/components/StudentsDashboard";
+import { useBatches } from "@/hooks/useBatches";
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -74,6 +75,7 @@ export default function Students() {
   // All students for summary cards & overdue section (uses separate cached query)
   const { data: allStudentsRaw = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
+  const { data: batchesData = [] } = useBatches({ status: "all" });
   const { canAddRevenue, canEdit, canDelete, isCompanyViewer, isDataEntryOperator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, activeCompanyId } = useCompany();
   const { user } = useAuth();
   
@@ -158,18 +160,8 @@ export default function Students() {
     return result;
   }, [students, studentSummaries, filters.admissionStatus, filters.monthlyStatus]);
 
-  // Summary cards (use all students, not paginated)
+  // totalStudents used below for filters display
   const totalStudents = allStudents.length;
-  const activeStudents = allStudents.filter((s) => s.status === "active").length;
-  const pendingAdmission = allStudents.filter((s) => {
-    const sum = allStudentSummaries.get(s.id);
-    return sum && sum.admissionStatus !== "paid" && sum.admissionTotal > 0;
-  }).length;
-  const overdueStudents = allStudents.filter((s) => {
-    const sum = allStudentSummaries.get(s.id);
-    return sum && sum.monthlyOverdueMonths.length > 0;
-  }).length;
-
   // Server-side pagination calculations
   const totalPages = Math.max(1, Math.ceil(serverTotalCount / pageSize));
   const startIndex = serverTotalCount === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -219,6 +211,13 @@ export default function Students() {
     filteredStudents.forEach(s => map.set(s.id, s.name));
     return map;
   }, [filteredStudents]);
+
+  // Batch name lookup
+  const batchNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    batchesData.forEach(b => map.set(b.id, b.batch_name));
+    return map;
+  }, [batchesData]);
 
   const handleDragStart = useCallback((e: React.DragEvent, studentId: string) => {
     e.dataTransfer.setData("text/student-id", studentId);
@@ -280,10 +279,17 @@ export default function Students() {
     return (
       <div className="space-y-6">
         <div><Skeleton className="h-7 w-32 mb-2" /><Skeleton className="h-4 w-72" /></div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28" />)}
         </div>
-        <SkeletonTable rows={6} columns={6} />
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+        <div className="flex gap-2">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-36" />)}</div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-64" />)}
+        </div>
+        <SkeletonTable rows={6} columns={8} />
       </div>
     );
   }
@@ -323,46 +329,16 @@ export default function Students() {
         </div>
       </div>
 
-      {/* Summary Cards - hidden for DEO */}
+      {/* Dashboard - hidden for DEO */}
       {!isDataEntryOperator && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{totalStudents}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-              <GraduationCap className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent><p className="text-2xl font-bold text-primary">{activeStudents}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Admission</CardTitle>
-              <CreditCard className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent><p className="text-2xl font-bold text-yellow-600">{pendingAdmission}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Monthly</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent><p className="text-2xl font-bold text-destructive">{overdueStudents}</p></CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Monthly Overdue Section - hidden for DEO */}
-      {!isDataEntryOperator && allStudents.length > 0 && (
-        <StudentOverdueSection
-          students={allStudents}
-          studentSummaries={allStudentSummaries}
-          currency={currency}
+        <StudentsDashboard
+          allStudents={allStudents}
+          batches={batchesData}
+          onSetFilters={(partial) => setFilters({ ...defaultFilters, ...partial })}
+          onImport={() => setImportDialogOpen(true)}
+          onExport={() => setExportDialogOpen(true)}
+          canAdd={effectiveCanAdd}
+          hasStudents={allStudents.length > 0}
         />
       )}
 
@@ -474,18 +450,19 @@ export default function Students() {
                       )}
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden sm:table-cell">Student ID</TableHead>
-                      <TableHead>Status</TableHead>
-                      {!isDataEntryOperator && <TableHead>Admission</TableHead>}
-                      {!isDataEntryOperator && <TableHead>Monthly</TableHead>}
-                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">Total Paid</TableHead>}
-                      {!isDataEntryOperator && <TableHead className="hidden md:table-cell">Total Pending</TableHead>}
+                      <TableHead className="hidden md:table-cell">Class</TableHead>
+                      <TableHead className="hidden lg:table-cell">Father Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Contact</TableHead>
+                      <TableHead>Enrollment</TableHead>
+                      <TableHead className="hidden sm:table-cell">Batch</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredStudents.map((s) => {
-                      const sum = studentSummaries.get(s.id)!;
                       const isSelected = selectedIds.has(s.id);
+                      const isEnrolled = s.batch_id != null;
+                      const batchName = s.batch_id ? batchNameMap.get(s.batch_id) || "—" : "—";
                       return (
                         <TableRow
                           key={s.id}
@@ -508,71 +485,17 @@ export default function Students() {
                           )}
                           <TableCell className="font-medium">{s.name}</TableCell>
                           <TableCell className="hidden sm:table-cell text-muted-foreground">{s.student_id_number || "—"}</TableCell>
+                          <TableCell className="hidden md:table-cell text-muted-foreground">{s.class_grade || "—"}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-muted-foreground">{s.father_name || "—"}</TableCell>
+                          <TableCell className="hidden md:table-cell text-muted-foreground">{s.phone || "—"}</TableCell>
                           <TableCell>
-                            <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">{s.status}</Badge>
+                            {isEnrolled ? (
+                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Enrolled</Badge>
+                            ) : (
+                              <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Not Enrolled</Badge>
+                            )}
                           </TableCell>
-                          {!isDataEntryOperator && (
-                            <TableCell>
-                              {sum.admissionTotal === 0 ? (
-                                <span className="text-muted-foreground text-sm">N/A</span>
-                              ) : sum.admissionStatus === "paid" ? (
-                                <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                              ) : sum.admissionStatus === "partial" ? (
-                                <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
-                                  {formatCurrency(sum.admissionPaid, currency)}/{formatCurrency(sum.admissionTotal, currency)}
-                                </Badge>
-                              ) : (
-                                <Badge variant="destructive">Pending</Badge>
-                              )}
-                            </TableCell>
-                          )}
-                          {!isDataEntryOperator && (
-                            <TableCell>
-                              {Number(s.monthly_fee_amount) === 0 ? (
-                                <span className="text-muted-foreground text-sm">N/A</span>
-                              ) : (() => {
-                                const hasPartial = sum.monthlyPartialMonths.length > 0;
-                                const hasOverdue = sum.monthlyOverdueMonths.length > 0;
-                                const hasPending = sum.monthlyPendingMonths.length > 0;
-                                const totalMonths = sum.monthlyPaidMonths.length + sum.monthlyOverdueMonths.length + sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length;
-
-                                if (hasPartial) {
-                                  return (
-                                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                                      {formatCurrency(sum.monthlyPaidTotal, currency)}/{formatCurrency(sum.monthlyPaidTotal + sum.monthlyPendingTotal, currency)} Partial
-                                    </Badge>
-                                  );
-                                }
-                                if (hasOverdue) {
-                                  return (
-                                    <Badge className="bg-destructive/15 text-destructive border-destructive/30">
-                                      {sum.monthlyOverdueMonths.length}/{totalMonths} Overdue
-                                    </Badge>
-                                  );
-                                }
-                                if (hasPending) {
-                                  return (
-                                    <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">
-                                      {sum.monthlyPendingMonths.length} months pending
-                                    </Badge>
-                                  );
-                                }
-                                return (
-                                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Paid</Badge>
-                                );
-                              })()}
-                            </TableCell>
-                          )}
-                          {!isDataEntryOperator && (
-                            <TableCell className="hidden md:table-cell font-semibold text-primary">
-                              {formatCurrency(sum.totalPaid, currency)}
-                            </TableCell>
-                          )}
-                          {!isDataEntryOperator && (
-                            <TableCell className="hidden md:table-cell font-semibold text-destructive">
-                              {sum.totalPending > 0 ? formatCurrency(sum.totalPending, currency) : "—"}
-                            </TableCell>
-                          )}
+                          <TableCell className="hidden sm:table-cell text-muted-foreground">{batchName}</TableCell>
                           <TableCell>
                             <div className="flex gap-1">
                               {!isDataEntryOperator && (
