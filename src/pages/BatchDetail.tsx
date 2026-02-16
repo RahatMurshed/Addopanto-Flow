@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { format, parse } from "date-fns";
-import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/BatchDateFilter";
+import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/shared/BatchDateFilter";
 import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
 import { useAllStudents } from "@/hooks/useStudents";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen, Loader2, UserPlus } from "lucide-react";
-import StudentOverdueSection from "@/components/StudentOverdueSection";
+import StudentOverdueSection from "@/components/students/StudentOverdueSection";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -30,14 +30,14 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import BatchDialog from "@/components/BatchDialog";
-import StudentDialog from "@/components/StudentDialog";
-import BatchEnrollDialog from "@/components/BatchEnrollDialog";
-import StudentPaymentDialog from "@/components/StudentPaymentDialog";
+import BatchDialog from "@/components/dialogs/BatchDialog";
+import StudentDialog from "@/components/dialogs/StudentDialog";
+import BatchEnrollDialog from "@/components/dialogs/BatchEnrollDialog";
+import StudentPaymentDialog from "@/components/dialogs/StudentPaymentDialog";
 import { useUpdateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();

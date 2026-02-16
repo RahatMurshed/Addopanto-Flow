@@ -7,7 +7,7 @@ import type { ContactData } from "./ContactStep";
 import type { FamilyData } from "./FamilyStep";
 import type { AcademicData } from "./AcademicStep";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import InitialPaymentSection, { type InitialPaymentData } from "@/components/InitialPaymentSection";
+import InitialPaymentSection, { type InitialPaymentData } from "@/components/finance/InitialPaymentSection";
 
 interface Props {
   personal: PersonalData;

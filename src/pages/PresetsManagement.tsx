@@ -20,7 +20,7 @@ import {
   useDeletePreset,
   type SavedSearchPreset,
 } from "@/hooks/useSavedSearchPresets";
-import type { StudentFilterValues } from "@/components/StudentFilters";
+import type { StudentFilterValues } from "@/components/students/StudentFilters";
 
 const FILTER_LABELS: Record<string, string> = {
   status: "Status",

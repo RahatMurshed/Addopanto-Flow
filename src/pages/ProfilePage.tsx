@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ImageUpload } from "@/components/ImageUpload";
+import { ImageUpload } from "@/components/shared/ImageUpload";
 import { Loader2, Save, User, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -18,13 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Users, Shield, UserPlus, Search, Loader2, Copy, RefreshCw, Trash2, Settings2, Eye } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
-import CompanyJoinRequests from "@/components/CompanyJoinRequests";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
+import CompanyJoinRequests from "@/components/auth/CompanyJoinRequests";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserAvatar } from "@/components/UserAvatar";
-import { CompanyRoleBadge } from "@/components/UserRoleBadge";
-import { PermissionAssignmentModal } from "@/components/PermissionAssignmentModal";
-import { UserProfileSheet } from "@/components/UserProfileSheet";
+import { UserAvatar } from "@/components/auth/UserAvatar";
+import { CompanyRoleBadge } from "@/components/auth/UserRoleBadge";
+import { PermissionAssignmentModal } from "@/components/dialogs/PermissionAssignmentModal";
+import { UserProfileSheet } from "@/components/auth/UserProfileSheet";
 
 
 function getPermissionsSummary(member: CompanyMembership): string {

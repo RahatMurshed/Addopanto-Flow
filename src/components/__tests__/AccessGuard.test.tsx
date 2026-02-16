@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AccessGuard, ACCESS_RULES } from "@/components/AccessGuard";
+import { AccessGuard, ACCESS_RULES } from "@/components/auth/AccessGuard";
 
 const mockCompanyContext = {
   isDataEntryOperator: false,

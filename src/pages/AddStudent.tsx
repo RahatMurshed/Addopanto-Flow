@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreateStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useSaveSiblings } from "@/hooks/useStudentSiblings";
-import type { InitialPaymentData } from "@/components/InitialPaymentSection";
+import type { InitialPaymentData } from "@/components/finance/InitialPaymentSection";
 import PersonalStep, { type PersonalData } from "@/components/StudentWizardSteps/PersonalStep";
 import ContactStep, { type ContactData } from "@/components/StudentWizardSteps/ContactStep";
 import FamilyStep, { type FamilyData } from "@/components/StudentWizardSteps/FamilyStep";

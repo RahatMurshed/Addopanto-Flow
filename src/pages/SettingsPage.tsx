@@ -11,11 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Info, Eye, EyeOff, Lock } from "lucide-react";
-import { DataManagementSection } from "@/components/DataManagementSection";
-import { DesignTokenEditor } from "@/components/DesignTokenEditor";
+import { DataManagementSection } from "@/components/shared/DataManagementSection";
+import { DesignTokenEditor } from "@/components/shared/DesignTokenEditor";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
-import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
-import { ImageUpload } from "@/components/ImageUpload";
+import { UnsavedChangesDialog } from "@/components/dialogs/UnsavedChangesDialog";
+import { ImageUpload } from "@/components/shared/ImageUpload";
 import { SUPPORTED_CURRENCIES, formatCurrency } from "@/utils/currencyUtils";
 
 const months = [

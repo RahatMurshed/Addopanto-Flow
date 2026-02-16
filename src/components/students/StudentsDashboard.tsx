@@ -10,10 +10,10 @@ import {
   TrendingUp, TrendingDown, BarChart3,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid } from "recharts";
-import MonthYearPicker from "@/components/MonthYearPicker";
+import MonthYearPicker from "@/components/shared/MonthYearPicker";
 import type { Student } from "@/hooks/useStudents";
 import type { Batch } from "@/hooks/useBatches";
-import type { defaultFilters, StudentFilterValues } from "@/components/StudentFilters";
+import type { defaultFilters, StudentFilterValues } from "@/components/students/StudentFilters";
 
 interface StudentsDashboardProps {
   allStudents: Student[];

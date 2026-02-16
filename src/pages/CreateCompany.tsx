@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Building2, Link2, FileText, KeyRound, ImageIcon, Users, Mail, Phone, Briefcase, MessageSquare } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import gaLogo from "@/assets/GA-LOGO.png";
-import { ImageUpload } from "@/components/ImageUpload";
+import { ImageUpload } from "@/components/shared/ImageUpload";
 
 export default function CreateCompany() {
   const { user } = useAuth();

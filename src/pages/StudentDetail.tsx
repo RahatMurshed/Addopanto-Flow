@@ -33,12 +33,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
-import StudentDialog from "@/components/StudentDialog";
-import StudentPaymentDialog from "@/components/StudentPaymentDialog";
-import StudentMonthGrid from "@/components/StudentMonthGrid";
-import MonthlyBreakdownList from "@/components/MonthlyBreakdownList";
+import StudentDialog from "@/components/dialogs/StudentDialog";
+import StudentPaymentDialog from "@/components/dialogs/StudentPaymentDialog";
+import StudentMonthGrid from "@/components/students/StudentMonthGrid";
+import MonthlyBreakdownList from "@/components/finance/MonthlyBreakdownList";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();

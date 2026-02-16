@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Download, Upload, AlertTriangle, Loader2 } from "lucide-react";
 import { useDataManagement } from "@/hooks/useDataManagement";
-import { RestoreDataDialog } from "@/components/RestoreDataDialog";
-import { ResetDataDialog } from "@/components/ResetDataDialog";
+import { RestoreDataDialog } from "@/components/dialogs/RestoreDataDialog";
+import { ResetDataDialog } from "@/components/dialogs/ResetDataDialog";
 
 export function DataManagementSection() {
   const { exportData, isExporting } = useDataManagement();

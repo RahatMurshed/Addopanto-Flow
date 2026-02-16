@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { exportToPDF } from "@/utils/exportUtils";
-import type { StudentFilterValues } from "@/components/StudentFilters";
+import type { StudentFilterValues } from "@/components/students/StudentFilters";
 import type { computeStudentSummary } from "@/hooks/useStudentPayments";
 
 // All possible export columns

@@ -24,10 +24,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Eye, Pencil, Trash2, BookOpen, Search, X, Loader2, TrendingUp, Users, SlidersHorizontal, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SkeletonTable } from "@/components/SkeletonLoaders";
-import CourseDialog from "@/components/CourseDialog";
+import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
+import CourseDialog from "@/components/dialogs/CourseDialog";
 import { usePagination } from "@/hooks/usePagination";
-import TablePagination from "@/components/TablePagination";
+import TablePagination from "@/components/shared/TablePagination";
 
 export default function Courses() {
   const [search, setSearch] = useState("");
