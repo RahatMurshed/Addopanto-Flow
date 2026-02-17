@@ -232,7 +232,7 @@ export function RestoreDataDialog({ open, onOpenChange }: RestoreDataDialogProps
                 <DialogTitle>Confirm Restore</DialogTitle>
               </div>
               <DialogDescription>
-                Type <strong>{CONFIRMATION_TEXT}</strong> to confirm you want to restore this backup.
+                Your current data can be changed. Type <strong>{CONFIRMATION_TEXT}</strong> to confirm you want to restore this backup.
               </DialogDescription>
             </DialogHeader>
 
