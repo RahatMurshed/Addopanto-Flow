@@ -197,6 +197,7 @@ export function RestoreDataDialog({ open, onOpenChange }: RestoreDataDialogProps
                   {preview.studentPaymentsCount > 0 && <li>• {preview.studentPaymentsCount} student payments</li>}
                   {preview.monthlyFeeHistoryCount > 0 && <li>• {preview.monthlyFeeHistoryCount} fee history records</li>}
                   {preview.siblingsCount > 0 && <li>• {preview.siblingsCount} student siblings</li>}
+                  {preview.batchHistoryCount > 0 && <li>• {preview.batchHistoryCount} batch transfer records</li>}
                   <li>• {preview.expenseAccountsCount} expense categories</li>
                   <li>• {preview.revenueSourcesCount} revenue sources</li>
                   <li>• {preview.revenuesCount} revenues</li>
@@ -205,6 +206,7 @@ export function RestoreDataDialog({ open, onOpenChange }: RestoreDataDialogProps
                   <li>• {preview.khataTransfersCount} transfers</li>
                   {preview.membershipsCount > 0 && <li>• {preview.membershipsCount} memberships</li>}
                   {preview.auditLogsCount > 0 && <li>• {preview.auditLogsCount} audit logs</li>}
+                  {preview.currencyChangeLogsCount > 0 && <li>• {preview.currencyChangeLogsCount} currency change logs</li>}
                 </ul>
               </div>
 

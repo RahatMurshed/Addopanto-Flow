@@ -49,8 +49,10 @@ export interface BackupPreview {
   monthlyFeeHistoryCount: number;
   coursesCount: number;
   siblingsCount: number;
+  batchHistoryCount: number;
   membershipsCount: number;
   auditLogsCount: number;
+  currencyChangeLogsCount: number;
   totalRecords: number;
   exportedAt: string;
   userEmail: string;
@@ -59,47 +61,52 @@ export interface BackupPreview {
 }
 
 export async function exportCompanyData(companyId: string): Promise<BackupData["data"]> {
-  const [
-    expenseAccountsRes,
-    revenueSourcesRes,
-    revenuesRes,
-    allocationsRes,
-    expensesRes,
-    khataTransfersRes,
-    batchesRes,
-    studentsRes,
-    studentPaymentsRes,
-    monthlyFeeHistoryRes,
-  ] = await Promise.all([
-    supabase.from("expense_accounts").select("*").eq("company_id", companyId),
-    supabase.from("revenue_sources").select("*").eq("company_id", companyId),
-    supabase.from("revenues").select("*").eq("company_id", companyId),
-    supabase.from("allocations").select("*").eq("company_id", companyId),
-    supabase.from("expenses").select("*").eq("company_id", companyId),
-    supabase.from("khata_transfers").select("*").eq("company_id", companyId),
-    supabase.from("batches").select("*").eq("company_id", companyId),
-    supabase.from("students").select("*").eq("company_id", companyId),
-    supabase.from("student_payments").select("*").eq("company_id", companyId),
-    supabase.from("monthly_fee_history").select("*").eq("company_id", companyId),
-  ]);
+  const tables = [
+    "expense_accounts",
+    "revenue_sources",
+    "revenues",
+    "allocations",
+    "expenses",
+    "khata_transfers",
+    "batches",
+    "students",
+    "student_payments",
+    "monthly_fee_history",
+    "courses",
+    "student_siblings",
+    "student_batch_history",
+    "company_memberships",
+    "audit_logs",
+    "currency_change_logs",
+  ];
+
+  const results = await Promise.all(
+    tables.map((table) =>
+      supabase.from(table as any).select("*").eq("company_id", companyId)
+    )
+  );
+
+  const data: Record<string, any[]> = {};
+  tables.forEach((table, i) => {
+    data[table] = results[i].data || [];
+  });
+
+  // Also fetch company settings
+  const { data: companyData } = await supabase
+    .from("companies")
+    .select("*")
+    .eq("id", companyId)
+    .single();
 
   return {
-    expense_accounts: expenseAccountsRes.data || [],
-    revenue_sources: revenueSourcesRes.data || [],
-    revenues: revenuesRes.data || [],
-    allocations: allocationsRes.data || [],
-    expenses: expensesRes.data || [],
-    khata_transfers: khataTransfersRes.data || [],
-    batches: batchesRes.data || [],
-    students: studentsRes.data || [],
-    student_payments: studentPaymentsRes.data || [],
-    monthly_fee_history: monthlyFeeHistoryRes.data || [],
-  };
+    company_settings: companyData ? [companyData] : [],
+    ...data,
+  } as BackupData["data"];
 }
 
 export function downloadBackup(data: BackupData["data"], userEmail: string, companyName?: string): void {
   const backup: BackupData = {
-    version: "2.0",
+    version: "3.0",
     exportedAt: new Date().toISOString(),
     userEmail,
     companyName,
@@ -204,8 +211,10 @@ export function getBackupPreview(backup: BackupData): BackupPreview {
     monthlyFeeHistoryCount: (backup.data.monthly_fee_history || []).length,
     coursesCount: (backup.data.courses || []).length,
     siblingsCount: (backup.data.student_siblings || []).length,
+    batchHistoryCount: (backup.data.student_batch_history || []).length,
     membershipsCount: (backup.data.company_memberships || []).length,
     auditLogsCount: (backup.data.audit_logs || []).length,
+    currencyChangeLogsCount: (backup.data.currency_change_logs || []).length,
   };
 
   return {

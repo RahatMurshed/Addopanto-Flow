@@ -226,7 +226,7 @@ export function useDataManagement() {
       const userId = user.id;
       const companyId = activeCompanyId;
 
-      report(5, "Restoring expense categories...");
+      report(3, "Restoring expense categories...");
       const accountIdMap = new Map<string, string>();
       for (const account of backup.data.expense_accounts || []) {
         const { data, error } = await supabase.from("expense_accounts").insert({
@@ -235,23 +235,25 @@ export function useDataManagement() {
           allocation_percentage: account.allocation_percentage,
           expected_monthly_expense: account.expected_monthly_expense,
           is_active: account.is_active,
+          created_at: account.created_at,
         }).select("id").single();
         if (error) throw error;
         accountIdMap.set(account.id, data.id);
       }
 
-      report(15, "Restoring revenue sources...");
+      report(10, "Restoring revenue sources...");
       const sourceIdMap = new Map<string, string>();
       for (const source of backup.data.revenue_sources || []) {
         const { data, error } = await supabase.from("revenue_sources").insert({
           user_id: userId, company_id: companyId,
           name: source.name, is_active: source.is_active,
+          created_at: source.created_at,
         }).select("id").single();
         if (error) throw error;
         sourceIdMap.set(source.id, data.id);
       }
 
-      report(20, "Restoring courses...");
+      report(15, "Restoring courses...");
       const courseIdMap = new Map<string, string>();
       for (const course of backup.data.courses || []) {
         const { data, error } = await supabase.from("courses").insert({
@@ -260,12 +262,13 @@ export function useDataManagement() {
           description: course.description, category: course.category,
           duration_months: course.duration_months, status: course.status,
           cover_image_url: course.cover_image_url,
+          created_at: course.created_at,
         }).select("id").single();
         if (error) throw error;
         courseIdMap.set(course.id, data.id);
       }
 
-      report(30, "Restoring batches...");
+      report(22, "Restoring batches...");
       const batchIdMap = new Map<string, string>();
       for (const batch of backup.data.batches || []) {
         const mappedCourseId = batch.course_id ? courseIdMap.get(batch.course_id) : null;
@@ -279,12 +282,13 @@ export function useDataManagement() {
           course_duration_months: batch.course_duration_months,
           max_capacity: batch.max_capacity,
           course_id: mappedCourseId,
+          created_at: batch.created_at,
         }).select("id").single();
         if (error) throw error;
         batchIdMap.set(batch.id, data.id);
       }
 
-      report(40, "Restoring revenues...");
+      report(30, "Restoring revenues...");
       const revenueIdMap = new Map<string, string>();
       for (const revenue of backup.data.revenues || []) {
         const { data, error } = await supabase.from("revenues").insert({
@@ -292,12 +296,13 @@ export function useDataManagement() {
           amount: revenue.amount, date: revenue.date,
           description: revenue.description,
           source_id: revenue.source_id ? sourceIdMap.get(revenue.source_id) : null,
+          created_at: revenue.created_at,
         }).select("id").single();
         if (error) throw error;
         revenueIdMap.set(revenue.id, data.id);
       }
 
-      report(50, "Restoring allocations...");
+      report(38, "Restoring allocations...");
       for (const allocation of backup.data.allocations || []) {
         const mappedRevenueId = revenueIdMap.get(allocation.revenue_id);
         const mappedAccountId = accountIdMap.get(allocation.expense_account_id);
@@ -306,12 +311,13 @@ export function useDataManagement() {
             user_id: userId, company_id: companyId,
             amount: allocation.amount,
             revenue_id: mappedRevenueId, expense_account_id: mappedAccountId,
+            created_at: allocation.created_at,
           });
           if (error) throw error;
         }
       }
 
-      report(55, "Restoring expenses...");
+      report(44, "Restoring expenses...");
       for (const expense of backup.data.expenses || []) {
         const mappedAccountId = accountIdMap.get(expense.expense_account_id);
         if (mappedAccountId) {
@@ -321,12 +327,13 @@ export function useDataManagement() {
             description: expense.description,
             expense_account_id: mappedAccountId,
             receipt_url: expense.receipt_url,
+            created_at: expense.created_at,
           });
           if (error) throw error;
         }
       }
 
-      report(60, "Restoring transfers...");
+      report(50, "Restoring transfers...");
       for (const transfer of backup.data.khata_transfers || []) {
         const mappedFromId = accountIdMap.get(transfer.from_account_id);
         const mappedToId = accountIdMap.get(transfer.to_account_id);
@@ -335,12 +342,13 @@ export function useDataManagement() {
             user_id: userId, company_id: companyId,
             amount: transfer.amount, description: transfer.description,
             from_account_id: mappedFromId, to_account_id: mappedToId,
+            created_at: transfer.created_at,
           });
           if (error) throw error;
         }
       }
 
-      report(70, "Restoring students...");
+      report(56, "Restoring students...");
       const studentIdMap = new Map<string, string>();
       for (const student of backup.data.students || []) {
         const mappedBatchId = student.batch_id ? batchIdMap.get(student.batch_id) : null;
@@ -366,12 +374,40 @@ export function useDataManagement() {
           address_state: student.address_state, address_pin_zip: student.address_pin_zip,
           academic_year: student.academic_year, class_grade: student.class_grade,
           section_division: student.section_division,
+          // Previously missing fields
+          blood_group: student.blood_group,
+          religion_category: student.religion_category,
+          nationality: student.nationality,
+          aadhar_id_number: student.aadhar_id_number,
+          father_occupation: student.father_occupation,
+          father_annual_income: student.father_annual_income,
+          mother_occupation: student.mother_occupation,
+          guardian_relationship: student.guardian_relationship,
+          previous_school: student.previous_school,
+          previous_qualification: student.previous_qualification,
+          previous_percentage: student.previous_percentage,
+          board_university: student.board_university,
+          special_needs_medical: student.special_needs_medical,
+          emergency_contact_name: student.emergency_contact_name,
+          emergency_contact_number: student.emergency_contact_number,
+          transportation_mode: student.transportation_mode,
+          distance_from_institution: student.distance_from_institution,
+          extracurricular_interests: student.extracurricular_interests,
+          language_proficiency: student.language_proficiency,
+          permanent_address_same: student.permanent_address_same,
+          perm_address_house: student.perm_address_house,
+          perm_address_street: student.perm_address_street,
+          perm_address_area: student.perm_address_area,
+          perm_address_city: student.perm_address_city,
+          perm_address_state: student.perm_address_state,
+          perm_address_pin_zip: student.perm_address_pin_zip,
+          created_at: student.created_at,
         }).select("id").single();
         if (error) throw error;
         studentIdMap.set(student.id, data.id);
       }
 
-      report(80, "Restoring student payments...");
+      report(68, "Restoring student payments...");
       for (const payment of backup.data.student_payments || []) {
         const mappedStudentId = studentIdMap.get(payment.student_id);
         if (mappedStudentId) {
@@ -383,12 +419,13 @@ export function useDataManagement() {
             months_covered: payment.months_covered,
             description: payment.description, receipt_number: payment.receipt_number,
             source_id: payment.source_id ? sourceIdMap.get(payment.source_id) : null,
+            created_at: payment.created_at,
           });
           if (error) throw error;
         }
       }
 
-      report(88, "Restoring fee history...");
+      report(76, "Restoring fee history...");
       for (const history of backup.data.monthly_fee_history || []) {
         const mappedStudentId = studentIdMap.get(history.student_id);
         if (mappedStudentId) {
@@ -397,12 +434,13 @@ export function useDataManagement() {
             student_id: mappedStudentId,
             monthly_amount: history.monthly_amount,
             effective_from: history.effective_from,
+            created_at: history.created_at,
           });
           if (error) throw error;
         }
       }
 
-      report(93, "Restoring student siblings...");
+      report(82, "Restoring student siblings...");
       for (const sibling of backup.data.student_siblings || []) {
         const mappedStudentId = studentIdMap.get(sibling.student_id);
         if (mappedStudentId) {
@@ -411,9 +449,54 @@ export function useDataManagement() {
             name: sibling.name, age: sibling.age,
             contact: sibling.contact,
             occupation_school: sibling.occupation_school,
+            created_at: sibling.created_at,
           });
           if (error) throw error;
         }
+      }
+
+      report(87, "Restoring batch transfer history...");
+      for (const entry of backup.data.student_batch_history || []) {
+        const mappedStudentId = studentIdMap.get(entry.student_id);
+        if (mappedStudentId) {
+          const { error } = await supabase.from("student_batch_history").insert({
+            company_id: companyId,
+            student_id: mappedStudentId,
+            from_batch_id: entry.from_batch_id ? batchIdMap.get(entry.from_batch_id) || null : null,
+            to_batch_id: entry.to_batch_id ? batchIdMap.get(entry.to_batch_id) || null : null,
+            reason: entry.reason,
+            transferred_by: userId,
+            transferred_at: entry.transferred_at,
+          });
+          if (error) throw error;
+        }
+      }
+
+      report(92, "Restoring currency change logs...");
+      for (const log of backup.data.currency_change_logs || []) {
+        const { error } = await supabase.from("currency_change_logs").insert({
+          company_id: companyId,
+          changed_by: userId,
+          old_currency: log.old_currency,
+          new_currency: log.new_currency,
+          old_exchange_rate: log.old_exchange_rate,
+          new_exchange_rate: log.new_exchange_rate,
+          changed_at: log.changed_at,
+        });
+        if (error) throw error;
+      }
+
+      // Restore company settings if present
+      report(96, "Restoring company settings...");
+      const companySettings = backup.data.company_settings?.[0];
+      if (companySettings) {
+        const { error } = await supabase.from("companies").update({
+          currency: companySettings.currency,
+          base_currency: companySettings.base_currency,
+          exchange_rate: companySettings.exchange_rate,
+          fiscal_year_start_month: companySettings.fiscal_year_start_month,
+        }).eq("id", companyId);
+        if (error) throw error;
       }
 
       report(100, "Restore complete!");
