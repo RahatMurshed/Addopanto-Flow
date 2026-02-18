@@ -1,82 +1,50 @@
 
 
-## Audit and Fix: Complete Data Backup System
+## Fix: Include Admission Fees in "Total Collected" Card
 
-### Problems Found
+### Problem
+In `src/pages/BatchDetail.tsx`, the "Total Collected" card displays `batchStats.monthCollected` and compares it against `batchStats.monthDue`. Both values are computed in the loop at lines 252-259, which only iterates over monthly fee months -- admission payments are never included.
 
-**1. Export is missing 6 tables entirely**
-The old `exportCompanyData()` utility only exports 10 tables. The newer `useDataManagement` export handles 16 tables plus company settings, but the utility function is out of sync.
+This means:
+- **Collected** shows only monthly payments (e.g., 1,250) but ignores any admission payments already made
+- **Due** shows only monthly fee totals but ignores admission fee totals
+- The progress bar and percentage are therefore inaccurate
 
-Tables missing from the utility (but present in the hook's export):
-- `courses`
-- `student_siblings`
-- `student_batch_history`
-- `company_memberships`
-- `audit_logs`
-- `currency_change_logs`
-- `company_settings` (the company record itself)
+### Root Cause (lines 252-259)
+```
+for (const m of includedMonths) {
+  monthDue += effMonthly;          // only monthly fees
+  monthCollected += payments for month;  // only monthly payments
+}
+```
 
-**2. Student restore is missing ~27 fields**
-When restoring students, only about half of the columns are mapped. These fields are silently lost:
-
-- Personal: `blood_group`, `religion_category`, `nationality`, `aadhar_id_number`
-- Family: `father_occupation`, `father_annual_income`, `mother_occupation`, `guardian_relationship`
-- Academic: `previous_school`, `previous_qualification`, `previous_percentage`, `board_university`
-- Contact/Emergency: `emergency_contact_name`, `emergency_contact_number`, `special_needs_medical`
-- Address (permanent): `permanent_address_same`, `perm_address_house`, `perm_address_street`, `perm_address_area`, `perm_address_city`, `perm_address_state`, `perm_address_pin_zip`
-- Other: `transportation_mode`, `distance_from_institution`, `extracurricular_interests`, `language_proficiency`
-
-**3. Restore skips `student_batch_history` and `currency_change_logs`**
-These are exported but never restored.
-
-**4. Company settings not restored**
-The backup includes the company record (currency, fiscal year, etc.) but restore ignores it.
-
-**5. Timestamps not preserved**
-`created_at` values for all records are lost -- they all get `now()` instead of the original dates. This makes audit trails and historical analysis inaccurate after restore.
-
----
+Admission paid/due amounts are tracked separately (`admissionCollected`, `admissionPending`) but never added to the card's displayed values.
 
 ### Solution
+In `src/pages/BatchDetail.tsx`, add admission fees to the filtered stats inside the `batchStats` useMemo:
 
-#### File 1: `src/utils/dataBackupUtils.ts`
-- Update `exportCompanyData()` to export all 16 tables plus company settings (matching what `useDataManagement` already does)
-- Add `currency_change_logs` count to `BackupPreview`
-- Update `getBackupPreview()` to include the new count
-- Bump backup version to `"3.0"` in validation
+1. After the per-student monthly loop (around line 259), add the student's admission due and paid amounts:
+   - `monthDue += effAdm` (admission fee total for that student)
+   - `monthCollected += sum.admissionPaid` (admission amount already paid)
 
-#### File 2: `src/hooks/useDataManagement.ts`
-- **Student restore**: Add all 27 missing fields to the insert payload
-- **Student batch history restore**: Add a new restore step for `student_batch_history` records, mapping `student_id`, `from_batch_id`, and `to_batch_id` using existing ID maps
-- **Currency change logs restore**: Add a restore step for `currency_change_logs`
-- **Company settings restore**: If backup contains `company_settings`, update the active company's currency, fiscal year, and exchange rate
-- **Preserve timestamps**: Include `created_at` in all insert payloads so historical dates survive the restore
-
-#### File 3: `src/components/dialogs/RestoreDataDialog.tsx`
-- Add `currency_change_logs` count to the preview display so users can see all data being restored
-
----
+2. This makes the "Total Collected" card show the true total (admission + monthly) collected vs. the true total due.
 
 ### Technical Details
 
-**Student restore insert -- adding missing fields:**
-```text
-blood_group, religion_category, nationality, aadhar_id_number,
-father_occupation, father_annual_income, mother_occupation,
-guardian_relationship, previous_school, previous_qualification,
-previous_percentage, board_university, special_needs_medical,
-emergency_contact_name, emergency_contact_number,
-transportation_mode, distance_from_institution,
-extracurricular_interests, language_proficiency,
-permanent_address_same, perm_address_house, perm_address_street,
-perm_address_area, perm_address_city, perm_address_state,
-perm_address_pin_zip
+**File**: `src/pages/BatchDetail.tsx`
+
+**Change location**: Inside the `batchStats` useMemo, in the `for (const [sid, sum])` loop, after the monthly `includedMonths` loop (after line 259), add:
+
+```typescript
+// Include admission fees in total collected/due
+monthDue += effAdm;
+monthCollected += sum.admissionPaid;
 ```
 
-**Timestamp preservation pattern:**
-Each insert will include `created_at: record.created_at` to keep the original timestamp.
+**Impact**:
+- The "Total Collected" card will now show combined admission + monthly collections
+- The progress bar percentage will reflect true overall collection rate
+- The "due" subtitle will show the correct total obligation
+- No other cards are affected -- "Total Pending" and "Admission pending" already work correctly
 
-**Student batch history restore** needs INSERT RLS policy (currently missing). A database migration will be added to create this policy.
-
-**No breaking changes** -- all additions are backward-compatible with older backup files since each new field defaults to `undefined`/`null`.
-
+This is a one-line-area change in a single file with no side effects.
