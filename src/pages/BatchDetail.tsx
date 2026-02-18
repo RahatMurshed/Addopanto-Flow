@@ -258,6 +258,10 @@ export default function BatchDetail() {
         monthCollected += sum.monthlyPaymentsByMonth.get(m) || 0;
       }
 
+      // Include admission fees in total collected/due
+      monthDue += effAdm;
+      monthCollected += sum.admissionPaid;
+
       // Overdue for included months
       const overdueInRange = sum.monthlyOverdueMonths.filter((m) => isMonthIncluded(m, filterValue));
       const partialInRange = sum.monthlyPartialMonths.filter((m) => isMonthIncluded(m, filterValue));
