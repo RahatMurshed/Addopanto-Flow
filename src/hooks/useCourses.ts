@@ -124,8 +124,9 @@ export function useUpdateCourse() {
         .update(updates)
         .eq("id", id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Course update failed — you may not have permission.");
       return data as unknown as Course;
     },
     onSuccess: (data: Course) => {
