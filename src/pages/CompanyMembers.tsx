@@ -305,7 +305,7 @@ export default function CompanyMembers() {
                             />
                             <div>
                               <p className="font-medium">
-                                {getName(member.user_id) || "Unknown Member"}
+                                {getName(member.user_id) || getEmail(member.user_id) || `User ${member.user_id.slice(0, 8)}…`}
                                 {isCurrentUser && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
                               </p>
                               <p className="text-xs text-muted-foreground">{getEmail(member.user_id)}</p>
