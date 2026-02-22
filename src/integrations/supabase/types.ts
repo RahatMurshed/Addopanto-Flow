@@ -1868,6 +1868,54 @@ export type Database = {
       }
       get_active_company_id: { Args: { _user_id: string }; Returns: string }
       get_cipher_user_ids: { Args: never; Returns: string[] }
+      get_company_members_filtered: {
+        Args: { _company_id: string }
+        Returns: {
+          approved_by: string | null
+          can_add_expense: boolean
+          can_add_expense_source: boolean
+          can_add_revenue: boolean
+          can_manage_students: boolean
+          can_transfer: boolean
+          can_view_reports: boolean
+          company_id: string
+          data_entry_mode: boolean
+          deo_batches: boolean
+          deo_courses: boolean
+          deo_finance: boolean
+          deo_payments: boolean
+          deo_students: boolean
+          id: string
+          joined_at: string
+          mod_batches_add: boolean
+          mod_batches_delete: boolean
+          mod_batches_edit: boolean
+          mod_courses_add: boolean
+          mod_courses_delete: boolean
+          mod_courses_edit: boolean
+          mod_expenses_add: boolean
+          mod_expenses_delete: boolean
+          mod_expenses_edit: boolean
+          mod_payments_add: boolean
+          mod_payments_delete: boolean
+          mod_payments_edit: boolean
+          mod_revenue_add: boolean
+          mod_revenue_delete: boolean
+          mod_revenue_edit: boolean
+          mod_students_add: boolean
+          mod_students_delete: boolean
+          mod_students_edit: boolean
+          role: Database["public"]["Enums"]["company_role"]
+          status: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "company_memberships"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

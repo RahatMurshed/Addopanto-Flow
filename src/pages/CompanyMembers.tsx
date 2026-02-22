@@ -66,38 +66,20 @@ export default function CompanyMembers() {
   const [editingMember, setEditingMember] = useState<CompanyMembership | null>(null);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
-  // Fetch cipher user IDs using security definer function (works for all authenticated users)
-  const { data: cipherUserIds = [] } = useQuery({
-    queryKey: ["cipher-user-ids"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_cipher_user_ids");
-      if (error) throw error;
-      return (data as string[]) ?? [];
-    },
-    enabled: canViewMembers,
-  });
 
-  // Fetch members
-  const { data: rawMembers = [], isLoading: membersLoading } = useQuery({
+  // Fetch members using server-side filtered function (excludes cipher for non-cipher users)
+  const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["company-members", activeCompanyId],
     queryFn: async () => {
       if (!activeCompanyId) return [];
-      const { data, error } = await supabase
-        .from("company_memberships")
-        .select("*")
-        .eq("company_id", activeCompanyId)
-        .order("joined_at", { ascending: true });
+      const { data, error } = await supabase.rpc("get_company_members_filtered", {
+        _company_id: activeCompanyId,
+      });
       if (error) throw error;
-      return data as CompanyMembership[];
+      return (data ?? []) as CompanyMembership[];
     },
     enabled: !!activeCompanyId && canViewMembers,
   });
-
-  // Filter out cipher members for non-cipher users; cipher users see everyone
-  const members = useMemo(() => {
-    if (isCipher || cipherUserIds.length === 0) return rawMembers;
-    return rawMembers.filter((m) => !cipherUserIds.includes(m.user_id));
-  }, [rawMembers, cipherUserIds, isCipher]);
 
   // Fetch member profiles
   const { data: profiles = [] } = useQuery({
