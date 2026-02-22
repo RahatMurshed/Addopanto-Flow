@@ -176,11 +176,11 @@ export function useStudents(filters?: StudentFilters) {
   const page = filters?.page || 1;
   const pageSize = filters?.pageSize || 50;
 
-  const { activeCompanyId, canViewStudentPII } = useCompany();
+  const { activeCompanyId, canViewStudentPII, isDataEntryModerator } = useCompany();
   const table = canViewStudentPII ? "students" : "students_safe";
 
   return useQuery({
-    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear, page, pageSize, table }],
+    queryKey: ["students", activeCompanyId, { search, status, sortBy, sortOrder, batchId, gender, classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear, page, pageSize, table, isDataEntryModerator }],
     queryFn: async (): Promise<PaginatedStudentsResult> => {
       if (!user) return { data: [], totalCount: 0 };
       if (!activeCompanyId) return { data: [], totalCount: 0 };
@@ -188,6 +188,12 @@ export function useStudents(filters?: StudentFilters) {
       // Build base query for both count and data
       let countQuery = supabase.from(table as any).select("id", { count: "exact", head: true }).eq("company_id", activeCompanyId);
       let dataQuery = supabase.from(table as any).select("*").eq("company_id", activeCompanyId);
+
+      // DEO moderators only see students they created
+      if (isDataEntryModerator) {
+        countQuery = countQuery.eq("user_id", user.id);
+        dataQuery = dataQuery.eq("user_id", user.id);
+      }
 
       // Apply filters to both queries
       if (status !== "all") {
@@ -412,11 +418,11 @@ export function useDeleteStudent() {
  */
 export function useAllStudents() {
   const { user } = useAuth();
-  const { activeCompanyId, canViewStudentPII } = useCompany();
+  const { activeCompanyId, canViewStudentPII, isDataEntryModerator } = useCompany();
   const table = canViewStudentPII ? "students" : "students_safe";
 
   return useQuery({
-    queryKey: ["students", "all", activeCompanyId, table],
+    queryKey: ["students", "all", activeCompanyId, table, isDataEntryModerator],
     queryFn: async () => {
       if (!user || !activeCompanyId) return [];
       let allData: Student[] = [];
@@ -424,11 +430,15 @@ export function useAllStudents() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore) {
-        const { data, error } = await supabase
+        let query = supabase
           .from(table as any)
           .select("*")
-          .eq("company_id", activeCompanyId)
-          .range(from, from + batchSize - 1);
+          .eq("company_id", activeCompanyId);
+        // DEO moderators only see their own students
+        if (isDataEntryModerator) {
+          query = query.eq("user_id", user.id);
+        }
+        const { data, error } = await query.range(from, from + batchSize - 1);
         if (error) throw error;
         allData = allData.concat((data as unknown) as Student[]);
         hasMore = data.length === batchSize;
