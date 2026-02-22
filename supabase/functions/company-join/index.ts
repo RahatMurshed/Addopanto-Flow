@@ -83,7 +83,7 @@ const approveJoinSchema = z.object({
   action: z.literal("approve-join-request"),
   requestId: uuidField,
   companyId: uuidField,
-  role: z.literal("moderator").default("moderator"),
+  role: z.enum(["admin", "moderator", "viewer", "data_entry_operator"]).default("moderator"),
   permissions: z.any().optional(),
 });
 
@@ -99,7 +99,7 @@ const acceptRejectedSchema = z.object({
   requestId: uuidField,
   companyId: uuidField,
   targetUserId: uuidField,
-  role: z.literal("moderator").default("moderator"),
+  role: z.enum(["admin", "moderator", "viewer", "data_entry_operator"]).default("moderator"),
   permissions: z.any().optional(),
 });
 
@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
     if (action === "approve-join-request") {
       const parsed = approveJoinSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-      const { requestId, companyId, permissions: perms } = parsed.data;
+      const { requestId, companyId, role: assignedRole, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
 
@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
       }).eq("id", requestId);
 
       const memberData: Record<string, unknown> = {
-        user_id: joinReq.user_id, company_id: companyId, role: "moderator", status: "active",
+        user_id: joinReq.user_id, company_id: companyId, role: assignedRole, status: "active",
         approved_by: user.id,
         deo_students: p.deo_students ?? false,
         deo_payments: p.deo_payments ?? false,
@@ -361,7 +361,7 @@ Deno.serve(async (req) => {
     if (action === "accept-rejected-join-request") {
       const parsed = acceptRejectedSchema.safeParse(rawBody);
       if (!parsed.success) return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
-      const { requestId, companyId, targetUserId, permissions: perms } = parsed.data;
+      const { requestId, companyId, targetUserId, role: assignedRole, permissions: perms } = parsed.data;
 
       if (!isCipher && !(await isCompanyAdmin(companyId))) return json(403, { error: "Not authorized" });
       const p = perms || {};
@@ -371,7 +371,7 @@ Deno.serve(async (req) => {
       }).eq("id", requestId).eq("company_id", companyId).eq("status", "rejected");
 
       const memberData: Record<string, unknown> = {
-        user_id: targetUserId, company_id: companyId, role: "moderator", status: "active",
+        user_id: targetUserId, company_id: companyId, role: assignedRole, status: "active",
         approved_by: user.id,
         deo_students: p.deo_students ?? false,
         deo_payments: p.deo_payments ?? false,
