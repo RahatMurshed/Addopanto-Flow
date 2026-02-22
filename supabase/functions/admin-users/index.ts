@@ -148,7 +148,10 @@ Deno.serve(async (req) => {
         return jsonResp(400, { error: "Password required to delete a user" });
       }
 
-      const { error: authError } = await adminClient.auth.signInWithPassword({
+      const verifyClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { error: authError } = await verifyClient.auth.signInWithPassword({
         email: user.email!,
         password,
       });
@@ -239,7 +242,10 @@ Deno.serve(async (req) => {
           return jsonResp(400, { error: "Password required for Cipher role changes" });
         }
 
-        const { error: authError } = await adminClient.auth.signInWithPassword({
+        const verifyClient = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+        const { error: authError } = await verifyClient.auth.signInWithPassword({
           email: user.email!,
           password,
         });
