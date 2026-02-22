@@ -26,9 +26,7 @@ import gaLogo from "@/assets/GA-LOGO.png";
 import { UserAvatar } from "@/components/auth/UserAvatar";
 import CommandPalette from "@/components/layout/CommandPalette";
 
-const baseNavItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-];
+const baseNavItems: Array<{ label: string; href: string; icon: any; badge?: number }> = [];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
@@ -96,47 +94,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const buildNavItems = () => {
     const items: Array<{ label: string; href: string; icon: any; badge?: number }> = [...baseNavItems];
 
+    // Dashboard: admin/cipher only
+    if (!isModerator) {
+      items.push({ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard });
+    }
+
     if (isDataEntryModerator) {
-      // Data Entry Moderator: restricted navigation
-      // Always show Students (read-only reference + own entries)
+      // Data Entry Moderator: only Students and Expenses
       if (canAddStudent || canEditStudent || canDeleteStudent) {
         items.push({ label: "Students", href: "/students", icon: GraduationCap });
-      }
-      // Show Batches for reference (read-only)
-      if (canAddBatch || canEditBatch || canDeleteBatch) {
-        items.push({ label: "Batches", href: "/batches", icon: Layers });
-      }
-      // Show Courses for reference
-      if (canAddCourse || canEditCourse || canDeleteCourse) {
-        items.push({ label: "Courses", href: "/courses", icon: BookOpen });
-      }
-      if (canAddRevenue || canEditRevenue || canDeleteRevenue) {
-        items.push({ label: "My Revenue", href: "/revenue", icon: TrendingUp });
       }
       if (canAddExpense || canEditExpense || canDeleteExpense) {
         items.push({ label: "My Expenses", href: "/expenses", icon: Receipt });
       }
+    } else if (isTraditionalModerator) {
+      // Traditional Moderator: granular permissions, no Dashboard/Reports
+      if (canAddCourse || canEditCourse || canDeleteCourse) {
+        items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+      }
+      if (canAddStudent || canEditStudent || canDeleteStudent) {
+        items.push({ label: "Students", href: "/students", icon: GraduationCap });
+      }
+      if (canAddRevenue || canEditRevenue || canDeleteRevenue) {
+        items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
+      }
+      if (canAddExpense || canEditExpense || canDeleteExpense) {
+        items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
+      }
     } else {
-      // Admin or Traditional Moderator: full navigation
-      const showCourses = !isTraditionalModerator || canAddCourse || canEditCourse || canDeleteCourse;
-      const showStudents = !isTraditionalModerator || canAddStudent || canEditStudent || canDeleteStudent;
-      const showBatches = !isTraditionalModerator || canAddBatch || canEditBatch || canDeleteBatch;
-      const showRevenue = !isTraditionalModerator || canAddRevenue || canEditRevenue || canDeleteRevenue;
-      const showExpenses = !isTraditionalModerator || canAddExpense || canEditExpense || canDeleteExpense;
-      const showKhatas = !isTraditionalModerator || canAddExpenseSource;
-
-      if (showCourses) items.push({ label: "Courses", href: "/courses", icon: BookOpen });
-      if (showStudents) items.push({ label: "Students", href: "/students", icon: GraduationCap });
-      if (showKhatas) items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
-      if (showRevenue) items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
-      if (showExpenses) items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
-      if (canViewReports) items.push({ label: "Reports", href: "/reports", icon: FileText });
-      if (canViewMembers && !isTraditionalModerator) {
-        items.push({ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 });
-      }
-      if ((isCompanyAdmin || isCipher) && !isTraditionalModerator) {
-        items.push({ label: "Audit Log", href: "/audit-log", icon: ClipboardList });
-      }
+      // Admin/Cipher: full navigation
+      items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+      items.push({ label: "Students", href: "/students", icon: GraduationCap });
+      items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
+      items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
+      items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
+      items.push({ label: "Reports", href: "/reports", icon: FileText });
+      items.push({ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 });
+      items.push({ label: "Audit Log", href: "/audit-log", icon: ClipboardList });
 
       // Cipher-only platform pages
       if (isCipher) {
@@ -144,9 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         items.push({ label: "Platform Users", href: "/users", icon: ShieldCheck });
       }
 
-      if ((isCompanyAdmin || isCipher) && !isTraditionalModerator) {
-        items.push({ label: "Settings", href: "/settings", icon: Settings });
-      }
+      items.push({ label: "Settings", href: "/settings", icon: Settings });
     }
 
     return items;
