@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, Users } from "lucide-react";
+import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, Users, XCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -69,6 +69,21 @@ export default function JoinCompany() {
     enabled: !!user?.id,
   });
 
+  // Fetch rejected requests to block re-joining
+  const { data: rejectedRequests = [] } = useQuery({
+    queryKey: ["my-rejected-join-requests-ids", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("company_join_requests")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .eq("status", "rejected");
+      return data?.map(r => r.company_id) ?? [];
+    },
+    enabled: !!user?.id,
+  });
+
   const filteredCompanies = allCompanies.filter(c => {
     const matchesSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.slug.toLowerCase().includes(search.toLowerCase());
     const notMember = !existingMemberships.includes(c.id);
@@ -77,6 +92,17 @@ export default function JoinCompany() {
 
   const handleJoinWithPassword = async () => {
     if (!selectedCompany || !user) return;
+
+    // Block if previously rejected
+    if (rejectedRequests.includes(selectedCompany.id)) {
+      toast({
+        title: "Cannot join this business",
+        description: "Your previous request to join this business was rejected. Please contact the admin or try another business.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("company-join", {
@@ -93,6 +119,8 @@ export default function JoinCompany() {
       setSelectedCompany(null);
       setPassword("");
       setMessage("");
+      queryClient.invalidateQueries({ queryKey: ["my-join-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["my-pending-join-requests"] });
     } catch (err: any) {
       toast({ title: "Failed to join", description: err.message, variant: "destructive" });
     }
@@ -139,6 +167,18 @@ export default function JoinCompany() {
       toast({ title: "Failed to join", description: err.message, variant: "destructive" });
     }
     setLoading(false);
+  };
+
+  const handleSelectCompany = (company: any) => {
+    if (rejectedRequests.includes(company.id)) {
+      toast({
+        title: "Request previously rejected",
+        description: "Your previous request to join this business was rejected. Please contact the admin or try another business.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedCompany(company);
   };
 
   return (
@@ -255,13 +295,15 @@ export default function JoinCompany() {
                 ) : (
                   filteredCompanies.map((company) => {
                     const isPending = pendingRequests.includes(company.id);
+                    const isRejected = rejectedRequests.includes(company.id);
                     const isJoining = joiningCompanyId === company.id;
                     const anyJoining = joiningCompanyId !== null;
+                    const isDisabled = isPending || isRejected || anyJoining;
                     return (
                       <Card
                         key={company.id}
-                        className={`cursor-pointer transition-all ${isPending ? "opacity-60" : "hover:border-primary/50 hover:shadow-sm"}`}
-                        onClick={() => !isPending && !anyJoining && setSelectedCompany(company)}
+                        className={`cursor-pointer transition-all ${isDisabled ? "opacity-60" : "hover:border-primary/50 hover:shadow-sm"}`}
+                        onClick={() => !isDisabled && handleSelectCompany(company)}
                       >
                         <CardContent className="flex items-center justify-between py-4">
                           <div className="flex items-center gap-3">
@@ -279,7 +321,11 @@ export default function JoinCompany() {
                               )}
                             </div>
                           </div>
-                          {isPending ? (
+                          {isRejected ? (
+                            <Badge variant="destructive" className="gap-1">
+                              <XCircle className="h-3 w-3" /> Rejected
+                            </Badge>
+                          ) : isPending ? (
                             <Badge variant="secondary" className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
                               Pending
                             </Badge>
