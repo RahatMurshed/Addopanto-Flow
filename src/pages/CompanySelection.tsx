@@ -1,20 +1,25 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, UserPlus, LogOut, Loader2, Users, ChevronRight, Clock, XCircle, X } from "lucide-react";
+import { Building2, Plus, UserPlus, LogOut, Loader2, Users, ChevronRight, Clock, XCircle, X, Sparkles } from "lucide-react";
 import gaLogo from "@/assets/GA-LOGO.png";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CompanySelection() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { companies, memberships, switchCompany, isCipher, isLoading } = useCompany();
   const [dismissedRejections, setDismissedRejections] = useState<string[]>([]);
+  const [newlyJoinedIds, setNewlyJoinedIds] = useState<string[]>([]);
 
   // Fetch cipher user IDs for member count filtering
   const { data: cipherUserIds = [] } = useQuery({
@@ -121,6 +126,34 @@ export default function CompanySelection() {
     },
     enabled: requestCompanyIds.length > 0,
   });
+
+  // Poll for pending join request approvals every 7 seconds
+  useEffect(() => {
+    if (!user?.id || pendingJoinRequests.length === 0) return;
+    const knownCompanyIds = companies.map(c => c.id);
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("company_memberships")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .eq("status", "active");
+      const currentIds = data?.map(m => m.company_id) ?? [];
+      const newIds = currentIds.filter(id => !knownCompanyIds.includes(id));
+      if (newIds.length > 0) {
+        setNewlyJoinedIds(prev => [...new Set([...prev, ...newIds])]);
+        // Find company name from request data
+        const companyName = requestCompanyNames[newIds[0]] || "business";
+        queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
+        queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+        queryClient.invalidateQueries({ queryKey: ["my-pending-join-requests"] });
+        toast({
+          title: "🎉 You've been approved!",
+          description: `You've been added to ${companyName}!`,
+        });
+      }
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [user?.id, pendingJoinRequests.length, companies, requestCompanyNames, queryClient, toast]);
 
   // Auto-redirect to join page when user has no companies and no pending/rejected requests
   useEffect(() => {
@@ -280,7 +313,7 @@ export default function CompanySelection() {
               {companies.map((company) => (
                 <Card
                   key={company.id}
-                  className="group cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
+                  className={`group cursor-pointer transition-all hover:border-primary/50 hover:shadow-md ${newlyJoinedIds.includes(company.id) ? "border-primary/50 ring-1 ring-primary/20" : ""}`}
                   onClick={() => handleSelectCompany(company.id)}
                 >
                   <CardHeader className="pb-2">
@@ -294,7 +327,14 @@ export default function CompanySelection() {
                           </div>
                         )}
                         <div>
-                          <CardTitle className="text-base">{company.name}</CardTitle>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            {company.name}
+                            {newlyJoinedIds.includes(company.id) && (
+                              <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] py-0 px-1.5 gap-0.5">
+                                <Sparkles className="h-3 w-3" /> New
+                              </Badge>
+                            )}
+                          </CardTitle>
                           {company.description && (
                             <CardDescription className="text-xs line-clamp-1">{company.description}</CardDescription>
                           )}
