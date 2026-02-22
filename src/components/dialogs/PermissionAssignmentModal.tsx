@@ -16,13 +16,10 @@ interface PermissionAssignmentModalProps {
   onPermissionChange: (key: string, value: boolean) => void;
 }
 
-/* ── Data Entry Mode categories ── */
+/* ── Data Entry Mode categories (minimal: only Students and Expenses) ── */
 const DEO_CATEGORIES = [
   { key: "deo_students", label: "Add Students", description: "Create new student records", icon: GraduationCap },
-  { key: "deo_payments", label: "Record Payments", description: "Record student payments", icon: CreditCard },
-  { key: "deo_batches", label: "Add Batches", description: "Create new batches", icon: Layers },
-  { key: "deo_courses", label: "Add Courses", description: "Create new courses", icon: BookOpen },
-  { key: "deo_finance", label: "Add Revenue & Expenses", description: "Record revenue and expense entries", icon: TrendingUp },
+  { key: "deo_finance", label: "Add Expenses", description: "Record expense entries", icon: Receipt },
 ] as const;
 
 /* ── Traditional Moderator permission categories ── */
@@ -168,7 +165,7 @@ export function PermissionAssignmentModal({
               })}
             </div>
             <p className="text-xs text-muted-foreground italic">
-              Data entry moderators can only edit/delete entries they personally created. They can view all students and batches for reference.
+              Data entry moderators can only add students and expenses. Dashboard, Reports, Courses, Batches, Payments, and Revenue are blocked.
             </p>
           </div>
         )}
@@ -213,7 +210,7 @@ export function PermissionAssignmentModal({
               })}
             </div>
             <p className="text-xs text-muted-foreground italic">
-              Full moderators can view all data, analytics, and reports. Permissions control what actions they can perform.
+              Full moderators can access pages and perform actions only when specific permissions are granted. Dashboard and Reports remain admin-only.
             </p>
           </div>
         )}

@@ -257,7 +257,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const canAddExpenseSource = isCompanyAdmin;
   const canTransfer = isCompanyAdmin || (isTraditionalModerator && (membership?.can_transfer ?? false));
-  const canViewReports = isCompanyAdmin || isTraditionalModerator;
+  const canViewReports = isCompanyAdmin; // Only admin/cipher can view reports
   const canManageStudents = isCompanyAdmin || canAddStudent || canEditStudent;
   const canEdit = isCompanyAdmin;
   const canDelete = isCompanyAdmin;
@@ -268,7 +268,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canViewStudentPII = isCompanyAdmin;
 
   // Data entry mode specific visibility
-  const canViewDashboardMetrics = !isDataEntryModerator;
+  const canViewDashboardMetrics = isCompanyAdmin; // Only admin/cipher can view dashboard
   const canViewPaymentHistory = !isDataEntryModerator;
   const canViewFinancialData = !isDataEntryModerator;
 

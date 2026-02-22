@@ -41,16 +41,16 @@ const CHART_COLORS = [
 
 export default function Reports() {
   const { user } = useAuth();
-  const { activeCompany, isDataEntryModerator, isLoading: companyLoading } = useCompany();
+  const { activeCompany, isDataEntryModerator, isModerator, isLoading: companyLoading } = useCompany();
   const { fcp, fc } = useCompanyCurrency();
   const navigate = useNavigate();
 
-  // Redirect data entry moderators away from reports
+  // Redirect all moderators away from reports (admin/cipher only)
   useEffect(() => {
-    if (!companyLoading && isDataEntryModerator) {
+    if (!companyLoading && isModerator) {
       navigate("/dashboard", { replace: true });
     }
-  }, [companyLoading, isDataEntryModerator, navigate]);
+  }, [companyLoading, isModerator, navigate]);
   
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { data: transfers = [] } = useKhataTransfers();

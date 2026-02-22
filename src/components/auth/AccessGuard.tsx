@@ -10,6 +10,18 @@ interface AccessRule {
 }
 
 export const ACCESS_RULES = {
+  /** Block all moderators from Dashboard (admin/cipher only) */
+  moderatorDashboard: {
+    isDenied: (ctx) => ctx.isModerator,
+    message: "Access Denied — Admin Only. The Dashboard is restricted to admins.",
+    autoRedirectSeconds: 5,
+  },
+  /** Block all moderators from Reports (admin/cipher only) */
+  moderatorReports: {
+    isDenied: (ctx) => ctx.isModerator,
+    message: "Access Denied — Admin Only. Reports are restricted to admins.",
+    autoRedirectSeconds: 5,
+  },
   /** Block moderators with no revenue permissions */
   deoRevenue: {
     isDenied: (ctx) => ctx.isModerator && !ctx.canAddRevenue && !ctx.canViewRevenue,
@@ -24,6 +36,30 @@ export const ACCESS_RULES = {
   deoCourses: {
     isDenied: (ctx) => ctx.isModerator && !ctx.canAddBatch && !ctx.canEditBatch && !ctx.canDeleteBatch,
     message: "You don't have permission to access courses or batches. Contact your company admin to request access.",
+  },
+  /** Block DEO moderators from courses page */
+  deoCoursePages: {
+    isDenied: (ctx) => ctx.isDataEntryModerator,
+    message: "Access Denied. Courses are not available in Data Entry Mode.",
+    autoRedirectSeconds: 5,
+  },
+  /** Block DEO moderators from batches page */
+  deoBatchPages: {
+    isDenied: (ctx) => ctx.isDataEntryModerator,
+    message: "Access Denied. Batches are not available in Data Entry Mode.",
+    autoRedirectSeconds: 5,
+  },
+  /** Block DEO moderators from revenue page */
+  deoRevenuePages: {
+    isDenied: (ctx) => ctx.isDataEntryModerator,
+    message: "Access Denied. Revenue is not available in Data Entry Mode.",
+    autoRedirectSeconds: 5,
+  },
+  /** Block DEO moderators from payments */
+  deoPaymentPages: {
+    isDenied: (ctx) => ctx.isDataEntryModerator,
+    message: "Access Denied. Payments are not available in Data Entry Mode.",
+    autoRedirectSeconds: 5,
   },
   /** Block all moderators from member management */
   deoMembers: {
