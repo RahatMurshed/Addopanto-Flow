@@ -44,7 +44,7 @@ export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete, isModerator, canEditStudent, canViewStudentPII, isLoading: companyLoading } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, isDataEntryModerator, canEditStudent, canDeleteStudent, canViewStudentPII, isLoading: companyLoading } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: student, isLoading: studentLoading } = useStudent(id);
@@ -286,8 +286,9 @@ export default function StudentDetail() {
           </div>
         </div>
         <div className="flex gap-2">
-          {canEdit && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
-          {canAddRevenue && (
+          {(canEdit || canEditStudent) && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
+          {/* DEO moderators are completely blocked from payments */}
+          {!isDataEntryModerator && canAddRevenue && (
             summary && summary.totalPending <= 0 ? (
               <Button disabled className="opacity-60"><Plus className="mr-2 h-4 w-4" />All Fees Collected</Button>
             ) : (
@@ -330,8 +331,8 @@ export default function StudentDetail() {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Card 1: Admission Fee */}
+      {/* Financial summary cards - hidden for DEO moderators */}
+      {!isDataEntryModerator && <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
@@ -437,7 +438,7 @@ export default function StudentDetail() {
             <p className="text-xs text-muted-foreground text-right">{summary.overallPercent.toFixed(0)}% complete</p>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* Student Notes Card */}
       {student.notes && (
@@ -517,8 +518,8 @@ export default function StudentDetail() {
           </CardContent>
         </Card>
       )}
-      {/* Monthly Fee Visual Grid & Breakdown */}
-      {effectiveMonthlyFee > 0 && (
+      {/* Monthly Fee Visual Grid & Breakdown - hidden for DEO moderators */}
+      {!isDataEntryModerator && effectiveMonthlyFee > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Monthly Fee Breakdown</CardTitle>
@@ -551,8 +552,8 @@ export default function StudentDetail() {
         </Card>
       )}
 
-      {/* Payment History */}
-      <Card>
+      {/* Payment History - hidden for DEO moderators */}
+      {!isDataEntryModerator && <Card>
         <CardHeader className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Payment History</CardTitle>
@@ -698,10 +699,10 @@ export default function StudentDetail() {
             </>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      {/* Payment Notes Timeline */}
-      {(() => {
+      {/* Payment Notes Timeline - hidden for DEO moderators */}
+      {!isDataEntryModerator && (() => {
         const notedPayments = payments
           .filter((p) => p.description)
           .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());

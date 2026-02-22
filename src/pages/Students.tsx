@@ -78,24 +78,16 @@ export default function Students() {
   const { data: allStudentsRaw = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
   const { data: batchesData = [] } = useBatches({ status: "all" });
-  const { canAddRevenue, canEdit, canDelete, isModerator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, canViewStudentPII, activeCompanyId } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, isDataEntryModerator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, canViewStudentPII, activeCompanyId } = useCompany();
   const { user } = useAuth();
   
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // DEO filter for all students (summary cards)
-  const allStudents = useMemo(() => {
-    if (!isModerator) return allStudentsRaw;
-    return allStudentsRaw.filter(s => s.user_id === user?.id);
-  }, [allStudentsRaw, isModerator, user?.id]);
-
-  // DEO filter for paginated students
-  const students = useMemo(() => {
-    if (!isModerator) return serverStudents;
-    return serverStudents.filter(s => s.user_id === user?.id);
-  }, [serverStudents, isModerator, user?.id]);
+  // Server-side filtering handles DEO isolation now; no client-side filter needed
+  const allStudents = allStudentsRaw;
+  const students = serverStudents;
 
   const createMutation = useCreateStudent();
   const deleteMutation = useDeleteStudent();
@@ -299,7 +291,8 @@ export default function Students() {
   const effectiveCanAdd = canAddRevenue || canAddStudent;
   const effectiveCanEdit = canEdit || canEditStudent;
   const effectiveCanDelete = canDelete || canDeleteStudent;
-  const effectiveCanPayment = canAddRevenue || canAddPayment;
+  // DEO moderators are completely blocked from payments
+  const effectiveCanPayment = !isDataEntryModerator && (canAddRevenue || canAddPayment);
 
   return (
     <div className="space-y-6">
@@ -307,8 +300,8 @@ export default function Students() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Students</h1>
-            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">Moderator</Badge>}
+            <h1 className="text-2xl font-bold tracking-tight">{isDataEntryModerator ? "My Students" : "Students"}</h1>
+            {isModerator && <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">{isDataEntryModerator ? "Data Entry" : "Moderator"}</Badge>}
           </div>
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>

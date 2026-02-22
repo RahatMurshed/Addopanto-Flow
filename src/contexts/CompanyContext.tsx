@@ -235,9 +235,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canEditStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_edit ?? false)) || (isDataEntryModerator && deoStudents);
   const canDeleteStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_delete ?? false)) || (isDataEntryModerator && deoStudents);
 
-  const canAddPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_add ?? false)) || (isDataEntryModerator && deoPayments);
-  const canEditPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_edit ?? false)) || (isDataEntryModerator && deoPayments);
-  const canDeletePayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_delete ?? false)) || (isDataEntryModerator && deoPayments);
+  // DEO moderators are completely blocked from payments regardless of any flag
+  const canAddPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_add ?? false));
+  const canEditPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_edit ?? false));
+  const canDeletePayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_delete ?? false));
 
   const canAddBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_add ?? false)) || (isDataEntryModerator && deoBatches);
   const canEditBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_edit ?? false)) || (isDataEntryModerator && deoBatches);
