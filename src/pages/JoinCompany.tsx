@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, XCircle, AlertCircle } from "lucide-react";
+import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, XCircle, AlertCircle, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -71,6 +71,40 @@ export default function JoinCompany() {
     enabled: !!user?.id,
   });
 
+  // Fetch pending requests with details for the visual section
+  const { data: pendingRequestDetails = [] } = useQuery({
+    queryKey: ["my-pending-join-details", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("company_join_requests")
+        .select("id, company_id, requested_at, status")
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Get company names for pending requests
+  const pendingCompanyIds = pendingRequestDetails.map(r => r.company_id);
+  const { data: pendingCompanyNames = {} } = useQuery({
+    queryKey: ["pending-company-names", pendingCompanyIds],
+    queryFn: async () => {
+      if (pendingCompanyIds.length === 0) return {};
+      const { data, error } = await (supabase
+        .from("companies_public" as any)
+        .select("id, name")
+        .in("id", pendingCompanyIds) as any);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const c of data ?? []) map[c.id] = c.name;
+      return map;
+    },
+    enabled: pendingCompanyIds.length > 0,
+  });
+
   const { data: rejectedRequests = [] } = useQuery({
     queryKey: ["my-rejected-join-requests-ids", user?.id],
     queryFn: async () => {
@@ -84,6 +118,47 @@ export default function JoinCompany() {
     },
     enabled: !!user?.id,
   });
+
+  // Poll for approval: check memberships every 7 seconds when there are pending requests
+  const previousMembershipIds = useRef<string[]>(existingMemberships);
+  useEffect(() => {
+    previousMembershipIds.current = existingMemberships;
+  }, [existingMemberships]);
+
+  useEffect(() => {
+    if (!user?.id || pendingRequests.length === 0) return;
+
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("company_memberships")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .eq("status", "active");
+      const currentIds = data?.map(m => m.company_id) ?? [];
+      const prevIds = previousMembershipIds.current;
+
+      // Find newly approved companies
+      const newlyApproved = currentIds.filter(id => !prevIds.includes(id));
+      if (newlyApproved.length > 0) {
+        // Find the company name
+        const approvedId = newlyApproved[0];
+        const companyName = pendingCompanyNames[approvedId] || allCompanies.find(c => c.id === approvedId)?.name;
+        queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
+        queryClient.invalidateQueries({ queryKey: ["user-companies"] });
+        queryClient.invalidateQueries({ queryKey: ["my-join-requests"] });
+        queryClient.invalidateQueries({ queryKey: ["my-pending-join-requests"] });
+        toast({
+          title: "🎉 You've been approved!",
+          description: companyName
+            ? `You've been added to ${companyName}!`
+            : "Your join request has been approved!",
+        });
+        navigate("/companies", { replace: true });
+      }
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, [user?.id, pendingRequests.length, pendingCompanyNames, allCompanies, queryClient, toast, navigate]);
 
   const filteredCompanies = allCompanies.filter(c => {
     const matchesSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.slug.toLowerCase().includes(search.toLowerCase());
@@ -273,6 +348,37 @@ export default function JoinCompany() {
                 className="pl-9"
               />
             </div>
+
+            {/* Pending requests visual section */}
+            {pendingRequestDetails.length > 0 && !selectedCompany && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
+                  <Clock className="h-4 w-4" /> Pending Requests
+                </h3>
+                {pendingRequestDetails.map((req) => (
+                  <Card key={req.id} className="border-yellow-500/30 bg-yellow-500/5">
+                    <CardContent className="flex items-center gap-3 py-3">
+                      <div className="relative">
+                        <Clock className="h-5 w-5 text-yellow-600 shrink-0" />
+                        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">
+                          {pendingCompanyNames[req.company_id] || "Business"}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Waiting for admin approval...
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 text-xs">
+                        Pending
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
 
             {selectedCompany ? (
               <Card className="border-primary/30 shadow-md">
