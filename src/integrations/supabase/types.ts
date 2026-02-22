@@ -1867,6 +1867,7 @@ export type Database = {
         Returns: boolean
       }
       get_active_company_id: { Args: { _user_id: string }; Returns: string }
+      get_cipher_user_ids: { Args: never; Returns: string[] }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

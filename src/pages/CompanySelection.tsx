@@ -21,16 +21,13 @@ export default function CompanySelection() {
   const [dismissedRejections, setDismissedRejections] = useState<string[]>([]);
   const [newlyJoinedIds, setNewlyJoinedIds] = useState<string[]>([]);
 
-  // Fetch cipher user IDs for member count filtering
+  // Fetch cipher user IDs for member count filtering (uses security definer function)
   const { data: cipherUserIds = [] } = useQuery({
     queryKey: ["cipher-user-ids-for-counts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "cipher");
+      const { data, error } = await supabase.rpc("get_cipher_user_ids");
       if (error) throw error;
-      return data.map(r => r.user_id);
+      return (data as string[]) ?? [];
     },
     enabled: !isCipher && companies.length > 0,
   });

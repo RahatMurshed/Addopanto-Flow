@@ -66,16 +66,13 @@ export default function CompanyMembers() {
   const [editingMember, setEditingMember] = useState<CompanyMembership | null>(null);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
-  // Fetch cipher user IDs to filter them out for non-cipher users
+  // Fetch cipher user IDs using security definer function (works for all authenticated users)
   const { data: cipherUserIds = [] } = useQuery({
     queryKey: ["cipher-user-ids"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "cipher");
+      const { data, error } = await supabase.rpc("get_cipher_user_ids");
       if (error) throw error;
-      return data.map((r) => r.user_id);
+      return (data as string[]) ?? [];
     },
     enabled: canViewMembers,
   });
