@@ -96,11 +96,11 @@ export default function CompanyMembers() {
     enabled: !!activeCompanyId && canViewMembers,
   });
 
-  // Always filter out cipher members from the members list (cipher is invisible to everyone)
+  // Filter out cipher members for non-cipher users; cipher users see everyone
   const members = useMemo(() => {
-    if (cipherUserIds.length === 0) return rawMembers;
+    if (isCipher || cipherUserIds.length === 0) return rawMembers;
     return rawMembers.filter((m) => !cipherUserIds.includes(m.user_id));
-  }, [rawMembers, cipherUserIds]);
+  }, [rawMembers, cipherUserIds, isCipher]);
 
   // Fetch member profiles
   const { data: profiles = [] } = useQuery({
