@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, Users, XCircle } from "lucide-react";
+import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, XCircle, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -29,6 +29,8 @@ export default function JoinCompany() {
   const [loading, setLoading] = useState(false);
   const [joiningCompanyId, setJoiningCompanyId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const { data: allCompanies = [] } = useQuery({
     queryKey: ["all-companies"],
@@ -69,7 +71,6 @@ export default function JoinCompany() {
     enabled: !!user?.id,
   });
 
-  // Fetch rejected requests to block re-joining
   const { data: rejectedRequests = [] } = useQuery({
     queryKey: ["my-rejected-join-requests-ids", user?.id],
     queryFn: async () => {
@@ -90,16 +91,25 @@ export default function JoinCompany() {
     return matchesSearch && notMember;
   });
 
+  const getFriendlyError = (error: any): string => {
+    if (!error) return "Failed to send join request. Please try again.";
+    const msg = typeof error === "string" ? error : error?.message || "";
+    // Map technical errors to friendly messages
+    if (msg.includes("non-2xx") || msg.includes("FunctionsHttpError")) {
+      return "Failed to send join request. Please try again.";
+    }
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+      return "Network error. Please check your internet connection and try again.";
+    }
+    return msg || "Failed to send join request. Please try again.";
+  };
+
   const handleJoinWithPassword = async () => {
     if (!selectedCompany || !user) return;
+    setJoinError(null);
 
-    // Block if previously rejected
     if (rejectedRequests.includes(selectedCompany.id)) {
-      toast({
-        title: "Cannot join this business",
-        description: "Your previous request to join this business was rejected. Please contact the admin or try another business.",
-        variant: "destructive",
-      });
+      setJoinError("Your previous request to join this business was rejected. Please contact the admin or try another business.");
       return;
     }
 
@@ -113,16 +123,33 @@ export default function JoinCompany() {
           message,
         },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+
+      if (error) {
+        setJoinError(getFriendlyError(error));
+        setPassword("");
+        setLoading(false);
+        return;
+      }
+
+      if (data?.error) {
+        setJoinError(data.error);
+        if (data.code === "INVALID_PASSWORD") {
+          setPassword("");
+        }
+        setLoading(false);
+        return;
+      }
+
       toast({ title: "Join request sent!", description: "Waiting for admin approval." });
       setSelectedCompany(null);
       setPassword("");
       setMessage("");
+      setJoinError(null);
       queryClient.invalidateQueries({ queryKey: ["my-join-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-pending-join-requests"] });
     } catch (err: any) {
-      toast({ title: "Failed to join", description: err.message, variant: "destructive" });
+      setJoinError(getFriendlyError(err));
+      setPassword("");
     }
     setLoading(false);
   };
@@ -141,13 +168,14 @@ export default function JoinCompany() {
       queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
       navigate("/companies");
     } catch (err: any) {
-      toast({ title: "Failed to join", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to join", description: getFriendlyError(err), variant: "destructive" });
     }
     setJoiningCompanyId(null);
   };
 
   const handleJoinWithInvite = async () => {
     if (!user) return;
+    setInviteError(null);
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("company-join", {
@@ -156,15 +184,26 @@ export default function JoinCompany() {
           inviteCode,
         },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+
+      if (error) {
+        setInviteError(getFriendlyError(error));
+        setLoading(false);
+        return;
+      }
+
+      if (data?.error) {
+        setInviteError(data.error);
+        setLoading(false);
+        return;
+      }
+
       toast({ title: "Joined successfully!", description: "You have been added to the business." });
       queryClient.invalidateQueries({ queryKey: ["company-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["user-companies"] });
       queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
       navigate("/companies");
     } catch (err: any) {
-      toast({ title: "Failed to join", description: err.message, variant: "destructive" });
+      setInviteError(getFriendlyError(err));
     }
     setLoading(false);
   };
@@ -178,13 +217,26 @@ export default function JoinCompany() {
       });
       return;
     }
+    setJoinError(null);
+    setPassword("");
     setSelectedCompany(company);
   };
+
+  const ErrorBanner = ({ message, onDismiss }: { message: string; onDismiss?: () => void }) => (
+    <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+      <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+      <p className="text-sm text-destructive flex-1">{message}</p>
+      {onDismiss && (
+        <button onClick={onDismiss} className="text-destructive/60 hover:text-destructive shrink-0">
+          <XCircle className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-lg space-y-6">
-        {/* Branding header */}
         <div className="text-center space-y-2">
           <Link to="/companies">
             <img src={gaLogo} alt="Grammar Addopanto" className="mx-auto h-14 w-auto object-contain" />
@@ -240,16 +292,19 @@ export default function JoinCompany() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {joinError && (
+                    <ErrorBanner message={joinError} onDismiss={() => setJoinError(null)} />
+                  )}
                   <div className="space-y-2">
                     <Label>Business Password</Label>
                     <div className="relative">
                       <Input
                         type={showPassword ? "text" : "password"}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => { setPassword(e.target.value); if (joinError) setJoinError(null); }}
                         placeholder="Enter business password"
                         disabled={loading}
-                        className="pr-10"
+                        className={`pr-10 ${joinError ? "border-destructive" : ""}`}
                       />
                       <Button
                         type="button"
@@ -275,7 +330,7 @@ export default function JoinCompany() {
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setSelectedCompany(null)} disabled={loading}>Cancel</Button>
+                    <Button variant="outline" onClick={() => { setSelectedCompany(null); setJoinError(null); setPassword(""); }} disabled={loading}>Cancel</Button>
                     <Button onClick={handleJoinWithPassword} disabled={loading || !password} className="flex-1">
                       {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Send Join Request
@@ -368,14 +423,17 @@ export default function JoinCompany() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {inviteError && (
+                  <ErrorBanner message={inviteError} onDismiss={() => setInviteError(null)} />
+                )}
                 <div className="space-y-2">
                   <Label>Invite Code</Label>
                   <Input
                     value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    onChange={(e) => { setInviteCode(e.target.value.toUpperCase()); if (inviteError) setInviteError(null); }}
                     placeholder="e.g. AB12CD34"
                     maxLength={12}
-                    className="font-mono text-center tracking-widest text-lg"
+                    className={`font-mono text-center tracking-widest text-lg ${inviteError ? "border-destructive" : ""}`}
                   />
                   <p className="text-xs text-muted-foreground">The code is case-insensitive and provided by the business admin</p>
                 </div>

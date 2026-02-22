@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
 
       if (banCheck?.banned_until && new Date(banCheck.banned_until) > new Date()) {
         const remaining = Math.ceil((new Date(banCheck.banned_until).getTime() - Date.now()) / (1000 * 60 * 60));
-        return json(400, { error: `You are temporarily blocked from joining this company. Try again in ${remaining} hour(s).` });
+        return json(200, { error: `You are temporarily blocked from joining this business. Try again in ${remaining} hour(s).`, code: "BANNED" });
       }
 
       const { data: company } = await adminClient
@@ -243,13 +243,13 @@ Deno.serve(async (req) => {
         .eq("id", companyId)
         .single();
 
-      if (!company) return json(400, { error: "Company not found" });
-      if (!company.join_password) return json(400, { error: "This business has not set a join password yet. Please contact the business admin to set one, or use an invite code instead." });
+      if (!company) return json(200, { error: "Business not found.", code: "COMPANY_NOT_FOUND" });
+      if (!company.join_password) return json(200, { error: "This business has not set a join password yet. Please contact the business admin to set one, or use an invite code instead.", code: "NO_PASSWORD_SET" });
       
       let passwordValid = false;
       try { passwordValid = await verifyPassword(password, company.join_password); }
       catch (e) { console.log("Password verification error", e); passwordValid = false; }
-      if (!passwordValid) return json(400, { error: "Incorrect password" });
+      if (!passwordValid) return json(200, { error: "Incorrect business password. Please check with the admin and try again.", code: "INVALID_PASSWORD" });
 
       if (isLegacyPassword(company.join_password)) {
         const rehashed = await hashPassword(password);
@@ -258,11 +258,11 @@ Deno.serve(async (req) => {
 
       const { data: existing } = await adminClient
         .from("company_memberships").select("id").eq("user_id", user.id).eq("company_id", companyId).maybeSingle();
-      if (existing) return json(400, { error: "Already a member" });
+      if (existing) return json(200, { error: "You are already a member of this business.", code: "ALREADY_MEMBER" });
 
       const { data: existingReq } = await adminClient
         .from("company_join_requests").select("id").eq("user_id", user.id).eq("company_id", companyId).eq("status", "pending").maybeSingle();
-      if (existingReq) return json(400, { error: "Join request already pending" });
+      if (existingReq) return json(200, { error: "You already have a pending request for this business.", code: "PENDING_REQUEST" });
 
       await adminClient.from("company_join_requests").insert({
         user_id: user.id, company_id: companyId, message: message || null,
@@ -278,11 +278,11 @@ Deno.serve(async (req) => {
       const { inviteCode } = parsed.data;
       const { data: company } = await adminClient
         .from("companies").select("id").eq("invite_code", inviteCode.toUpperCase()).maybeSingle();
-      if (!company) return json(400, { error: "Invalid invite code" });
+      if (!company) return json(200, { error: "Invalid invite code. Please check and try again.", code: "INVALID_INVITE" });
 
       const { data: existing } = await adminClient
         .from("company_memberships").select("id").eq("user_id", user.id).eq("company_id", company.id).maybeSingle();
-      if (existing) return json(400, { error: "Already a member" });
+      if (existing) return json(200, { error: "You are already a member of this business.", code: "ALREADY_MEMBER" });
 
       // Invite code joins assign moderator with no permissions by default
       await adminClient.from("company_memberships").insert({
