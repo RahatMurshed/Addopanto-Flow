@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +8,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Search, Loader2, Eye, Merge, Trash2, ShieldX, Users, CheckCircle2 } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
+import { ArrowLeft, Search, Loader2, Eye, Merge, Trash2, ShieldX, Users, CheckCircle2, Undo2 } from "lucide-react";
 import {
   useFindDuplicates,
   useDismissDuplicate,
   useMergeStudents,
+  useUnmergeStudents,
   type DuplicateGroup,
+  type MergeUndoData,
 } from "@/hooks/useDuplicateDetection";
 import { useDeleteStudent } from "@/hooks/useStudents";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +31,7 @@ export default function StudentDuplicates() {
   const { toast } = useToast();
   const { data: groups = [], isLoading, isFetching, refetch } = useFindDuplicates();
   const mergeMutation = useMergeStudents();
+  const unmergeMutation = useUnmergeStudents();
   const dismissMutation = useDismissDuplicate();
   const deleteMutation = useDeleteStudent();
   const [hasScanned, setHasScanned] = useState(false);
@@ -35,6 +39,7 @@ export default function StudentDuplicates() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ studentId: string; studentName: string } | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<DuplicateGroup | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const handleScan = async () => {
     await refetch();
@@ -44,13 +49,31 @@ export default function StudentDuplicates() {
   const handleMerge = async () => {
     if (!mergeConfirm) return;
     try {
-      await mergeMutation.mutateAsync({
+      const result = await mergeMutation.mutateAsync({
         primaryStudentId: mergeConfirm.primaryId,
         duplicateStudentId: mergeConfirm.duplicateId,
       });
-      toast({ title: "Students merged successfully" });
       setMergeConfirm(null);
       refetch();
+
+      // Show undo toast via sonner (supports action buttons)
+      const undoData = result.undo_data;
+      sonnerToast.success("Students merged successfully", {
+        description: "You can undo this within 15 seconds.",
+        duration: 15000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await unmergeMutation.mutateAsync(undoData);
+              sonnerToast.success("Merge undone successfully");
+              refetch();
+            } catch (err: any) {
+              sonnerToast.error("Undo failed", { description: err.message });
+            }
+          },
+        },
+      });
     } catch (err: any) {
       toast({ title: "Merge failed", description: err.message, variant: "destructive" });
     }
