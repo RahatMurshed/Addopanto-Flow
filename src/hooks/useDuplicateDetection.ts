@@ -137,7 +137,7 @@ export function useCheckSingleDuplicate(
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
     // Only check when all three fields are provided
-    const hasInput = phone.trim() && name.trim() && email.trim();
+    const hasInput = phone.trim() && name.trim();
 
     if (!hasInput || !activeCompanyId) {
       setResults([]);

@@ -329,7 +329,7 @@ export default function AddStudent() {
                <strong>Potential duplicate found:</strong>{" "}
                 {duplicateWarnings.map((d, i) => (
                   <span key={i}>
-                    "{d.student_name}" matches by Name + Phone + Email.{" "}
+                    "{d.student_name}" matches by Name + Phone.{" "}
                     <a href={`/students/${d.student_id}`} target="_blank" rel="noreferrer" className="underline text-primary">
                       View
                     </a>

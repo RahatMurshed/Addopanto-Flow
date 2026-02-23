@@ -23,7 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
 const CRITERIA_LABELS: Record<string, string> = {
-  name_phone_email: "Name + Phone + Email",
+  name_phone: "Name + Phone",
 };
 
 export default function StudentDuplicates() {
@@ -145,7 +145,7 @@ export default function StudentDuplicates() {
             </div>
             <h3 className="mb-2 text-lg font-semibold">Ready to scan</h3>
             <p className="mb-4 max-w-md text-muted-foreground">
-              Click "Scan for Duplicates" to find students where Name, Phone, and Email all match exactly.
+              Click "Scan for Duplicates" to find students where Name and Phone match exactly.
             </p>
           </CardContent>
         </Card>
