@@ -4,13 +4,15 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, ChevronLeft, ChevronRight, Check, ArrowLeft } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, ChevronLeft, ChevronRight, Check, ArrowLeft, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreateStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useSaveSiblings } from "@/hooks/useStudentSiblings";
+import { useCheckSingleDuplicate } from "@/hooks/useDuplicateDetection";
 import type { InitialPaymentData } from "@/components/finance/InitialPaymentSection";
 import PersonalStep, { type PersonalData } from "@/components/StudentWizardSteps/PersonalStep";
 import ContactStep, { type ContactData } from "@/components/StudentWizardSteps/ContactStep";
@@ -84,7 +86,14 @@ export default function AddStudent() {
   }));
   const [initialPayment, setInitialPayment] = useState<InitialPaymentData>(defaultPayment);
 
-  // Auto-save draft
+  // Real-time duplicate detection
+  const { results: duplicateWarnings } = useCheckSingleDuplicate(
+    contact.phone,
+    personal.name,
+    contact.email,
+    personal.aadhar_id_number
+  );
+
   const draftKey = `student-draft-page-${activeCompanyId}`;
   useEffect(() => {
     if (activeCompanyId) {
@@ -312,6 +321,24 @@ export default function AddStudent() {
       {/* Step Content */}
       <Card>
         <CardContent className="pt-6 min-h-[350px]">
+          {/* Duplicate warning banner */}
+          {duplicateWarnings.length > 0 && (
+            <Alert className="mb-4 border-warning/50 bg-warning/10">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertDescription className="text-sm">
+                <strong>Potential duplicate found:</strong>{" "}
+                {duplicateWarnings.map((d, i) => (
+                  <span key={i}>
+                    "{d.student_name}" matches by {d.match_criteria === "phone_name" ? "Phone + Name" : d.match_criteria === "email" ? "Email" : "Aadhar"}.{" "}
+                    <a href={`/students/${d.student_id}`} target="_blank" rel="noreferrer" className="underline text-primary">
+                      View
+                    </a>
+                    {i < duplicateWarnings.length - 1 ? " · " : ""}
+                  </span>
+                ))}
+              </AlertDescription>
+            </Alert>
+          )}
           {step === 0 && <PersonalStep data={personal} onChange={setPersonal} errors={errors} disabled={saving} />}
           {step === 1 && <ContactStep data={contact} onChange={setContact} errors={errors} disabled={saving} />}
           {step === 2 && <FamilyStep data={family} onChange={setFamily} errors={errors} disabled={saving} />}

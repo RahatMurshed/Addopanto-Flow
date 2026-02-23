@@ -67,6 +67,12 @@ export const ACCESS_RULES = {
     message: "You don't have permission to manage company members. Contact your company admin for assistance.",
     autoRedirectSeconds: 5,
   },
+  /** Block all moderators from duplicate detection */
+  moderatorDuplicates: {
+    isDenied: (ctx) => ctx.isModerator,
+    message: "Access Denied — Admin Only. Duplicate detection is restricted to admins.",
+    autoRedirectSeconds: 5,
+  },
 } satisfies Record<string, AccessRule>;
 
 interface AccessGuardProps {
