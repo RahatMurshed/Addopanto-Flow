@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { SectionErrorBoundary } from "@/components/layout/SectionErrorBoundary";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -133,7 +134,9 @@ function CompanyGuard({ children }: { children: React.ReactNode }) {
 
   return (
     <AppLayout>
-      <Suspense fallback={<ContentLoader />}>{children}</Suspense>
+      <SectionErrorBoundary>
+        <Suspense fallback={<ContentLoader />}>{children}</Suspense>
+      </SectionErrorBoundary>
     </AppLayout>
   );
 }
