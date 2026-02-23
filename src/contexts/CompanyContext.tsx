@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, setForcedLogoutInProgress } from "@/contexts/AuthContext";
 
 export interface Company {
   id: string;
@@ -142,6 +142,33 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Check if user has ANY role in user_roles (deletion fallback)
+  const { data: userRoleExists, isFetched: userRoleFetched } = useQuery({
+    queryKey: ["check-user-exists", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+    refetchInterval: 10 * 1000,
+  });
+
+  // Fallback: if user has no role at all, they were deleted — force logout
+  useEffect(() => {
+    if (userRoleFetched && !userRoleExists && user) {
+      setForcedLogoutInProgress(true);
+      supabase.auth.signOut({ scope: 'local' }).then(() => {
+        window.location.replace('/auth');
+      });
+    }
+  }, [userRoleFetched, userRoleExists, user]);
 
   // Check if user is cipher (platform-level)
   const { data: isCipher = false, isLoading: cipherLoading } = useQuery({
