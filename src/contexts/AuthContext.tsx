@@ -16,6 +16,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 let forcedLogoutInProgress = false;
 
+export function setForcedLogoutInProgress(value: boolean) {
+  forcedLogoutInProgress = value;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
