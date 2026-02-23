@@ -379,6 +379,7 @@ export type Database = {
           can_add_revenue: boolean
           can_manage_students: boolean
           can_transfer: boolean
+          can_view_employees: boolean
           can_view_reports: boolean
           company_id: string
           data_entry_mode: boolean
@@ -418,6 +419,7 @@ export type Database = {
           can_add_revenue?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
+          can_view_employees?: boolean
           can_view_reports?: boolean
           company_id: string
           data_entry_mode?: boolean
@@ -457,6 +459,7 @@ export type Database = {
           can_add_revenue?: boolean
           can_manage_students?: boolean
           can_transfer?: boolean
+          can_view_employees?: boolean
           can_view_reports?: boolean
           company_id?: string
           data_entry_mode?: boolean
@@ -722,6 +725,312 @@ export type Database = {
             columns: ["student_id_b"]
             isOneToOne: false
             referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_attendance: {
+        Row: {
+          company_id: string
+          created_at: string
+          date: string
+          employee_id: string
+          id: string
+          marked_by: string
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          date: string
+          employee_id: string
+          id?: string
+          marked_by: string
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          date?: string
+          employee_id?: string
+          id?: string
+          marked_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_attendance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_attendance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_leaves: {
+        Row: {
+          approval_status: string
+          approved_by: string | null
+          company_id: string
+          created_at: string
+          employee_id: string
+          end_date: string
+          id: string
+          leave_type: string
+          reason: string | null
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          approval_status?: string
+          approved_by?: string | null
+          company_id: string
+          created_at?: string
+          employee_id: string
+          end_date: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          approval_status?: string
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string
+          employee_id?: string
+          end_date?: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_leaves_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_leaves_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_leaves_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_salary_payments: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          deductions: number | null
+          description: string | null
+          employee_id: string
+          id: string
+          month: string
+          net_amount: number
+          payment_date: string
+          payment_method: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          deductions?: number | null
+          description?: string | null
+          employee_id: string
+          id?: string
+          month: string
+          net_amount: number
+          payment_date?: string
+          payment_method?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          deductions?: number | null
+          description?: string | null
+          employee_id?: string
+          id?: string
+          month?: string
+          net_amount?: number
+          payment_date?: string
+          payment_method?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_salary_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_salary_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_salary_payments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          aadhar_national_id: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_name: string | null
+          blood_group: string | null
+          company_id: string
+          contact_number: string
+          created_at: string
+          created_by: string
+          current_address: string | null
+          date_of_birth: string | null
+          department: string | null
+          designation: string | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_number: string | null
+          employee_id_number: string
+          employment_status: string
+          employment_type: string
+          full_name: string
+          gender: string | null
+          id: string
+          join_date: string
+          monthly_salary: number
+          notes: string | null
+          permanent_address: string | null
+          permanent_address_same: boolean | null
+          previous_experience: string | null
+          profile_picture_url: string | null
+          qualifications: string | null
+          updated_at: string
+          user_id: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          aadhar_national_id?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
+          blood_group?: string | null
+          company_id: string
+          contact_number: string
+          created_at?: string
+          created_by: string
+          current_address?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          designation?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
+          employee_id_number: string
+          employment_status?: string
+          employment_type?: string
+          full_name: string
+          gender?: string | null
+          id?: string
+          join_date: string
+          monthly_salary?: number
+          notes?: string | null
+          permanent_address?: string | null
+          permanent_address_same?: boolean | null
+          previous_experience?: string | null
+          profile_picture_url?: string | null
+          qualifications?: string | null
+          updated_at?: string
+          user_id: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          aadhar_national_id?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
+          blood_group?: string | null
+          company_id?: string
+          contact_number?: string
+          created_at?: string
+          created_by?: string
+          current_address?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          designation?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
+          employee_id_number?: string
+          employment_status?: string
+          employment_type?: string
+          full_name?: string
+          gender?: string | null
+          id?: string
+          join_date?: string
+          monthly_salary?: number
+          notes?: string | null
+          permanent_address?: string | null
+          permanent_address_same?: boolean | null
+          previous_experience?: string | null
+          profile_picture_url?: string | null
+          qualifications?: string | null
+          updated_at?: string
+          user_id?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1947,7 +2256,15 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      company_can_manage_employees: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       company_can_transfer: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_view_employees: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
@@ -1971,6 +2288,7 @@ export type Database = {
           can_add_revenue: boolean
           can_manage_students: boolean
           can_transfer: boolean
+          can_view_employees: boolean
           can_view_reports: boolean
           company_id: string
           data_entry_mode: boolean

@@ -49,6 +49,8 @@ const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const CompanyCreationRequests = lazy(() => import("@/pages/CompanyCreationRequests"));
 const AddStudent = lazy(() => import("@/pages/AddStudent"));
 const StudentDuplicates = lazy(() => import("@/pages/StudentDuplicates"));
+const EmployeesPage = lazy(() => import("@/pages/Employees"));
+const EmployeeDetailPage = lazy(() => import("@/pages/EmployeeDetail"));
 
 
 const queryClient = new QueryClient({
@@ -180,6 +182,8 @@ const App = () => (
                   <Route path="/company/members" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoMembers]}><CompanyMembers /></AccessGuard></ProtectedRoute>} />
                   <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
+                  <Route path="/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
+                  <Route path="/employees/:id" element={<ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>} />
                   
                   
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
