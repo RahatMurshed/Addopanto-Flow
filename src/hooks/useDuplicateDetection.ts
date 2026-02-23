@@ -136,8 +136,8 @@ export function useCheckSingleDuplicate(
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    const hasInput =
-      (phone.trim() && name.trim()) || email.trim() || aadhar.trim();
+    // Only check when all three fields are provided
+    const hasInput = phone.trim() && name.trim() && email.trim();
 
     if (!hasInput || !activeCompanyId) {
       setResults([]);

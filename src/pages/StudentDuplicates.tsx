@@ -20,9 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
 const CRITERIA_LABELS: Record<string, string> = {
-  phone_name: "Phone + Name",
-  email: "Email",
-  aadhar: "Aadhar / National ID",
+  name_phone_email: "Name + Phone + Email",
 };
 
 export default function StudentDuplicates() {
@@ -35,6 +33,8 @@ export default function StudentDuplicates() {
   const [hasScanned, setHasScanned] = useState(false);
   const [mergeConfirm, setMergeConfirm] = useState<{ group: DuplicateGroup; primaryId: string; duplicateId: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ studentId: string; studentName: string } | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<DuplicateGroup | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const handleScan = async () => {
     await refetch();
@@ -78,6 +78,24 @@ export default function StudentDuplicates() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteConfirm) return;
+    setBulkDeleting(true);
+    try {
+      const nonPrimary = bulkDeleteConfirm.students.filter((s) => !s.isPrimary);
+      for (const s of nonPrimary) {
+        await deleteMutation.mutateAsync(s.id);
+      }
+      toast({ title: `Deleted ${nonPrimary.length} duplicate(s)` });
+      setBulkDeleteConfirm(null);
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -104,7 +122,7 @@ export default function StudentDuplicates() {
             </div>
             <h3 className="mb-2 text-lg font-semibold">Ready to scan</h3>
             <p className="mb-4 max-w-md text-muted-foreground">
-              Click "Scan for Duplicates" to find students with matching phone+name, email, or Aadhar/National ID.
+              Click "Scan for Duplicates" to find students where Name, Phone, and Email all match exactly.
             </p>
           </CardContent>
         </Card>
@@ -166,7 +184,7 @@ export default function StudentDuplicates() {
                         <Button size="sm" variant="outline" onClick={() => navigate(`/students/${student.id}`)}>
                           <Eye className="mr-1 h-3 w-3" /> View
                         </Button>
-                        {!student.isPrimary && group.students.length === 2 && (
+                        {!student.isPrimary && (
                           <>
                             <Button
                               size="sm"
@@ -196,8 +214,18 @@ export default function StudentDuplicates() {
                     </div>
                   ))}
                 </div>
-                {group.students.length === 2 && (
-                  <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex justify-end gap-2">
+                  {group.students.filter((s) => !s.isPrimary).length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive"
+                      onClick={() => setBulkDeleteConfirm(group)}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" /> Delete All Duplicates
+                    </Button>
+                  )}
+                  {group.students.length === 2 && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -206,8 +234,8 @@ export default function StudentDuplicates() {
                     >
                       <ShieldX className="mr-1 h-3 w-3" /> Not a Duplicate
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -248,6 +276,28 @@ export default function StudentDuplicates() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={!!bulkDeleteConfirm} onOpenChange={() => setBulkDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Duplicates</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {bulkDeleteConfirm?.students.filter((s) => !s.isPrimary).length} duplicate student(s), keeping only the primary record. All associated payments and records will be lost. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? "Deleting…" : "Delete All"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

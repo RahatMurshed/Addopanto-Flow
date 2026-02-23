@@ -326,10 +326,10 @@ export default function AddStudent() {
             <Alert className="mb-4 border-warning/50 bg-warning/10">
               <AlertTriangle className="h-4 w-4 text-warning" />
               <AlertDescription className="text-sm">
-                <strong>Potential duplicate found:</strong>{" "}
+               <strong>Potential duplicate found:</strong>{" "}
                 {duplicateWarnings.map((d, i) => (
                   <span key={i}>
-                    "{d.student_name}" matches by {d.match_criteria === "phone_name" ? "Phone + Name" : d.match_criteria === "email" ? "Email" : "Aadhar"}.{" "}
+                    "{d.student_name}" matches by Name + Phone + Email.{" "}
                     <a href={`/students/${d.student_id}`} target="_blank" rel="noreferrer" className="underline text-primary">
                       View
                     </a>
