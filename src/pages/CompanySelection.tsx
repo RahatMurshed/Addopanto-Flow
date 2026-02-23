@@ -147,10 +147,12 @@ export default function CompanySelection() {
           title: "🎉 You've been approved!",
           description: `You've been added to ${companyName}!`,
         });
+        // Auto-redirect to company selection so user can pick the newly approved company
+        navigate("/companies", { replace: true });
       }
     }, 7000);
     return () => clearInterval(interval);
-  }, [user?.id, pendingJoinRequests.length, companies, requestCompanyNames, queryClient, toast]);
+  }, [user?.id, pendingJoinRequests.length, companies, requestCompanyNames, queryClient, toast, navigate]);
 
   // Auto-redirect to join page when user has no companies and no pending/rejected requests
   useEffect(() => {
