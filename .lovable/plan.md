@@ -1,36 +1,41 @@
 
 
-# Change Duplicate Detection: Name + Phone Only (Remove Email)
+# Role-Based Salary Visibility with Admin Toggle
 
-## What Changes
+## Overview
+Salary data will be hidden by default for Admins with an eye toggle to reveal it on demand. Cipher users always see salary data without needing a toggle. Moderators never see salary data.
 
-The duplicate detection currently requires all three fields (Name + Phone + Email) to match. This update changes it to match on **Name + Phone only**, removing the email requirement entirely. This is safer for your use case since students often lack email addresses but always have a name and parent's phone number.
+## Changes
 
-## Technical Details
+### 1. Employees List Page (`src/pages/Employees.tsx`)
+- Add a `showSalary` state, defaulting to `true` for Cipher and `false` for Admin
+- Add an eye icon toggle button (EyeOff/Eye from lucide) next to the header or filters area, visible only to Admin users
+- Conditionally show the "Salary" column and "Monthly Payroll" stats card based on `isCipher || showSalary`
+- CSV export will include salary column only when salary is currently visible
 
-### 1. Database Migration -- Replace both RPC functions
+### 2. Employee Detail Page (`src/pages/EmployeeDetail.tsx`)
+- Add the same `showSalary` toggle state (default: `true` for Cipher, `false` for Admin)
+- Show/hide the "Salary" tab, "Financial Information" card, and salary-related content based on `isCipher || showSalary`
+- The toggle button appears in the header area, visible only to Admin users
 
-**`find_duplicate_students`**: Change the matching logic to group by `(norm_name, norm_phone)` instead of `(norm_name, norm_phone, norm_email)`. Remove the filter requiring email to be non-empty.
+### Technical Details
 
-**`check_student_duplicates_single`**: Match when name + phone both match. Remove the email requirement from the guard condition. Change `match_criteria` return value from `'name_phone_email'` to `'name_phone'`.
+**State logic:**
+```
+const [showSalary, setShowSalary] = useState(isCipher);
+const salaryVisible = isCipher || showSalary;
+```
 
-### 2. `src/hooks/useDuplicateDetection.ts`
+**Toggle UI (Admin only):**
+A small button with Eye/EyeOff icon and tooltip "Show/Hide Salary" placed near the page header, rendered only when `canManage && !isCipher` (i.e., Admin only).
 
-- Update `useCheckSingleDuplicate` trigger condition from `phone.trim() && name.trim() && email.trim()` to just `phone.trim() && name.trim()`
-- Remove `email` from the `useEffect` dependency check (still pass it to the RPC for backward compat, but it won't be used)
-
-### 3. `src/pages/StudentDuplicates.tsx`
-
-- Update `CRITERIA_LABELS` from `{ name_phone_email: "Name + Phone + Email" }` to `{ name_phone: "Name + Phone" }`
-- Update scan description text from "Name, Phone, and Email" to "Name and Phone"
-
-### 4. `src/pages/AddStudent.tsx`
-
-- Update the duplicate warning message from "matches by Name + Phone + Email" to "matches by Name + Phone"
+**Affected visibility areas:**
+- Employees list: Salary table column, Monthly Payroll stat card, salary in CSV export
+- Employee detail: Financial Information card, Salary tab, salary slip downloads
 
 ### Files Modified
-- New SQL migration (replace both RPC functions)
-- `src/hooks/useDuplicateDetection.ts` (line 140)
-- `src/pages/StudentDuplicates.tsx` (lines 25-27, 148)
-- `src/pages/AddStudent.tsx` (line 332)
+- `src/pages/Employees.tsx` -- add toggle state and conditional rendering
+- `src/pages/EmployeeDetail.tsx` -- add toggle state and conditional rendering
+
+No database or backend changes needed -- this is purely a UI-level visibility control. The underlying RLS policies already restrict salary data access at the database level.
 
