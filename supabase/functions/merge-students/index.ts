@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller identity with anon client
     const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -45,7 +44,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role for DB operations
     const db = createClient(supabaseUrl, serviceRoleKey);
 
     // Verify caller is admin or cipher
@@ -85,6 +83,27 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Collect IDs of records that will be transferred (for undo)
+    const { data: paymentIds } = await db
+      .from("student_payments")
+      .select("id")
+      .eq("student_id", duplicate_student_id);
+
+    const { data: batchHistoryIds } = await db
+      .from("student_batch_history")
+      .select("id")
+      .eq("student_id", duplicate_student_id);
+
+    const { data: feeHistoryIds } = await db
+      .from("monthly_fee_history")
+      .select("id")
+      .eq("student_id", duplicate_student_id);
+
+    const { data: siblingIds } = await db
+      .from("student_siblings")
+      .select("id")
+      .eq("student_id", duplicate_student_id);
 
     // Transfer student_payments
     await db
@@ -162,8 +181,24 @@ Deno.serve(async (req) => {
       new_data: { primary_student: primary, fields_filled: updates },
     });
 
+    // Build undo payload
+    const undoData = {
+      primary_student_id,
+      duplicate_student_id,
+      company_id,
+      duplicate_original: {
+        status: duplicate.status,
+        notes: duplicate.notes,
+      },
+      fields_filled_on_primary: Object.keys(updates),
+      transferred_payment_ids: (paymentIds || []).map((r: any) => r.id),
+      transferred_batch_history_ids: (batchHistoryIds || []).map((r: any) => r.id),
+      transferred_fee_history_ids: (feeHistoryIds || []).map((r: any) => r.id),
+      transferred_sibling_ids: (siblingIds || []).map((r: any) => r.id),
+    };
+
     return new Response(
-      JSON.stringify({ success: true, primary_student_id }),
+      JSON.stringify({ success: true, primary_student_id, undo_data: undoData }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

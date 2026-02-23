@@ -210,6 +210,18 @@ export function useDismissDuplicate() {
   });
 }
 
+export interface MergeUndoData {
+  primary_student_id: string;
+  duplicate_student_id: string;
+  company_id: string;
+  duplicate_original: { status: string; notes: string | null };
+  fields_filled_on_primary: string[];
+  transferred_payment_ids: string[];
+  transferred_batch_history_ids: string[];
+  transferred_fee_history_ids: string[];
+  transferred_sibling_ids: string[];
+}
+
 export function useMergeStudents() {
   const queryClient = useQueryClient();
   const { activeCompanyId } = useCompany();
@@ -221,7 +233,7 @@ export function useMergeStudents() {
     }: {
       primaryStudentId: string;
       duplicateStudentId: string;
-    }) => {
+    }): Promise<{ success: boolean; primary_student_id: string; undo_data: MergeUndoData }> => {
       if (!activeCompanyId) throw new Error("No active company");
 
       const { data, error } = await supabase.functions.invoke(
@@ -233,6 +245,27 @@ export function useMergeStudents() {
             company_id: activeCompanyId,
           },
         }
+      );
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["duplicate-students"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+    },
+  });
+}
+
+export function useUnmergeStudents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (undoData: MergeUndoData) => {
+      const { data, error } = await supabase.functions.invoke(
+        "unmerge-students",
+        { body: undoData }
       );
 
       if (error) throw error;
