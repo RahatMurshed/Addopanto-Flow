@@ -326,9 +326,22 @@ export function useCreateStudent() {
     mutationFn: async (student: StudentInsert) => {
       if (!user) throw new Error("Not authenticated");
       if (!activeCompanyId) throw new Error("No active company");
+      // Validate batch_id exists if provided (guards against stale/deleted batch IDs from drafts)
+      let validBatchId: string | null = student.batch_id || null;
+      if (validBatchId) {
+        const { data: batchExists } = await supabase
+          .from("batches" as any)
+          .select("id")
+          .eq("id", validBatchId)
+          .maybeSingle();
+        if (!batchExists) {
+          console.warn(`Batch ${validBatchId} not found, setting batch_id to null`);
+          validBatchId = null;
+        }
+      }
       const sanitized = {
         ...student,
-        batch_id: student.batch_id || null,
+        batch_id: validBatchId,
         user_id: user.id,
         company_id: activeCompanyId,
       };
