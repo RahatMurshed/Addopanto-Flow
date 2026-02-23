@@ -155,10 +155,10 @@ export default function CompanySelection() {
   // Auto-redirect to join page when user has no companies and no pending/rejected requests
   useEffect(() => {
     if (isLoading) return;
-    if (companies.length === 0 && !isCipher && pendingJoinRequests.length === 0 && rejectedJoinRequests.length === 0) {
+    if (companies.length === 0 && !isCipher && pendingJoinRequests.length === 0 && rejectedJoinRequests.length === 0 && newlyJoinedIds.length === 0) {
       navigate("/companies/join", { replace: true });
     }
-  }, [companies.length, isCipher, isLoading, navigate, pendingJoinRequests.length, rejectedJoinRequests.length]);
+  }, [companies.length, isCipher, isLoading, navigate, pendingJoinRequests.length, rejectedJoinRequests.length, newlyJoinedIds.length]);
 
   const handleSelectCompany = async (companyId: string) => {
     await switchCompany(companyId);
