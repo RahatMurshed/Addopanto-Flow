@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         async () => {
           await supabase.auth.signOut({ scope: 'local' });
+          window.location.href = '/auth';
         }
       )
       .subscribe();
