@@ -11,9 +11,13 @@ export interface MonthlyPerformance {
   halfDays: number;
   leaveDays: number;
   workingDays: number;
+  unmarkedDays: number;
   attendancePercent: number;
   salaryPaid: boolean;
   salaryAmount: number;
+  salaryGross: number;
+  salaryDeductions: number;
+  effectiveDays: number;
 }
 
 export interface PerformanceData {
@@ -77,7 +81,7 @@ export function useEmployeePerformance(
       if (!employeeId) return [];
       const { data, error } = await supabase
         .from("employee_salary_payments")
-        .select("month, net_amount")
+        .select("month, net_amount, amount, deductions")
         .eq("employee_id", employeeId);
       if (error) throw error;
       return data || [];
@@ -93,9 +97,12 @@ export function useEmployeePerformance(
       attByMonth[m].push(a);
     });
 
-    const salByMonth: Record<string, number> = {};
+    const salByMonth: Record<string, { net: number; gross: number; deductions: number }> = {};
     salaryPayments.forEach(s => {
-      salByMonth[s.month] = (salByMonth[s.month] || 0) + s.net_amount;
+      if (!salByMonth[s.month]) salByMonth[s.month] = { net: 0, gross: 0, deductions: 0 };
+      salByMonth[s.month].net += s.net_amount;
+      salByMonth[s.month].gross += s.amount;
+      salByMonth[s.month].deductions += (s.deductions || 0);
     });
 
     return monthRange.map(({ key, label, year, monthIndex }) => {
@@ -105,9 +112,11 @@ export function useEmployeePerformance(
       const halfDays = records.filter(r => r.status === "half_day").length;
       const leaveDays = records.filter(r => r.status === "leave").length;
       const workingDays = getWorkingDays(year, monthIndex);
+      const markedDays = daysPresent + daysAbsent + halfDays + leaveDays;
+      const unmarkedDays = Math.max(0, workingDays - markedDays);
       const effectiveDays = daysPresent + halfDays * 0.5;
       const attendancePercent = workingDays > 0 ? Math.round((effectiveDays / workingDays) * 100) : 0;
-      const salaryAmount = salByMonth[key] || 0;
+      const sal = salByMonth[key] || { net: 0, gross: 0, deductions: 0 };
 
       return {
         month: key,
@@ -117,9 +126,13 @@ export function useEmployeePerformance(
         halfDays,
         leaveDays,
         workingDays,
+        unmarkedDays,
         attendancePercent: Math.min(attendancePercent, 100),
-        salaryPaid: salaryAmount > 0,
-        salaryAmount,
+        salaryPaid: sal.net > 0,
+        salaryAmount: sal.net,
+        salaryGross: sal.gross,
+        salaryDeductions: sal.deductions,
+        effectiveDays,
       };
     });
   }, [attendance, salaryPayments, monthRange]);

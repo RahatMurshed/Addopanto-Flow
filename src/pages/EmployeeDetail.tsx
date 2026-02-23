@@ -24,7 +24,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download, Eye, EyeOff, TrendingUp, Users, CheckCircle, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ComposedChart, Line, Cell, Tooltip as RechartsTooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ComposedChart, Line, Cell, Tooltip as RechartsTooltip, Legend, Area, ReferenceLine } from "recharts";
 import jsPDF from "jspdf";
 import { format, getDaysInMonth, startOfMonth, addMonths, subMonths } from "date-fns";
 import { toast } from "sonner";
@@ -573,12 +573,42 @@ export default function EmployeeDetail() {
                 </Card>
               </div>
 
-              {/* Attendance Trend Chart */}
+              {/* Attendance Breakdown Chart */}
               <Card>
-                <CardHeader><CardTitle className="text-sm">Attendance Trend (Last 6 Months)</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-sm">Attendance Breakdown (Last 6 Months)</CardTitle>
+                  <p className="text-xs text-muted-foreground">Daily attendance distribution by category per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                      <RechartsTooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
+                        formatter={(value: number, name: string) => [value, name]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Bar dataKey="daysPresent" name="Present" stackId="a" fill="hsl(var(--success))" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="halfDays" name="Half Day" stackId="a" fill="hsl(var(--warning))" />
+                      <Bar dataKey="leaveDays" name="Leave" stackId="a" fill="hsl(var(--primary))" />
+                      <Bar dataKey="daysAbsent" name="Absent" stackId="a" fill="hsl(var(--destructive))" />
+                      <Bar dataKey="unmarkedDays" name="Unmarked" stackId="a" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Attendance % Trend with Reference Line */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Attendance Trend</CardTitle>
+                  <p className="text-xs text-muted-foreground">Monthly attendance percentage with 80% target line</p>
+                </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <ComposedChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
@@ -586,32 +616,43 @@ export default function EmployeeDetail() {
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                         formatter={(value: number) => [`${value}%`, "Attendance"]}
                       />
-                      <Bar dataKey="attendancePercent" radius={[4, 4, 0, 0]}>
+                      <ReferenceLine y={80} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" label={{ value: "Target 80%", position: "right", fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                      <Area type="monotone" dataKey="attendancePercent" fill="hsl(var(--primary) / 0.15)" stroke="none" />
+                      <Bar dataKey="attendancePercent" name="Attendance %" radius={[4, 4, 0, 0]}>
                         {perf.months.map((m, i) => (
                           <Cell key={i} fill={getBarColor(m.attendancePercent)} />
                         ))}
                       </Bar>
-                    </BarChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
 
-              {/* Payroll vs Attendance (salary visible only) */}
+              {/* Payroll vs Attendance Correlation (salary visible only) */}
               {salaryVisible && (
                 <Card>
-                  <CardHeader><CardTitle className="text-sm">Payroll vs Attendance Correlation</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Payroll vs Attendance Correlation</CardTitle>
+                    <p className="text-xs text-muted-foreground">Gross salary, deductions, and net pay mapped against attendance rate</p>
+                  </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer width="100%" height={300}>
                       <ComposedChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                        <YAxis yAxisId="left" domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                        <YAxis yAxisId="left" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} unit="%" />
                         <RechartsTooltip
-                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
+                          formatter={(value: number, name: string) => {
+                            if (name === "Attendance %") return [`${value}%`, name];
+                            return [formatAmount(value), name];
+                          }}
                         />
-                        <Bar yAxisId="left" dataKey="attendancePercent" name="Attendance %" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.7} />
-                        <Line yAxisId="right" dataKey="salaryAmount" name="Salary Paid" stroke="hsl(var(--success))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--success))" }} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar yAxisId="left" dataKey="salaryGross" name="Gross Salary" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.3} />
+                        <Bar yAxisId="left" dataKey="salaryAmount" name="Net Paid" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} opacity={0.8} />
+                        <Line yAxisId="right" dataKey="attendancePercent" name="Attendance %" stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--warning))", strokeWidth: 2, stroke: "hsl(var(--card))" }} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -626,27 +667,35 @@ export default function EmployeeDetail() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Month</TableHead>
+                        <TableHead>Working</TableHead>
                         <TableHead>Present</TableHead>
                         <TableHead>Absent</TableHead>
                         <TableHead>Half Days</TableHead>
                         <TableHead>Leaves</TableHead>
+                        <TableHead>Effective</TableHead>
                         <TableHead>Attendance %</TableHead>
-                        {salaryVisible && <TableHead>Salary Status</TableHead>}
+                        {salaryVisible && <TableHead>Net Paid</TableHead>}
+                        {salaryVisible && <TableHead>Status</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {[...perf.months].reverse().map(m => (
                         <TableRow key={m.month}>
                           <TableCell className="font-medium">{m.label}</TableCell>
+                          <TableCell className="text-muted-foreground">{m.workingDays}</TableCell>
                           <TableCell>{m.daysPresent}</TableCell>
                           <TableCell>{m.daysAbsent}</TableCell>
                           <TableCell>{m.halfDays}</TableCell>
                           <TableCell>{m.leaveDays}</TableCell>
+                          <TableCell className="font-medium">{m.effectiveDays}</TableCell>
                           <TableCell>
                             <span className="font-medium" style={{ color: getBarColor(m.attendancePercent) }}>
                               {m.attendancePercent}%
                             </span>
                           </TableCell>
+                          {salaryVisible && (
+                            <TableCell className="font-medium">{m.salaryPaid ? formatAmount(m.salaryAmount) : "—"}</TableCell>
+                          )}
                           {salaryVisible && (
                             <TableCell>
                               <Badge variant={m.salaryPaid ? "default" : "secondary"}>
