@@ -105,19 +105,25 @@ export default function JoinCompany() {
     enabled: pendingCompanyIds.length > 0,
   });
 
-  const { data: rejectedRequests = [] } = useQuery({
+  const { data: rejectedRequestsRaw = [] } = useQuery({
     queryKey: ["my-rejected-join-requests-ids", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("company_join_requests")
-        .select("company_id")
+        .select("id, company_id, rejection_reason, reviewed_at, status")
         .eq("user_id", user.id)
         .eq("status", "rejected");
-      return data?.map(r => r.company_id) ?? [];
+      return data ?? [];
     },
     enabled: !!user?.id,
   });
+
+  // Build a map for efficient lookup: company_id -> rejection_reason
+  const rejectedRequestMap = new Map(
+    rejectedRequestsRaw.map(r => [r.company_id, r.rejection_reason])
+  );
+  const rejectedCompanyIds = Array.from(rejectedRequestMap.keys());
 
   // Poll for approval: check memberships every 7 seconds when there are pending requests
   const previousMembershipIds = useRef<string[]>(existingMemberships);
@@ -183,8 +189,11 @@ export default function JoinCompany() {
     if (!selectedCompany || !user) return;
     setJoinError(null);
 
-    if (rejectedRequests.includes(selectedCompany.id)) {
-      setJoinError("Your previous request to join this business was rejected. Please contact the admin or try another business.");
+    if (rejectedCompanyIds.includes(selectedCompany.id)) {
+      const reason = rejectedRequestMap.get(selectedCompany.id);
+      setJoinError(reason
+        ? `Your request was rejected: "${reason}". Please contact the admin or try another business.`
+        : "Your previous request to join this business was rejected. Please contact the admin or try another business.");
       return;
     }
 
@@ -284,10 +293,13 @@ export default function JoinCompany() {
   };
 
   const handleSelectCompany = (company: any) => {
-    if (rejectedRequests.includes(company.id)) {
+    if (rejectedCompanyIds.includes(company.id)) {
+      const reason = rejectedRequestMap.get(company.id);
       toast({
         title: "Request previously rejected",
-        description: "Your previous request to join this business was rejected. Please contact the admin or try another business.",
+        description: reason
+          ? `Reason: "${reason}". Please contact the admin or try another business.`
+          : "Your previous request to join this business was rejected. Please contact the admin or try another business.",
         variant: "destructive",
       });
       return;
@@ -366,8 +378,7 @@ export default function JoinCompany() {
                         <p className="text-sm font-medium">
                           {pendingCompanyNames[req.company_id] || "Business"}
                         </p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                        <p className="text-xs text-muted-foreground">
                           Waiting for admin approval...
                         </p>
                       </div>
@@ -456,7 +467,7 @@ export default function JoinCompany() {
                 ) : (
                   filteredCompanies.map((company) => {
                     const isPending = pendingRequests.includes(company.id);
-                    const isRejected = rejectedRequests.includes(company.id);
+                    const isRejected = rejectedCompanyIds.includes(company.id);
                     const isJoining = joiningCompanyId === company.id;
                     const anyJoining = joiningCompanyId !== null;
                     const isDisabled = isPending || isRejected || anyJoining;
@@ -483,9 +494,16 @@ export default function JoinCompany() {
                             </div>
                           </div>
                           {isRejected ? (
-                            <Badge variant="destructive" className="gap-1">
-                              <XCircle className="h-3 w-3" /> Rejected
-                            </Badge>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge variant="destructive" className="gap-1">
+                                <XCircle className="h-3 w-3" /> Rejected
+                              </Badge>
+                              {rejectedRequestMap.get(company.id) && (
+                                <p className="text-xs text-destructive max-w-[180px] text-right line-clamp-2">
+                                  {rejectedRequestMap.get(company.id)}
+                                </p>
+                              )}
+                            </div>
                           ) : isPending ? (
                             <Badge variant="secondary" className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
                               Pending
