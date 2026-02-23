@@ -1,47 +1,47 @@
 
-# Add Performance Score KPI to Employee Detail Header
+# Force Logout and Full Cleanup on User Deletion
 
-## Overview
-Surface the Performance Score as a prominent, always-visible KPI badge directly on the Employee Detail header card (next to the employee name/info), so users get an at-a-glance performance indicator without navigating to the Performance tab.
+## Problem
+When a Cipher deletes a user from the platform:
+1. Company memberships are **not** removed -- the deleted user's records linger in all businesses
+2. The realtime listener signs out locally but does **not** redirect to the login page
+3. `user_profiles` and `company_join_requests` are not cleaned up
 
-## What Changes
+## Changes
 
-### Employee Detail Header Card (`src/pages/EmployeeDetail.tsx`)
-Add a compact color-coded Performance Score indicator to the header card area (between the employee info and action buttons):
+### 1. Edge Function Cleanup (`supabase/functions/admin-users/index.ts`)
 
-- A small radial ring (40x40px) showing the score with color-coded bands:
-  - **Green** (80-100): "Excellent"
-  - **Orange** (50-79): "Good" 
-  - **Red** (0-49): "Needs Improvement"
-- Displayed inline next to the employee details in the header
-- Shows a loading skeleton while data fetches
-- Score value and label are clickable, scrolling/switching to the Performance tab for details
+In the `handleDeleteUser` function, add cleanup steps **before** deleting the auth user:
 
-### Visual Layout
-The header will look like:
+- Delete all `company_memberships` for the target user (removes them from every business)
+- Delete all `company_join_requests` for the target user (cleans up pending/rejected requests)
+- Delete `user_profiles` for the target user (removes profile data)
 
-```text
-[Avatar]  Employee Name  [Status Badge]  [Score Ring 85 Excellent]   [Eye Toggle] [Edit]
-          EMP-001 . Designer . Design
-          Full Time . Joined 15 Jan 2024
+Order of deletions:
+```
+1. user_roles          (already exists -- triggers realtime logout)
+2. moderator_permissions (already exists)
+3. registration_requests (already exists)
+4. company_memberships   (NEW)
+5. company_join_requests (NEW)
+6. user_profiles         (NEW)
+7. signOut global        (already exists)
+8. deleteUser from auth  (already exists)
 ```
 
-## Technical Details
+### 2. Redirect to Login on Forced Logout (`src/contexts/AuthContext.tsx`)
 
-### File: `src/pages/EmployeeDetail.tsx`
+Update the realtime listener callback to redirect to `/auth` after signing out:
 
-**Additions to the header card (lines ~237-243):**
-- Insert a compact score ring + label after the employee text info, inside the `flex-1` div or as a sibling element
-- Reuse the existing `scoreColor`, `scoreLabel`, `circumference`, and `strokeDashoffset` variables already computed at lines 217-221
-- Reuse the existing `perf` data from `useEmployeePerformance` hook already called in the component
-- Add an `onClick` handler that switches the active tab to "performance" (convert `Tabs` to controlled mode with `value` state if not already)
+```typescript
+async () => {
+  await supabase.auth.signOut({ scope: 'local' });
+  window.location.href = '/auth';  // Hard redirect ensures full state reset
+}
+```
 
-**Controlled Tabs:**
-- Add `const [activeTab, setActiveTab] = useState("profile")` state
-- Update `<Tabs defaultValue="profile">` to `<Tabs value={activeTab} onValueChange={setActiveTab}>`
-- Score badge click calls `setActiveTab("performance")`
-
-**No new files, hooks, or database changes needed** -- all data is already fetched by the existing `useEmployeePerformance` hook.
+Using `window.location.href` instead of React Router's `navigate()` ensures all in-memory state, query caches, and contexts are fully cleared -- important for a security-critical forced logout.
 
 ### Files Modified
-- `src/pages/EmployeeDetail.tsx` -- add compact score KPI to header card, convert tabs to controlled mode
+- `supabase/functions/admin-users/index.ts` -- add company_memberships, company_join_requests, and user_profiles deletion
+- `src/contexts/AuthContext.tsx` -- add redirect to `/auth` after forced signOut
