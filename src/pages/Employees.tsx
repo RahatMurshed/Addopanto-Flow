@@ -14,10 +14,11 @@ import { EmployeeDialog } from "@/components/dialogs/EmployeeDialog";
 import { useEmployees, useDeleteEmployee, type Employee } from "@/hooks/useEmployees";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { Plus, Search, Eye, Pencil, Trash2, Users, UserCheck, UserX, Clock, Download } from "lucide-react";
+import { Plus, Search, Eye, EyeOff, Pencil, Trash2, Users, UserCheck, UserX, Clock, Download } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 
 const STATUS_BADGES: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   active: { label: "Active", variant: "default" },
@@ -47,6 +48,8 @@ export default function Employees() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [showSalary, setShowSalary] = useState(isCipher);
+  const salaryVisible = isCipher || showSalary;
 
   const { data, isLoading } = useEmployees({ search, department, designation, status, employmentType, page, pageSize: 50 });
   const deleteEmployee = useDeleteEmployee();
@@ -87,12 +90,17 @@ export default function Employees() {
   };
 
   const handleExportCSV = () => {
-    const headers = ["Employee ID", "Full Name", "Designation", "Department", "Contact", "Email", "Join Date", "Status", "Type", "Monthly Salary"];
-    const rows = employees.map(e => [
-      e.employee_id_number, e.full_name, e.designation || "", e.department || "",
-      e.contact_number, e.email || "", e.join_date, e.employment_status,
-      TYPE_LABELS[e.employment_type] || e.employment_type, e.monthly_salary.toString(),
-    ].map(v => `"${v}"`).join(","));
+    const baseHeaders = ["Employee ID", "Full Name", "Designation", "Department", "Contact", "Email", "Join Date", "Status", "Type"];
+    const headers = salaryVisible ? [...baseHeaders, "Monthly Salary"] : baseHeaders;
+    const rows = employees.map(e => {
+      const baseRow = [
+        e.employee_id_number, e.full_name, e.designation || "", e.department || "",
+        e.contact_number, e.email || "", e.join_date, e.employment_status,
+        TYPE_LABELS[e.employment_type] || e.employment_type,
+      ];
+      if (salaryVisible) baseRow.push(e.monthly_salary.toString());
+      return baseRow.map(v => `"${v}"`).join(",");
+    });
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -116,6 +124,18 @@ export default function Employees() {
           <p className="text-sm text-muted-foreground">Manage your company staff</p>
         </div>
         <div className="flex items-center gap-2">
+          {canManage && !isCipher && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setShowSalary(s => !s)}>
+                    {showSalary ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{showSalary ? "Hide Salary" : "Show Salary"}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {canManage && employees.length > 0 && (
             <Button variant="outline" onClick={handleExportCSV} className="gap-2">
               <Download className="h-4 w-4" /> Export CSV
@@ -179,7 +199,7 @@ export default function Employees() {
 
       {/* Department chart + Payroll */}
       {canManage && stats.deptChart.length > 0 && (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className={`grid ${salaryVisible ? "md:grid-cols-2" : "md:grid-cols-1"} gap-4`}>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Department Distribution</CardTitle></CardHeader>
             <CardContent className="h-48">
@@ -188,20 +208,22 @@ export default function Employees() {
                   <Pie data={stats.deptChart} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name, value }) => `${name}: ${value}`}>
                     {stats.deptChart.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip />
+                  <RechartsTooltip />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Payroll</CardTitle></CardHeader>
-            <CardContent className="flex items-center justify-center h-48">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-primary">{formatAmount(stats.totalSalary)}</p>
-                <p className="text-sm text-muted-foreground mt-1">Total active employee salaries</p>
-              </div>
-            </CardContent>
-          </Card>
+          {salaryVisible && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Payroll</CardTitle></CardHeader>
+              <CardContent className="flex items-center justify-center h-48">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary">{formatAmount(stats.totalSalary)}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Total active employee salaries</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -254,7 +276,7 @@ export default function Employees() {
                 <TableHead className="hidden lg:table-cell">Contact</TableHead>
                 <TableHead className="hidden lg:table-cell">Join Date</TableHead>
                 <TableHead>Status</TableHead>
-                {canManage && <TableHead className="hidden md:table-cell">Salary</TableHead>}
+                {salaryVisible && <TableHead className="hidden md:table-cell">Salary</TableHead>}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -262,13 +284,13 @@ export default function Employees() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: canManage ? 8 : 7 }).map((_, j) => (
+                    {Array.from({ length: salaryVisible ? 8 : 7 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : employees.length === 0 ? (
-                <TableRow><TableCell colSpan={canManage ? 8 : 7} className="text-center py-8 text-muted-foreground">No employees found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={salaryVisible ? 8 : 7} className="text-center py-8 text-muted-foreground">No employees found</TableCell></TableRow>
               ) : (
                 employees.map(emp => {
                   const initials = emp.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
@@ -294,7 +316,7 @@ export default function Employees() {
                       <TableCell>
                         <Badge variant={badge.variant}>{badge.label}</Badge>
                       </TableCell>
-                      {canManage && (
+                      {salaryVisible && (
                         <TableCell className="hidden md:table-cell text-sm font-medium">{formatAmount(emp.monthly_salary)}</TableCell>
                       )}
                       <TableCell className="text-right" onClick={e => e.stopPropagation()}>
