@@ -21,7 +21,8 @@ import {
 } from "@/hooks/useEmployees";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download, Eye, EyeOff } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import jsPDF from "jspdf";
 import { format, getDaysInMonth, startOfMonth, addMonths, subMonths } from "date-fns";
 import { toast } from "sonner";
@@ -38,12 +39,14 @@ const ATTENDANCE_COLORS: Record<string, string> = { present: "bg-success/20 text
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { canManageEmployees } = useCompany();
+  const { canManageEmployees, isCipher } = useCompany();
   const { fc: formatAmount } = useCompanyCurrency();
   const canManage = canManageEmployees;
 
   const { data: employee, isLoading } = useEmployee(id);
   const [editOpen, setEditOpen] = useState(false);
+  const [showSalary, setShowSalary] = useState(isCipher);
+  const salaryVisible = isCipher || showSalary;
 
   // Salary
   const { data: salaryPayments = [] } = useEmployeeSalaryPayments(id);
@@ -206,11 +209,25 @@ export default function EmployeeDetail() {
               <p className="text-muted-foreground">{employee.employee_id_number} • {employee.designation || "No designation"} • {employee.department || "No department"}</p>
               <p className="text-sm text-muted-foreground mt-1">{TYPE_LABELS[employee.employment_type] || employee.employment_type} • Joined {format(new Date(employee.join_date), "dd MMM yyyy")}</p>
             </div>
-            {canManage && (
-              <Button onClick={() => setEditOpen(true)} variant="outline" className="gap-2">
-                <Pencil className="h-4 w-4" /> Edit
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {canManage && !isCipher && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" onClick={() => setShowSalary(s => !s)}>
+                        {showSalary ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{showSalary ? "Hide Salary" : "Show Salary"}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {canManage && (
+                <Button onClick={() => setEditOpen(true)} variant="outline" className="gap-2">
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -218,7 +235,7 @@ export default function EmployeeDetail() {
       <Tabs defaultValue="profile">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile" className="gap-1"><FileText className="h-3 w-3 hidden sm:inline" /> Profile</TabsTrigger>
-          {canManage && <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>}
+          {salaryVisible && <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>}
           <TabsTrigger value="attendance" className="gap-1"><Calendar className="h-3 w-3 hidden sm:inline" /> Attendance</TabsTrigger>
           <TabsTrigger value="leaves" className="gap-1"><Clock className="h-3 w-3 hidden sm:inline" /> Leaves</TabsTrigger>
         </TabsList>
@@ -251,7 +268,7 @@ export default function EmployeeDetail() {
                 <InfoRow label="Permanent" value={employee.permanent_address_same ? "Same as current" : employee.permanent_address} />
               </CardContent>
             </Card>
-            {canManage && (
+            {salaryVisible && (
               <Card>
                 <CardHeader><CardTitle className="text-sm">Financial Information</CardTitle></CardHeader>
                 <CardContent className="space-y-2 text-sm">
@@ -274,7 +291,7 @@ export default function EmployeeDetail() {
         </TabsContent>
 
         {/* Salary Tab */}
-        {canManage && (
+        {salaryVisible && (
           <TabsContent value="salary" className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
               <div>
