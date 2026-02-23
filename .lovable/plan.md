@@ -1,38 +1,28 @@
 
-# Fix: Redirect Deleted Users to Login Page (Not Join Company)
+
+# Remove Extra DEO Permission Options from Accept Dialog
 
 ## Problem
-When a Cipher deletes a user, the intended redirect to the login page (`/auth`) is being intercepted by React's routing logic. Here's what happens:
+When accepting a user as a Moderator with Data Entry Mode enabled, the dialog shows 6 permission checkboxes: Students, Payments, Revenue, Expenses, Batches, and Courses. Per the established role policy, DEO mode is strictly limited to **Add Students** and **Add Expenses** only. The extra options (Payments, Revenue, Batches, Courses) must be removed.
 
-1. The `user_roles` row is deleted, triggering the realtime listener
-2. `signOut({ scope: 'local' })` clears the session
-3. React's `onAuthStateChange` fires SIGNED_OUT, setting `user` to `null`
-4. Before the `window.location.href = '/auth'` hard redirect completes, React re-renders and `CompanyGuard` sees no companies, redirecting to `/companies`, which then auto-redirects to `/companies/join`
+## Changes
 
-## Solution
-Prevent React from re-rendering after the forced sign-out by immediately replacing the location and short-circuiting any further component updates.
+### File: `src/components/auth/CompanyJoinRequests.tsx`
 
-### File: `src/contexts/AuthContext.tsx`
+**1. Remove extra DEO checkbox options (lines 391-397)**
+Reduce the DEO permission list from 6 items to 2:
+- Keep: `deoStudents` ("Can Add Students")
+- Keep: `deoExpenses` ("Can Add Expenses")
+- Remove: `deoPayments`, `deoRevenue`, `deoBatches`, `deoCourses`
 
-**Change the realtime listener callback to:**
-- Set a flag that prevents `onAuthStateChange` from updating state after forced logout
-- Use `window.location.replace('/auth')` for an immediate, non-recoverable redirect
+**2. Update `buildPermissionsPayload` (lines 140-148)**
+Remove the extra DEO fields from the payload:
+- Remove `deo_payments`, `deo_batches`, `deo_courses`
+- Change `deo_finance` to map directly from `deoExpenses` only (not `deoRevenue || deoExpenses`)
 
-**Change the `onAuthStateChange` handler to:**
-- Skip state updates if forced logout is in progress (prevents React from re-rendering and triggering intermediate redirects)
+**3. Update `buildPermissionsSummary` (lines 183-189)**
+Remove summary entries for Payments, Revenue, Batches, Courses in DEO mode -- keep only Students and Expenses.
 
-### Technical Detail
+**4. Clean up `defaultApproveData` (lines 278-284)**
+The unused fields (`deoPayments`, `deoRevenue`, `deoBatches`, `deoCourses`) can remain in the interface for backward compatibility but will no longer be rendered or sent.
 
-```
-Realtime DELETE on user_roles
-  --> Set forcedLogout flag = true
-  --> signOut local
-  --> window.location.replace('/auth')  (hard redirect, no history entry)
-
-onAuthStateChange (SIGNED_OUT)
-  --> Check forcedLogout flag
-  --> If true: skip setState (prevents CompanyGuard redirect race)
-```
-
-### Files Modified
-- `src/contexts/AuthContext.tsx` -- add forced-logout flag to prevent race condition with React routing
