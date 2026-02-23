@@ -175,7 +175,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
         monthly_fee_amount: academic.monthly_fee_amount,
         status: academic.status,
         notes: academic.notes || null,
-        batch_id: academic.batch_id !== "none" ? academic.batch_id : undefined,
+        batch_id: (academic.batch_id && academic.batch_id !== "none") ? academic.batch_id : null,
         // New extended fields
         date_of_birth: personal.date_of_birth || null,
         gender: personal.gender || null,
