@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useEmployees";
 import { useEmployeePerformance } from "@/hooks/useEmployeePerformance";
 import { useCompany } from "@/contexts/CompanyContext";
+import { exportToPDF } from "@/utils/exportUtils";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download, Eye, EyeOff, TrendingUp, Users, CheckCircle, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -59,7 +60,7 @@ function getBarColor(pct: number) {
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { canManageEmployees, isCipher } = useCompany();
+  const { canManageEmployees, isCipher, activeCompany } = useCompany();
   const { fc: formatAmount } = useCompanyCurrency();
   const canManage = canManageEmployees;
 
@@ -537,6 +538,30 @@ export default function EmployeeDetail() {
             <div className="space-y-4"><Skeleton className="h-40 w-full" /><Skeleton className="h-64 w-full" /></div>
           ) : (
             <>
+              <div className="flex items-center justify-between" data-pdf-hide>
+                <p className="text-sm text-muted-foreground">Performance overview for the last 6 months</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={async () => {
+                    toast.info("Generating PDF...");
+                    try {
+                      await exportToPDF(
+                        "employee-performance-report",
+                        `${employee.full_name.replace(/\s+/g, "_")}_Performance`,
+                        `${employee.full_name} — Performance Report`,
+                        "Last 6 Months",
+                        activeCompany?.name
+                      );
+                      toast.success("PDF downloaded");
+                    } catch { toast.error("PDF generation failed"); }
+                  }}
+                >
+                  <Download className="h-4 w-4" /> Download PDF
+                </Button>
+              </div>
+              <div id="employee-performance-report">
               {/* Score + KPIs Row */}
               <div className="grid md:grid-cols-5 gap-4">
                 {/* Radial Score */}
@@ -740,6 +765,7 @@ export default function EmployeeDetail() {
                   </Table>
                 </CardContent>
               </Card>
+              </div>
             </>
           )}
         </TabsContent>
