@@ -1,28 +1,27 @@
 
 
-# Remove Extra DEO Permission Options from Accept Dialog
+# Fix: Prevent Bounce-Back to Join Page After Approval
 
 ## Problem
-When accepting a user as a Moderator with Data Entry Mode enabled, the dialog shows 6 permission checkboxes: Students, Payments, Revenue, Expenses, Batches, and Courses. Per the established role policy, DEO mode is strictly limited to **Add Students** and **Add Expenses** only. The extra options (Payments, Revenue, Batches, Courses) must be removed.
+When a user's join request is accepted, the polling in the Join page navigates them to `/companies`. However, on the Company Selection page, an auto-redirect rule sends users back to `/companies/join` if they have 0 companies and 0 pending requests. Because the company list query hasn't refreshed yet at that moment, the user gets bounced back to the join page.
 
-## Changes
+## Solution
 
-### File: `src/components/auth/CompanyJoinRequests.tsx`
+### File: `src/pages/CompanySelection.tsx`
 
-**1. Remove extra DEO checkbox options (lines 391-397)**
-Reduce the DEO permission list from 6 items to 2:
-- Keep: `deoStudents` ("Can Add Students")
-- Keep: `deoExpenses` ("Can Add Expenses")
-- Remove: `deoPayments`, `deoRevenue`, `deoBatches`, `deoCourses`
+Update the auto-redirect condition (line 158) to also check `newlyJoinedIds`. If there are newly joined companies (detected by polling), skip the redirect -- the query cache is still refreshing and will populate the company list momentarily.
 
-**2. Update `buildPermissionsPayload` (lines 140-148)**
-Remove the extra DEO fields from the payload:
-- Remove `deo_payments`, `deo_batches`, `deo_courses`
-- Change `deo_finance` to map directly from `deoExpenses` only (not `deoRevenue || deoExpenses`)
+**Current:**
+```
+if (companies.length === 0 && !isCipher && pendingJoinRequests.length === 0 && rejectedJoinRequests.length === 0)
+```
 
-**3. Update `buildPermissionsSummary` (lines 183-189)**
-Remove summary entries for Payments, Revenue, Batches, Courses in DEO mode -- keep only Students and Expenses.
+**Updated:**
+```
+if (companies.length === 0 && !isCipher && pendingJoinRequests.length === 0 && rejectedJoinRequests.length === 0 && newlyJoinedIds.length === 0)
+```
 
-**4. Clean up `defaultApproveData` (lines 278-284)**
-The unused fields (`deoPayments`, `deoRevenue`, `deoBatches`, `deoCourses`) can remain in the interface for backward compatibility but will no longer be rendered or sent.
+This single condition change prevents the race between query invalidation and the redirect logic.
 
+### Files Modified
+- `src/pages/CompanySelection.tsx` -- add `newlyJoinedIds.length === 0` guard to auto-redirect condition
