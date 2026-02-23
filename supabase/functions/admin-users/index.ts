@@ -189,6 +189,9 @@ Deno.serve(async (req) => {
 
       await adminClient.from("moderator_permissions").delete().eq("user_id", userId);
       await adminClient.from("registration_requests").delete().eq("user_id", userId);
+      await adminClient.from("company_memberships").delete().eq("user_id", userId);
+      await adminClient.from("company_join_requests").delete().eq("user_id", userId);
+      await adminClient.from("user_profiles").delete().eq("user_id", userId);
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
