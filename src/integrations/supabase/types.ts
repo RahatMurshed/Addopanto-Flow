@@ -656,6 +656,76 @@ export type Database = {
         }
         Relationships: []
       }
+      duplicate_dismissals: {
+        Row: {
+          company_id: string
+          created_at: string
+          dismissed_by: string
+          id: string
+          student_id_a: string
+          student_id_b: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          dismissed_by: string
+          id?: string
+          student_id_a: string
+          student_id_b: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          dismissed_by?: string
+          id?: string
+          student_id_a?: string
+          student_id_b?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_dismissals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_dismissals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_dismissals_student_id_a_fkey"
+            columns: ["student_id_a"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_dismissals_student_id_a_fkey"
+            columns: ["student_id_a"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_dismissals_student_id_b_fkey"
+            columns: ["student_id_b"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_dismissals_student_id_b_fkey"
+            columns: ["student_id_b"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_accounts: {
         Row: {
           allocation_percentage: number
@@ -1794,6 +1864,21 @@ export type Database = {
       can_edit_delete: { Args: { _user_id: string }; Returns: boolean }
       can_transfer: { Args: { _user_id: string }; Returns: boolean }
       can_view_user: { Args: { _target_user_id: string }; Returns: boolean }
+      check_student_duplicates_single: {
+        Args: {
+          _aadhar?: string
+          _company_id: string
+          _email?: string
+          _exclude_student_id?: string
+          _name?: string
+          _phone?: string
+        }
+        Returns: {
+          match_criteria: string
+          student_id: string
+          student_name: string
+        }[]
+      }
       company_can_add_batch: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -1865,6 +1950,15 @@ export type Database = {
       company_can_transfer: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
+      }
+      find_duplicate_students: {
+        Args: { _company_id: string }
+        Returns: {
+          group_id: number
+          is_primary: boolean
+          match_criteria: string
+          student_id: string
+        }[]
       }
       get_active_company_id: { Args: { _user_id: string }; Returns: string }
       get_cipher_user_ids: { Args: never; Returns: string[] }

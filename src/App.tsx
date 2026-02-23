@@ -48,6 +48,7 @@ const AuditLog = lazy(() => import("@/pages/AuditLog"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const CompanyCreationRequests = lazy(() => import("@/pages/CompanyCreationRequests"));
 const AddStudent = lazy(() => import("@/pages/AddStudent"));
+const StudentDuplicates = lazy(() => import("@/pages/StudentDuplicates"));
 
 
 const queryClient = new QueryClient({
@@ -167,6 +168,7 @@ const App = () => (
                   <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                   <Route path="/students" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><Students /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/new" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><AddStudent /></AccessGuard></ProtectedRoute>} />
+                  <Route path="/students/duplicates" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.moderatorDuplicates]}><StudentDuplicates /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
                   <Route path="/courses" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCoursePages, ACCESS_RULES.deoCourses]}><Courses /></AccessGuard></ProtectedRoute>} />
                   <Route path="/courses/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCoursePages]}><CourseDetail /></AccessGuard></ProtectedRoute>} />

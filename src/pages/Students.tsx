@@ -18,7 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download, ScanSearch } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import StudentDialog from "@/components/dialogs/StudentDialog";
@@ -306,6 +306,11 @@ export default function Students() {
           <p className="text-muted-foreground">Manage student profiles and track fee payments</p>
         </div>
         <div className="flex gap-2">
+          {!isModerator && (
+            <Button variant="outline" onClick={() => navigate("/students/duplicates")}>
+              <ScanSearch className="mr-2 h-4 w-4" /> Find Duplicates
+            </Button>
+          )}
           {filteredStudents.length > 0 && (
             <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
               <Download className="mr-2 h-4 w-4" /> Export
