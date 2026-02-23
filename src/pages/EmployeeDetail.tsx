@@ -21,7 +21,8 @@ import {
 } from "@/hooks/useEmployees";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download } from "lucide-react";
+import jsPDF from "jspdf";
 import { format, getDaysInMonth, startOfMonth, addMonths, subMonths } from "date-fns";
 import { toast } from "sonner";
 
@@ -37,9 +38,9 @@ const ATTENDANCE_COLORS: Record<string, string> = { present: "bg-success/20 text
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isCompanyAdmin, isCipher } = useCompany();
+  const { canManageEmployees } = useCompany();
   const { fc: formatAmount } = useCompanyCurrency();
-  const canManage = isCompanyAdmin || isCipher;
+  const canManage = canManageEmployees;
 
   const { data: employee, isLoading } = useEmployee(id);
   const [editOpen, setEditOpen] = useState(false);
@@ -94,6 +95,61 @@ export default function EmployeeDetail() {
       setLeaveDialogOpen(false);
       setLeaveForm({ leave_type: "casual", start_date: "", end_date: "", reason: "" });
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleDownloadSalarySlip = (sp: { month: string; amount: number; deductions: number; net_amount: number; payment_date: string; payment_method: string }) => {
+    if (!employee) return;
+    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    const w = 210;
+    let y = 20;
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("SALARY SLIP", w / 2, y, { align: "center" });
+    y += 10;
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Month: ${sp.month}`, w / 2, y, { align: "center" });
+    y += 12;
+    pdf.setDrawColor(200);
+    pdf.line(20, y, w - 20, y);
+    y += 8;
+    const addRow = (label: string, value: string) => {
+      pdf.setFont("helvetica", "normal");
+      pdf.text(label, 25, y);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(value, 120, y);
+      y += 7;
+    };
+    addRow("Employee Name:", employee.full_name);
+    addRow("Employee ID:", employee.employee_id_number);
+    addRow("Designation:", employee.designation || "N/A");
+    addRow("Department:", employee.department || "N/A");
+    y += 5;
+    pdf.line(20, y, w - 20, y);
+    y += 8;
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Earnings & Deductions", 25, y);
+    y += 10;
+    pdf.setFontSize(10);
+    addRow("Gross Salary:", formatAmount(sp.amount));
+    addRow("Deductions:", formatAmount(sp.deductions));
+    y += 3;
+    pdf.line(20, y, w - 20, y);
+    y += 8;
+    pdf.setFontSize(12);
+    addRow("Net Payable:", formatAmount(sp.net_amount));
+    y += 5;
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    addRow("Payment Date:", format(new Date(sp.payment_date), "dd MMM yyyy"));
+    addRow("Payment Method:", sp.payment_method.replace("_", " ").toUpperCase());
+    y += 10;
+    pdf.setFontSize(8);
+    pdf.setTextColor(150);
+    pdf.text(`Generated on ${format(new Date(), "dd MMM yyyy 'at' HH:mm")}`, w / 2, y, { align: "center" });
+    pdf.save(`salary_slip_${employee.employee_id_number}_${sp.month}.pdf`);
+    toast.success("Salary slip downloaded");
   };
 
   // Attendance calendar data
@@ -252,6 +308,8 @@ export default function EmployeeDetail() {
                         <TableCell>{format(new Date(sp.payment_date), "dd MMM yyyy")}</TableCell>
                         <TableCell className="capitalize">{sp.payment_method}</TableCell>
                         <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleDownloadSalarySlip(sp)} title="Download Salary Slip"><Download className="h-4 w-4" /></Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -267,6 +325,7 @@ export default function EmployeeDetail() {
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

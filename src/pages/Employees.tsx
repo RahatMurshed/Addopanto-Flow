@@ -14,7 +14,7 @@ import { EmployeeDialog } from "@/components/dialogs/EmployeeDialog";
 import { useEmployees, useDeleteEmployee, type Employee } from "@/hooks/useEmployees";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { Plus, Search, Eye, Pencil, Trash2, Users, UserCheck, UserX, Clock } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, Users, UserCheck, UserX, Clock, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -35,9 +35,9 @@ const CHART_COLORS = ["hsl(30,100%,45%)", "hsl(217,70%,45%)", "hsl(142,76%,36%)"
 
 export default function Employees() {
   const navigate = useNavigate();
-  const { isCompanyAdmin, isCipher } = useCompany();
+  const { isCompanyAdmin, isCipher, canManageEmployees } = useCompany();
   const { fc: formatAmount } = useCompanyCurrency();
-  const canManage = isCompanyAdmin || isCipher;
+  const canManage = canManageEmployees;
 
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("all");
@@ -86,6 +86,24 @@ export default function Employees() {
     setDialogOpen(true);
   };
 
+  const handleExportCSV = () => {
+    const headers = ["Employee ID", "Full Name", "Designation", "Department", "Contact", "Email", "Join Date", "Status", "Type", "Monthly Salary"];
+    const rows = employees.map(e => [
+      e.employee_id_number, e.full_name, e.designation || "", e.department || "",
+      e.contact_number, e.email || "", e.join_date, e.employment_status,
+      TYPE_LABELS[e.employment_type] || e.employment_type, e.monthly_salary.toString(),
+    ].map(v => `"${v}"`).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `employees_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Employee list exported");
+  };
+
   // Unique departments/designations from current data for filters
   const departments = useMemo(() => [...new Set(employees.map(e => e.department).filter(Boolean))], [employees]);
   const designations = useMemo(() => [...new Set(employees.map(e => e.designation).filter(Boolean))], [employees]);
@@ -97,11 +115,18 @@ export default function Employees() {
           <h1 className="text-2xl font-bold text-foreground">Employees</h1>
           <p className="text-sm text-muted-foreground">Manage your company staff</p>
         </div>
-        {canManage && (
-          <Button onClick={handleAdd} className="gap-2">
-            <Plus className="h-4 w-4" /> Add Employee
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canManage && employees.length > 0 && (
+            <Button variant="outline" onClick={handleExportCSV} className="gap-2">
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+          )}
+          {canManage && (
+            <Button onClick={handleAdd} className="gap-2">
+              <Plus className="h-4 w-4" /> Add Employee
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

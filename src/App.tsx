@@ -182,8 +182,8 @@ const App = () => (
                   <Route path="/company/members" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoMembers]}><CompanyMembers /></AccessGuard></ProtectedRoute>} />
                   <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
-                  <Route path="/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
-                  <Route path="/employees/:id" element={<ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>} />
+                  <Route path="/employees" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeesPage /></AccessGuard></ProtectedRoute>} />
+                  <Route path="/employees/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeeDetailPage /></AccessGuard></ProtectedRoute>} />
                   
                   
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

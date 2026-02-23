@@ -73,6 +73,12 @@ export const ACCESS_RULES = {
     message: "Access Denied — Admin Only. Duplicate detection is restricted to admins.",
     autoRedirectSeconds: 5,
   },
+  /** Block moderators without employee view permission */
+  deoEmployees: {
+    isDenied: (ctx) => ctx.isModerator && !ctx.canViewEmployees,
+    message: "You don't have permission to access employee data. Contact your company admin to request employee access.",
+    autoRedirectSeconds: 5,
+  },
 } satisfies Record<string, AccessRule>;
 
 interface AccessGuardProps {

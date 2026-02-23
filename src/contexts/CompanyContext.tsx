@@ -31,6 +31,7 @@ export interface CompanyMembership {
   can_transfer: boolean;
   can_view_reports: boolean;
   can_manage_students: boolean;
+  can_view_employees: boolean;
   // Data Entry Mode category permissions
   deo_students: boolean;
   deo_payments: boolean;
@@ -123,6 +124,8 @@ interface CompanyContextType {
   canViewRevenue: boolean;
   canViewExpense: boolean;
   canViewStudentPII: boolean;
+  canViewEmployees: boolean;
+  canManageEmployees: boolean;
 
   // Data entry mode specific
   canViewDashboardMetrics: boolean;
@@ -267,6 +270,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canViewRevenue = isCompanyAdmin || (isTraditionalModerator && ((membership?.mod_revenue_add ?? false) || (membership?.mod_revenue_edit ?? false))) || (isDataEntryModerator && deoFinance);
   const canViewExpense = isCompanyAdmin || (isTraditionalModerator && ((membership?.mod_expenses_add ?? false) || (membership?.mod_expenses_edit ?? false))) || (isDataEntryModerator && deoFinance);
   const canViewStudentPII = isCompanyAdmin;
+  const canManageEmployees = isCompanyAdmin;
+  const canViewEmployees = isCompanyAdmin || (isModerator && (membership?.can_view_employees ?? false));
 
   // Data entry mode specific visibility
   const canViewDashboardMetrics = isCompanyAdmin; // Only admin/cipher can view dashboard
@@ -352,6 +357,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       canViewRevenue,
       canViewExpense,
       canViewStudentPII,
+      canViewEmployees,
+      canManageEmployees,
       canViewDashboardMetrics,
       canViewPaymentHistory,
       canViewFinancialData,

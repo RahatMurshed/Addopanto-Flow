@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
-  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen,
+  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -40,6 +40,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     canAddExpense, canEditExpense, canDeleteExpense,
     canAddExpenseSource,
     canViewReports,
+    canViewEmployees, canManageEmployees,
   } = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,6 +116,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (canAddStudent || canEditStudent || canDeleteStudent) {
         items.push({ label: "Students", href: "/students", icon: GraduationCap });
       }
+      if (canViewEmployees) {
+        items.push({ label: "Employees", href: "/employees", icon: Briefcase });
+      }
       if (canAddRevenue || canEditRevenue || canDeleteRevenue) {
         items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
       }
@@ -125,6 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       // Admin/Cipher: full navigation
       items.push({ label: "Courses", href: "/courses", icon: BookOpen });
       items.push({ label: "Students", href: "/students", icon: GraduationCap });
+      items.push({ label: "Employees", href: "/employees", icon: Briefcase });
       items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
       items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
       items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
