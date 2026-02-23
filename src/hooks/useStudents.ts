@@ -326,13 +326,15 @@ export function useCreateStudent() {
     mutationFn: async (student: StudentInsert) => {
       if (!user) throw new Error("Not authenticated");
       if (!activeCompanyId) throw new Error("No active company");
+      const sanitized = {
+        ...student,
+        batch_id: student.batch_id || null,
+        user_id: user.id,
+        company_id: activeCompanyId,
+      };
       const { data, error } = await supabase
         .from("students")
-        .insert({
-          ...student,
-          user_id: user.id,
-          company_id: activeCompanyId,
-        })
+        .insert(sanitized)
         .select()
         .single();
       if (error) throw error;
