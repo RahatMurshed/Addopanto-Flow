@@ -14,6 +14,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+let forcedLogoutInProgress = false;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -21,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (forcedLogoutInProgress) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -50,8 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           filter: `user_id=eq.${user.id}`,
         },
         async () => {
+          forcedLogoutInProgress = true;
           await supabase.auth.signOut({ scope: 'local' });
-          window.location.href = '/auth';
+          window.location.replace('/auth');
         }
       )
       .subscribe();
