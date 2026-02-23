@@ -1,53 +1,32 @@
 
-# Enhance Error Boundaries with Retry Logic and Toast Notifications
 
-## Current State
-The project has two error boundaries already:
-- **ErrorBoundary** (top-level, full-screen fallback) -- used in `App.tsx`
-- **SectionErrorBoundary** (inline, per-section fallback) -- not currently used anywhere
+# Create Quick-Start Plan Template
 
-Both are basic: they catch errors, show a message, and offer a manual retry. Neither has automatic retry, retry counting, or toast notifications.
+## Overview
+Add a reusable Markdown template file (`.lovable/PLAN_TEMPLATE.md`) that standardizes how new implementation plans are written. This template captures the conventions already established by existing plans in the project and provides fill-in sections so future plans can be created faster and more consistently.
 
-## Changes
+## What the Template Includes
 
-### 1. `src/components/layout/ErrorBoundary.tsx` -- Add retry counter, auto-retry, and toast
+The template will have the following sections, each with placeholder guidance:
 
-- Track `retryCount` in state (max 3 automatic retries)
-- On error, if `retryCount < 3`, wait 1 second then auto-retry (reset `hasError`)
-- After 3 failed auto-retries, show the full-screen fallback UI with the retry count displayed
-- On manual "Try Again", reset the retry counter to 0
-- Fire a toast notification via the `toast()` function (imported from `@/hooks/use-toast`) each time an error is caught, showing the error message. Since `toast()` is a standalone function (not a hook), it can be called from `componentDidCatch` in a class component
+1. **Title** -- Short feature/fix name
+2. **Problem / Motivation** -- What is broken or missing, and why it matters
+3. **Current State** -- Relevant existing code, tables, or components (with file paths)
+4. **Solution** -- High-level approach in 2-3 sentences
+5. **Changes** -- Per-file breakdown (numbered, with bullet points for each modification)
+6. **Technical Details** -- Implementation notes: patterns used, edge cases, security considerations (RLS, PII), currency handling
+7. **Testing Checklist** -- Table format (matching the DEO testing plan style) with columns: #, Test, Expected Result, Pass
+8. **Files Modified** -- Summary list of all touched files
+9. **Rollback Notes** -- What to revert if something goes wrong
 
-### 2. `src/components/layout/SectionErrorBoundary.tsx` -- Add retry counter and toast
-
-- Track `retryCount` in state (max 2 automatic retries)
-- On error, if under the limit, auto-retry after 500ms
-- After exhausting retries, show the inline fallback with retry count
-- Fire a `toast()` notification on each caught error
-- Manual "Retry" button resets the counter
-
-### 3. `src/App.tsx` -- Wrap lazy-loaded routes with SectionErrorBoundary
-
-- Wrap each `Suspense` fallback route group inside `<SectionErrorBoundary>` so that a single page crash does not take down the entire app. The top-level `ErrorBoundary` remains as the last-resort catch-all.
+## File Created
+- `.lovable/PLAN_TEMPLATE.md`
 
 ## Technical Details
 
-**Toast from class components:** The `toast()` function from `@/hooks/use-toast` is a standalone module-level function, so it can be called directly inside `componentDidCatch` without needing React hooks.
+The template is a plain Markdown file with no code changes. It follows the exact formatting conventions seen in the two existing plans:
+- `plan.md` uses heading hierarchy: Problem, Changes (per-file with numbered headings), Technical Details, Files Modified
+- `deo-testing-plan.md` uses phased testing tables with checkbox columns
 
-**Auto-retry timing:**
-- Top-level: 1s delay, max 3 retries
-- Section-level: 500ms delay, max 2 retries
+The template merges both styles into a single reusable scaffold. Placeholder text is wrapped in `[brackets]` for easy find-and-replace.
 
-**State shape changes:**
-```
-interface State {
-  hasError: boolean;
-  error: Error | null;
-  retryCount: number;
-}
-```
-
-**Files modified:**
-- `src/components/layout/ErrorBoundary.tsx`
-- `src/components/layout/SectionErrorBoundary.tsx`
-- `src/App.tsx`
