@@ -1,59 +1,53 @@
 
-# Fix: Deleted Users Getting Stuck on /companies/join
+# Enhance Error Boundaries with Retry Logic and Toast Notifications
 
-## Root Cause
+## Current State
+The project has two error boundaries already:
+- **ErrorBoundary** (top-level, full-screen fallback) -- used in `App.tsx`
+- **SectionErrorBoundary** (inline, per-section fallback) -- not currently used anywhere
 
-The existing realtime-based fix (listening for `user_roles` DELETE) is unreliable. Here's what actually happens:
+Both are basic: they catch errors, show a message, and offer a manual retry. Neither has automatic retry, retry counting, or toast notifications.
 
-1. Edge function deletes `user_roles` (should trigger realtime listener)
-2. Edge function then deletes `company_memberships`, `user_profiles`, etc.
-3. **Before** the realtime DELETE event reaches the client, React Query may refetch `company_memberships` (due to stale time, window focus, or other invalidation) and get back empty results
-4. `CompanyGuard` sees `hasCompanies = false` and redirects to `/companies`
-5. `CompanySelection` sees 0 companies, 0 pending requests and redirects to `/companies/join`
-6. The user is now stuck with a stale JWT that hasn't expired yet -- they appear "logged in" but all queries return empty
+## Changes
 
-The realtime approach is a race condition by design: the client must receive and process the `user_roles` DELETE event **before** any other query refetch detects the missing data. This is not guaranteed.
+### 1. `src/components/layout/ErrorBoundary.tsx` -- Add retry counter, auto-retry, and toast
 
-## Solution: Add a Fallback Detection Layer
+- Track `retryCount` in state (max 3 automatic retries)
+- On error, if `retryCount < 3`, wait 1 second then auto-retry (reset `hasError`)
+- After 3 failed auto-retries, show the full-screen fallback UI with the retry count displayed
+- On manual "Try Again", reset the retry counter to 0
+- Fire a toast notification via the `toast()` function (imported from `@/hooks/use-toast`) each time an error is caught, showing the error message. Since `toast()` is a standalone function (not a hook), it can be called from `componentDidCatch` in a class component
 
-Add a `user_roles` existence check in `CompanyContext`. If a logged-in user has **no role** in `user_roles` (query returns null) and loading is complete, force sign out and redirect to `/auth`. This catches the deletion regardless of whether realtime fires.
+### 2. `src/components/layout/SectionErrorBoundary.tsx` -- Add retry counter and toast
 
-### Why this is safe
-- Every user gets a `user_roles` entry on signup (via database trigger)
-- The only way a user has no `user_roles` entry is if they were deleted from the platform
-- New users always have a role entry before they reach CompanyProvider
+- Track `retryCount` in state (max 2 automatic retries)
+- On error, if under the limit, auto-retry after 500ms
+- After exhausting retries, show the inline fallback with retry count
+- Fire a `toast()` notification on each caught error
+- Manual "Retry" button resets the counter
 
-## Technical Changes
+### 3. `src/App.tsx` -- Wrap lazy-loaded routes with SectionErrorBoundary
 
-### File: `src/contexts/CompanyContext.tsx`
+- Wrap each `Suspense` fallback route group inside `<SectionErrorBoundary>` so that a single page crash does not take down the entire app. The top-level `ErrorBoundary` remains as the last-resort catch-all.
 
-1. **Add a `user_roles` existence query** -- query for any role for the current user (not just cipher). If the result is null and the query has finished loading, the user was deleted.
+## Technical Details
 
-2. **Add a `useEffect`** that watches for the "no role found" state. When detected:
-   - Call `supabase.auth.signOut({ scope: 'local' })`
-   - Call `window.location.replace('/auth')`
-   - This serves as the reliable fallback when realtime fails
+**Toast from class components:** The `toast()` function from `@/hooks/use-toast` is a standalone module-level function, so it can be called directly inside `componentDidCatch` without needing React hooks.
 
-### File: `src/contexts/AuthContext.tsx`
+**Auto-retry timing:**
+- Top-level: 1s delay, max 3 retries
+- Section-level: 500ms delay, max 2 retries
 
-3. **Export `forcedLogoutInProgress`** as a readable flag so CompanyContext can set it before signing out, preventing any intermediate re-renders.
-
-### Flow After Fix
-
-```text
-User Deleted (edge function)
-  |
-  +--> Realtime fires DELETE on user_roles
-  |      --> AuthContext: forcedLogout flag + signOut + replace('/auth')  [FAST PATH]
-  |
-  +--> CompanyContext query refetches user_roles
-         --> Returns null (no role found)
-         --> useEffect detects deletion
-         --> forcedLogout flag + signOut + replace('/auth')              [FALLBACK PATH]
+**State shape changes:**
+```
+interface State {
+  hasError: boolean;
+  error: Error | null;
+  retryCount: number;
+}
 ```
 
-Both paths lead to the same outcome. The fallback catches cases where realtime is slow or doesn't fire.
-
-### Files Modified
-- `src/contexts/AuthContext.tsx` -- export `forcedLogoutInProgress` setter
-- `src/contexts/CompanyContext.tsx` -- add user_roles existence check + forced logout fallback
+**Files modified:**
+- `src/components/layout/ErrorBoundary.tsx`
+- `src/components/layout/SectionErrorBoundary.tsx`
+- `src/App.tsx`
