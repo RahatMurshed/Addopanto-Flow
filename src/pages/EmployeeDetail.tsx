@@ -66,6 +66,7 @@ export default function EmployeeDetail() {
   const { data: employee, isLoading } = useEmployee(id);
   const [editOpen, setEditOpen] = useState(false);
   const [showSalary, setShowSalary] = useState(isCipher);
+  const [activeTab, setActiveTab] = useState("profile");
   const salaryVisible = isCipher || showSalary;
 
   // Salary
@@ -242,6 +243,36 @@ export default function EmployeeDetail() {
               <p className="text-muted-foreground">{employee.employee_id_number} • {employee.designation || "No designation"} • {employee.department || "No department"}</p>
               <p className="text-sm text-muted-foreground mt-1">{TYPE_LABELS[employee.employment_type] || employee.employment_type} • Joined {format(new Date(employee.join_date), "dd MMM yyyy")}</p>
             </div>
+            {/* Performance Score KPI */}
+            <button
+              onClick={() => setActiveTab("performance")}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+              title="View Performance Details"
+            >
+              {perf.isLoading ? (
+                <Skeleton className="h-10 w-10 rounded-full" />
+              ) : (
+                <svg width="40" height="40" viewBox="0 0 100 100" className="shrink-0">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
+                  <circle
+                    cx="50" cy="50" r="45" fill="none"
+                    stroke={scoreColor} strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    transform="rotate(-90 50 50)"
+                    className="transition-all duration-700"
+                  />
+                  <text x="50" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" fill={scoreColor}>
+                    {perf.overallScore}
+                  </text>
+                </svg>
+              )}
+              <div className="text-left hidden sm:block">
+                <p className="text-xs font-semibold" style={{ color: scoreColor }}>{scoreLabel}</p>
+                <p className="text-[10px] text-muted-foreground">Performance</p>
+              </div>
+            </button>
             <div className="flex items-center gap-2">
               {canManage && !isCipher && (
                 <TooltipProvider>
@@ -265,7 +296,7 @@ export default function EmployeeDetail() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="profile">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className={`grid w-full grid-cols-${tabCount}`}>
           <TabsTrigger value="profile" className="gap-1"><FileText className="h-3 w-3 hidden sm:inline" /> Profile</TabsTrigger>
           {salaryVisible && <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>}
