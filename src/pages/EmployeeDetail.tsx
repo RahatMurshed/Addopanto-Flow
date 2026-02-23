@@ -19,10 +19,12 @@ import {
   useEmployeeAttendance, useMarkAttendance,
   useEmployeeLeaves, useCreateLeave, useDeleteLeave,
 } from "@/hooks/useEmployees";
+import { useEmployeePerformance } from "@/hooks/useEmployeePerformance";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download, Eye, EyeOff, TrendingUp, Users, CheckCircle, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ComposedChart, Line, Cell, Tooltip as RechartsTooltip } from "recharts";
 import jsPDF from "jspdf";
 import { format, getDaysInMonth, startOfMonth, addMonths, subMonths } from "date-fns";
 import { toast } from "sonner";
@@ -35,6 +37,24 @@ const STATUS_BADGES: Record<string, { label: string; variant: "default" | "secon
 
 const TYPE_LABELS: Record<string, string> = { full_time: "Full-time", part_time: "Part-time", contract: "Contract" };
 const ATTENDANCE_COLORS: Record<string, string> = { present: "bg-success/20 text-success", absent: "bg-destructive/20 text-destructive", half_day: "bg-warning/20 text-warning", leave: "bg-primary/20 text-primary" };
+
+function getScoreColor(score: number) {
+  if (score >= 80) return "hsl(var(--success))";
+  if (score >= 50) return "hsl(var(--warning))";
+  return "hsl(var(--destructive))";
+}
+
+function getScoreLabel(score: number) {
+  if (score >= 80) return "Excellent";
+  if (score >= 50) return "Good";
+  return "Needs Improvement";
+}
+
+function getBarColor(pct: number) {
+  if (pct >= 80) return "hsl(var(--success))";
+  if (pct >= 50) return "hsl(var(--warning))";
+  return "hsl(var(--destructive))";
+}
 
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -66,6 +86,12 @@ export default function EmployeeDetail() {
   const deleteLeave = useDeleteLeave();
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ leave_type: "casual", start_date: "", end_date: "", reason: "" });
+
+  // Performance
+  const perf = useEmployeePerformance(id, 6, salaryVisible);
+
+  // Tab count for grid
+  const tabCount = salaryVisible ? 5 : 4;
 
   const handlePaySalary = async () => {
     if (!id || !employee) return;
@@ -187,6 +213,13 @@ export default function EmployeeDetail() {
   const initials = employee.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
   const badge = STATUS_BADGES[employee.employment_status] || STATUS_BADGES.active;
 
+  // Performance chart data
+  const scoreColor = getScoreColor(perf.overallScore);
+  const scoreLabel = getScoreLabel(perf.overallScore);
+  const scorePercent = perf.overallScore / 100;
+  const circumference = 2 * Math.PI * 45;
+  const strokeDashoffset = circumference * (1 - scorePercent);
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" onClick={() => navigate("/employees")} className="gap-2 mb-2">
@@ -233,10 +266,11 @@ export default function EmployeeDetail() {
       </Card>
 
       <Tabs defaultValue="profile">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={`grid w-full grid-cols-${tabCount}`}>
           <TabsTrigger value="profile" className="gap-1"><FileText className="h-3 w-3 hidden sm:inline" /> Profile</TabsTrigger>
           {salaryVisible && <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>}
           <TabsTrigger value="attendance" className="gap-1"><Calendar className="h-3 w-3 hidden sm:inline" /> Attendance</TabsTrigger>
+          <TabsTrigger value="performance" className="gap-1"><TrendingUp className="h-3 w-3 hidden sm:inline" /> Performance</TabsTrigger>
           <TabsTrigger value="leaves" className="gap-1"><Clock className="h-3 w-3 hidden sm:inline" /> Leaves</TabsTrigger>
         </TabsList>
 
@@ -464,6 +498,170 @@ export default function EmployeeDetail() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Performance Tab */}
+        <TabsContent value="performance" className="space-y-6 mt-4">
+          {perf.isLoading ? (
+            <div className="space-y-4"><Skeleton className="h-40 w-full" /><Skeleton className="h-64 w-full" /></div>
+          ) : (
+            <>
+              {/* Score + KPIs Row */}
+              <div className="grid md:grid-cols-5 gap-4">
+                {/* Radial Score */}
+                <Card className="md:col-span-1 flex flex-col items-center justify-center py-6">
+                  <div className="relative w-28 h-28">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="45" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
+                      <circle
+                        cx="50" cy="50" r="45" fill="none"
+                        stroke={scoreColor}
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        className="transition-all duration-700"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold" style={{ color: scoreColor }}>{perf.overallScore}</span>
+                      <span className="text-[10px] text-muted-foreground">/ 100</span>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium mt-2" style={{ color: scoreColor }}>{scoreLabel}</p>
+                  <p className="text-xs text-muted-foreground">Performance Score</p>
+                </Card>
+
+                {/* KPI Cards */}
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <TrendingUp className="h-5 w-5 mx-auto text-primary mb-2" />
+                    <p className="text-2xl font-bold">{perf.avgAttendance}%</p>
+                    <p className="text-xs text-muted-foreground">Avg Attendance</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Users className="h-5 w-5 mx-auto text-success mb-2" />
+                    <p className="text-2xl font-bold">{perf.totalPresent}</p>
+                    <p className="text-xs text-muted-foreground">Days Present</p>
+                  </CardContent>
+                </Card>
+                {salaryVisible ? (
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <CheckCircle className="h-5 w-5 mx-auto text-primary mb-2" />
+                      <p className="text-2xl font-bold">{perf.monthsPaidOnTime}/{perf.totalMonths}</p>
+                      <p className="text-xs text-muted-foreground">Salary Months Paid</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <AlertTriangle className="h-5 w-5 mx-auto text-warning mb-2" />
+                      <p className="text-2xl font-bold">{perf.months.reduce((s, m) => s + m.daysAbsent, 0)}</p>
+                      <p className="text-xs text-muted-foreground">Days Absent</p>
+                    </CardContent>
+                  </Card>
+                )}
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Clock className="h-5 w-5 mx-auto text-warning mb-2" />
+                    <p className="text-2xl font-bold">{perf.totalLeaves}</p>
+                    <p className="text-xs text-muted-foreground">Total Leaves</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Attendance Trend Chart */}
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Attendance Trend (Last 6 Months)</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                      <RechartsTooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                        formatter={(value: number) => [`${value}%`, "Attendance"]}
+                      />
+                      <Bar dataKey="attendancePercent" radius={[4, 4, 0, 0]}>
+                        {perf.months.map((m, i) => (
+                          <Cell key={i} fill={getBarColor(m.attendancePercent)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Payroll vs Attendance (salary visible only) */}
+              {salaryVisible && (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Payroll vs Attendance Correlation</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <ComposedChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                        <YAxis yAxisId="left" domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                        <RechartsTooltip
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                        />
+                        <Bar yAxisId="left" dataKey="attendancePercent" name="Attendance %" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.7} />
+                        <Line yAxisId="right" dataKey="salaryAmount" name="Salary Paid" stroke="hsl(var(--success))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--success))" }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Monthly Breakdown Table */}
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Monthly Breakdown</CardTitle></CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Present</TableHead>
+                        <TableHead>Absent</TableHead>
+                        <TableHead>Half Days</TableHead>
+                        <TableHead>Leaves</TableHead>
+                        <TableHead>Attendance %</TableHead>
+                        {salaryVisible && <TableHead>Salary Status</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...perf.months].reverse().map(m => (
+                        <TableRow key={m.month}>
+                          <TableCell className="font-medium">{m.label}</TableCell>
+                          <TableCell>{m.daysPresent}</TableCell>
+                          <TableCell>{m.daysAbsent}</TableCell>
+                          <TableCell>{m.halfDays}</TableCell>
+                          <TableCell>{m.leaveDays}</TableCell>
+                          <TableCell>
+                            <span className="font-medium" style={{ color: getBarColor(m.attendancePercent) }}>
+                              {m.attendancePercent}%
+                            </span>
+                          </TableCell>
+                          {salaryVisible && (
+                            <TableCell>
+                              <Badge variant={m.salaryPaid ? "default" : "secondary"}>
+                                {m.salaryPaid ? "Paid" : "Pending"}
+                              </Badge>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Leaves Tab */}
