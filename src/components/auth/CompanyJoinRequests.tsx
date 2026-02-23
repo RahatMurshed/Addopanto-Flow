@@ -141,10 +141,7 @@ export default function CompanyJoinRequests() {
       return {
         data_entry_mode: true,
         deo_students: data.deoStudents,
-        deo_payments: data.deoPayments,
-        deo_finance: data.deoRevenue || data.deoExpenses,
-        deo_batches: data.deoBatches,
-        deo_courses: data.deoCourses,
+        deo_finance: data.deoExpenses,
       };
     }
     return {
@@ -182,11 +179,7 @@ export default function CompanyJoinRequests() {
     const enabled: string[] = [];
     if (data.dataEntryMode) {
       if (data.deoStudents) enabled.push("Students");
-      if (data.deoPayments) enabled.push("Payments");
-      if (data.deoRevenue) enabled.push("Revenue");
       if (data.deoExpenses) enabled.push("Expenses");
-      if (data.deoBatches) enabled.push("Batches");
-      if (data.deoCourses) enabled.push("Courses");
     } else {
       if (data.modStudentsAdd || data.modStudentsEdit || data.modStudentsDelete) enabled.push("Students");
       if (data.modPaymentsAdd || data.modPaymentsEdit || data.modPaymentsDelete) enabled.push("Payments");
@@ -390,11 +383,7 @@ export default function CompanyJoinRequests() {
             <div className="grid grid-cols-2 gap-3">
               {([
                 { key: "deoStudents", label: "Can Add Students" },
-                { key: "deoPayments", label: "Can Record Payments" },
-                { key: "deoRevenue", label: "Can Add Revenue" },
                 { key: "deoExpenses", label: "Can Add Expenses" },
-                { key: "deoBatches", label: "Can Add Batches" },
-                { key: "deoCourses", label: "Can Add Courses" },
               ] as const).map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox
