@@ -1,27 +1,59 @@
 
+# Fix: Deleted Users Getting Stuck on /companies/join
 
-# Fix: Prevent Bounce-Back to Join Page After Approval
+## Root Cause
 
-## Problem
-When a user's join request is accepted, the polling in the Join page navigates them to `/companies`. However, on the Company Selection page, an auto-redirect rule sends users back to `/companies/join` if they have 0 companies and 0 pending requests. Because the company list query hasn't refreshed yet at that moment, the user gets bounced back to the join page.
+The existing realtime-based fix (listening for `user_roles` DELETE) is unreliable. Here's what actually happens:
 
-## Solution
+1. Edge function deletes `user_roles` (should trigger realtime listener)
+2. Edge function then deletes `company_memberships`, `user_profiles`, etc.
+3. **Before** the realtime DELETE event reaches the client, React Query may refetch `company_memberships` (due to stale time, window focus, or other invalidation) and get back empty results
+4. `CompanyGuard` sees `hasCompanies = false` and redirects to `/companies`
+5. `CompanySelection` sees 0 companies, 0 pending requests and redirects to `/companies/join`
+6. The user is now stuck with a stale JWT that hasn't expired yet -- they appear "logged in" but all queries return empty
 
-### File: `src/pages/CompanySelection.tsx`
+The realtime approach is a race condition by design: the client must receive and process the `user_roles` DELETE event **before** any other query refetch detects the missing data. This is not guaranteed.
 
-Update the auto-redirect condition (line 158) to also check `newlyJoinedIds`. If there are newly joined companies (detected by polling), skip the redirect -- the query cache is still refreshing and will populate the company list momentarily.
+## Solution: Add a Fallback Detection Layer
 
-**Current:**
+Add a `user_roles` existence check in `CompanyContext`. If a logged-in user has **no role** in `user_roles` (query returns null) and loading is complete, force sign out and redirect to `/auth`. This catches the deletion regardless of whether realtime fires.
+
+### Why this is safe
+- Every user gets a `user_roles` entry on signup (via database trigger)
+- The only way a user has no `user_roles` entry is if they were deleted from the platform
+- New users always have a role entry before they reach CompanyProvider
+
+## Technical Changes
+
+### File: `src/contexts/CompanyContext.tsx`
+
+1. **Add a `user_roles` existence query** -- query for any role for the current user (not just cipher). If the result is null and the query has finished loading, the user was deleted.
+
+2. **Add a `useEffect`** that watches for the "no role found" state. When detected:
+   - Call `supabase.auth.signOut({ scope: 'local' })`
+   - Call `window.location.replace('/auth')`
+   - This serves as the reliable fallback when realtime fails
+
+### File: `src/contexts/AuthContext.tsx`
+
+3. **Export `forcedLogoutInProgress`** as a readable flag so CompanyContext can set it before signing out, preventing any intermediate re-renders.
+
+### Flow After Fix
+
+```text
+User Deleted (edge function)
+  |
+  +--> Realtime fires DELETE on user_roles
+  |      --> AuthContext: forcedLogout flag + signOut + replace('/auth')  [FAST PATH]
+  |
+  +--> CompanyContext query refetches user_roles
+         --> Returns null (no role found)
+         --> useEffect detects deletion
+         --> forcedLogout flag + signOut + replace('/auth')              [FALLBACK PATH]
 ```
-if (companies.length === 0 && !isCipher && pendingJoinRequests.length === 0 && rejectedJoinRequests.length === 0)
-```
 
-**Updated:**
-```
-if (companies.length === 0 && !isCipher && pendingJoinRequests.length === 0 && rejectedJoinRequests.length === 0 && newlyJoinedIds.length === 0)
-```
-
-This single condition change prevents the race between query invalidation and the redirect logic.
+Both paths lead to the same outcome. The fallback catches cases where realtime is slow or doesn't fire.
 
 ### Files Modified
-- `src/pages/CompanySelection.tsx` -- add `newlyJoinedIds.length === 0` guard to auto-redirect condition
+- `src/contexts/AuthContext.tsx` -- export `forcedLogoutInProgress` setter
+- `src/contexts/CompanyContext.tsx` -- add user_roles existence check + forced logout fallback
