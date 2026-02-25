@@ -1310,6 +1310,249 @@ export type Database = {
           },
         ]
       }
+      product_sales: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer_name: string | null
+          id: string
+          notes: string | null
+          payment_method: string
+          product_id: string
+          quantity: number
+          sale_date: string
+          source_id: string | null
+          student_id: string | null
+          total_amount: number
+          unit_price: number
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          product_id: string
+          quantity?: number
+          sale_date?: string
+          source_id?: string | null
+          student_id?: string | null
+          total_amount: number
+          unit_price: number
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          product_id?: string
+          quantity?: number
+          sale_date?: string
+          source_id?: string | null
+          student_id?: string | null
+          total_amount?: number
+          unit_price?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sales_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "revenue_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_stock_movements: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          movement_type: string
+          new_stock: number
+          previous_stock: number
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference_id: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          movement_type: string
+          new_stock: number
+          previous_stock: number
+          product_id: string
+          quantity: number
+          reason?: string | null
+          reference_id?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          movement_type?: string
+          new_stock?: number
+          previous_stock?: number
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          reference_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_stock_movements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_movements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          image_url: string | null
+          linked_course_id: string | null
+          price: number
+          product_code: string
+          product_name: string
+          purchase_price: number | null
+          reorder_level: number | null
+          status: string
+          stock_quantity: number | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          linked_course_id?: string | null
+          price?: number
+          product_code: string
+          product_name: string
+          purchase_price?: number | null
+          reorder_level?: number | null
+          status?: string
+          stock_quantity?: number | null
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          linked_course_id?: string | null
+          price?: number
+          product_code?: string
+          product_name?: string
+          purchase_price?: number | null
+          reorder_level?: number | null
+          status?: string
+          stock_quantity?: number | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_linked_course_id_fkey"
+            columns: ["linked_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registration_requests: {
         Row: {
           banned_until: string | null
@@ -1411,6 +1654,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          product_sale_id: string | null
           source_id: string | null
           student_payment_id: string | null
           updated_at: string
@@ -1423,6 +1667,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          product_sale_id?: string | null
           source_id?: string | null
           student_payment_id?: string | null
           updated_at?: string
@@ -1435,6 +1680,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          product_sale_id?: string | null
           source_id?: string | null
           student_payment_id?: string | null
           updated_at?: string
@@ -1453,6 +1699,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_product_sale_id_fkey"
+            columns: ["product_sale_id"]
+            isOneToOne: false
+            referencedRelation: "product_sales"
             referencedColumns: ["id"]
           },
           {

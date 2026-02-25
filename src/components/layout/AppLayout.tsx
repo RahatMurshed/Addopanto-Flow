@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
-  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, Briefcase,
+  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, Briefcase, Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -128,6 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     } else {
       // Admin/Cipher: full navigation
       items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+      items.push({ label: "Products", href: "/products", icon: Package });
       items.push({ label: "Students", href: "/students", icon: GraduationCap });
       items.push({ label: "Employees", href: "/employees", icon: Briefcase });
       items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
