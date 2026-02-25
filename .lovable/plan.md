@@ -1,58 +1,68 @@
 
 
-# Fix Product Category Selection + Category Detail Pages
+# Fix Product Management Workflow Issues
 
-## Problems Found
+## Issues Found
 
-1. **ProductDialog uses hardcoded categories** (lines 19-25 in ProductDialog.tsx) -- the `CATEGORIES` constant lists "courses, books, stationery, uniforms, other" instead of fetching from the `product_categories` table. So any custom category added by the admin never appears in the Add Product dropdown.
+### 1. Products page fetches ALL products twice (Performance Bug)
+In `Products.tsx`, lines 40 and 54 both call `useProducts()` -- once with filters and once without. The unfiltered call (`allProducts`) is used only for category stats calculation. This causes two separate network requests on every render.
 
-2. **No dedicated page per category** -- clicking a category card on the Products page only toggles a filter on the same table. The user expects each category (e.g., "Books", "Stationery") to have its own page like Courses does, showing products within that category with full management capabilities.
+**Fix**: Remove the duplicate `useProducts()` call on line 54. Use the already-fetched `allSales` and a single unfiltered products query for stats, OR compute stats from the unfiltered hook and use a separate filtered list for the table display. The cleanest approach: keep ONE `useProducts()` without filters for stats, and filter in-memory for the table.
 
-## Changes
+### 2. Courses page missing "Products >" breadcrumb
+The Courses page (`src/pages/Courses.tsx`) has no breadcrumb linking back to Products. CourseDetail and BatchDetail correctly show "Products > Courses > ..." but the Courses list page itself has no breadcrumb at all, breaking the navigation hierarchy.
 
-### 1. Fix ProductDialog -- Use Dynamic Categories
+**Fix**: Add a breadcrumb section to `Courses.tsx` showing `Products > Courses`.
 
-**File: `src/components/dialogs/ProductDialog.tsx`**
-- Remove the hardcoded `CATEGORIES` constant
-- Import and use `useProductCategories()` hook to fetch categories from DB
-- Filter out the "courses" system category (courses are managed separately)
-- Populate the category `<Select>` with dynamic categories
-- Add supplier dropdown using `useSuppliers()` hook
-- Add barcode/SKU input fields
+### 3. ProductSaleDialog does not reset preselectedProduct on reopen (State Bug)
+In `ProductSaleDialog.tsx`, the `productId` and `unitPrice` states are initialized from `preselectedProduct` only once via `useState`. When the dialog reopens with a different preselected product (or from a different context), the old values persist.
 
-### 2. Create Category Detail Page
+**Fix**: Add a `useEffect` that resets form state when `open` or `preselectedProduct` changes, similar to how `ProductDialog` handles it.
 
-**New file: `src/pages/CategoryProducts.tsx`**
-- A page at route `/products/category/:slug` showing:
-  - Breadcrumb: `Products > [Category Name]`
-  - Category header with name, icon, color, product count, total revenue
-  - "Add Product" button (pre-selects this category in the dialog)
-  - Products table filtered to this category with search, status filter
-  - Same product row actions (edit, delete, click to go to product detail)
+### 4. Realtime sync missing product tables
+`useRealtimeSync.ts` does not subscribe to `products`, `product_sales`, `product_stock_movements`, `product_categories`, `suppliers`, or `purchase_orders` tables. Changes by other users to these tables won't auto-refresh.
 
-### 3. Update Products Page -- Category Cards Navigate to Category Pages
+**Fix**: Add these tables to `TABLE_INVALIDATION_MAP` and `TABLE_LABELS`, and add corresponding `.on("postgres_changes", ...)` subscriptions.
 
-**File: `src/pages/Products.tsx`**
-- Change category card `onClick` behavior: instead of filtering the table, navigate to `/products/category/:slug`
-- Keep "courses" card navigating to `/courses`
-- The main Products page table still shows ALL products (no category filter needed since each category has its own page)
-- Remove the category filter dropdown from the Products page (replaced by category pages)
+### 5. CategoryProducts page "Add Product" does not pre-select category in dialog
+The `CategoryProducts` page passes `defaultCategory={slug}` to `ProductDialog`, which works. However, when opening the sale dialog from `CategoryProducts`, the `ProductSaleDialog` shows ALL products, not filtered to the category. This is acceptable behavior but could be confusing.
 
-### 4. Add Route
+**Fix**: No code change needed -- it's by design since sales should allow any product selection.
 
-**File: `src/App.tsx`**
-- Add lazy import for `CategoryProducts`
-- Add route: `/products/category/:slug` with same access guards as Products
+### 6. Products page `useProducts` fetches without filters then WITH filters -- table shows filtered, stats show all (Correct but wasteful)
+The intent is correct: stats need all products, table needs filtered products. But the approach creates two separate API calls.
 
-### 5. Update ProductDetail Breadcrumbs
+**Fix**: Fetch all products once (unfiltered), compute stats from that, then filter in-memory for the table display.
 
-**File: `src/pages/ProductDetail.tsx`**
-- Update the back button and header to show breadcrumb: `Products > [Category Name] > [Product Name]`
-- Back button navigates to `/products/category/:slug` instead of `/products`
+### 7. Console warning: "Function components cannot be given refs"
+From the console logs, `ProductSaleDialog` and `AlertDialog` are receiving refs but are not wrapped in `forwardRef`. This happens because they're rendered as direct children of components that try to pass refs.
 
-## Technical Details
+**Fix**: This is a non-critical React warning from Radix UI internals. No action needed.
 
-- The `CategoryProducts` page reuses existing hooks: `useProducts({ category: slug })`, `useProductSales()`, `useProductCategories()`
-- The ProductDialog receives an optional `defaultCategory` prop so when "Add Product" is clicked from a category page, the category is pre-selected
-- The category slug comes from the URL param and is matched against `product_categories` to get the display name, icon, and color
-- No database changes needed -- all tables and data already exist
+## Changes Summary
+
+### File: `src/pages/Products.tsx`
+- Remove duplicate `useProducts()` call (line 54)
+- Use single unfiltered fetch for stats, filter in-memory for table display
+
+### File: `src/pages/Courses.tsx`
+- Add breadcrumb: `Products > Courses` at the top of the page
+
+### File: `src/components/dialogs/ProductSaleDialog.tsx`
+- Add `useEffect` to reset form state (`productId`, `unitPrice`, `quantity`, `customerName`, `notes`, `paymentMethod`, `saleDate`) when `open` changes or `preselectedProduct` changes
+
+### File: `src/hooks/useRealtimeSync.ts`
+- Add entries to `TABLE_INVALIDATION_MAP`:
+  - `products` -> `["products", "product-sales", "dashboard"]`
+  - `product_sales` -> `["product-sales", "products", "revenues", "dashboard", "reports"]`
+  - `product_stock_movements` -> `["product-stock-movements", "products"]`
+  - `product_categories` -> `["product_categories", "products"]`
+  - `suppliers` -> `["suppliers"]`
+  - `purchase_orders` -> `["purchase_orders"]`
+  - `purchase_order_items` -> `["purchase_order_items", "products", "product-stock-movements"]`
+- Add corresponding `TABLE_LABELS`
+- Add `.on("postgres_changes", ...)` for each new table
+
+## No Database Changes Required
+All issues are frontend-only. The database triggers, RLS policies, and schema are correctly implemented.
+
