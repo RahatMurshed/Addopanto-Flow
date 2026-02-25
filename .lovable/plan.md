@@ -1,179 +1,169 @@
 
-
-# Phase 1: Products Management System -- Core Foundation
+# Restructure Products as Top-Level Hub + Dynamic Categories + Phase 2
 
 ## Overview
-Build the foundational products management system with a Products page, product CRUD, basic sales recording with automatic revenue integration, and stock tracking. This follows existing patterns (hooks, company isolation, RLS, audit triggers) and sets up the database schema for future phases.
 
-## What Gets Built
+The user wants three key changes:
 
-### Products page at `/products`
-- Category cards at top: Courses (links to existing `/courses`), Books, Stationery, Uniforms, Other
-- Each card shows: icon, product count, total revenue, quick "Add Product" button
-- Products table with search, category/status filters, sorting
-- Grid/list view toggle
-- Clicking a course-type product navigates to `/courses/:id`; clicking physical products opens `/products/:id`
+1. **Products becomes the top-level navigation entry point** wrapping Courses. The hierarchy changes from `Courses -> Batches -> Students` to `Products -> Courses -> Batches -> Students`. The Products page lists ALL sellable items in the business. Clicking a course-category product navigates to the existing Courses page (not a single course).
 
-### Add/Edit Product dialog
-- Fields: product name, product code, category (Courses/Books/Stationery/Uniforms/Other), type (Digital/Physical), description, price, purchase price (admin-only), stock quantity, reorder level, image URL, status (Active/Out of Stock/Discontinued)
-- For "Courses" category: link to existing course via dropdown
-- Conditional fields: stock/reorder only for Physical type
-- Validation: unique product code per company, no negative prices/stock
+2. **Dynamic product categories** instead of hardcoded ones. Admins can add custom categories (e.g., "Lab Equipment", "Accessories") alongside defaults like Books, Stationery, Uniforms. Both physical and digital product types supported.
 
-### Product Detail page at `/products/:id`
-- Product info card with image, name, code, category, price, stock indicator (green/orange/red)
-- Sales history table: Sale Date, Quantity, Unit Price, Total, Customer, Payment Method, Sold By
-- Summary cards: Total Revenue, Items Sold, Current Stock, Profit Margin (admin-only)
+3. **Phase 2 features**: Suppliers management, purchase orders for restocking, and barcode/QR integration.
 
-### Sales recording
-- Modal to record a sale: product dropdown (searchable), quantity, unit price (auto-filled, editable), customer name, link to student (optional), payment method, sale date, notes
-- Stock deduction on sale
-- Auto-creates a revenue entry via database trigger (same pattern as `sync_student_payment_revenue`)
-- Validates stock availability before sale
+## What Changes
 
-### Stock tracking
-- Stock movement log (sale/purchase/adjustment) with previous and new stock levels
-- Low stock badge on product cards when stock drops below reorder level
-- Stock adjustment feature with reason field
+### 1. Navigation Restructure
 
-## Database Changes (4 new tables + 1 trigger + RLS)
+- **Sidebar**: Replace separate "Courses" and "Products" nav items with a single "Products" entry at the top. Courses page is accessed BY clicking the "Courses" category card on the Products page (or via breadcrumb).
+- **Products page** becomes the central hub showing:
+  - Dynamic category cards (including "Courses" which navigates to `/courses`)
+  - All non-course products in a filterable table below
+  - "Add Product" and "Record Sale" buttons
+- **Breadcrumbs**: CourseDetail and BatchDetail breadcrumbs update to show `Products > Courses > [Course Name]` and `Products > Courses > [Course] > [Batch]`
+- **Routes**: Keep existing `/courses`, `/courses/:id`, `/batches/:id` routes but update breadcrumbs. `/products` remains the main entry.
 
-### Table: `products`
+### 2. Dynamic Product Categories (New Table)
+
+Create a `product_categories` table so admins can add/edit/delete categories:
+
 ```text
-id              uuid PK DEFAULT gen_random_uuid()
-company_id      uuid NOT NULL (FK companies)
-product_name    text NOT NULL
-product_code    text NOT NULL
-category        text NOT NULL DEFAULT 'other'
-type            text NOT NULL DEFAULT 'physical'  -- physical | digital
-description     text
-price           numeric NOT NULL DEFAULT 0
-purchase_price  numeric DEFAULT 0
-stock_quantity  integer DEFAULT 0
-reorder_level   integer DEFAULT 5
-image_url       text
-status          text NOT NULL DEFAULT 'active'
-linked_course_id uuid  -- FK courses, nullable
-user_id         uuid NOT NULL
-created_by      uuid NOT NULL
-created_at      timestamptz DEFAULT now()
-updated_at      timestamptz DEFAULT now()
-UNIQUE(company_id, product_code)
+product_categories table:
+  id           uuid PK
+  company_id   uuid NOT NULL (FK companies)
+  name         text NOT NULL (e.g. "Books", "Stationery")
+  slug         text NOT NULL (e.g. "books", "stationery")
+  icon         text DEFAULT 'package' (icon name from lucide)
+  color        text DEFAULT '#6B7280' (hex color for card)
+  is_system    boolean DEFAULT false (true for "Courses" - cannot be deleted)
+  sort_order   integer DEFAULT 0
+  user_id      uuid NOT NULL
+  created_at   timestamptz DEFAULT now()
+  UNIQUE(company_id, slug)
 ```
 
-### Table: `product_sales`
+- Seed default categories per company: Courses (system, non-deletable), Books, Stationery, Uniforms, Other
+- Products table `category` column changes from free-text to FK referencing `product_categories.id` (or we keep it as text matching the slug for backward compatibility -- using slug is simpler and avoids migration complexity)
+- Category management UI: small dialog to add/edit/delete categories from the Products page (admin only)
+
+### 3. Phase 2: Suppliers + Purchase Orders
+
+#### Suppliers Table
 ```text
-id              uuid PK DEFAULT gen_random_uuid()
-company_id      uuid NOT NULL
-product_id      uuid NOT NULL (FK products)
-quantity         integer NOT NULL DEFAULT 1
-unit_price      numeric NOT NULL
-total_amount    numeric NOT NULL
-customer_name   text
-student_id      uuid  -- FK students, nullable
-payment_method  text DEFAULT 'cash'
-sale_date       date DEFAULT CURRENT_DATE
-notes           text
-source_id       uuid  -- FK revenue_sources, nullable
-user_id         uuid NOT NULL
-created_at      timestamptz DEFAULT now()
+suppliers table:
+  id              uuid PK
+  company_id      uuid NOT NULL
+  supplier_name   text NOT NULL
+  contact_person  text
+  phone           text
+  email           text
+  address         text
+  payment_terms   text
+  notes           text
+  status          text DEFAULT 'active'
+  user_id         uuid NOT NULL
+  created_at      timestamptz DEFAULT now()
+  updated_at      timestamptz DEFAULT now()
 ```
 
-### Table: `product_stock_movements`
+#### Purchase Orders Table
 ```text
-id              uuid PK DEFAULT gen_random_uuid()
-company_id      uuid NOT NULL
-product_id      uuid NOT NULL (FK products)
-movement_type   text NOT NULL  -- sale | purchase | adjustment
-quantity         integer NOT NULL
-previous_stock  integer NOT NULL
-new_stock       integer NOT NULL
-reference_id    uuid   -- links to product_sales.id or null
-reason          text
-user_id         uuid NOT NULL
-created_at      timestamptz DEFAULT now()
+purchase_orders table:
+  id                uuid PK
+  company_id        uuid NOT NULL
+  supplier_id       uuid (FK suppliers)
+  order_number      text NOT NULL
+  status            text DEFAULT 'pending' (pending/partial/received/cancelled)
+  expected_delivery date
+  total_amount      numeric DEFAULT 0
+  notes             text
+  user_id           uuid NOT NULL
+  created_at        timestamptz DEFAULT now()
+  updated_at        timestamptz DEFAULT now()
+  UNIQUE(company_id, order_number)
 ```
 
-### Revenue trigger: `sync_product_sale_revenue()`
-- Same pattern as existing `sync_student_payment_revenue`
-- On INSERT into `product_sales`: creates a revenue entry with `product_sale_id` FK
-- On UPDATE: updates linked revenue
-- On DELETE: revenue auto-deleted via CASCADE
-- Adds `product_sale_id` column to `revenues` table (nullable, FK with ON DELETE CASCADE)
+#### Purchase Order Items Table
+```text
+purchase_order_items table:
+  id                uuid PK
+  purchase_order_id uuid NOT NULL (FK purchase_orders)
+  product_id        uuid NOT NULL (FK products)
+  company_id        uuid NOT NULL
+  quantity_ordered  integer NOT NULL
+  quantity_received integer DEFAULT 0
+  unit_cost         numeric NOT NULL
+  total_cost        numeric NOT NULL
+  user_id           uuid NOT NULL
+  created_at        timestamptz DEFAULT now()
+```
 
-### RLS Policies (all tables)
-- SELECT: `is_company_member(auth.uid(), company_id)` with active company check
-- INSERT/UPDATE/DELETE: admin/cipher, plus moderators with product permissions (future `can_manage_products` flag -- for Phase 1, admin/cipher only)
-- Purchase price visible only to admin/cipher (handled in frontend)
+- When a purchase order is marked "received", stock is automatically updated and stock movements are logged
+- A trigger or frontend logic handles partial receipts (updating `quantity_received`)
 
-### Audit trigger
-- Attach existing `audit_log_trigger` to `products`, `product_sales`, `product_stock_movements`
+#### Barcode/QR Integration
+- Add `barcode` and `sku` columns to `products` table
+- Auto-generate a barcode value from product_code if not provided
+- Display barcode on ProductDetail page using a simple barcode rendering component (CSS-based or a lightweight library)
+- Barcode search: typing or scanning a barcode in the Products page search will find the product
 
-## New Files
+## Files to Create
 
-### Hooks
-- `src/hooks/useProducts.ts` -- CRUD hooks following `useCourses.ts` pattern
-- `src/hooks/useProductSales.ts` -- Sales CRUD + stock validation
-- `src/hooks/useProductStockMovements.ts` -- Stock movement queries
+| File | Purpose |
+|------|---------|
+| `src/hooks/useProductCategories.ts` | CRUD hooks for dynamic product categories |
+| `src/hooks/useSuppliers.ts` | CRUD hooks for suppliers |
+| `src/hooks/usePurchaseOrders.ts` | CRUD hooks for purchase orders + items |
+| `src/components/dialogs/ProductCategoryDialog.tsx` | Add/Edit category dialog |
+| `src/components/dialogs/SupplierDialog.tsx` | Add/Edit supplier dialog |
+| `src/components/dialogs/PurchaseOrderDialog.tsx` | Create/Edit purchase order dialog |
+| `src/pages/Suppliers.tsx` | Suppliers management page |
+| `src/pages/PurchaseOrders.tsx` | Purchase orders list page |
+| `src/pages/PurchaseOrderDetail.tsx` | Single PO detail with items + receive flow |
 
-### Pages
-- `src/pages/Products.tsx` -- Main products page with category cards + table
-- `src/pages/ProductDetail.tsx` -- Single product view with sales history
+## Files to Modify
 
-### Dialogs
-- `src/components/dialogs/ProductDialog.tsx` -- Add/Edit product form
-- `src/components/dialogs/ProductSaleDialog.tsx` -- Record sale modal
-- `src/components/dialogs/StockAdjustmentDialog.tsx` -- Stock adjustment modal
+| File | Changes |
+|------|---------|
+| `src/pages/Products.tsx` | Replace hardcoded CATEGORY_CONFIG with dynamic categories from DB; add category management button; update "Courses" card to navigate to `/courses`; update layout |
+| `src/pages/ProductDetail.tsx` | Add supplier info display; add barcode display; update breadcrumbs to `Products > [Product Name]` |
+| `src/pages/Courses.tsx` | Update breadcrumbs to `Products > Courses`; remove from direct sidebar nav |
+| `src/pages/CourseDetail.tsx` | Update breadcrumbs to `Products > Courses > [Course Name]` |
+| `src/pages/BatchDetail.tsx` | Update breadcrumbs to `Products > Courses > [Course] > [Batch]` |
+| `src/components/layout/AppLayout.tsx` | Remove separate "Courses" nav item; keep single "Products" entry. Add "Suppliers" nav item for admin/cipher |
+| `src/components/dialogs/ProductDialog.tsx` | Use dynamic categories from DB instead of hardcoded list; add supplier selection dropdown; add barcode/SKU fields |
+| `src/hooks/useProducts.ts` | Add `supplier_id`, `barcode`, `sku` to Product interface |
+| `src/App.tsx` | Add routes for `/suppliers`, `/purchase-orders`, `/purchase-orders/:id` |
+| `src/components/auth/AccessGuard.tsx` | Add access rules for suppliers/purchase-orders (same as products: block DEO) |
+| `src/components/layout/CommandPalette.tsx` | Add Products and Suppliers to command palette search |
 
-## Modified Files
+## Database Migration
 
-### `src/App.tsx`
-- Add lazy imports for Products, ProductDetail
-- Add routes: `/products`, `/products/:id` with CriticalRouteErrorBoundary
+Single migration covering:
 
-### `src/components/layout/AppLayout.tsx`
-- Add "Products" nav item with `Package` icon (from lucide-react)
-- Position after Courses in navigation for admin/cipher
-- Traditional moderators: show if future `canManageProducts` permission is granted
+1. **`product_categories` table** with RLS policies (company member SELECT, admin/cipher INSERT/UPDATE/DELETE)
+2. **`suppliers` table** with RLS policies
+3. **`purchase_orders` table** with RLS policies
+4. **`purchase_order_items` table** with RLS policies
+5. **Add columns to `products`**: `supplier_id` (uuid, nullable, FK suppliers), `barcode` (text, nullable), `sku` (text, nullable)
+6. **Seed default categories**: A trigger or function that creates default categories (Courses, Books, Stationery, Uniforms, Other) when a new company is created
+7. **Purchase order receive trigger**: `receive_purchase_order_items()` -- updates product stock and logs stock movements when `quantity_received` changes
+8. **Audit triggers** on all new tables
+9. **Indexes** on company_id, supplier_id, barcode for all relevant tables
 
-### `src/components/auth/AccessGuard.tsx`
-- Add `deoProducts` rule blocking DEO moderators from Products page
+## Implementation Order
 
-### Database migration
-- Create `products`, `product_sales`, `product_stock_movements` tables
-- Add `product_sale_id` column to `revenues` table
-- Create `sync_product_sale_revenue` trigger function
-- Create RLS policies for all new tables
-- Attach audit triggers
-- Add database indexes on `company_id`, `product_code`, `category`, `status`
+1. Database migration (all tables + triggers + RLS)
+2. Dynamic categories (hook + dialog + update Products page)
+3. Navigation restructure (sidebar, breadcrumbs)
+4. Suppliers management (hook + page + dialog)
+5. Purchase orders (hook + pages + dialog + receive flow)
+6. Barcode/SKU fields (product dialog + detail display)
+7. Update ProductDialog to use dynamic categories + supplier dropdown
 
-## Technical Details
+## Technical Notes
 
-- **Company isolation**: All queries filter by `company_id = activeCompanyId` in hooks + RLS
-- **Revenue auto-creation**: Database trigger creates revenue with "Product Sales" source (auto-created per company like "Student Fees")
-- **Stock race conditions**: The stock deduction uses a transaction in the trigger -- UPDATE products SET stock_quantity = stock_quantity - NEW.quantity WHERE id = NEW.product_id AND stock_quantity >= NEW.quantity, raising an exception if insufficient
-- **Currency**: All prices displayed using existing `useCompanyCurrency` hook
-- **Audit**: Reuses existing `audit_log_trigger` function
-- **No PII concerns**: Product data is not PII-sensitive
-
-## Testing Checklist
-
-| # | Test | Expected Result | Pass |
-|---|------|----------------|------|
-| 1 | Create product with unique code | Product appears in table | |
-| 2 | Create product with duplicate code | Error: duplicate product code | |
-| 3 | Record sale with sufficient stock | Stock decreases, revenue entry created | |
-| 4 | Record sale exceeding stock | Error: insufficient stock | |
-| 5 | Delete product sale | Revenue auto-deleted, stock restored | |
-| 6 | Stock adjustment | Movement logged, stock updated | |
-| 7 | Course product click | Navigates to /courses/:id | |
-| 8 | Category filter | Only matching products shown | |
-| 9 | Moderator cannot see purchase price | Purchase price column hidden | |
-| 10 | Cross-company isolation | Products from other companies not visible | |
-
-## Future Phases (not in scope now)
-- Phase 2: Suppliers, purchase orders, barcode/QR
-- Phase 3: Product bundles, variants, promotions
-- Phase 4: Advanced analytics, returns/refunds, notifications
-- Phase 5: Product lifecycle, waste tracking, CSV bulk import
-
+- **Backward compatibility**: Existing products with hardcoded category strings (e.g., "books") will still work since we match by slug. The migration will seed default categories matching existing slugs.
+- **Company isolation**: All new tables have `company_id` with RLS policies using existing `is_company_member` and `company_can_edit_delete` functions.
+- **No breaking changes to Courses flow**: The Course -> Batch -> Student hierarchy is untouched. Only navigation entry point and breadcrumbs change.
+- **Category "Courses" is special**: It's marked `is_system = true` and clicking it navigates to `/courses` instead of filtering products. Course products are NOT shown in the products table (they live in the courses system).
