@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
-  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, Briefcase, Package,
+  ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, Briefcase, Package, Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -111,7 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     } else if (isTraditionalModerator) {
       // Traditional Moderator: granular permissions, no Dashboard/Reports
       if (canAddCourse || canEditCourse || canDeleteCourse) {
-        items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+        items.push({ label: "Products", href: "/products", icon: Package });
       }
       if (canAddStudent || canEditStudent || canDeleteStudent) {
         items.push({ label: "Students", href: "/students", icon: GraduationCap });
@@ -127,10 +127,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
     } else {
       // Admin/Cipher: full navigation
-      items.push({ label: "Courses", href: "/courses", icon: BookOpen });
       items.push({ label: "Products", href: "/products", icon: Package });
       items.push({ label: "Students", href: "/students", icon: GraduationCap });
       items.push({ label: "Employees", href: "/employees", icon: Briefcase });
+      items.push({ label: "Suppliers", href: "/suppliers", icon: Truck });
+      items.push({ label: "Purchase Orders", href: "/purchase-orders", icon: ClipboardList });
       items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
       items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
       items.push({ label: "Expenses", href: "/expenses", icon: Receipt });

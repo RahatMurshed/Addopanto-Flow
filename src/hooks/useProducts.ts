@@ -18,6 +18,9 @@ export interface Product {
   image_url: string | null;
   status: string;
   linked_course_id: string | null;
+  supplier_id: string | null;
+  barcode: string | null;
+  sku: string | null;
   user_id: string;
   created_by: string;
   created_at: string;
@@ -37,6 +40,9 @@ export interface ProductInsert {
   image_url?: string | null;
   status?: string;
   linked_course_id?: string | null;
+  supplier_id?: string | null;
+  barcode?: string | null;
+  sku?: string | null;
 }
 
 export interface ProductFilters {
@@ -66,7 +72,7 @@ export function useProducts(filters?: ProductFilters) {
       if (status !== "all") query = query.eq("status", status);
       if (search) {
         const s = search.replace(/[%_\\]/g, "\\$&");
-        query = query.or(`product_name.ilike.%${s}%,product_code.ilike.%${s}%`);
+        query = query.or(`product_name.ilike.%${s}%,product_code.ilike.%${s}%,barcode.ilike.%${s}%,sku.ilike.%${s}%`);
       }
 
       const { data, error } = await query;

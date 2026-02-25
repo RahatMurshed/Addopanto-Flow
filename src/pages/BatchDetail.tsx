@@ -390,6 +390,10 @@ export default function BatchDetail() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
+            <BreadcrumbLink asChild><Link to="/products">Products</Link></BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
             <BreadcrumbLink asChild><Link to="/courses">Courses</Link></BreadcrumbLink>
           </BreadcrumbItem>
           {course && (
