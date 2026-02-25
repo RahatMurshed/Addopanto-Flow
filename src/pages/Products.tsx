@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
+import { useProductCategories, useDeleteProductCategory, type ProductCategory } from "@/hooks/useProductCategories";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useProductSales } from "@/hooks/useProductSales";
 import { ProductDialog } from "@/components/dialogs/ProductDialog";
 import { ProductSaleDialog } from "@/components/dialogs/ProductSaleDialog";
+import { ProductCategoryDialog } from "@/components/dialogs/ProductCategoryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -17,20 +19,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  BookOpen, GraduationCap, Package, Pencil, Plus, Search, ShoppingCart, Shirt, Trash2, MoreHorizontal,
+  BookOpen, GraduationCap, Package, Pencil, Plus, Search, ShoppingCart, Shirt, Trash2, MoreHorizontal, Settings2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-
-const CATEGORY_CONFIG = [
-  { key: "courses", label: "Courses", icon: GraduationCap, color: "text-blue-500" },
-  { key: "books", label: "Books", icon: BookOpen, color: "text-amber-500" },
-  { key: "stationery", label: "Stationery", icon: Pencil, color: "text-green-500" },
-  { key: "uniforms", label: "Uniforms", icon: Shirt, color: "text-purple-500" },
-  { key: "other", label: "Other", icon: Package, color: "text-muted-foreground" },
-];
 
 export default function Products() {
   const navigate = useNavigate();
@@ -44,17 +38,20 @@ export default function Products() {
 
   const { data: products = [], isLoading } = useProducts({ search, category: categoryFilter, status: statusFilter });
   const { data: allSales = [] } = useProductSales();
+  const { data: categories = [] } = useProductCategories();
   const deleteProduct = useDeleteProduct();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
-  // Category stats
+  // Category stats from dynamic categories
   const { data: allProducts = [] } = useProducts();
-  const categoryStats = CATEGORY_CONFIG.map((cat) => {
-    const catProducts = allProducts.filter((p) => p.category === cat.key);
+  const categoryStats = categories.map((cat) => {
+    const catProducts = allProducts.filter((p) => p.category === cat.slug);
     const catSales = allSales.filter((s) => catProducts.some((p) => p.id === s.product_id));
     return {
       ...cat,
@@ -98,6 +95,9 @@ export default function Products() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
+            <Button onClick={() => { setEditingCategory(null); setCategoryDialogOpen(true); }} variant="ghost" size="icon" title="Manage Categories">
+              <Settings2 className="h-4 w-4" />
+            </Button>
             <Button onClick={() => setSaleDialogOpen(true)} variant="outline" className="gap-2">
               <ShoppingCart className="h-4 w-4" /> Record Sale
             </Button>
@@ -112,16 +112,17 @@ export default function Products() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {categoryStats.map((cat) => (
           <Card
-            key={cat.key}
+            key={cat.slug}
             className="cursor-pointer transition-all hover:shadow-md"
             onClick={() => {
-              if (cat.key === "courses") { navigate("/courses"); return; }
-              setCategoryFilter(categoryFilter === cat.key ? "all" : cat.key);
+              if (cat.slug === "courses") { navigate("/courses"); return; }
+              setCategoryFilter(categoryFilter === cat.slug ? "all" : cat.slug);
             }}
+            style={{ borderColor: categoryFilter === cat.slug ? cat.color : undefined }}
           >
             <CardContent className="flex flex-col items-center gap-2 p-4">
-              <cat.icon className={`h-8 w-8 ${cat.color}`} />
-              <span className="text-sm font-medium">{cat.label}</span>
+              <Package className="h-8 w-8" style={{ color: cat.color }} />
+              <span className="text-sm font-medium">{cat.name}</span>
               <span className="text-xs text-muted-foreground">{cat.count} products</span>
               <span className="text-xs font-semibold">{fc(cat.revenue)}</span>
             </CardContent>
@@ -139,7 +140,7 @@ export default function Products() {
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {CATEGORY_CONFIG.map((c) => (<SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>))}
+            {categories.filter(c => c.slug !== "courses").map((c) => (<SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -215,6 +216,7 @@ export default function Products() {
 
       <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editingProduct} />
       <ProductSaleDialog open={saleDialogOpen} onOpenChange={setSaleDialogOpen} />
+      <ProductCategoryDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} category={editingCategory} />
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
