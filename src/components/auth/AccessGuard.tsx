@@ -79,6 +79,12 @@ export const ACCESS_RULES = {
     message: "You don't have permission to access employee data. Contact your company admin to request employee access.",
     autoRedirectSeconds: 5,
   },
+  /** Block DEO moderators from Products */
+  deoProducts: {
+    isDenied: (ctx) => ctx.isDataEntryModerator,
+    message: "Access Denied. Products are not available in Data Entry Mode.",
+    autoRedirectSeconds: 5,
+  },
 } satisfies Record<string, AccessRule>;
 
 interface AccessGuardProps {

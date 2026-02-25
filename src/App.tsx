@@ -53,6 +53,8 @@ const AddStudent = lazy(() => import("@/pages/AddStudent"));
 const StudentDuplicates = lazy(() => import("@/pages/StudentDuplicates"));
 const EmployeesPage = lazy(() => import("@/pages/Employees"));
 const EmployeeDetailPage = lazy(() => import("@/pages/EmployeeDetail"));
+const Products = lazy(() => import("@/pages/Products"));
+const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
 
 
 const queryClient = new QueryClient({
@@ -188,6 +190,8 @@ const App = () => (
                   <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
                   <Route path="/employees" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeesPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/employees/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeeDetailPage /></AccessGuard></ProtectedRoute>} />
+                  <Route path="/products" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CriticalRouteErrorBoundary routeName="Products"><Products /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
+                  <Route path="/products/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><ProductDetail /></AccessGuard></ProtectedRoute>} />
                   
                   
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
