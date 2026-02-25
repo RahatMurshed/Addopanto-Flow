@@ -58,6 +58,7 @@ const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
 const SuppliersPage = lazy(() => import("@/pages/Suppliers"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/PurchaseOrders"));
 const PurchaseOrderDetailPage = lazy(() => import("@/pages/PurchaseOrderDetail"));
+const CategoryProducts = lazy(() => import("@/pages/CategoryProducts"));
 
 
 const queryClient = new QueryClient({
@@ -194,6 +195,7 @@ const App = () => (
                   <Route path="/employees" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeesPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/employees/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeeDetailPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/products" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CriticalRouteErrorBoundary routeName="Products"><Products /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
+                  <Route path="/products/category/:slug" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CategoryProducts /></AccessGuard></ProtectedRoute>} />
                   <Route path="/products/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><ProductDetail /></AccessGuard></ProtectedRoute>} />
                   <Route path="/suppliers" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><SuppliersPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/purchase-orders" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><PurchaseOrdersPage /></AccessGuard></ProtectedRoute>} />
