@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
+import { useProductCategories } from "@/hooks/useProductCategories";
+import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCourses } from "@/hooks/useCourses";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
@@ -14,27 +16,25 @@ interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product?: Product | null;
+  defaultCategory?: string;
 }
 
-const CATEGORIES = [
-  { value: "courses", label: "Courses" },
-  { value: "books", label: "Books" },
-  { value: "stationery", label: "Stationery" },
-  { value: "uniforms", label: "Uniforms" },
-  { value: "other", label: "Other" },
-];
-
-export function ProductDialog({ open, onOpenChange, product }: ProductDialogProps) {
+export function ProductDialog({ open, onOpenChange, product, defaultCategory }: ProductDialogProps) {
   const { isCompanyAdmin, isCipher } = useCompany();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
+  const { data: categories = [] } = useProductCategories();
+  const { data: suppliers = [] } = useSuppliers();
   const { data: courses = [] } = useCourses();
   const isAdmin = isCompanyAdmin || isCipher;
+
+  // Filter out system "courses" category - courses are managed separately
+  const selectableCategories = categories.filter((c) => c.slug !== "courses");
 
   const [form, setForm] = useState<ProductInsert>({
     product_name: "",
     product_code: "",
-    category: "other",
+    category: defaultCategory || "other",
     type: "physical",
     description: "",
     price: 0,
@@ -44,6 +44,9 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
     image_url: "",
     status: "active",
     linked_course_id: null,
+    supplier_id: null,
+    barcode: null,
+    sku: null,
   });
 
   useEffect(() => {
@@ -61,15 +64,19 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
         image_url: product.image_url || "",
         status: product.status,
         linked_course_id: product.linked_course_id,
+        supplier_id: product.supplier_id,
+        barcode: product.barcode,
+        sku: product.sku,
       });
     } else {
       setForm({
-        product_name: "", product_code: "", category: "other", type: "physical",
+        product_name: "", product_code: "", category: defaultCategory || "other", type: "physical",
         description: "", price: 0, purchase_price: 0, stock_quantity: 0,
         reorder_level: 5, image_url: "", status: "active", linked_course_id: null,
+        supplier_id: null, barcode: null, sku: null,
       });
     }
-  }, [product, open]);
+  }, [product, open, defaultCategory]);
 
   const isPhysical = form.type === "physical";
   const isCourseCategory = form.category === "courses";
@@ -127,7 +134,9 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
               <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
+                  {selectableCategories.map((c) => (
+                    <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -188,6 +197,30 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
               </div>
             </div>
           )}
+
+          {/* Supplier */}
+          <div className="space-y-2">
+            <Label>Supplier</Label>
+            <Select value={form.supplier_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, supplier_id: v === "none" ? null : v }))}>
+              <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No supplier</SelectItem>
+                {suppliers.map((s) => (<SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Barcode / SKU */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Barcode</Label>
+              <Input value={form.barcode || ""} onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value || null }))} placeholder="Barcode" />
+            </div>
+            <div className="space-y-2">
+              <Label>SKU</Label>
+              <Input value={form.sku || ""} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value || null }))} placeholder="SKU" />
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

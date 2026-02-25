@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useProduct, useDeleteProduct } from "@/hooks/useProducts";
 import { useProductSales, useDeleteProductSale } from "@/hooks/useProductSales";
 import { useProductStockMovements } from "@/hooks/useProductStockMovements";
+import { useProductCategories } from "@/hooks/useProductCategories";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { ProductDialog } from "@/components/dialogs/ProductDialog";
@@ -33,6 +34,8 @@ export default function ProductDetail() {
   const { data: product, isLoading } = useProduct(id);
   const { data: sales = [] } = useProductSales(id);
   const { data: movements = [] } = useProductStockMovements(id);
+  const { data: categories = [] } = useProductCategories();
+  const productCategory = product ? categories.find((c) => c.slug === product.category) : null;
   const deleteProduct = useDeleteProduct();
   const deleteSale = useDeleteProductSale();
 
@@ -78,12 +81,16 @@ export default function ProductDetail() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/products")}>
+        <Button variant="ghost" size="icon" onClick={() => productCategory ? navigate(`/products/category/${productCategory.slug}`) : navigate("/products")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">{product.product_name}</h1>
-          <p className="text-sm text-muted-foreground">{product.product_code} · <span className="capitalize">{product.category}</span></p>
+          <p className="text-sm text-muted-foreground">
+            <button onClick={() => navigate("/products")} className="hover:underline">Products</button>
+            {productCategory && <>{" > "}<button onClick={() => navigate(`/products/category/${productCategory.slug}`)} className="hover:underline">{productCategory.name}</button></>}
+            {" > "}{product.product_name}
+          </p>
         </div>
         {isAdmin && (
           <div className="flex gap-2">

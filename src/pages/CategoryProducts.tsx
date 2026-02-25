@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
-import { useProductCategories, useDeleteProductCategory, type ProductCategory } from "@/hooks/useProductCategories";
-import { useCourses } from "@/hooks/useCourses";
+import { useProductCategories } from "@/hooks/useProductCategories";
+import { useProductSales } from "@/hooks/useProductSales";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { useProductSales } from "@/hooks/useProductSales";
 import { ProductDialog } from "@/components/dialogs/ProductDialog";
 import { ProductSaleDialog } from "@/components/dialogs/ProductSaleDialog";
-import { ProductCategoryDialog } from "@/components/dialogs/ProductCategoryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,59 +18,38 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  BookOpen, GraduationCap, Package, Pencil, Plus, Search, ShoppingCart, Shirt, Trash2, MoreHorizontal, Settings2,
+  ArrowLeft, MoreHorizontal, Package, Pencil, Plus, Search, ShoppingCart, Trash2, TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
-export default function Products() {
+export default function CategoryProducts() {
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { isCompanyAdmin, isCipher } = useCompany();
   const { fc } = useCompanyCurrency();
   const isAdmin = isCompanyAdmin || isCipher;
 
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: products = [], isLoading } = useProducts({ search, category: categoryFilter, status: statusFilter });
-  const { data: allSales = [] } = useProductSales();
   const { data: categories = [] } = useProductCategories();
-  const { data: courses = [] } = useCourses();
+  const category = categories.find((c) => c.slug === slug);
+
+  const { data: products = [], isLoading } = useProducts({ search, category: slug, status: statusFilter });
+  const { data: allSales = [] } = useProductSales();
   const deleteProduct = useDeleteProduct();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
-  // Category stats from dynamic categories
-  const { data: allProducts = [] } = useProducts();
-  const categoryStats = categories.map((cat) => {
-    if (cat.slug === "courses") {
-      // Courses live in the courses table, not products
-      return { ...cat, count: courses.length, revenue: 0 };
-    }
-    const catProducts = allProducts.filter((p) => p.category === cat.slug);
-    const catSales = allSales.filter((s) => catProducts.some((p) => p.id === s.product_id));
-    return {
-      ...cat,
-      count: catProducts.length,
-      revenue: catSales.reduce((sum, s) => sum + s.total_amount, 0),
-    };
-  });
-
-  const handleProductClick = (product: Product) => {
-    if (product.category === "courses" && product.linked_course_id) {
-      navigate(`/courses/${product.linked_course_id}`);
-    } else {
-      navigate(`/products/${product.id}`);
-    }
-  };
+  const categoryRevenue = allSales
+    .filter((s) => products.some((p) => p.id === s.product_id))
+    .reduce((sum, s) => sum + s.total_amount, 0);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -92,18 +69,36 @@ export default function Products() {
     return <Badge className="bg-green-500/15 text-green-600 text-[10px]">In Stock</Badge>;
   };
 
+  if (!category && categories.length > 0) {
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        Category not found. <Button variant="link" onClick={() => navigate("/products")}>Back to Products</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Products</h1>
-          <p className="text-sm text-muted-foreground">Manage products, record sales, and track inventory</p>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/products")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground" style={{ color: category?.color }}>
+                {category?.name || slug}
+              </h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              <button onClick={() => navigate("/products")} className="hover:underline">Products</button>
+              {" > "}{category?.name || slug}
+            </p>
+          </div>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <Button onClick={() => { setEditingCategory(null); setCategoryDialogOpen(true); }} variant="ghost" size="icon" title="Manage Categories">
-              <Settings2 className="h-4 w-4" />
-            </Button>
             <Button onClick={() => setSaleDialogOpen(true)} variant="outline" className="gap-2">
               <ShoppingCart className="h-4 w-4" /> Record Sale
             </Button>
@@ -114,25 +109,26 @@ export default function Products() {
         )}
       </div>
 
-      {/* Category Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {categoryStats.map((cat) => (
-          <Card
-            key={cat.slug}
-            className="cursor-pointer transition-all hover:shadow-md"
-            onClick={() => {
-              if (cat.slug === "courses") { navigate("/courses"); return; }
-              navigate(`/products/category/${cat.slug}`);
-            }}
-          >
-            <CardContent className="flex flex-col items-center gap-2 p-4">
-              <Package className="h-8 w-8" style={{ color: cat.color }} />
-              <span className="text-sm font-medium">{cat.name}</span>
-              <span className="text-xs text-muted-foreground">{cat.count} {cat.slug === "courses" ? "courses" : "products"}</span>
-              {cat.slug !== "courses" && <span className="text-xs font-semibold">{fc(cat.revenue)}</span>}
-            </CardContent>
-          </Card>
-        ))}
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <Package className="h-8 w-8" style={{ color: category?.color }} />
+            <div>
+              <p className="text-xs text-muted-foreground">Products</p>
+              <p className="text-lg font-bold">{products.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <TrendingUp className="h-8 w-8 text-primary" />
+            <div>
+              <p className="text-xs text-muted-foreground">Revenue</p>
+              <p className="text-lg font-bold">{fc(categoryRevenue)}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -141,13 +137,6 @@ export default function Products() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Category" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.filter(c => c.slug !== "courses").map((c) => (<SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>))}
-          </SelectContent>
-        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
@@ -159,12 +148,12 @@ export default function Products() {
         </Select>
       </div>
 
-      {/* Products Table */}
+      {/* Table */}
       {isLoading ? (
         <div className="py-12 text-center text-muted-foreground">Loading products...</div>
       ) : products.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
-          No products found. {isAdmin && "Click 'Add Product' to get started."}
+          No products in this category. {isAdmin && "Click 'Add Product' to get started."}
         </div>
       ) : (
         <div className="rounded-lg border">
@@ -173,7 +162,6 @@ export default function Products() {
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>Code</TableHead>
-                <TableHead>Category</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Status</TableHead>
@@ -182,12 +170,9 @@ export default function Products() {
             </TableHeader>
             <TableBody>
               {products.map((p) => (
-                <TableRow key={p.id} className="cursor-pointer" onClick={() => handleProductClick(p)}>
+                <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/products/${p.id}`)}>
                   <TableCell className="font-medium">{p.product_name}</TableCell>
                   <TableCell className="text-muted-foreground">{p.product_code}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize text-xs">{p.category}</Badge>
-                  </TableCell>
                   <TableCell className="text-right">{fc(p.price)}</TableCell>
                   <TableCell>{stockBadge(p) || <span className="text-xs text-muted-foreground">N/A</span>}</TableCell>
                   <TableCell>
@@ -219,9 +204,8 @@ export default function Products() {
         </div>
       )}
 
-      <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editingProduct} />
+      <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editingProduct} defaultCategory={slug} />
       <ProductSaleDialog open={saleDialogOpen} onOpenChange={setSaleDialogOpen} />
-      <ProductCategoryDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} category={editingCategory} />
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
