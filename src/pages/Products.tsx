@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useProductCategories, useDeleteProductCategory, type ProductCategory } from "@/hooks/useProductCategories";
@@ -34,10 +34,9 @@ export default function Products() {
   const isAdmin = isCompanyAdmin || isCipher;
 
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: products = [], isLoading } = useProducts({ search, category: categoryFilter, status: statusFilter });
+  const { data: allProducts = [], isLoading } = useProducts();
   const { data: allSales = [] } = useProductSales();
   const { data: categories = [] } = useProductCategories();
   const { data: courses = [] } = useCourses();
@@ -50,8 +49,18 @@ export default function Products() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
-  // Category stats from dynamic categories
-  const { data: allProducts = [] } = useProducts();
+  // Filter products in-memory for table display
+  const products = useMemo(() => {
+    return allProducts.filter((p) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (search) {
+        const s = search.toLowerCase();
+        if (!p.product_name.toLowerCase().includes(s) && !p.product_code.toLowerCase().includes(s)) return false;
+      }
+      return true;
+    });
+  }, [allProducts, search, statusFilter]);
+
   const categoryStats = categories.map((cat) => {
     if (cat.slug === "courses") {
       // Courses live in the courses table, not products
@@ -141,13 +150,6 @@ export default function Products() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Category" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.filter(c => c.slug !== "courses").map((c) => (<SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>))}
-          </SelectContent>
-        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>

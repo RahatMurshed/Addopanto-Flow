@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,13 +19,26 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
   const { data: products = [] } = useProducts({ status: "active" });
   const createSale = useCreateProductSale();
 
-  const [productId, setProductId] = useState(preselectedProduct?.id || "");
+  const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [unitPrice, setUnitPrice] = useState(preselectedProduct?.price || 0);
+  const [unitPrice, setUnitPrice] = useState(0);
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+
+  // Reset form when dialog opens or preselectedProduct changes
+  useEffect(() => {
+    if (open) {
+      setProductId(preselectedProduct?.id || "");
+      setUnitPrice(preselectedProduct?.price || 0);
+      setQuantity(1);
+      setCustomerName("");
+      setPaymentMethod("cash");
+      setSaleDate(new Date().toISOString().slice(0, 10));
+      setNotes("");
+    }
+  }, [open, preselectedProduct]);
 
   // When product changes, update unit price
   const handleProductChange = (id: string) => {

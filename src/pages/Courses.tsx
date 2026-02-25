@@ -22,7 +22,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, Pencil, Trash2, BookOpen, Search, X, Loader2, TrendingUp, Users, SlidersHorizontal, Layers } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, BookOpen, Search, X, Loader2, TrendingUp, Users, SlidersHorizontal, Layers, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import CourseDialog from "@/components/dialogs/CourseDialog";
@@ -189,6 +190,13 @@ export default function Courses() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link to="/products" className="hover:text-foreground transition-colors">Products</Link>
+        <ChevronRight className="h-3.5 w-3.5" />
+        <span className="text-foreground font-medium">Courses</span>
+      </nav>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
