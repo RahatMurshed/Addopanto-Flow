@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useProductCategories, useDeleteProductCategory, type ProductCategory } from "@/hooks/useProductCategories";
+import { useCourses } from "@/hooks/useCourses";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useProductSales } from "@/hooks/useProductSales";
@@ -39,6 +40,7 @@ export default function Products() {
   const { data: products = [], isLoading } = useProducts({ search, category: categoryFilter, status: statusFilter });
   const { data: allSales = [] } = useProductSales();
   const { data: categories = [] } = useProductCategories();
+  const { data: courses = [] } = useCourses();
   const deleteProduct = useDeleteProduct();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -51,6 +53,10 @@ export default function Products() {
   // Category stats from dynamic categories
   const { data: allProducts = [] } = useProducts();
   const categoryStats = categories.map((cat) => {
+    if (cat.slug === "courses") {
+      // Courses live in the courses table, not products
+      return { ...cat, count: courses.length, revenue: 0 };
+    }
     const catProducts = allProducts.filter((p) => p.category === cat.slug);
     const catSales = allSales.filter((s) => catProducts.some((p) => p.id === s.product_id));
     return {
@@ -123,8 +129,8 @@ export default function Products() {
             <CardContent className="flex flex-col items-center gap-2 p-4">
               <Package className="h-8 w-8" style={{ color: cat.color }} />
               <span className="text-sm font-medium">{cat.name}</span>
-              <span className="text-xs text-muted-foreground">{cat.count} products</span>
-              <span className="text-xs font-semibold">{fc(cat.revenue)}</span>
+              <span className="text-xs text-muted-foreground">{cat.count} {cat.slug === "courses" ? "courses" : "products"}</span>
+              {cat.slug !== "courses" && <span className="text-xs font-semibold">{fc(cat.revenue)}</span>}
             </CardContent>
           </Card>
         ))}
