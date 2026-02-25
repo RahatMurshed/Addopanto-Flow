@@ -31,6 +31,13 @@ const TABLE_INVALIDATION_MAP: Record<string, string[]> = {
   monthly_fee_history: ["monthly_fee_history", "students", "dashboard", "reports"],
   batches: ["batches", "students", "dashboard"],
   companies: ["user-companies", "dashboard", "reports"],
+  products: ["products", "product-sales", "dashboard"],
+  product_sales: ["product-sales", "products", "revenues", "dashboard", "reports"],
+  product_stock_movements: ["product-stock-movements", "products"],
+  product_categories: ["product_categories", "products"],
+  suppliers: ["suppliers"],
+  purchase_orders: ["purchase_orders"],
+  purchase_order_items: ["purchase_order_items", "products", "product-stock-movements"],
 };
 
 const TABLE_LABELS: Record<string, string> = {
@@ -44,6 +51,13 @@ const TABLE_LABELS: Record<string, string> = {
   monthly_fee_history: "Fee history",
   batches: "Batches",
   companies: "Company settings",
+  products: "Products",
+  product_sales: "Product sales",
+  product_stock_movements: "Stock movements",
+  product_categories: "Categories",
+  suppliers: "Suppliers",
+  purchase_orders: "Purchase orders",
+  purchase_order_items: "PO items",
 };
 
 export function useRealtimeSync() {
@@ -98,6 +112,13 @@ export function useRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "monthly_fee_history" }, (p) => handleChange("monthly_fee_history", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "batches" }, (p) => handleChange("batches", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "companies" }, (p) => handleChange("companies", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, (p) => handleChange("products", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_sales" }, (p) => handleChange("product_sales", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_stock_movements" }, (p) => handleChange("product_stock_movements", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, (p) => handleChange("product_categories", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "suppliers" }, (p) => handleChange("suppliers", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "purchase_orders" }, (p) => handleChange("purchase_orders", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "purchase_order_items" }, (p) => handleChange("purchase_order_items", p))
       .subscribe();
 
     return () => {
