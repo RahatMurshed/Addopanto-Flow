@@ -41,6 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     canAddExpenseSource,
     canViewReports,
     canViewEmployees, canManageEmployees,
+    isLoading: companyLoading,
   } = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
@@ -91,8 +92,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
-  // Build navigation based on role
+  // Build navigation based on role — empty while loading to prevent flash
   const buildNavItems = () => {
+    if (companyLoading) return [];
     const items: Array<{ label: string; href: string; icon: any; badge?: number }> = [...baseNavItems];
 
     // Dashboard: admin/cipher only
@@ -176,7 +178,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/">
             <img src={gaLogo} alt="Grammar Addopanto" className="h-10 w-auto max-w-[140px] object-contain" />
           </Link>
-          {showCompanySwitcher ? (
+          {companyLoading ? null : showCompanySwitcher ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between px-2 text-sidebar-foreground hover:bg-sidebar-accent">
@@ -247,28 +249,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-sidebar-border p-3">
-          <div className="mb-2 flex items-center justify-between px-2">
-            <span className="text-xs font-medium text-sidebar-foreground/60">Theme</span>
-            <ThemeToggle />
+        {!companyLoading && (
+          <div className="border-t border-sidebar-border p-3">
+            <div className="mb-2 flex items-center justify-between px-2">
+              <span className="text-xs font-medium text-sidebar-foreground/60">Theme</span>
+              <ThemeToggle />
+            </div>
+            <Link
+              to="/profile"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/profile"
+                  ? "border-l-[3px] border-sidebar-primary bg-sidebar-accent text-sidebar-primary"
+                  : "border-l-[3px] border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              )}
+            >
+              <UserCircle className="h-4 w-4" />
+              My Profile
+            </Link>
+            <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
           </div>
-          <Link
-            to="/profile"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname === "/profile"
-                ? "border-l-[3px] border-sidebar-primary bg-sidebar-accent text-sidebar-primary"
-                : "border-l-[3px] border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            )}
-          >
-            <UserCircle className="h-4 w-4" />
-            My Profile
-          </Link>
-          <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-        </div>
+        )}
       </aside>
 
       {/* Mobile Layout */}
