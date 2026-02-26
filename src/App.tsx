@@ -57,7 +57,9 @@ const Products = lazy(() => import("@/pages/Products"));
 const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
 
 const CategoryProducts = lazy(() => import("@/pages/CategoryProducts"));
-
+const Stakeholders = lazy(() => import("@/pages/Stakeholders"));
+const AddStakeholder = lazy(() => import("@/pages/AddStakeholder"));
+const StakeholderDetail = lazy(() => import("@/pages/StakeholderDetail"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -196,6 +198,10 @@ const App = () => (
                   <Route path="/products/category/:slug" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CategoryProducts /></AccessGuard></ProtectedRoute>} />
                   <Route path="/products/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><ProductDetail /></AccessGuard></ProtectedRoute>} />
                   
+                  {/* Cipher-only: Investors & Loans */}
+                  <Route path="/stakeholders" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><Stakeholders /></RoleGuard></ProtectedRoute>} />
+                  <Route path="/stakeholders/new" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><AddStakeholder /></RoleGuard></ProtectedRoute>} />
+                  <Route path="/stakeholders/:id" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><StakeholderDetail /></RoleGuard></ProtectedRoute>} />
                   
                   
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
