@@ -181,6 +181,25 @@ All colors MUST be HSL.
   animation: brand-pulse 2s ease-in-out infinite;
 }
 
+/* Thin, theme-matched sidebar scrollbar */
+.sidebar-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--sidebar-accent)) transparent;
+}
+.sidebar-nav-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--sidebar-accent));
+  border-radius: 4px;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--sidebar-border));
+}
+
 /* Print styles for PDF export */
 @media print {
   /* Hide navigation and non-essential UI elements */

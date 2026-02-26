@@ -225,7 +225,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
+        <nav className="flex-1 space-y-1 p-3 overflow-y-auto sidebar-nav-scroll">
           {navItems.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -304,7 +304,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </Button>
                 </div>
               )}
-              <div className="flex-1 space-y-1 overflow-y-auto">
+              <div className="flex-1 space-y-1 overflow-y-auto sidebar-nav-scroll">
                 {navItems.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
