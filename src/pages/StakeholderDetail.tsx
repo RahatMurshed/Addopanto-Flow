@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useStakeholder, useInvestments, useLoans, useProfitDistributions, useLoanRepayments, useSaveProfitDistribution, useSaveLoanRepayment } from "@/hooks/useStakeholders";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useStakeholder, useInvestments, useLoans, useProfitDistributions, useLoanRepayments, useSaveProfitDistribution, useSaveLoanRepayment, useSaveStakeholder } from "@/hooks/useStakeholders";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,23 +13,110 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, TrendingUp, Landmark, Plus, Calendar, DollarSign } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ImageUpload } from "@/components/shared/ImageUpload";
+import { ArrowLeft, TrendingUp, Landmark, Plus, Calendar, DollarSign, Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function StakeholderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { fc, symbol } = useCompanyCurrency();
+  const { activeCompanyId } = useCompany();
+  const isEditMode = searchParams.get("edit") === "true";
 
   const { data: stakeholder, isLoading } = useStakeholder(id);
   const { data: investments = [] } = useInvestments(id);
   const { data: loans = [] } = useLoans(id);
+  const saveStakeholder = useSaveStakeholder();
+
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editContact, setEditContact] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editIdNumber, setEditIdNumber] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [formInitialized, setFormInitialized] = useState(false);
+
+  // Initialize edit form when stakeholder loads
+  if (stakeholder && isEditMode && !formInitialized) {
+    setEditName(stakeholder.name);
+    setEditCategory(stakeholder.category);
+    setEditContact(stakeholder.contact_number || "");
+    setEditEmail(stakeholder.email || "");
+    setEditAddress(stakeholder.address || "");
+    setEditIdNumber(stakeholder.id_number || "");
+    setEditNotes(stakeholder.relationship_notes || "");
+    setEditStatus(stakeholder.status);
+    setImagePreview(stakeholder.image_url || null);
+    setFormInitialized(true);
+  }
+
+  const enterEditMode = () => {
+    setFormInitialized(false);
+    setSearchParams({ edit: "true" });
+  };
+
+  const cancelEdit = () => {
+    setFormInitialized(false);
+    setImageFile(null);
+    setSearchParams({});
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editName.trim()) { toast.error("Name is required"); return; }
+
+    let imageUrl = stakeholder?.image_url || null;
+
+    // Upload image if new file selected
+    if (imageFile && activeCompanyId) {
+      const ext = imageFile.name.split(".").pop();
+      const path = `${activeCompanyId}/${id}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("stakeholder-images")
+        .upload(path, imageFile, { upsert: true });
+      if (upErr) { toast.error("Image upload failed: " + upErr.message); return; }
+      const { data: pub } = supabase.storage.from("stakeholder-images").getPublicUrl(path);
+      imageUrl = pub.publicUrl;
+    }
+
+    try {
+      await saveStakeholder.mutateAsync({
+        id: id!,
+        data: {
+          name: editName.trim(),
+          category: editCategory,
+          contact_number: editContact || null,
+          email: editEmail || null,
+          address: editAddress || null,
+          id_number: editIdNumber || null,
+          relationship_notes: editNotes || null,
+          status: editStatus,
+          image_url: imageUrl,
+        },
+      });
+      toast.success("Stakeholder updated");
+      setFormInitialized(false);
+      setImageFile(null);
+      setSearchParams({});
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
 
   if (isLoading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
   if (!stakeholder) return <div className="text-center py-12 text-muted-foreground">Stakeholder not found</div>;
 
   const isInvestor = stakeholder.stakeholder_type === "investor";
+  const initials = stakeholder.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <div className="space-y-6">
@@ -36,11 +124,21 @@ export default function StakeholderDetailPage() {
       <div className="flex items-start gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/stakeholders")}><ArrowLeft className="h-4 w-4" /></Button>
         <div className="flex items-center gap-4 flex-1">
-          <div className={`h-14 w-14 rounded-full flex items-center justify-center text-xl font-bold text-white ${isInvestor ? "bg-emerald-500" : "bg-orange-500"}`}>
-            {stakeholder.name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">{stakeholder.name}</h1>
+          <Avatar className={`h-14 w-14 ring-2 ${isInvestor ? "ring-emerald-500/50" : "ring-orange-500/50"}`}>
+            {stakeholder.image_url && <AvatarImage src={stakeholder.image_url} alt={stakeholder.name} className="object-cover" />}
+            <AvatarFallback className={`text-xl font-bold text-white ${isInvestor ? "bg-emerald-500" : "bg-orange-500"}`}>
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">{stakeholder.name}</h1>
+              {!isEditMode && (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={enterEditMode}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge className={isInvestor ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-orange-500/15 text-orange-700 dark:text-orange-400"}>
                 {isInvestor ? "Investor" : "Lender"}
@@ -53,6 +151,83 @@ export default function StakeholderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Form */}
+      {isEditMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Edit Stakeholder</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ImageUpload
+              value={imagePreview}
+              onChange={(url) => setImagePreview(url)}
+              onFileSelect={(f) => { setImageFile(f); }}
+              label="Upload Photo"
+              variant="avatar"
+              fallbackText={editName}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Full Name <span className="text-destructive">*</span></Label>
+                <Input value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={editCategory} onValueChange={setEditCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">Individual</SelectItem>
+                    <SelectItem value="organization">Organization</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                    <SelectItem value="family">Family</SelectItem>
+                    <SelectItem value="partner">Business Partner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Contact Number</Label>
+                <Input value={editContact} onChange={e => setEditContact(e.target.value)} />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+              </div>
+              <div>
+                <Label>ID / Registration Number</Label>
+                <Input value={editIdNumber} onChange={e => setEditIdNumber(e.target.value)} />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="exited">Exited</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Textarea value={editAddress} onChange={e => setEditAddress(e.target.value)} rows={2} />
+            </div>
+            <div>
+              <Label>Relationship Notes</Label>
+              <Textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={2} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={cancelEdit}>
+                <X className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              <Button onClick={handleSaveEdit} disabled={saveStakeholder.isPending}>
+                <Save className="h-4 w-4 mr-1" /> {saveStakeholder.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isInvestor ? (
         <InvestorDetails stakeholderId={id!} investments={investments} fc={fc} symbol={symbol} />

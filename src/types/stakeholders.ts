@@ -13,6 +13,7 @@ export interface Stakeholder {
   user_id: string;
   created_at: string;
   updated_at: string;
+  image_url: string | null;
 }
 
 export interface Investment {

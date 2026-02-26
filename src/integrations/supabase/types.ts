@@ -2132,6 +2132,7 @@ export type Database = {
           email: string | null
           id: string
           id_number: string | null
+          image_url: string | null
           name: string
           relationship_notes: string | null
           stakeholder_type: string
@@ -2148,6 +2149,7 @@ export type Database = {
           email?: string | null
           id?: string
           id_number?: string | null
+          image_url?: string | null
           name: string
           relationship_notes?: string | null
           stakeholder_type: string
@@ -2164,6 +2166,7 @@ export type Database = {
           email?: string | null
           id?: string
           id_number?: string | null
+          image_url?: string | null
           name?: string
           relationship_notes?: string | null
           stakeholder_type?: string
