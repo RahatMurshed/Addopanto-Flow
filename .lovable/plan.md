@@ -1,37 +1,27 @@
 
 
-# Add Investment & Loan Amount Summary Cards
+# Fix: Sidebar Profile & Logout Buttons Not Visible
 
-## What will change
+## Root Cause
 
-Add two prominent summary cards at the top of the Investors & Loans page, placed before the existing 3 summary cards:
+The desktop sidebar nav element (`<nav className="flex-1 space-y-1 p-3">`) has `flex-1` which lets it grow, but it has **no `overflow-y-auto`**. For Cipher users with 15+ nav items, the content overflows the viewport, pushing the footer section (Theme toggle, My Profile, Logout) off-screen.
 
-1. **Total Investment Card** (green accent) -- Shows the total invested amount across all investors, with a `TrendingUp` icon
-2. **Total Loan Card** (orange accent) -- Shows the total loan amount across all lenders, with a `Landmark` icon
+The same issue exists in the mobile sidebar nav.
 
-Both cards will use the company currency formatter (`fc`) for proper currency display.
+## Fix
 
-## Layout
+### File: `src/components/layout/AppLayout.tsx`
 
-The two new cards will be in a 2-column grid row above the existing 3-card row:
+**Desktop sidebar nav (line 228):**
+Change `className="flex-1 space-y-1 p-3"` to `className="flex-1 space-y-1 p-3 overflow-y-auto"`
 
-```text
-+---------------------------+---------------------------+
-|   Total Investment        |   Total Loan Amount       |
-|   [green icon]            |   [orange icon]           |
-|   ৳ 5,00,000              |   ৳ 3,00,000              |
-+---------------------------+---------------------------+
-|  Investors  |  Lenders   |  Total Obligations         |
-|  (existing) |  (existing)|  (existing)                |
-+-------------+------------+----------------------------+
-```
+**Mobile sidebar nav container (line 307):**
+Change `className="flex-1 space-y-1"` to `className="flex-1 space-y-1 overflow-y-auto"`
 
-## Technical details
+Also add the missing "My Profile" link to the mobile sidebar footer (before the Logout button, around line 332), matching the desktop version.
 
-**File: `src/pages/Stakeholders.tsx`**
+## Result
 
-- Insert a new `div` with `grid grid-cols-1 md:grid-cols-2 gap-4` between the header and the existing summary cards (around line 163)
-- Card 1: "Total Investment" with `totalInvested` value, emerald-themed
-- Card 2: "Total Loan Amount" with `totalLoaned` value, orange-themed
-- Both use large font sizes for the amount to make them prominent
-- No new dependencies or data fetches needed -- `totalInvested` and `totalLoaned` are already computed on lines 52-54
+- Nav items scroll independently when they overflow
+- Profile and Logout buttons remain pinned at the bottom of the sidebar, always visible
+- Mobile sidebar also gets the Profile link and proper scrolling
