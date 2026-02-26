@@ -243,18 +243,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify company membership
+    // Verify company membership and permissions
     const { data: membership } = await authClient
       .from("company_memberships")
-      .select("role")
+      .select("role, data_entry_mode, deo_students")
       .eq("company_id", company_id)
       .eq("user_id", user.id)
-      .eq("status", "approved")
+      .eq("status", "active")
       .single();
 
     if (!membership) {
       return new Response(
         JSON.stringify({ error: "Not a member of this company" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check permission: admin/cipher can always import, moderators need deo_students
+    if (membership.role === "moderator" && !membership.deo_students) {
+      return new Response(
+        JSON.stringify({ error: "You don't have permission to import students" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

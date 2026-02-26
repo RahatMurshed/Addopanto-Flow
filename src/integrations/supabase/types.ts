@@ -2553,6 +2553,16 @@ export type Database = {
       }
     }
     Functions: {
+      browse_companies_safe: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          logo_url: string
+          name: string
+          slug: string
+        }[]
+      }
       can_add_expense: { Args: { _user_id: string }; Returns: boolean }
       can_add_expense_source: { Args: { _user_id: string }; Returns: boolean }
       can_add_revenue: { Args: { _user_id: string }; Returns: boolean }
