@@ -266,6 +266,9 @@ export function useSaveLoanRepayment() {
       qc.invalidateQueries({ queryKey: ["loan_repayments"] });
       qc.invalidateQueries({ queryKey: ["loans"] });
       qc.invalidateQueries({ queryKey: ["stakeholders"] });
+      // Interest portion auto-creates an expense via DB trigger
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["expense-accounts"] });
     },
   });
 }
