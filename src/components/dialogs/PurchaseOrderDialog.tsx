@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreatePurchaseOrder, useUpdatePurchaseOrder, type PurchaseOrder, type PurchaseOrderInsert } from "@/hooks/usePurchaseOrders";
-import { useSuppliers } from "@/hooks/useSuppliers";
+
 import { toast } from "sonner";
 
 interface Props {
@@ -18,7 +18,7 @@ interface Props {
 export function PurchaseOrderDialog({ open, onOpenChange, order }: Props) {
   const createOrder = useCreatePurchaseOrder();
   const updateOrder = useUpdatePurchaseOrder();
-  const { data: suppliers = [] } = useSuppliers();
+  
 
   const [form, setForm] = useState<PurchaseOrderInsert>({
     order_number: "",
@@ -65,7 +65,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, order }: Props) {
   };
 
   const isPending = createOrder.isPending || updateOrder.isPending;
-  const activeSuppliers = suppliers.filter((s) => s.status === "active");
+  
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,18 +79,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, order }: Props) {
               <Label>Order Number *</Label>
               <Input value={form.order_number} onChange={(e) => setForm((f) => ({ ...f, order_number: e.target.value }))} />
             </div>
-            <div className="space-y-2">
-              <Label>Supplier</Label>
-              <Select value={form.supplier_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, supplier_id: v === "none" ? null : v }))}>
-                <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No supplier</SelectItem>
-                  {activeSuppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProducts, useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import { useProductCategories } from "@/hooks/useProductCategories";
-import { useSuppliers } from "@/hooks/useSuppliers";
+
 import { useCourses } from "@/hooks/useCourses";
 import { useBatches } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -26,7 +26,7 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const { data: categories = [] } = useProductCategories();
-  const { data: suppliers = [] } = useSuppliers();
+  
   const { data: courses = [] } = useCourses();
   const { data: batches = [] } = useBatches();
   const { data: allProducts = [] } = useProducts();
@@ -306,18 +306,8 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
             </div>
           )}
 
-          {!isCourseCategory && (
-            <div className="space-y-2">
-              <Label>Supplier</Label>
-              <Select value={form.supplier_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, supplier_id: v === "none" ? null : v }))}>
-                <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No supplier</SelectItem>
-                  {suppliers.map((s) => (<SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+
+
 
           {!isCourseCategory && (
             <div className="grid grid-cols-2 gap-4">

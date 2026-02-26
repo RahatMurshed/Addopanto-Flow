@@ -14,7 +14,7 @@ import { useBatches } from "@/hooks/useBatches";
 import { useCourses } from "@/hooks/useCourses";
 import {
   GraduationCap, Layers, BookOpen, LayoutDashboard, TrendingUp,
-  Receipt, FileText, Settings, Users, Wallet, ClipboardList, UserCircle, Package, Truck,
+  Receipt, FileText, Settings, Users, Wallet, ClipboardList, UserCircle, Package,
 } from "lucide-react";
 
 interface Props {
@@ -38,7 +38,7 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
     { label: "Products", icon: Package, path: "/products" },
     { label: "Courses", icon: BookOpen, path: "/courses" },
     { label: "Students", icon: GraduationCap, path: "/students" },
-    { label: "Suppliers", icon: Truck, path: "/suppliers" },
+    
     { label: "Purchase Orders", icon: ClipboardList, path: "/purchase-orders" },
     { label: "Revenue", icon: TrendingUp, path: "/revenue" },
     { label: "Expenses", icon: Receipt, path: "/expenses" },
