@@ -631,6 +631,15 @@ export default function AuditLog() {
 
   const [isExporting, setIsExporting] = useState(false);
 
+  // Block render while role data is loading to prevent unauthorized content flash
+  if (companyLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   const handleExportCSV = async () => {
     if (!activeCompanyId) return;
     setIsExporting(true);
