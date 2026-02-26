@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useProduct, useDeleteProduct } from "@/hooks/useProducts";
 import { useProductSales, useDeleteProductSale } from "@/hooks/useProductSales";
@@ -19,10 +19,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ArrowLeft, DollarSign, Package, Pencil, Plus, ShoppingCart, Trash2, TrendingUp, Warehouse,
+  ArrowLeft, DollarSign, Package, Pencil, Plus, ShoppingCart, Trash2, TrendingUp, Warehouse, BarChart3, ExternalLink,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO, startOfMonth } from "date-fns";
 import { toast } from "sonner";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -146,38 +147,14 @@ export default function ProductDetail() {
         )}
       </div>
 
-      {/* Product Info */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Product Details</CardTitle>
-          {isAdmin && product.type === "physical" && (
-            <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
-              <Warehouse className="mr-1 h-4 w-4" /> Adjust Stock
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
-            <div><span className="text-muted-foreground">Price:</span> <span className="font-medium">{fc(product.price)}</span></div>
-            {isAdmin && <div><span className="text-muted-foreground">Purchase Price:</span> <span className="font-medium">{fc(product.purchase_price)}</span></div>}
-            <div><span className="text-muted-foreground">Type:</span> <span className="capitalize font-medium">{product.type}</span></div>
-            <div><span className="text-muted-foreground">Status:</span> <Badge variant="outline" className="capitalize ml-1">{product.status.replace("_", " ")}</Badge></div>
-            {product.type === "physical" && (
-              <>
-                <div><span className="text-muted-foreground">Reorder Level:</span> <span className="font-medium">{product.reorder_level}</span></div>
-              </>
-            )}
-            {product.description && <div className="col-span-full"><span className="text-muted-foreground">Description:</span> <span>{product.description}</span></div>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabs: Sales + Stock */}
-      <Tabs defaultValue="sales">
+      {/* Tabs */}
+      <Tabs defaultValue="overview">
         <div className="flex items-center justify-between">
           <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="sales">Sales History</TabsTrigger>
             {product.type === "physical" && <TabsTrigger value="stock">Stock Movements</TabsTrigger>}
+            <TabsTrigger value="analytics">Revenue Analytics</TabsTrigger>
           </TabsList>
           {isAdmin && (
             <Button onClick={() => setSaleOpen(true)} size="sm" className="gap-1">
@@ -186,6 +163,71 @@ export default function ProductDetail() {
           )}
         </div>
 
+        {/* Overview Tab */}
+        <TabsContent value="overview">
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Product Image + Info */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex gap-4">
+                  <div className="h-24 w-24 shrink-0 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.product_name} className="h-full w-full object-cover" />
+                    ) : (
+                      <Package className="h-8 w-8 text-muted-foreground/30" />
+                    )}
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div><span className="text-muted-foreground">Code:</span> <span className="font-medium">{product.product_code}</span></div>
+                    <div><span className="text-muted-foreground">Category:</span> <Badge variant="outline" className="capitalize ml-1">{product.category}</Badge></div>
+                    <div><span className="text-muted-foreground">Type:</span> <span className="capitalize font-medium">{product.type}</span></div>
+                    <div><span className="text-muted-foreground">Status:</span> <Badge variant={product.status === "active" ? "default" : "secondary"} className="capitalize ml-1">{product.status.replace("_", " ")}</Badge></div>
+                  </div>
+                </div>
+                {product.description && (
+                  <p className="mt-3 text-sm text-muted-foreground">{product.description}</p>
+                )}
+                {product.linked_course_id && (
+                  <Button
+                    variant="link"
+                    className="mt-2 p-0 h-auto text-sm gap-1"
+                    onClick={() => navigate(`/courses/${product.linked_course_id}`)}
+                  >
+                    <ExternalLink className="h-3 w-3" /> View Linked Course
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pricing & Stock */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base">Pricing & Stock</CardTitle>
+                {isAdmin && product.type === "physical" && (
+                  <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
+                    <Warehouse className="mr-1 h-4 w-4" /> Adjust Stock
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="text-muted-foreground">Selling Price:</span> <span className="font-medium">{fc(product.price)}</span></div>
+                  {isAdmin && <div><span className="text-muted-foreground">Purchase Price:</span> <span className="font-medium">{fc(product.purchase_price)}</span></div>}
+                  {product.type === "physical" && (
+                    <>
+                      <div><span className="text-muted-foreground">Stock:</span> <span className={`font-bold ${stockColor}`}>{product.stock_quantity}</span></div>
+                      <div><span className="text-muted-foreground">Reorder Level:</span> <span className="font-medium">{product.reorder_level}</span></div>
+                    </>
+                  )}
+                  {product.barcode && <div><span className="text-muted-foreground">Barcode:</span> <span className="font-medium">{product.barcode}</span></div>}
+                  {product.sku && <div><span className="text-muted-foreground">SKU:</span> <span className="font-medium">{product.sku}</span></div>}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Sales History Tab */}
         <TabsContent value="sales">
           {sales.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No sales recorded yet</p>
@@ -227,6 +269,7 @@ export default function ProductDetail() {
           )}
         </TabsContent>
 
+        {/* Stock Movements Tab */}
         {product.type === "physical" && (
           <TabsContent value="stock">
             {movements.length === 0 ? (
@@ -263,6 +306,11 @@ export default function ProductDetail() {
             )}
           </TabsContent>
         )}
+
+        {/* Revenue Analytics Tab */}
+        <TabsContent value="analytics">
+          <RevenueAnalyticsTab sales={sales} fc={fc} isAdmin={isAdmin} purchasePrice={product.purchase_price} />
+        </TabsContent>
       </Tabs>
 
       <ProductDialog open={editOpen} onOpenChange={setEditOpen} product={product} />
@@ -294,6 +342,94 @@ export default function ProductDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// --- Revenue Analytics sub-component ---
+function RevenueAnalyticsTab({
+  sales,
+  fc,
+  isAdmin,
+  purchasePrice,
+}: {
+  sales: any[];
+  fc: (amount: number) => string;
+  isAdmin: boolean;
+  purchasePrice: number;
+}) {
+  const chartData = useMemo(() => {
+    const monthMap: Record<string, { month: string; revenue: number; quantity: number }> = {};
+    sales.forEach((s) => {
+      const monthKey = format(startOfMonth(parseISO(s.sale_date)), "yyyy-MM");
+      if (!monthMap[monthKey]) {
+        monthMap[monthKey] = { month: format(parseISO(s.sale_date), "MMM yyyy"), revenue: 0, quantity: 0 };
+      }
+      monthMap[monthKey].revenue += s.total_amount;
+      monthMap[monthKey].quantity += s.quantity;
+    });
+    return Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
+  }, [sales]);
+
+  const totalRevenue = sales.reduce((s, sale) => s + sale.total_amount, 0);
+  const totalQty = sales.reduce((s, sale) => s + sale.quantity, 0);
+  const totalProfit = purchasePrice > 0 ? sales.reduce((s, sale) => s + (sale.unit_price - purchasePrice) * sale.quantity, 0) : 0;
+
+  if (sales.length === 0) {
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        <BarChart3 className="mx-auto h-12 w-12 mb-3 opacity-30" />
+        <p>No sales data to analyze</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Total Revenue</p>
+            <p className="text-xl font-bold">{fc(totalRevenue)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Total Quantity Sold</p>
+            <p className="text-xl font-bold">{totalQty}</p>
+          </CardContent>
+        </Card>
+        {isAdmin && purchasePrice > 0 && (
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-muted-foreground">Estimated Profit</p>
+              <p className="text-xl font-bold text-green-600">{fc(totalProfit)}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {chartData.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Revenue Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                  formatter={(value: number) => [fc(value), "Revenue"]}
+                />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

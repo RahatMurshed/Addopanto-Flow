@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProducts, type Product } from "@/hooks/useProducts";
 import { useCreateProductSale } from "@/hooks/useProductSales";
+import { useStudents } from "@/hooks/useStudents";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { toast } from "sonner";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface ProductSaleDialogProps {
   open: boolean;
@@ -17,15 +20,20 @@ interface ProductSaleDialogProps {
 
 export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: ProductSaleDialogProps) {
   const { data: products = [] } = useProducts({ status: "active" });
+  const { data: studentsResult } = useStudents();
+  const students = Array.isArray(studentsResult) ? studentsResult : studentsResult?.data ?? [];
   const createSale = useCreateProductSale();
+  const { fc } = useCompanyCurrency();
 
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [unitPrice, setUnitPrice] = useState(0);
   const [customerName, setCustomerName] = useState("");
+  const [studentId, setStudentId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [saleSuccess, setSaleSuccess] = useState(false);
 
   // Reset form when dialog opens or preselectedProduct changes
   useEffect(() => {
@@ -34,9 +42,11 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
       setUnitPrice(preselectedProduct?.price || 0);
       setQuantity(1);
       setCustomerName("");
+      setStudentId(null);
       setPaymentMethod("cash");
       setSaleDate(new Date().toISOString().slice(0, 10));
       setNotes("");
+      setSaleSuccess(false);
     }
   }, [open, preselectedProduct]);
 
@@ -47,12 +57,23 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
     if (p) setUnitPrice(p.price);
   };
 
+  const selectedProduct = products.find((p) => p.id === productId);
   const totalAmount = quantity * unitPrice;
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Validation
+  const isPhysical = selectedProduct?.type === "physical";
+  const stockAvailable = selectedProduct?.stock_quantity ?? 0;
+  const isOverStock = isPhysical && quantity > stockAvailable;
+  const isFutureDate = saleDate > today;
+  const canSubmit = productId && quantity > 0 && unitPrice > 0 && !isOverStock && !isFutureDate && !createSale.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productId) { toast.error("Select a product"); return; }
     if (quantity < 1) { toast.error("Quantity must be at least 1"); return; }
+    if (isOverStock) { toast.error(`Insufficient stock. Available: ${stockAvailable}`); return; }
+    if (isFutureDate) { toast.error("Sale date cannot be in the future"); return; }
 
     try {
       await createSale.mutateAsync({
@@ -61,21 +82,46 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
         unit_price: unitPrice,
         total_amount: totalAmount,
         customer_name: customerName || null,
+        student_id: studentId,
         payment_method: paymentMethod,
         sale_date: saleDate,
         notes: notes || null,
       });
-      toast.success("Sale recorded successfully");
-      onOpenChange(false);
-      // Reset
-      setProductId(""); setQuantity(1); setUnitPrice(0);
-      setCustomerName(""); setNotes("");
+      setSaleSuccess(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to record sale");
     }
   };
 
-  const selectedProduct = products.find((p) => p.id === productId);
+  const handleRecordAnother = () => {
+    setProductId("");
+    setQuantity(1);
+    setUnitPrice(0);
+    setCustomerName("");
+    setStudentId(null);
+    setNotes("");
+    setSaleSuccess(false);
+  };
+
+  if (saleSuccess) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm">
+          <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <CheckCircle2 className="h-12 w-12 text-green-500" />
+            <h3 className="text-lg font-semibold">Sale Recorded!</h3>
+            <p className="text-sm text-muted-foreground">
+              {quantity}× {selectedProduct?.product_name} — {fc(totalAmount)}
+            </p>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+              <Button onClick={handleRecordAnother}>Record Another</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,8 +143,11 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
                 ))}
               </SelectContent>
             </Select>
-            {selectedProduct?.type === "physical" && selectedProduct.stock_quantity < quantity && (
-              <p className="text-xs text-destructive">Insufficient stock (available: {selectedProduct.stock_quantity})</p>
+            {isOverStock && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Only {stockAvailable} units available
+              </p>
             )}
           </div>
 
@@ -113,7 +162,7 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
             </div>
             <div className="space-y-2">
               <Label>Total</Label>
-              <Input value={totalAmount.toFixed(2)} readOnly className="bg-muted" />
+              <Input value={fc(totalAmount)} readOnly className="bg-muted" />
             </div>
           </div>
 
@@ -136,9 +185,28 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
             </div>
           </div>
 
+          {/* Link to Student */}
+          <div className="space-y-2">
+            <Label>Link to Student (optional)</Label>
+            <Select value={studentId || "none"} onValueChange={(v) => setStudentId(v === "none" ? null : v)}>
+              <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No student</SelectItem>
+                {students.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} {s.student_id_number ? `(${s.student_id_number})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label>Sale Date</Label>
-            <Input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
+            <Input type="date" value={saleDate} max={today} onChange={(e) => setSaleDate(e.target.value)} />
+            {isFutureDate && (
+              <p className="text-xs text-destructive">Sale date cannot be in the future</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -148,7 +216,9 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={createSale.isPending}>{createSale.isPending ? "Recording..." : "Record Sale"}</Button>
+            <Button type="submit" disabled={!canSubmit}>
+              {createSale.isPending ? "Recording..." : "Record Sale"}
+            </Button>
           </div>
         </form>
       </DialogContent>

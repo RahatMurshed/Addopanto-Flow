@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useProductCategories, useDeleteProductCategory, type ProductCategory } from "@/hooks/useProductCategories";
@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -21,11 +20,26 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   BookOpen, GraduationCap, Package, Pencil, Plus, Search, ShoppingCart, Shirt, Trash2, MoreHorizontal, Settings2,
+  Eye, AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+
+// Map icon strings from DB to lucide components
+const ICON_MAP: Record<string, React.ComponentType<any>> = {
+  "graduation-cap": GraduationCap,
+  "book-open": BookOpen,
+  "pencil": Pencil,
+  "shirt": Shirt,
+  "package": Package,
+  "shopping-cart": ShoppingCart,
+};
+
+function getCategoryIcon(iconName: string) {
+  return ICON_MAP[iconName] || Package;
+}
 
 export default function Products() {
   const navigate = useNavigate();
@@ -35,6 +49,7 @@ export default function Products() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   const { data: allProducts = [], isLoading } = useProducts();
   const { data: allSales = [] } = useProductSales();
@@ -45,25 +60,33 @@ export default function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
+  const [saleProduct, setSaleProduct] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
-  // Filter products in-memory for table display
+  // Filter products in-memory
   const products = useMemo(() => {
     return allProducts.filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
       if (search) {
         const s = search.toLowerCase();
         if (!p.product_name.toLowerCase().includes(s) && !p.product_code.toLowerCase().includes(s)) return false;
       }
       return true;
     });
-  }, [allProducts, search, statusFilter]);
+  }, [allProducts, search, statusFilter, categoryFilter]);
+
+  // Stats
+  const stats = useMemo(() => ({
+    total: allProducts.length,
+    active: allProducts.filter((p) => p.status === "active").length,
+    outOfStock: allProducts.filter((p) => p.status === "out_of_stock" || (p.type === "physical" && (p.stock_quantity ?? 0) <= 0)).length,
+  }), [allProducts]);
 
   const categoryStats = categories.map((cat) => {
     if (cat.slug === "courses") {
-      // Courses live in the courses table, not products
       return { ...cat, count: courses.length, revenue: 0 };
     }
     const catProducts = allProducts.filter((p) => p.category === cat.slug);
@@ -96,8 +119,8 @@ export default function Products() {
 
   const stockBadge = (p: Product) => {
     if (p.type !== "physical") return null;
-    if (p.stock_quantity <= 0) return <Badge variant="destructive" className="text-[10px]">Out of Stock</Badge>;
-    if (p.stock_quantity <= p.reorder_level) return <Badge className="bg-orange-500/15 text-orange-600 text-[10px]">Low Stock</Badge>;
+    if ((p.stock_quantity ?? 0) <= 0) return <Badge variant="destructive" className="text-[10px]">Out of Stock</Badge>;
+    if ((p.stock_quantity ?? 0) <= (p.reorder_level ?? 0)) return <Badge className="bg-orange-500/15 text-orange-600 text-[10px]">Low Stock</Badge>;
     return <Badge className="bg-green-500/15 text-green-600 text-[10px]">In Stock</Badge>;
   };
 
@@ -113,7 +136,7 @@ export default function Products() {
             <Button onClick={() => { setEditingCategory(null); setCategoryDialogOpen(true); }} variant="ghost" size="icon" title="Manage Categories">
               <Settings2 className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setSaleDialogOpen(true)} variant="outline" className="gap-2">
+            <Button onClick={() => { setSaleProduct(null); setSaleDialogOpen(true); }} variant="outline" className="gap-2">
               <ShoppingCart className="h-4 w-4" /> Record Sale
             </Button>
             <Button onClick={() => { setEditingProduct(null); setDialogOpen(true); }} className="gap-2">
@@ -123,25 +146,50 @@ export default function Products() {
         )}
       </div>
 
+      {/* Stats Header */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="flex flex-col items-center p-4">
+            <span className="text-2xl font-bold">{stats.total}</span>
+            <span className="text-xs text-muted-foreground">Total Products</span>
+          </CardContent>
+        </Card>
+        <Card className="border-green-500/20">
+          <CardContent className="flex flex-col items-center p-4">
+            <span className="text-2xl font-bold text-green-600">{stats.active}</span>
+            <span className="text-xs text-muted-foreground">Active</span>
+          </CardContent>
+        </Card>
+        <Card className="border-destructive/20">
+          <CardContent className="flex flex-col items-center p-4">
+            <span className="text-2xl font-bold text-destructive">{stats.outOfStock}</span>
+            <span className="text-xs text-muted-foreground">Out of Stock</span>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Category Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {categoryStats.map((cat) => (
-          <Card
-            key={cat.slug}
-            className="cursor-pointer transition-all hover:shadow-md"
-            onClick={() => {
-              if (cat.slug === "courses") { navigate("/courses"); return; }
-              navigate(`/products/category/${cat.slug}`);
-            }}
-          >
-            <CardContent className="flex flex-col items-center gap-2 p-4">
-              <Package className="h-8 w-8" style={{ color: cat.color }} />
-              <span className="text-sm font-medium">{cat.name}</span>
-              <span className="text-xs text-muted-foreground">{cat.count} {cat.slug === "courses" ? "courses" : "products"}</span>
-              {cat.slug !== "courses" && <span className="text-xs font-semibold">{fc(cat.revenue)}</span>}
-            </CardContent>
-          </Card>
-        ))}
+        {categoryStats.map((cat) => {
+          const IconComp = getCategoryIcon(cat.icon);
+          return (
+            <Card
+              key={cat.slug}
+              className={`cursor-pointer transition-all hover:shadow-md ${categoryFilter === cat.slug ? "ring-2 ring-primary" : ""}`}
+              onClick={() => {
+                if (cat.slug === "courses") { navigate("/courses"); return; }
+                setCategoryFilter(categoryFilter === cat.slug ? "all" : cat.slug);
+              }}
+            >
+              <CardContent className="flex flex-col items-center gap-2 p-4">
+                <IconComp className="h-8 w-8" style={{ color: cat.color }} />
+                <span className="text-sm font-medium">{cat.name}</span>
+                <span className="text-xs text-muted-foreground">{cat.count} {cat.slug === "courses" ? "courses" : "products"}</span>
+                {cat.slug !== "courses" && <span className="text-xs font-semibold">{fc(cat.revenue)}</span>}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -159,70 +207,123 @@ export default function Products() {
             <SelectItem value="discontinued">Discontinued</SelectItem>
           </SelectContent>
         </Select>
+        {categoryFilter !== "all" && (
+          <Button variant="ghost" size="sm" onClick={() => setCategoryFilter("all")}>
+            Clear filter
+          </Button>
+        )}
       </div>
 
-      {/* Products Table */}
+      {/* Products Card Grid */}
       {isLoading ? (
         <div className="py-12 text-center text-muted-foreground">Loading products...</div>
       ) : products.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
-          No products found. {isAdmin && "Click 'Add Product' to get started."}
+          <Package className="mx-auto h-12 w-12 mb-3 opacity-30" />
+          <p>No products found.</p>
+          {isAdmin && <p className="text-sm">Click 'Add Product' to get started.</p>}
         </div>
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Status</TableHead>
-                {isAdmin && <TableHead className="w-10" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((p) => (
-                <TableRow key={p.id} className="cursor-pointer" onClick={() => handleProductClick(p)}>
-                  <TableCell className="font-medium">{p.product_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.product_code}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize text-xs">{p.category}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">{fc(p.price)}</TableCell>
-                  <TableCell>{stockBadge(p) || <span className="text-xs text-muted-foreground">N/A</span>}</TableCell>
-                  <TableCell>
-                    <Badge variant={p.status === "active" ? "default" : "secondary"} className="capitalize text-xs">
-                      {p.status.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {products.map((p) => (
+            <Card key={p.id} className="group overflow-hidden transition-all hover:shadow-md">
+              {/* Product Image / Placeholder */}
+              <div
+                className="relative h-36 bg-muted flex items-center justify-center cursor-pointer"
+                onClick={() => handleProductClick(p)}
+              >
+                {p.image_url ? (
+                  <img src={p.image_url} alt={p.product_name} className="h-full w-full object-cover" />
+                ) : (
+                  <Package className="h-12 w-12 text-muted-foreground/30" />
+                )}
+                {/* Status badge overlay */}
+                {p.status !== "active" && (
+                  <Badge variant="destructive" className="absolute top-2 right-2 text-[10px] capitalize">
+                    {p.status.replace("_", " ")}
+                  </Badge>
+                )}
+              </div>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h3
+                      className="font-semibold text-sm truncate cursor-pointer hover:text-primary"
+                      onClick={() => handleProductClick(p)}
+                    >
+                      {p.product_name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">{p.product_code}</p>
+                  </div>
                   {isAdmin && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => { setEditingProduct(p); setDialogOpen(true); }}>
-                            <Pencil className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(p.id)}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => { setEditingProduct(p); setDialogOpen(true); }}>
+                          <Pencil className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(p.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="capitalize text-[10px]">{p.category}</Badge>
+                  {stockBadge(p)}
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-base font-bold">{fc(p.price)}</span>
+                  {p.type === "physical" && (
+                    <span className="text-xs text-muted-foreground">Stock: {p.stock_quantity ?? 0}</span>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => handleProductClick(p)}
+                  >
+                    <Eye className="mr-1 h-3 w-3" /> View
+                  </Button>
+                  {isAdmin && p.status === "active" && !(p.type === "physical" && (p.stock_quantity ?? 0) <= 0) && (
+                    <Button
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => { setSaleProduct(p); setSaleDialogOpen(true); }}
+                    >
+                      <ShoppingCart className="mr-1 h-3 w-3" /> Sell
+                    </Button>
+                  )}
+                  {p.type === "physical" && (p.stock_quantity ?? 0) <= 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs text-destructive border-destructive/30"
+                      disabled
+                    >
+                      <AlertTriangle className="mr-1 h-3 w-3" /> Out of Stock
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
       <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editingProduct} />
-      <ProductSaleDialog open={saleDialogOpen} onOpenChange={setSaleDialogOpen} />
+      <ProductSaleDialog open={saleDialogOpen} onOpenChange={setSaleDialogOpen} preselectedProduct={saleProduct} />
       <ProductCategoryDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} category={editingCategory} />
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>

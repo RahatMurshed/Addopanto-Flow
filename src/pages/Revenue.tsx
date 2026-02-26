@@ -337,7 +337,7 @@ export default function Revenue() {
 
       {/* Summary Cards - hidden for DEO */}
       {!isModerator && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -368,6 +368,8 @@ export default function Revenue() {
               <p className="text-xs text-muted-foreground mt-1">{revenues.length} total entries</p>
             </CardContent>
           </Card>
+          {/* Student Fees vs Product Sales Split */}
+          <RevenueSplitCard revenues={filteredRevenues} formatCurrency={formatCurrency} currency={currency} label={dateRange?.label} />
         </div>
       )}
 
@@ -624,5 +626,56 @@ export default function Revenue() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// --- Revenue Split Card sub-component ---
+function RevenueSplitCard({
+  revenues,
+  formatCurrency,
+  currency,
+  label,
+}: {
+  revenues: RevenueWithSource[];
+  formatCurrency: (amount: number, currency?: string) => string;
+  currency: string;
+  label?: string;
+}) {
+  const studentFees = useMemo(
+    () => revenues.filter((r) => r.student_payment_id).reduce((s, r) => s + Number(r.amount), 0),
+    [revenues]
+  );
+  const productSales = useMemo(
+    () => revenues.filter((r) => r.product_sale_id).reduce((s, r) => s + Number(r.amount), 0),
+    [revenues]
+  );
+  const total = studentFees + productSales;
+  const studentPct = total > 0 ? ((studentFees / total) * 100).toFixed(0) : "0";
+  const productPct = total > 0 ? ((productSales / total) * 100).toFixed(0) : "0";
+
+  if (total === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Revenue Split{label ? ` — ${label}` : ""}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span>Student Fees</span>
+          <span className="font-semibold">{formatCurrency(studentFees, currency)} ({studentPct}%)</span>
+        </div>
+        <div className="h-2 rounded-full bg-muted overflow-hidden">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${studentPct}%` }} />
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span>Product Sales</span>
+          <span className="font-semibold">{formatCurrency(productSales, currency)} ({productPct}%)</span>
+        </div>
+        <div className="h-2 rounded-full bg-muted overflow-hidden">
+          <div className="h-full rounded-full bg-accent-foreground/60" style={{ width: `${productPct}%` }} />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
