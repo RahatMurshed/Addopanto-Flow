@@ -111,6 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     } else if (isTraditionalModerator) {
       // Traditional Moderator: granular permissions, no Dashboard/Reports
       if (canAddCourse || canEditCourse || canDeleteCourse) {
+        items.push({ label: "Courses", href: "/courses", icon: BookOpen });
         items.push({ label: "Products", href: "/products", icon: Package });
       }
       if (canAddStudent || canEditStudent || canDeleteStudent) {
@@ -131,7 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       items.push({ label: "Students", href: "/students", icon: GraduationCap });
       items.push({ label: "Employees", href: "/employees", icon: Briefcase });
       
-      items.push({ label: "Purchase Orders", href: "/purchase-orders", icon: ClipboardList });
+      items.push({ label: "Courses", href: "/courses", icon: BookOpen });
       items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
       items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
       items.push({ label: "Expenses", href: "/expenses", icon: Receipt });

@@ -2,7 +2,6 @@ import { useState, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useProductCategories, useDeleteProductCategory, type ProductCategory } from "@/hooks/useProductCategories";
-import { useCourses } from "@/hooks/useCourses";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useProductSales } from "@/hooks/useProductSales";
@@ -54,7 +53,6 @@ export default function Products() {
   const { data: allProducts = [], isLoading } = useProducts();
   const { data: allSales = [] } = useProductSales();
   const { data: categories = [] } = useProductCategories();
-  const { data: courses = [] } = useCourses();
   const deleteProduct = useDeleteProduct();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -85,25 +83,20 @@ export default function Products() {
     outOfStock: allProducts.filter((p) => p.status === "out_of_stock" || (p.type === "physical" && (p.stock_quantity ?? 0) <= 0)).length,
   }), [allProducts]);
 
-  const categoryStats = categories.map((cat) => {
-    if (cat.slug === "courses") {
-      return { ...cat, count: courses.length, revenue: 0 };
-    }
-    const catProducts = allProducts.filter((p) => p.category === cat.slug);
-    const catSales = allSales.filter((s) => catProducts.some((p) => p.id === s.product_id));
-    return {
-      ...cat,
-      count: catProducts.length,
-      revenue: catSales.reduce((sum, s) => sum + s.total_amount, 0),
-    };
-  });
+  const categoryStats = categories
+    .filter((cat) => cat.slug !== "courses")
+    .map((cat) => {
+      const catProducts = allProducts.filter((p) => p.category === cat.slug);
+      const catSales = allSales.filter((s) => catProducts.some((p) => p.id === s.product_id));
+      return {
+        ...cat,
+        count: catProducts.length,
+        revenue: catSales.reduce((sum, s) => sum + s.total_amount, 0),
+      };
+    });
 
   const handleProductClick = (product: Product) => {
-    if (product.category === "courses" && product.linked_course_id) {
-      navigate(`/courses/${product.linked_course_id}`);
-    } else {
-      navigate(`/products/${product.id}`);
-    }
+    navigate(`/products/${product.id}`);
   };
 
   const handleDelete = async () => {
@@ -177,15 +170,14 @@ export default function Products() {
               key={cat.slug}
               className={`cursor-pointer transition-all hover:shadow-md ${categoryFilter === cat.slug ? "ring-2 ring-primary" : ""}`}
               onClick={() => {
-                if (cat.slug === "courses") { navigate("/courses"); return; }
                 setCategoryFilter(categoryFilter === cat.slug ? "all" : cat.slug);
               }}
             >
               <CardContent className="flex flex-col items-center gap-2 p-4">
                 <IconComp className="h-8 w-8" style={{ color: cat.color }} />
                 <span className="text-sm font-medium">{cat.name}</span>
-                <span className="text-xs text-muted-foreground">{cat.count} {cat.slug === "courses" ? "courses" : "products"}</span>
-                {cat.slug !== "courses" && <span className="text-xs font-semibold">{fc(cat.revenue)}</span>}
+                <span className="text-xs text-muted-foreground">{cat.count} products</span>
+                <span className="text-xs font-semibold">{fc(cat.revenue)}</span>
               </CardContent>
             </Card>
           );
