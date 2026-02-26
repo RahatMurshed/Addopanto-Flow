@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, Landmark, Eye, Pencil, Trash2, Users } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Plus, TrendingUp, Landmark, Eye, Pencil, Trash2, Users, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -65,7 +67,6 @@ export default function StakeholdersPage() {
     setDeleteId(null);
   };
 
-  // Get investment/loan summary per stakeholder
   const getInvestorSummary = (id: string) => {
     const inv = allInvestments.filter(i => i.stakeholder_id === id);
     return {
@@ -76,35 +77,57 @@ export default function StakeholdersPage() {
 
   const getLenderSummary = (id: string) => {
     const ln = allLoans.filter(l => l.stakeholder_id === id);
-    return {
-      totalLent: ln.reduce((s, l) => s + l.loan_amount, 0),
-      totalRepayable: ln.reduce((s, l) => s + l.total_repayable, 0),
-      remaining: ln.filter(l => l.status !== "paid_off").reduce((s, l) => s + l.remaining_balance, 0),
-    };
+    const totalLent = ln.reduce((s, l) => s + l.loan_amount, 0);
+    const totalRepayable = ln.reduce((s, l) => s + l.total_repayable, 0);
+    const remaining = ln.filter(l => l.status !== "paid_off").reduce((s, l) => s + l.remaining_balance, 0);
+    const pctRepaid = totalRepayable > 0 ? ((totalRepayable - remaining) / totalRepayable) * 100 : 0;
+    return { totalLent, totalRepayable, remaining, pctRepaid };
   };
 
   const renderCard = (s: Stakeholder) => {
     const isInvestor = s.stakeholder_type === "investor";
     const summary = isInvestor ? getInvestorSummary(s.id) : getLenderSummary(s.id);
+    const initials = s.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
     return (
-      <Card key={s.id} className="group hover:shadow-md transition-shadow">
-        <CardContent className="p-4">
+      <Card
+        key={s.id}
+        className={`group hover:shadow-lg transition-all duration-200 border-l-4 ${
+          isInvestor ? "border-l-emerald-500" : "border-l-orange-500"
+        }`}
+      >
+        <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${isInvestor ? "bg-emerald-500" : "bg-orange-500"}`}>
-                {s.name.charAt(0).toUpperCase()}
-              </div>
+              <Avatar className={`h-12 w-12 ring-2 ${isInvestor ? "ring-emerald-500/30" : "ring-orange-500/30"}`}>
+                {s.image_url && <AvatarImage src={s.image_url} alt={s.name} className="object-cover" />}
+                <AvatarFallback className={`text-sm font-bold text-white ${isInvestor ? "bg-emerald-500" : "bg-orange-500"}`}>
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
-                <h3 className="font-semibold truncate">{s.name}</h3>
+                <h3 className="font-semibold truncate text-base">{s.name}</h3>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <TypeBadge type={s.stakeholder_type} />
                   <CategoryBadge category={s.category} />
                   <StakeholderStatusBadge status={s.status} />
                 </div>
+                {/* Contact info */}
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                  {s.contact_number && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-3 w-3" /> {s.contact_number}
+                    </span>
+                  )}
+                  {s.email && (
+                    <span className="flex items-center gap-1 truncate">
+                      <Mail className="h-3 w-3" /> {s.email}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex gap-1 shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => navigate(`/stakeholders/${s.id}`)}>
                 <Eye className="h-4 w-4" />
               </Button>
@@ -121,27 +144,38 @@ export default function StakeholdersPage() {
             {isInvestor ? (
               <>
                 <div>
-                  <p className="text-muted-foreground">Total Invested</p>
+                  <p className="text-muted-foreground text-xs">Total Invested</p>
                   <p className="font-semibold text-emerald-600 dark:text-emerald-400">{fc((summary as any).totalInvested)}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Ownership</p>
+                  <p className="text-muted-foreground text-xs">Ownership</p>
                   <p className="font-semibold">{(summary as any).ownership.toFixed(1)}%</p>
                 </div>
               </>
             ) : (
               <>
                 <div>
-                  <p className="text-muted-foreground">Total Lent</p>
+                  <p className="text-muted-foreground text-xs">Total Lent</p>
                   <p className="font-semibold text-orange-600 dark:text-orange-400">{fc((summary as any).totalLent)}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Remaining</p>
+                  <p className="text-muted-foreground text-xs">Remaining</p>
                   <p className="font-semibold text-destructive">{fc((summary as any).remaining)}</p>
                 </div>
               </>
             )}
           </div>
+
+          {/* Repayment progress for lenders */}
+          {!isInvestor && (summary as any).totalRepayable > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>Repaid</span>
+                <span>{(summary as any).pctRepaid.toFixed(0)}%</span>
+              </div>
+              <Progress value={(summary as any).pctRepaid} className="h-1.5" />
+            </div>
+          )}
         </CardContent>
       </Card>
     );

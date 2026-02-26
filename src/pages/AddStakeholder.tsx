@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ImageUpload } from "@/components/shared/ImageUpload";
 import { TrendingUp, Landmark, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type Step = "type" | "info" | "details";
 
@@ -34,6 +36,7 @@ export default function AddStakeholderPage() {
   const [address, setAddress] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [notes, setNotes] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   // Investment fields
   const [invAmount, setInvAmount] = useState("");
@@ -102,6 +105,19 @@ export default function AddStakeholderPage() {
 
       const stakeholderId = (shRow as any).id;
       const userId = (await supabase.auth.getUser()).data.user!.id;
+
+      // Upload image if selected
+      if (imageFile && activeCompanyId) {
+        const ext = imageFile.name.split(".").pop();
+        const path = `${activeCompanyId}/${stakeholderId}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("stakeholder-images")
+          .upload(path, imageFile, { upsert: true });
+        if (!upErr) {
+          const { data: pub } = supabase.storage.from("stakeholder-images").getPublicUrl(path);
+          await supabase.from("stakeholders").update({ image_url: pub.publicUrl } as any).eq("id", stakeholderId);
+        }
+      }
 
       if (type === "investor") {
         const amt = parseFloat(invAmount);
@@ -205,6 +221,14 @@ export default function AddStakeholderPage() {
             <CardTitle>Stakeholder Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <ImageUpload
+              value={null}
+              onChange={() => {}}
+              onFileSelect={(f) => setImageFile(f)}
+              label="Upload Photo"
+              variant="avatar"
+              fallbackText={name}
+            />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Full Name <span className="text-destructive">*</span></Label>
