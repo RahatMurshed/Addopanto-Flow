@@ -1,87 +1,20 @@
 
 
-# Stakeholder Edit, Image Upload, and Better Card UI
+# Add Profile Photo Avatar to Stakeholder Cards
 
-## Overview
+## What changes
 
-Three interconnected improvements: (1) implement edit functionality for stakeholders, (2) add profile image support when adding/editing stakeholders, and (3) redesign the stakeholder cards with better UI/UX.
+Add a stakeholder profile photo (or initials fallback) to each card in the stakeholder list, using the existing `UserAvatar` component pattern and the `image_url` field already stored in the database.
 
----
-
-## 1. Database: Add `image_url` column to `stakeholders` table
-
-Add a nullable `image_url TEXT` column to the `stakeholders` table via migration.
-
-## 2. Storage: Create `stakeholder-images` bucket
-
-Create a public storage bucket `stakeholder-images` with RLS policies allowing cipher users to upload/delete images.
-
-## 3. Update Type Definition
-
-**File: `src/types/stakeholders.ts`**
-- Add `image_url: string | null` to the `Stakeholder` interface.
-
-## 4. Implement Edit Mode on StakeholderDetail Page
-
-**File: `src/pages/StakeholderDetail.tsx`**
-
-- Read `?edit=true` from the URL search params using `useSearchParams`.
-- When `edit=true`, render an editable form (inline within the detail page) pre-filled with the stakeholder's current data: name, category, contact number, email, address, ID number, relationship notes, status, and the new image field.
-- Include an `ImageUpload` component (already exists at `src/components/shared/ImageUpload.tsx`) for uploading/changing the stakeholder photo.
-- On save, upload the image to the `stakeholder-images` bucket, then call `useSaveStakeholder` with the updated fields.
-- Include Cancel and Save buttons; Cancel returns to view mode.
-
-## 5. Add Image Upload to AddStakeholder Page
-
-**File: `src/pages/AddStakeholder.tsx`**
-
-- In Step 2 (Stakeholder Information), add the `ImageUpload` component at the top of the form.
-- Store the selected file in state; on save, upload to `stakeholder-images/{companyId}/{stakeholderId}.ext` and include the public URL in the stakeholder insert.
-
-## 6. Redesign Stakeholder Cards
+## Technical details
 
 **File: `src/pages/Stakeholders.tsx`**
 
-Improve the `renderCard` function with:
+- Import `Avatar`, `AvatarImage`, `AvatarFallback` from `@/components/ui/avatar`
+- In the `renderCard` function, add an avatar circle to the left of the stakeholder name
+  - If `s.image_url` exists, show the image
+  - Otherwise, show colored initials (emerald background for investors, orange for lenders)
+- The card layout changes from the current name-on-left / buttons-on-right to: avatar + name on the left, buttons on the right
 
-- Display the stakeholder image (or a colored initial avatar as fallback) using the `Avatar` component.
-- Add contact info (phone/email) as subtle icons below the name.
-- Show a progress indicator for lenders (% repaid).
-- Make action buttons (view/edit/delete) always visible on mobile, hover-reveal on desktop.
-- Add a subtle gradient left-border color (emerald for investors, orange for lenders).
-- Better spacing, slightly larger card with more breathing room.
-
-## 7. Update Detail Page Header
-
-**File: `src/pages/StakeholderDetail.tsx`**
-
-- Replace the colored-circle initial with the actual stakeholder image (Avatar with fallback to initials).
-
----
-
-## Technical Flow
-
-```text
-AddStakeholder                StakeholderDetail (edit mode)
-     |                                |
-     v                                v
-ImageUpload component         ImageUpload component
-     |                                |
-     v                                v
-Upload to storage bucket      Upload to storage bucket
-     |                                |
-     v                                v
-Save stakeholder row          Update stakeholder row
-(with image_url)              (with image_url)
-```
-
-## Files Modified
-
-| File | Change |
-|---|---|
-| Migration SQL | Add `image_url` column + storage bucket + policies |
-| `src/types/stakeholders.ts` | Add `image_url` field |
-| `src/pages/StakeholderDetail.tsx` | Edit mode with form, image upload, avatar in header |
-| `src/pages/AddStakeholder.tsx` | Add ImageUpload in step 2 |
-| `src/pages/Stakeholders.tsx` | Redesigned cards with images, better layout, progress bars |
+The change is minimal -- just adding the avatar element inside the existing card structure without altering the overall card design.
 
