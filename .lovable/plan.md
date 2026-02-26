@@ -1,27 +1,50 @@
 
 
-# Fix: Sidebar Profile & Logout Buttons Not Visible
+# Slim & Theme-Matched Sidebar Scrollbar
 
-## Root Cause
+## What Changes
 
-The desktop sidebar nav element (`<nav className="flex-1 space-y-1 p-3">`) has `flex-1` which lets it grow, but it has **no `overflow-y-auto`**. For Cipher users with 15+ nav items, the content overflows the viewport, pushing the footer section (Theme toggle, My Profile, Logout) off-screen.
+Add custom CSS to make the sidebar scrollbar thinner and blend with the sidebar's dark background, so it doesn't visually distract.
 
-The same issue exists in the mobile sidebar nav.
+## Technical Details
 
-## Fix
+### File: `src/index.css`
+
+Add custom scrollbar styles targeting the sidebar nav elements:
+
+- **Width**: Reduce from browser default (~8-12px) to 4px
+- **Colors**: Use the sidebar background tones so the scrollbar blends in, with a slightly lighter thumb on hover
+- **Both engines**: Use `::-webkit-scrollbar` for Chrome/Safari/Edge and `scrollbar-width: thin` + `scrollbar-color` for Firefox
+
+The CSS will target `.sidebar-nav-scroll` class (a new utility class added to the two `overflow-y-auto` nav containers).
 
 ### File: `src/components/layout/AppLayout.tsx`
 
-**Desktop sidebar nav (line 228):**
-Change `className="flex-1 space-y-1 p-3"` to `className="flex-1 space-y-1 p-3 overflow-y-auto"`
+Add the `sidebar-nav-scroll` class to:
+- Desktop nav (line 228): `className="flex-1 space-y-1 p-3 overflow-y-auto sidebar-nav-scroll"`
+- Mobile nav (line 307): `className="flex-1 space-y-1 overflow-y-auto sidebar-nav-scroll"`
 
-**Mobile sidebar nav container (line 307):**
-Change `className="flex-1 space-y-1"` to `className="flex-1 space-y-1 overflow-y-auto"`
+### CSS Rules (added to `src/index.css`)
 
-Also add the missing "My Profile" link to the mobile sidebar footer (before the Logout button, around line 332), matching the desktop version.
+```css
+/* Thin, theme-matched sidebar scrollbar */
+.sidebar-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--sidebar-accent)) transparent;
+}
+.sidebar-nav-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--sidebar-accent));
+  border-radius: 4px;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--sidebar-border));
+}
+```
 
-## Result
-
-- Nav items scroll independently when they overflow
-- Profile and Logout buttons remain pinned at the bottom of the sidebar, always visible
-- Mobile sidebar also gets the Profile link and proper scrolling
+This keeps the scrollbar functional but nearly invisible, matching the sidebar's dark blue theme.
