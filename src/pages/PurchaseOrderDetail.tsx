@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { usePurchaseOrder, usePurchaseOrderItems, useCreatePurchaseOrderItem, useReceivePurchaseOrderItem, useUpdatePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useProducts, type Product } from "@/hooks/useProducts";
-import { useSuppliers } from "@/hooks/useSuppliers";
+
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,7 @@ export default function PurchaseOrderDetail() {
   const { data: order, isLoading } = usePurchaseOrder(id);
   const { data: items = [] } = usePurchaseOrderItems(id);
   const { data: products = [] } = useProducts();
-  const { data: suppliers = [] } = useSuppliers();
+  
   const createItem = useCreatePurchaseOrderItem();
   const receiveItem = useReceivePurchaseOrderItem();
   const updateOrder = useUpdatePurchaseOrder();
@@ -43,7 +43,7 @@ export default function PurchaseOrderDetail() {
   if (isLoading) return <div className="py-12 text-center text-muted-foreground">Loading...</div>;
   if (!order) return <div className="py-12 text-center text-muted-foreground">Purchase order not found</div>;
 
-  const supplierName = order.supplier_id ? suppliers.find((s) => s.id === order.supplier_id)?.supplier_name : null;
+  const supplierName = null;
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();

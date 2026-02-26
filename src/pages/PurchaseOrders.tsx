@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePurchaseOrders, useDeletePurchaseOrder, type PurchaseOrder } from "@/hooks/usePurchaseOrders";
-import { useSuppliers } from "@/hooks/useSuppliers";
+
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { PurchaseOrderDialog } from "@/components/dialogs/PurchaseOrderDialog";
@@ -28,14 +28,14 @@ export default function PurchaseOrders() {
 
   const [search, setSearch] = useState("");
   const { data: orders = [], isLoading } = usePurchaseOrders();
-  const { data: suppliers = [] } = useSuppliers();
+  
   const deleteOrder = useDeletePurchaseOrder();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const supplierMap = new Map(suppliers.map((s) => [s.id, s.supplier_name]));
+  
 
   const filtered = orders.filter((o) =>
     !search || o.order_number.toLowerCase().includes(search.toLowerCase())
@@ -94,7 +94,7 @@ export default function PurchaseOrders() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order #</TableHead>
-                <TableHead>Supplier</TableHead>
+                
                 <TableHead>Status</TableHead>
                 <TableHead>Expected Delivery</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -106,7 +106,7 @@ export default function PurchaseOrders() {
               {filtered.map((o) => (
                 <TableRow key={o.id} className="cursor-pointer" onClick={() => navigate(`/purchase-orders/${o.id}`)}>
                   <TableCell className="font-medium">{o.order_number}</TableCell>
-                  <TableCell className="text-muted-foreground">{o.supplier_id ? supplierMap.get(o.supplier_id) || "—" : "—"}</TableCell>
+                  
                   <TableCell>{statusBadge(o.status)}</TableCell>
                   <TableCell>{o.expected_delivery ? format(new Date(o.expected_delivery), "dd MMM yyyy") : "—"}</TableCell>
                   <TableCell className="text-right">{fc(o.total_amount)}</TableCell>

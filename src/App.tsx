@@ -55,7 +55,7 @@ const EmployeesPage = lazy(() => import("@/pages/Employees"));
 const EmployeeDetailPage = lazy(() => import("@/pages/EmployeeDetail"));
 const Products = lazy(() => import("@/pages/Products"));
 const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
-const SuppliersPage = lazy(() => import("@/pages/Suppliers"));
+
 const PurchaseOrdersPage = lazy(() => import("@/pages/PurchaseOrders"));
 const PurchaseOrderDetailPage = lazy(() => import("@/pages/PurchaseOrderDetail"));
 const CategoryProducts = lazy(() => import("@/pages/CategoryProducts"));
@@ -197,7 +197,7 @@ const App = () => (
                   <Route path="/products" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CriticalRouteErrorBoundary routeName="Products"><Products /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
                   <Route path="/products/category/:slug" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CategoryProducts /></AccessGuard></ProtectedRoute>} />
                   <Route path="/products/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><ProductDetail /></AccessGuard></ProtectedRoute>} />
-                  <Route path="/suppliers" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><SuppliersPage /></AccessGuard></ProtectedRoute>} />
+                  
                   <Route path="/purchase-orders" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><PurchaseOrdersPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/purchase-orders/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><PurchaseOrderDetailPage /></AccessGuard></ProtectedRoute>} />
                   
