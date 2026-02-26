@@ -1,68 +1,105 @@
 
 
-# Fix Product Management Workflow Issues
+# Enhance Products Management System
 
-## Issues Found
+## Overview
+The core product management infrastructure (database tables, triggers, hooks, pages) is already built and working. This plan focuses on upgrading the UI/UX and adding missing business logic validations to match the detailed specification.
 
-### 1. Products page fetches ALL products twice (Performance Bug)
-In `Products.tsx`, lines 40 and 54 both call `useProducts()` -- once with filters and once without. The unfiltered call (`allProducts`) is used only for category stats calculation. This causes two separate network requests on every render.
+## Changes
 
-**Fix**: Remove the duplicate `useProducts()` call on line 54. Use the already-fetched `allSales` and a single unfiltered products query for stats, OR compute stats from the unfiltered hook and use a separate filtered list for the table display. The cleanest approach: keep ONE `useProducts()` without filters for stats, and filter in-memory for the table.
+### 1. Products Page - Card Grid Layout + Stats Header
+**File: `src/pages/Products.tsx`**
 
-### 2. Courses page missing "Products >" breadcrumb
-The Courses page (`src/pages/Courses.tsx`) has no breadcrumb linking back to Products. CourseDetail and BatchDetail correctly show "Products > Courses > ..." but the Courses list page itself has no breadcrumb at all, breaking the navigation hierarchy.
+Replace the products table with a responsive card grid layout:
+- Add stats header showing Total, Active, Out of Stock counts
+- Each product card displays: image (or placeholder), product name, code, category badge, price in company currency, stock indicator badge (for physical), and quick action buttons (View, Record Sale)
+- For course-linked products: show "Enrolled: N students" instead of stock
+- Keep search, status filter, and category cards at the top
+- Responsive: 4 columns desktop, 2 tablet, 1 mobile
 
-**Fix**: Add a breadcrumb section to `Courses.tsx` showing `Products > Courses`.
+### 2. ProductDialog - Course Category Business Logic
+**File: `src/components/dialogs/ProductDialog.tsx`**
 
-### 3. ProductSaleDialog does not reset preselectedProduct on reopen (State Bug)
-In `ProductSaleDialog.tsx`, the `productId` and `unitPrice` states are initialized from `preselectedProduct` only once via `useState`. When the dialog reopens with a different preselected product (or from a different context), the old values persist.
+- When category dropdown shows "courses" (re-enable courses category in the dropdown):
+  - Show "Link to Course" dropdown (already present)
+  - Auto-fill product name from selected course name
+  - Auto-calculate price: `course.admission_fee + (course.monthly_fee * course.duration_months)` (requires fetching batch defaults - will use first batch or course-level data)
+  - Auto-set type to "digital", hide stock/purchase price/reorder fields
+  - Validate: prevent duplicate products per course (check existing products with same `linked_course_id`)
+- For physical products:
+  - Validate selling price > purchase price on submit
+  - Show validation error message
+- Auto-generate product code (PRD-001, PRD-002...) based on existing product count when field is empty
+- Add product code uniqueness check before submit
 
-**Fix**: Add a `useEffect` that resets form state when `open` or `preselectedProduct` changes, similar to how `ProductDialog` handles it.
+### 3. ProductSaleDialog - Enhanced Validation + Student Link
+**File: `src/components/dialogs/ProductSaleDialog.tsx`**
 
-### 4. Realtime sync missing product tables
-`useRealtimeSync.ts` does not subscribe to `products`, `product_sales`, `product_stock_movements`, `product_categories`, `suppliers`, or `purchase_orders` tables. Changes by other users to these tables won't auto-refresh.
+- Hard-block sale submission when quantity > available stock (for physical products) - disable submit button
+- Add "Link to Student" searchable dropdown (fetch students from `useStudents` hook)
+  - Shows student name, ID, batch
+  - Passes `student_id` to sale record
+- Validate sale date cannot be future date
+- Show "Only N units available" error prominently
+- After success: show option buttons "Record Another" / close
 
-**Fix**: Add these tables to `TABLE_INVALIDATION_MAP` and `TABLE_LABELS`, and add corresponding `.on("postgres_changes", ...)` subscriptions.
+### 4. Product Detail Page - Enhanced Tabs
+**File: `src/pages/ProductDetail.tsx`**
 
-### 5. CategoryProducts page "Add Product" does not pre-select category in dialog
-The `CategoryProducts` page passes `defaultCategory={slug}` to `ProductDialog`, which works. However, when opening the sale dialog from `CategoryProducts`, the `ProductSaleDialog` shows ALL products, not filtered to the category. This is acceptable behavior but could be confusing.
+- Add "Overview" tab as first tab showing:
+  - Product image (if set) or placeholder
+  - All product details in organized cards (price, purchase price, type, status, description, supplier info, barcode/SKU)
+  - For course products: linked course info with link to course page
+  - For physical: stock level with visual indicator, reorder level
+- Keep "Sales History" and "Stock Movements" tabs as-is
+- Add "Revenue Analytics" tab:
+  - Monthly revenue chart using recharts (BarChart)
+  - Total revenue, quantity sold, profit margin stats
+  - Best selling periods
 
-**Fix**: No code change needed -- it's by design since sales should allow any product selection.
+### 5. Revenue Page - Product Sales Breakdown
+**File: `src/pages/Revenue.tsx`**
 
-### 6. Products page `useProducts` fetches without filters then WITH filters -- table shows filtered, stats show all (Correct but wasteful)
-The intent is correct: stats need all products, table needs filtered products. But the approach creates two separate API calls.
+The revenue page already shows product sales in "Revenue by Source" since the `sync_product_sale_revenue` trigger auto-creates a "Product Sales" revenue source. No structural changes needed, but:
+- Add a summary card showing "Student Fees" vs "Product Sales" split with percentages
+- Filter revenues to distinguish between `student_payment_id IS NOT NULL` (student fees) vs `product_sale_id IS NOT NULL` (product sales)
 
-**Fix**: Fetch all products once (unfiltered), compute stats from that, then filter in-memory for the table display.
+### 6. Products Page - Category Icon Rendering
+**File: `src/pages/Products.tsx`**
 
-### 7. Console warning: "Function components cannot be given refs"
-From the console logs, `ProductSaleDialog` and `AlertDialog` are receiving refs but are not wrapped in `forwardRef`. This happens because they're rendered as direct children of components that try to pass refs.
+Currently all category cards show the generic `Package` icon. Map the `icon` field from `product_categories` (e.g., "graduation-cap", "book-open", "pencil", "shirt") to the corresponding lucide-react icon component.
 
-**Fix**: This is a non-critical React warning from Radix UI internals. No action needed.
+## Technical Details
 
-## Changes Summary
+### Files to Modify
+| File | Changes |
+|------|---------|
+| `src/pages/Products.tsx` | Card grid layout, stats header, dynamic category icons, responsive grid |
+| `src/components/dialogs/ProductDialog.tsx` | Course auto-fill logic, price calculation, selling > purchase validation, auto-generate product code, duplicate course check |
+| `src/components/dialogs/ProductSaleDialog.tsx` | Stock hard-block, student link dropdown, future date validation, "Record Another" flow |
+| `src/pages/ProductDetail.tsx` | Add Overview tab with organized details, Revenue Analytics tab with recharts chart |
+| `src/pages/Revenue.tsx` | Add Student Fees vs Product Sales split card |
 
-### File: `src/pages/Products.tsx`
-- Remove duplicate `useProducts()` call (line 54)
-- Use single unfiltered fetch for stats, filter in-memory for table display
+### No Database Changes Needed
+All required tables, triggers, and RLS policies are already in place. The `sync_product_sale_revenue` trigger handles:
+- Stock decrement on sale insert
+- Stock restore on sale delete
+- Revenue record creation/update/delete
+- Expense account allocations
 
-### File: `src/pages/Courses.tsx`
-- Add breadcrumb: `Products > Courses` at the top of the page
+### Key Validations (Frontend)
+- Product code auto-generation: Query existing products count, generate `PRD-{count+1}` padded to 3 digits
+- Selling price > purchase price: Check on form submit for non-course products
+- Duplicate course product: Query products with same `linked_course_id` before creating
+- Stock availability: Disable submit when `quantity > product.stock_quantity` for physical products
+- Future date: Compare `saleDate` against `new Date()`, block if future
 
-### File: `src/components/dialogs/ProductSaleDialog.tsx`
-- Add `useEffect` to reset form state (`productId`, `unitPrice`, `quantity`, `customerName`, `notes`, `paymentMethod`, `saleDate`) when `open` changes or `preselectedProduct` changes
+### Revenue Analytics Chart
+Uses existing `recharts` dependency (already installed). Groups sales by month using `date-fns` and renders a `BarChart` showing monthly revenue trend for the specific product.
 
-### File: `src/hooks/useRealtimeSync.ts`
-- Add entries to `TABLE_INVALIDATION_MAP`:
-  - `products` -> `["products", "product-sales", "dashboard"]`
-  - `product_sales` -> `["product-sales", "products", "revenues", "dashboard", "reports"]`
-  - `product_stock_movements` -> `["product-stock-movements", "products"]`
-  - `product_categories` -> `["product_categories", "products"]`
-  - `suppliers` -> `["suppliers"]`
-  - `purchase_orders` -> `["purchase_orders"]`
-  - `purchase_order_items` -> `["purchase_order_items", "products", "product-stock-movements"]`
-- Add corresponding `TABLE_LABELS`
-- Add `.on("postgres_changes", ...)` for each new table
-
-## No Database Changes Required
-All issues are frontend-only. The database triggers, RLS policies, and schema are correctly implemented.
-
+## Implementation Order
+1. ProductDialog enhancements (course logic, validations, auto-code)
+2. ProductSaleDialog enhancements (stock block, student link, date validation)
+3. Products page card grid layout + stats + icons
+4. ProductDetail page enhanced tabs (Overview, Revenue Analytics)
+5. Revenue page product sales split card
