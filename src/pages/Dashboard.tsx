@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, BookOpen } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, BookOpen, Landmark, HandCoins } from "lucide-react";
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -100,6 +100,39 @@ export default function Dashboard() {
     setFilterValue(value);
     setPreviousRange(getPreviousPeriodRange(type, value));
   }, []);
+
+  // Cipher-only: Financial obligations (investments + loans)
+  const { data: obligationsData } = useQuery({
+    queryKey: ["financial-obligations", activeCompanyId],
+    queryFn: async () => {
+      const [investmentsRes, loansRes] = await Promise.all([
+        supabase
+          .from("investments")
+          .select("investment_amount, status")
+          .eq("company_id", activeCompanyId!)
+          .in("status", ["active", "exited"]),
+        supabase
+          .from("loans")
+          .select("loan_amount, remaining_balance, status")
+          .eq("company_id", activeCompanyId!)
+          .in("status", ["active", "overdue", "restructured"]),
+      ]);
+      if (investmentsRes.error) throw investmentsRes.error;
+      if (loansRes.error) throw loansRes.error;
+
+      const investments = investmentsRes.data || [];
+      const loans = loansRes.data || [];
+
+      const totalInvested = investments.reduce((s, i) => s + Number(i.investment_amount), 0);
+      const activeInvestors = investments.filter(i => i.status === "active").length;
+      const totalLoanOriginal = loans.reduce((s, l) => s + Number(l.loan_amount), 0);
+      const totalLoanOutstanding = loans.reduce((s, l) => s + Number(l.remaining_balance), 0);
+      const activeLoans = loans.length;
+
+      return { totalInvested, activeInvestors, totalLoanOriginal, totalLoanOutstanding, activeLoans };
+    },
+    enabled: !!user && !!activeCompanyId && isCipher,
+  });
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboard", user?.id, activeCompanyId],
@@ -615,6 +648,49 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Cipher-only: Financial Obligations Summary */}
+      {isCipher && obligationsData && (obligationsData.totalInvested > 0 || obligationsData.totalLoanOutstanding > 0) && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Landmark className="h-4 w-4 text-primary" />
+              Financial Obligations
+              <Badge variant="outline" className="ml-auto text-xs font-normal">Cipher Only</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {obligationsData.totalInvested > 0 && (
+                <div className="flex items-start gap-3 rounded-lg border border-border/50 bg-card p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-500/10">
+                    <HandCoins className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">Total Investments</p>
+                    <p className="text-lg font-bold">{formatCurrency(obligationsData.totalInvested)}</p>
+                    <p className="text-xs text-muted-foreground">{obligationsData.activeInvestors} active investor{obligationsData.activeInvestors !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              )}
+              {obligationsData.totalLoanOutstanding > 0 && (
+                <div className="flex items-start gap-3 rounded-lg border border-border/50 bg-card p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-amber-500/10">
+                    <CreditCard className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">Outstanding Loans</p>
+                    <p className="text-lg font-bold">{formatCurrency(obligationsData.totalLoanOutstanding)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {obligationsData.activeLoans} active loan{obligationsData.activeLoans !== 1 ? 's' : ''} · Originally {formatCurrency(obligationsData.totalLoanOriginal)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtered Period Summary */}
       <Card>
