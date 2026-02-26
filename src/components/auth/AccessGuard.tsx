@@ -95,6 +95,15 @@ interface AccessGuardProps {
 export function AccessGuard({ children, rules }: AccessGuardProps) {
   const ctx = useCompany();
 
+  // Block all rendering until role/permission data resolves
+  if (ctx.isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   for (const rule of rules) {
     if (rule.isDenied(ctx)) {
       return (
