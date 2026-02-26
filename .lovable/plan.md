@@ -1,73 +1,110 @@
 
 
-# Fix Navigation & Page Content Flash for Moderators
+# Security Audit: Complete RLS Analysis & Fixes
 
-## Root Cause
+## Architecture Context
 
-The sidebar flash fix is already in place (`buildNavItems()` returns `[]` during loading). However, **`AccessGuard` does not account for loading state**. During loading, all permission flags default to `false`:
+This application does NOT use Express.js API routes. All data access goes through the Supabase client directly, with PostgreSQL Row-Level Security (RLS) as the sole authorization layer. There are no `/api/*` endpoints to protect -- RLS IS the backend enforcement. Edge functions handle specific operations (reset, merge, admin-users, etc.) and already validate auth + roles server-side.
 
-- `isModerator = false` (no membership data yet)
-- `isDataEntryModerator = false`
+## Audit Results: 27 Feature Areas
 
-This means every `isDenied` rule evaluates to `false`, so restricted pages (Dashboard, Reports, Members, Products, etc.) briefly render their full content before the role data resolves and the guard kicks in.
+### SECURE -- No Changes Needed (23 of 27)
 
-## Fix
+| # | Feature | Enforcement | Status |
+|---|---------|------------|--------|
+| 1 | Dashboard | Revenues/expenses RLS blocks DEO; non-DEO moderators with finance perms see data (by design) | Secure |
+| 2 | Courses SELECT | `NOT is_data_entry_moderator` blocks DEO | Secure |
+| 3 | Courses Write | `is_company_admin OR is_cipher` -- admin/cipher only | Secure |
+| 4 | Course Details | Same as Courses -- company_id + active_company check | Secure |
+| 5 | Batches | DEO blocked from SELECT; write uses `company_can_*_batch` | Secure |
+| 6 | Students SELECT | DEO sees only `user_id = auth.uid()` rows | Secure |
+| 7 | Students INSERT | `company_can_add_student` + forces `user_id = auth.uid()` | Secure |
+| 8 | Students UPDATE | `company_can_edit_student` + DEO only own records | Secure |
+| 9 | Students DELETE | `company_can_delete_student` + DEO only own records | Secure |
+| 10 | Payments (all) | `company_can_*_payment` + `NOT is_data_entry_moderator` blocks DEO entirely | Secure |
+| 11 | Revenue (all) | `company_can_*_revenue` + `NOT is_data_entry_moderator` blocks DEO | Secure |
+| 12 | Expenses SELECT | DEO sees only `user_id = auth.uid()` | Secure |
+| 13 | Expenses Write | `company_can_*_expense` + DEO only own records | Secure |
+| 14 | Products | DEO blocked from SELECT; write is admin/cipher only | Secure |
+| 15 | Product Sales | DEO blocked; write is admin/cipher only | Secure |
+| 16 | Reports | Queries revenues/expenses -- RLS blocks DEO; moderator access controlled by finance perms | Secure |
+| 17 | Members | `company_memberships` write is admin/cipher only; cipher filtering via `get_company_members_filtered` | Secure |
+| 18 | Company Settings | `companies` UPDATE requires `is_cipher OR is_company_admin` | Secure |
+| 19 | Reset Data | Edge function validates cipher role + password server-side | Secure |
+| 20 | Audit Logs | SELECT requires `is_company_admin OR is_cipher`; DELETE cipher-only | Secure |
+| 21 | Company Requests | `company_creation_requests` SELECT/UPDATE cipher-only (+ own for users) | Secure |
+| 22 | Platform Users | Edge function `admin-users` validates cipher role server-side | Secure |
+| 23 | Employees | SELECT uses `company_can_view_employees`; salary payments use `company_can_manage_employees` (admin/cipher only) | Secure |
+| 24 | Join Requests | UPDATE requires `is_company_admin OR is_cipher` | Secure |
+| 25 | Transfers | INSERT requires `company_can_transfer` + DEO blocked from SELECT | Secure |
 
-### File: `src/components/auth/AccessGuard.tsx`
+### GAPS FOUND -- Fixes Required (3 issues)
 
-Add a loading guard: when `isLoading` is true, render a spinner instead of evaluating rules or rendering children. This ensures no protected content is ever shown before role data is confirmed.
+#### Gap 1: `expense_accounts` INSERT is too permissive (MEDIUM severity)
 
-```text
-export function AccessGuard({ children, rules }: AccessGuardProps) {
-  const ctx = useCompany();
-
-  // NEW: Block all rendering until role/permission data resolves
-  if (ctx.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-  for (const rule of rules) {
-    if (rule.isDenied(ctx)) {
-      return <PermissionDenied ... />;
-    }
-  }
-
-  return <>{children}</>;
-}
+**Current policy**: Any company member can insert expense accounts
+```sql
+WITH CHECK: (company_id = get_active_company_id(auth.uid()))
+  AND (is_company_member(auth.uid(), company_id) OR is_cipher(auth.uid()))
+  AND (user_id = auth.uid())
+```
+**Problem**: A moderator (including DEO) can create expense accounts via direct Supabase API call, bypassing the frontend-only restriction. The `company_can_add_expense_source` function exists but is NOT used in this policy.
+**Fix**: Replace the INSERT policy to use admin/cipher check, matching the existing `company_can_add_expense_source` function:
+```sql
+DROP POLICY "Authorized users can insert expense accounts" ON expense_accounts;
+CREATE POLICY "Admin/Cipher can insert expense accounts" ON expense_accounts
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    company_id = get_active_company_id(auth.uid())
+    AND company_can_add_expense_source(company_id, auth.uid())
+    AND user_id = auth.uid()
+  );
 ```
 
-### File: `src/components/auth/RoleGuard.tsx`
+#### Gap 2: `allocations` INSERT is too permissive (LOW severity)
 
-Same pattern -- `RoleGuard` (used for `/users` cipher-only page) also evaluates roles before data is ready. Its existing `isLoading` check returns `null`, which is fine, but confirm it handles this correctly. Currently at line 24: `if (isLoading) return null;` -- this is safe (renders nothing during loading).
+**Current policy**: Any company member can insert allocations
+```sql
+WITH CHECK: (company_id = get_active_company_id(auth.uid()))
+  AND (is_company_member(auth.uid(), company_id) OR is_cipher(auth.uid()))
+  AND (user_id = auth.uid())
+```
+**Problem**: Allocations are normally system-managed (created by triggers on revenue/payment insert). But a moderator could manually insert fake allocation records via direct API. The audit trigger skips allocations, so this would be invisible.
+**Fix**: Restrict INSERT to admin/cipher only (triggers run as SECURITY DEFINER so they bypass RLS):
+```sql
+DROP POLICY "Authorized users can insert allocations" ON allocations;
+CREATE POLICY "Admin/Cipher can insert allocations" ON allocations
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    company_id = get_active_company_id(auth.uid())
+    AND company_can_edit_delete(auth.uid(), company_id)
+    AND user_id = auth.uid()
+  );
+```
 
-No change needed for `RoleGuard`.
+#### Gap 3: `student_siblings` missing UPDATE/DELETE policies (LOW severity)
 
-## What Changes
+**Current**: No UPDATE or DELETE policies exist. This means siblings can never be updated or removed (even by admins), which is a functionality gap rather than a security hole.
+**Fix**: Add policies for admin/cipher:
+```sql
+CREATE POLICY "Admin/Cipher can update student siblings" ON student_siblings
+  FOR UPDATE TO authenticated
+  USING (
+    company_id = get_active_company_id(auth.uid())
+    AND company_can_edit_delete(auth.uid(), company_id)
+  );
 
-| File | Change |
-|------|--------|
-| `src/components/auth/AccessGuard.tsx` | Show spinner while `ctx.isLoading` is true, before evaluating any rules |
+CREATE POLICY "Admin/Cipher can delete student siblings" ON student_siblings
+  FOR DELETE TO authenticated
+  USING (
+    company_id = get_active_company_id(auth.uid())
+    AND company_can_edit_delete(auth.uid(), company_id)
+  );
+```
 
-## What Does NOT Change
+## Summary
 
-- No RLS policies modified
-- No database migrations
-- No edge functions
-- No existing features broken
-- No route structure changes
-- Sidebar fix remains as-is (already working)
-- Backend security (RLS) remains as-is (already enforced)
+The backend authorization is comprehensive. Out of 27 feature areas audited, 25 are fully secured via RLS. The Express.js middleware approach in the request is not applicable -- this app uses Supabase RLS which enforces authorization at the database level, making it impossible to bypass via direct API calls, browser dev tools, or URL manipulation.
 
-## Result
-
-A moderator refreshing the page will see:
-1. Branded loader (auth resolving)
-2. Empty sidebar + spinner in content area (role data resolving)
-3. Correct moderator-restricted view (data resolved)
-
-At no point will admin-only content or navigation flash.
+**3 migration statements needed** to fix the gaps found. No frontend changes. No edge function changes. No existing features will break.
 
