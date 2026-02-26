@@ -159,6 +159,32 @@ export default function StakeholdersPage() {
         </Button>
       </div>
 
+      {/* Investment & Loan Totals */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+              <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Investment</p>
+              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{fc(totalInvested)}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-orange-500/30 bg-orange-500/5">
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-500/15">
+              <Landmark className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Loan Amount</p>
+              <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{fc(totalLoaned)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
