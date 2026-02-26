@@ -190,13 +190,6 @@ export default function Courses() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Link to="/products" className="hover:text-foreground transition-colors">Products</Link>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <span className="text-foreground font-medium">Courses</span>
-      </nav>
-
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">

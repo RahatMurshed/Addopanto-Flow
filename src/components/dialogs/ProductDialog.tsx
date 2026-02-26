@@ -7,9 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProducts, useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import { useProductCategories } from "@/hooks/useProductCategories";
-
-import { useCourses } from "@/hooks/useCourses";
-import { useBatches } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
@@ -26,14 +23,11 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const { data: categories = [] } = useProductCategories();
-  
-  const { data: courses = [] } = useCourses();
-  const { data: batches = [] } = useBatches();
   const { data: allProducts = [] } = useProducts();
   const isAdmin = isCompanyAdmin || isCipher;
 
-  // Allow all categories including courses
-  const selectableCategories = categories;
+  // Filter out "courses" category
+  const selectableCategories = categories.filter((c) => c.slug !== "courses");
 
   const [form, setForm] = useState<ProductInsert>({
     product_name: "",
@@ -55,7 +49,6 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
 
   const [validationError, setValidationError] = useState("");
 
-  // Auto-generate product code
   const autoProductCode = useMemo(() => {
     const count = allProducts.length + 1;
     return `PRD-${count.toString().padStart(3, "0")}`;
@@ -75,7 +68,7 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
         reorder_level: product.reorder_level,
         image_url: product.image_url || "",
         status: product.status,
-        linked_course_id: product.linked_course_id,
+        linked_course_id: null,
         supplier_id: product.supplier_id,
         barcode: product.barcode,
         sku: product.sku,
@@ -91,46 +84,8 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
     setValidationError("");
   }, [product, open, defaultCategory]);
 
-  const isCourseCategory = form.category === "courses";
-  const isPhysical = form.type === "physical" && !isCourseCategory;
+  const isPhysical = form.type === "physical";
 
-  // Auto-fill course data when course is selected
-  useEffect(() => {
-    if (!isCourseCategory || !form.linked_course_id) return;
-    const course = courses.find((c) => c.id === form.linked_course_id);
-    if (!course) return;
-
-    // Find first batch for this course to get fee defaults
-    const courseBatch = batches.find((b) => b.course_id === course.id);
-    const admissionFee = courseBatch?.default_admission_fee || 0;
-    const monthlyFee = courseBatch?.default_monthly_fee || 0;
-    const duration = courseBatch?.course_duration_months || course.duration_months || 12;
-    const calculatedPrice = admissionFee + (monthlyFee * duration);
-
-    setForm((f) => ({
-      ...f,
-      product_name: course.course_name,
-      price: calculatedPrice,
-      type: "digital",
-    }));
-  }, [form.linked_course_id, isCourseCategory, courses, batches]);
-
-  // When category changes to courses, reset type
-  useEffect(() => {
-    if (isCourseCategory) {
-      setForm((f) => ({ ...f, type: "digital" }));
-    }
-  }, [isCourseCategory]);
-
-  // Check duplicate course product
-  const duplicateCourseProduct = useMemo(() => {
-    if (!isCourseCategory || !form.linked_course_id) return null;
-    return allProducts.find(
-      (p) => p.linked_course_id === form.linked_course_id && p.id !== product?.id
-    );
-  }, [isCourseCategory, form.linked_course_id, allProducts, product?.id]);
-
-  // Check product code uniqueness
   const codeExists = useMemo(() => {
     const code = (form.product_code || "").trim();
     if (!code) return false;
@@ -153,12 +108,7 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
       return;
     }
 
-    if (isCourseCategory && duplicateCourseProduct) {
-      toast.error(`A product already exists for this course: ${duplicateCourseProduct.product_name}`);
-      return;
-    }
-
-    if (!isCourseCategory && isPhysical && form.purchase_price > 0 && form.price <= form.purchase_price) {
+    if (isPhysical && form.purchase_price > 0 && form.price <= form.purchase_price) {
       setValidationError("Selling price must be greater than purchase price");
       return;
     }
@@ -169,10 +119,7 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
       const payload: ProductInsert = {
         ...form,
         product_code: code,
-        type: isCourseCategory ? "digital" : form.type,
-        linked_course_id: isCourseCategory ? form.linked_course_id : null,
-        // Clear physical fields for course products
-        ...(isCourseCategory ? { stock_quantity: 0, purchase_price: 0, reorder_level: 0 } : {}),
+        linked_course_id: null,
       };
       if (product) {
         await updateProduct.mutateAsync({ id: product.id, ...payload });
@@ -199,7 +146,7 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Category *</Label>
-              <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v, linked_course_id: null }))}>
+              <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {selectableCategories.map((c) => (
@@ -208,38 +155,17 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
                 </SelectContent>
               </Select>
             </div>
-            {!isCourseCategory && (
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="physical">Physical</SelectItem>
-                    <SelectItem value="digital">Digital</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {isCourseCategory && (
             <div className="space-y-2">
-              <Label>Link to Course *</Label>
-              <Select value={form.linked_course_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, linked_course_id: v === "none" ? null : v }))}>
-                <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+              <Label>Type</Label>
+              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Select a course...</SelectItem>
-                  {courses.map((c) => (<SelectItem key={c.id} value={c.id}>{c.course_name} ({c.course_code})</SelectItem>))}
+                  <SelectItem value="physical">Physical</SelectItem>
+                  <SelectItem value="digital">Digital</SelectItem>
                 </SelectContent>
               </Select>
-              {duplicateCourseProduct && (
-                <p className="text-xs text-destructive flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  A product already exists for this course
-                </p>
-              )}
             </div>
-          )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -247,8 +173,6 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
               <Input
                 value={form.product_name}
                 onChange={(e) => setForm((f) => ({ ...f, product_name: e.target.value }))}
-                readOnly={isCourseCategory && !!form.linked_course_id}
-                className={isCourseCategory && form.linked_course_id ? "bg-muted" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -269,16 +193,14 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>{isCourseCategory ? "Calculated Price" : "Selling Price *"}</Label>
+              <Label>Selling Price *</Label>
               <Input
                 type="number" min={0} step="0.01"
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: parseFloat(e.target.value) || 0 }))}
-                readOnly={isCourseCategory && !!form.linked_course_id}
-                className={isCourseCategory && form.linked_course_id ? "bg-muted" : ""}
               />
             </div>
-            {!isCourseCategory && isAdmin && (
+            {isAdmin && (
               <div className="space-y-2">
                 <Label>Purchase Price</Label>
                 <Input type="number" min={0} step="0.01" value={form.purchase_price} onChange={(e) => setForm((f) => ({ ...f, purchase_price: parseFloat(e.target.value) || 0 }))} />
@@ -306,21 +228,16 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
             </div>
           )}
 
-
-
-
-          {!isCourseCategory && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Barcode</Label>
-                <Input value={form.barcode || ""} onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value || null }))} placeholder="Barcode" />
-              </div>
-              <div className="space-y-2">
-                <Label>SKU</Label>
-                <Input value={form.sku || ""} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value || null }))} placeholder="SKU" />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Barcode</Label>
+              <Input value={form.barcode || ""} onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value || null }))} placeholder="Barcode" />
             </div>
-          )}
+            <div className="space-y-2">
+              <Label>SKU</Label>
+              <Input value={form.sku || ""} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value || null }))} placeholder="SKU" />
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -334,17 +251,15 @@ export function ProductDialog({ open, onOpenChange, product, defaultCategory }: 
                 </SelectContent>
               </Select>
             </div>
-            {!isCourseCategory && (
-              <div className="space-y-2">
-                <Label>Image URL</Label>
-                <Input value={form.image_url || ""} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="https://..." />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Image URL</Label>
+              <Input value={form.image_url || ""} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="https://..." />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !!duplicateCourseProduct}>
+            <Button type="submit" disabled={isPending}>
               {isPending ? "Saving..." : product ? "Update" : "Create"}
             </Button>
           </div>

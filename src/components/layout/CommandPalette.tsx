@@ -39,7 +39,6 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
     { label: "Courses", icon: BookOpen, path: "/courses" },
     { label: "Students", icon: GraduationCap, path: "/students" },
     
-    { label: "Purchase Orders", icon: ClipboardList, path: "/purchase-orders" },
     { label: "Revenue", icon: TrendingUp, path: "/revenue" },
     { label: "Expenses", icon: Receipt, path: "/expenses" },
     { label: "Expense Sources", icon: Wallet, path: "/khatas" },
