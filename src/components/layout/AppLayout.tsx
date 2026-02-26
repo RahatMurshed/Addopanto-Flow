@@ -20,6 +20,7 @@ import {
   LayoutDashboard, Wallet, TrendingUp, Receipt, FileText, Settings, LogOut, Menu, X,
   Users, UserPlus, Building2, ChevronDown, Plus, GraduationCap, ArrowLeftRight,
   ShieldCheck, Layers, ClipboardList, UserCircle, BookOpen, Briefcase, Package,
+  Handshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import gaLogo from "@/assets/GA-LOGO.png";
@@ -144,6 +145,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       // Cipher-only platform pages
       if (isCipher) {
+        items.push({ label: "Investors & Loans", href: "/stakeholders", icon: Handshake });
         items.push({ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount });
         items.push({ label: "Platform Users", href: "/users", icon: ShieldCheck });
       }

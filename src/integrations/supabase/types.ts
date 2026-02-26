@@ -1150,6 +1150,85 @@ export type Database = {
           },
         ]
       }
+      investments: {
+        Row: {
+          company_id: string
+          company_valuation_at_investment: number | null
+          created_at: string
+          exit_amount: number | null
+          exit_date: string | null
+          id: string
+          investment_amount: number
+          investment_date: string
+          investment_type: string
+          ownership_percentage: number
+          profit_share_percentage: number
+          stakeholder_id: string
+          status: string
+          terms_and_conditions: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          company_valuation_at_investment?: number | null
+          created_at?: string
+          exit_amount?: number | null
+          exit_date?: string | null
+          id?: string
+          investment_amount: number
+          investment_date: string
+          investment_type?: string
+          ownership_percentage?: number
+          profit_share_percentage?: number
+          stakeholder_id: string
+          status?: string
+          terms_and_conditions?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          company_valuation_at_investment?: number | null
+          created_at?: string
+          exit_amount?: number | null
+          exit_date?: string | null
+          id?: string
+          investment_amount?: number
+          investment_date?: string
+          investment_type?: string
+          ownership_percentage?: number
+          profit_share_percentage?: number
+          stakeholder_id?: string
+          status?: string
+          terms_and_conditions?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_stakeholder_id_fkey"
+            columns: ["stakeholder_id"]
+            isOneToOne: false
+            referencedRelation: "stakeholders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       khata_transfers: {
         Row: {
           amount: number
@@ -1208,6 +1287,176 @@ export type Database = {
             columns: ["to_account_id"]
             isOneToOne: false
             referencedRelation: "expense_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_repayments: {
+        Row: {
+          amount_paid: number
+          company_id: string
+          created_at: string
+          days_overdue: number | null
+          id: string
+          interest_portion: number
+          loan_id: string
+          notes: string | null
+          payment_method: string
+          payment_status: string
+          principal_portion: number
+          receipt_number: string | null
+          recorded_by: string
+          remaining_balance: number
+          repayment_date: string
+        }
+        Insert: {
+          amount_paid: number
+          company_id: string
+          created_at?: string
+          days_overdue?: number | null
+          id?: string
+          interest_portion?: number
+          loan_id: string
+          notes?: string | null
+          payment_method?: string
+          payment_status?: string
+          principal_portion?: number
+          receipt_number?: string | null
+          recorded_by: string
+          remaining_balance: number
+          repayment_date: string
+        }
+        Update: {
+          amount_paid?: number
+          company_id?: string
+          created_at?: string
+          days_overdue?: number | null
+          id?: string
+          interest_portion?: number
+          loan_id?: string
+          notes?: string | null
+          payment_method?: string
+          payment_status?: string
+          principal_portion?: number
+          receipt_number?: string | null
+          recorded_by?: string
+          remaining_balance?: number
+          repayment_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_repayments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          collateral_description: string | null
+          company_id: string
+          created_at: string
+          id: string
+          interest_amount: number
+          interest_rate: number
+          loan_agreement_url: string | null
+          loan_amount: number
+          loan_date: string
+          loan_purpose: string | null
+          monthly_installment: number | null
+          notes: string | null
+          remaining_balance: number
+          repayment_due_date: string
+          repayment_start_date: string | null
+          repayment_type: string
+          stakeholder_id: string
+          status: string
+          total_repayable: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          collateral_description?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          interest_amount?: number
+          interest_rate?: number
+          loan_agreement_url?: string | null
+          loan_amount: number
+          loan_date: string
+          loan_purpose?: string | null
+          monthly_installment?: number | null
+          notes?: string | null
+          remaining_balance: number
+          repayment_due_date: string
+          repayment_start_date?: string | null
+          repayment_type?: string
+          stakeholder_id: string
+          status?: string
+          total_repayable: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          collateral_description?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          interest_amount?: number
+          interest_rate?: number
+          loan_agreement_url?: string | null
+          loan_amount?: number
+          loan_date?: string
+          loan_purpose?: string | null
+          monthly_installment?: number | null
+          notes?: string | null
+          remaining_balance?: number
+          repayment_due_date?: string
+          repayment_start_date?: string | null
+          repayment_type?: string
+          stakeholder_id?: string
+          status?: string
+          total_repayable?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_stakeholder_id_fkey"
+            columns: ["stakeholder_id"]
+            isOneToOne: false
+            referencedRelation: "stakeholders"
             referencedColumns: ["id"]
           },
         ]
@@ -1623,6 +1872,85 @@ export type Database = {
           },
         ]
       }
+      profit_distributions: {
+        Row: {
+          amount_paid: number
+          calculated_amount: number
+          company_id: string
+          created_at: string
+          distributed_by: string
+          distribution_date: string
+          id: string
+          investment_id: string
+          investor_share_percentage: number
+          notes: string | null
+          payment_method: string
+          payment_reference: string | null
+          profit_period_end: string
+          profit_period_start: string
+          status: string
+          total_company_profit: number
+        }
+        Insert: {
+          amount_paid: number
+          calculated_amount: number
+          company_id: string
+          created_at?: string
+          distributed_by: string
+          distribution_date: string
+          id?: string
+          investment_id: string
+          investor_share_percentage: number
+          notes?: string | null
+          payment_method?: string
+          payment_reference?: string | null
+          profit_period_end: string
+          profit_period_start: string
+          status?: string
+          total_company_profit: number
+        }
+        Update: {
+          amount_paid?: number
+          calculated_amount?: number
+          company_id?: string
+          created_at?: string
+          distributed_by?: string
+          distribution_date?: string
+          id?: string
+          investment_id?: string
+          investor_share_percentage?: number
+          notes?: string | null
+          payment_method?: string
+          payment_reference?: string | null
+          profit_period_end?: string
+          profit_period_start?: string
+          status?: string
+          total_company_profit?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profit_distributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profit_distributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profit_distributions_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registration_requests: {
         Row: {
           banned_until: string | null
@@ -1790,6 +2118,72 @@ export type Database = {
             columns: ["student_payment_id"]
             isOneToOne: false
             referencedRelation: "student_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stakeholders: {
+        Row: {
+          address: string | null
+          category: string
+          company_id: string
+          contact_number: string | null
+          created_at: string
+          email: string | null
+          id: string
+          id_number: string | null
+          name: string
+          relationship_notes: string | null
+          stakeholder_type: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          category?: string
+          company_id: string
+          contact_number?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          id_number?: string | null
+          name: string
+          relationship_notes?: string | null
+          stakeholder_type: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          category?: string
+          company_id?: string
+          contact_number?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          id_number?: string | null
+          name?: string
+          relationship_notes?: string | null
+          stakeholder_type?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stakeholders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stakeholders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
             referencedColumns: ["id"]
           },
         ]
