@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, TrendingUp, Landmark, Eye, Pencil, Trash2, Users } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -90,12 +91,20 @@ export default function StakeholdersPage() {
       <Card key={s.id} className="hover:shadow-md transition-shadow">
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="font-semibold truncate">{s.name}</h3>
+            <div className="flex items-center gap-3 min-w-0">
+              <Avatar className="h-10 w-10 shrink-0">
+                {s.image_url && <AvatarImage src={s.image_url} alt={s.name} className="object-cover" />}
+                <AvatarFallback className={isInvestor ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-medium" : "bg-orange-500/15 text-orange-700 dark:text-orange-400 font-medium"}>
+                  {s.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <h3 className="font-semibold truncate">{s.name}</h3>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <TypeBadge type={s.stakeholder_type} />
                 <CategoryBadge category={s.category} />
                 <StakeholderStatusBadge status={s.status} />
+                </div>
               </div>
             </div>
             <div className="flex gap-1 shrink-0">
