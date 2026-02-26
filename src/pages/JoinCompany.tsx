@@ -35,10 +35,7 @@ export default function JoinCompany() {
   const { data: allCompanies = [] } = useQuery({
     queryKey: ["all-companies"],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from("companies_public" as any)
-        .select("id, name, slug, description, logo_url")
-        .order("name") as any);
+      const { data, error } = await supabase.rpc("browse_companies_safe");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string; slug: string; description: string | null; logo_url: string | null }>;
     },

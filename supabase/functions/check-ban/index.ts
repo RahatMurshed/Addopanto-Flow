@@ -24,6 +24,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Note: check-ban is called pre-auth during login flow, so we don't require auth token.
+    // It only returns ban status for a given email - no sensitive data exposed.
+    // Rate limiting should be applied at the infrastructure level.
     const rawBody = await req.json().catch(() => null);
     const parsed = checkBanSchema.safeParse(rawBody);
 
