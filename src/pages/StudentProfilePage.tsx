@@ -42,6 +42,7 @@ import { ProfileAccessDenied, ProfileNotFound } from "@/components/students/prof
 import { ProfileSkeleton } from "@/components/students/profile/ProfileSkeleton";
 import { PlaceholderCard } from "@/components/students/profile/ProfilePlaceholder";
 import { LifetimeValueBanner } from "@/components/students/profile/LifetimeValueBanner";
+import { EnrollmentTimeline } from "@/components/students/profile/EnrollmentTimeline";
 
 // ── helpers ──
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -384,9 +385,10 @@ export default function StudentProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Financial Summary removed */}
-
-            {/* Future: Enrollment Timeline, Product Cards, Financial Tabs */}
+            {/* Enrollment History Timeline */}
+            {activeCompanyId && (
+              <EnrollmentTimeline studentId={student.id} companyId={activeCompanyId} />
+            )}
           </div>
 
           {/* RIGHT COLUMN */}
