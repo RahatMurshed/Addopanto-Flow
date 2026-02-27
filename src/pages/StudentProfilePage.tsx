@@ -44,6 +44,7 @@ import { PlaceholderCard } from "@/components/students/profile/ProfilePlaceholde
 import { LifetimeValueBanner } from "@/components/students/profile/LifetimeValueBanner";
 import { EnrollmentTimeline } from "@/components/students/profile/EnrollmentTimeline";
 import { FinancialBreakdown } from "@/components/students/profile/FinancialBreakdown";
+import { ProductPurchaseHistory, type ProductPurchase } from "@/components/students/profile/ProductPurchaseHistory";
 
 // ── helpers ──
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -66,6 +67,46 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Reads from the FinancialBreakdown query cache to avoid duplicate fetches */
+function ProductPurchaseHistoryWrapper({ studentId, companyId, fc }: { studentId: string; companyId: string; fc: (n: number) => string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["financial-breakdown", studentId, companyId],
+    queryFn: () => null, // never actually fetches — relies on cache from FinancialBreakdown
+    enabled: false,
+    staleTime: Infinity,
+  });
+
+  const purchases: ProductPurchase[] = useMemo(() => {
+    if (!data) return [];
+    const d = data as any;
+    return (d.sales ?? []).map((s: any) => {
+      const product = d.productMap?.get(s.product_id);
+      const recordedBy = d.userMap?.get(s.user_id);
+      return {
+        id: s.id,
+        quantity: s.quantity,
+        unit_price: Number(s.unit_price),
+        total_amount: Number(s.total_amount),
+        sale_date: s.sale_date,
+        payment_method: s.payment_method,
+        user_id: s.user_id,
+        productName: product?.name ?? "Unknown Product",
+        category: product?.category ?? "General",
+        recordedBy: recordedBy ?? undefined,
+      };
+    });
+  }, [data]);
+
+  return (
+    <ProductPurchaseHistory
+      purchases={purchases}
+      companyId={companyId}
+      isLoading={isLoading && !data}
+      fc={fc}
+    />
+  );
+}
 
 export default function StudentProfilePage() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -394,6 +435,11 @@ export default function StudentProfilePage() {
             {/* Financial Breakdown */}
             {activeCompanyId && (
               <FinancialBreakdown studentId={student.id} companyId={activeCompanyId} />
+            )}
+
+            {/* Product Purchase History */}
+            {activeCompanyId && !isDataEntryModerator && (
+              <ProductPurchaseHistoryWrapper studentId={student.id} companyId={activeCompanyId} fc={formatCurrency} />
             )}
           </div>
 
