@@ -1,65 +1,53 @@
 
 
-# Fix: Batch Removal Should Update Enrollment History, Not Delete Student
+# Fix: Outstanding Shows 0 in Financial Breakdown
 
-## Two Issues
+## Root Cause
 
-### Issue 1: No enrollment sync when batch changes
-When a student's batch is changed or removed (via StudentWizardDialog edit, StudentDialog edit, or BatchDropZone), the `batch_enrollments` table is never updated. The old enrollment stays "active" and no new enrollment is created for the new batch.
+`totalInvoiced` is currently derived from the student's fee structure fields (`admission_fee_total`, `monthly_fee_amount`, `course_start_month`, `course_end_month`) rather than from actual payment rows. When `course_start_month` or `course_end_month` are null, `totalMonthlyMonths` = 0, and `totalInvoicedFromFees` collapses to just the admission fee or zero -- making Outstanding appear as 0.
 
-### Issue 2: BatchDetail "Delete Student" permanently deletes the student
-The BatchDetail page's delete button calls `deleteStudentMutation` which permanently removes the student from the database. Instead, it should only remove the student from the batch (set `batch_id = null`) and mark the enrollment as "dropped". The student should remain in the Students list.
+Meanwhile, `totalPaid` sums only `status === "paid"` rows. Since all existing payment rows likely have `status = "paid"`, the two values end up equal.
 
----
+## Fix
 
-## Solution
+In `src/components/students/profile/FinancialBreakdown.tsx`, change the `summaryData` memo (lines 240-267) to:
 
-### 1. Create shared utility: `src/utils/enrollmentSync.ts`
+- **totalInvoiced**: Sum the `amount` field of ALL `coursePayments` rows regardless of status
+- **totalPaid**: Sum only rows where `status === "paid"`
+- **Outstanding**: `totalInvoiced - totalPaid`
 
-A reusable function to handle all batch change scenarios:
+The `totalInvoicedFromFees` query (lines 100-119) and its return value (line 197) can be removed since they are no longer used.
 
-```text
-syncBatchEnrollment(studentId, oldBatchId, newBatchId, companyId, userId)
+### Specific changes in `summaryData` useMemo (lines 240-249):
+
+```typescript
+// BEFORE
+const totalCourseFee = data?.totalInvoicedFromFees ?? 0;
+const totalCoursePaid = coursePayments
+  .filter((p) => p.status === "paid")
+  .reduce((sum, p) => sum + p.amount, 0);
+const totalCourseOutstanding = Math.max(0, totalCourseFee - totalCoursePaid);
+
+// AFTER
+const totalCourseFee = coursePayments.reduce((sum, p) => sum + p.amount, 0);
+const totalCoursePaid = coursePayments
+  .filter((p) => p.status === "paid")
+  .reduce((sum, p) => sum + p.amount, 0);
+const totalCourseOutstanding = Math.max(0, totalCourseFee - totalCoursePaid);
 ```
 
-- If `oldBatchId` exists and differs from `newBatchId`: UPDATE existing `batch_enrollments` record to `status = 'dropped'`
-- If `newBatchId` exists and differs from `oldBatchId`: INSERT new `batch_enrollments` record with `status = 'active'`
-- If `newBatchId` is null (removed from batch): just mark old enrollment as `'dropped'`
-- If both are the same: no-op
+### Cleanup -- remove dead code:
 
-### 2. Update `StudentWizardDialog.tsx` (edit mode)
-
-After `onSave(insertData)` succeeds in edit mode, call `syncBatchEnrollment` comparing `editStudent.batch_id` with the new `insertData.batch_id`.
-
-### 3. Update `StudentDialog.tsx` (edit mode)
-
-After `onSave()` succeeds, call `syncBatchEnrollment` comparing original `student.batch_id` with new `selectedBatchId`.
-
-### 4. Update `BatchDropZone.tsx`
-
-After `updateStudent.mutateAsync`, call `syncBatchEnrollment` to mark old enrollment as dropped and create new one.
-
-### 5. Update `BatchAssignDialog.tsx`
-
-Already inserts new enrollment but doesn't mark old one as dropped. Add the drop step when `fromBatchId` exists.
-
-### 6. Change BatchDetail "Delete" to "Remove from Batch"
-
-Replace the destructive delete action in `BatchDetail.tsx`:
-- Change button label/icon from "Delete Student" to "Remove from Batch"
-- Change the confirmation dialog text accordingly
-- Replace `deleteStudentMutation.mutateAsync(id)` with:
-  - `updateStudentMutation.mutateAsync({ id, batch_id: null })`
-  - Call `syncBatchEnrollment(id, batchId, null, ...)` to mark enrollment as dropped
-  - Create a `student_batch_history` record for the removal
-- Student stays in the Students page; only the batch association is removed
+- Lines 100-119: Remove the student fee structure query (`studentRow` fetch and `totalInvoicedFromFees` calculation)
+- Line 197: Remove `totalInvoicedFromFees` from the return object
 
 ## Files Changed
 
-- **New**: `src/utils/enrollmentSync.ts`
-- **Modified**: `src/components/dialogs/StudentWizardDialog.tsx` -- sync on edit
-- **Modified**: `src/components/dialogs/StudentDialog.tsx` -- sync on edit  
-- **Modified**: `src/components/shared/BatchDropZone.tsx` -- sync on drag-drop
-- **Modified**: `src/components/dialogs/BatchAssignDialog.tsx` -- mark old enrollment dropped
-- **Modified**: `src/pages/BatchDetail.tsx` -- change delete to "Remove from Batch"
+- `src/components/students/profile/FinancialBreakdown.tsx` -- fix totalInvoiced calculation and remove unused fee-structure query
+
+## What stays the same
+
+- Payment fetching query (no status filter on the main query -- already correct)
+- Course Payments tab, Product Purchases tab, revenue projection logic
+- All other components untouched
 
