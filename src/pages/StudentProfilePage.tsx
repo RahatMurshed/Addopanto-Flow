@@ -41,6 +41,7 @@ import { ProfileStickyBar } from "@/components/students/profile/ProfileStickyBar
 import { ProfileAccessDenied, ProfileNotFound } from "@/components/students/profile/ProfileAccessGate";
 import { ProfileSkeleton } from "@/components/students/profile/ProfileSkeleton";
 import { PlaceholderCard } from "@/components/students/profile/ProfilePlaceholder";
+import { QuickActionsPanel } from "@/components/students/profile/QuickActionsPanel";
 import { LifetimeValueBanner } from "@/components/students/profile/LifetimeValueBanner";
 import { EnrollmentTimeline } from "@/components/students/profile/EnrollmentTimeline";
 import { FinancialBreakdown } from "@/components/students/profile/FinancialBreakdown";
@@ -116,9 +117,26 @@ export default function StudentProfilePage() {
   const { isCipher } = useRole();
   const {
     canEdit, canEditStudent, isDataEntryModerator, canViewStudentPII,
-    activeCompanyId, isCompanyAdmin,
+    activeCompanyId, isCompanyAdmin, membership,
   } = useCompany();
   const isAdmin = isCompanyAdmin || isCipher;
+
+  // Derive role + permissions for QuickActionsPanel
+  const quickActionRole = useMemo(() => {
+    if (isCipher) return "cipher";
+    if (isCompanyAdmin) return "admin";
+    if (isDataEntryModerator) return "deo";
+    if (membership?.role === "moderator") return "moderator";
+    return "viewer";
+  }, [isCipher, isCompanyAdmin, isDataEntryModerator, membership?.role]);
+
+  const quickActionPermissions = useMemo(() => {
+    if (!membership) return [];
+    const perms: string[] = [];
+    if (membership.can_manage_students || membership.mod_students_edit) perms.push("edit_students");
+    if (membership.mod_payments_add || membership.mod_payments_edit) perms.push("manage_payments");
+    return perms;
+  }, [membership]);
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   // ── UUID validation ──
@@ -456,13 +474,25 @@ export default function StudentProfilePage() {
 
           {/* RIGHT COLUMN */}
           <div className="lg:col-span-3 space-y-6">
-            <PlaceholderCard text="Quick actions panel will load here" />
-            {/* Future: Quick Actions, Financial Mini, Tags, Recent Activity */}
+            {activeCompanyId && (
+              <QuickActionsPanel
+                student={student}
+                companyId={activeCompanyId}
+                userRole={quickActionRole}
+                userPermissions={quickActionPermissions}
+                onStatusChange={(newStatus) => {
+                  // Optimistically update local student data by refetching
+                  // The status badge in header/sticky bar reads from `student.status`
+                }}
+                onEdit={() => setEditOpen(true)}
+              />
+            )}
+            {/* Future: Financial Mini, Tags, Recent Activity */}
           </div>
         </div>
 
         {/* BOTTOM FULL-WIDTH — Sales & Follow-up Notes */}
-        <Card className="rounded-xl shadow-sm">
+        <Card className="rounded-xl shadow-sm" data-section="sales-notes">
           <CardContent className="pt-6">
             <SectionHeader icon={MessageSquare} title="Sales & Follow-up Notes" />
 
