@@ -141,6 +141,7 @@ interface LifetimeValueBannerProps {
   studentId: string;
   student: {
     enrollment_date: string;
+    created_at: string;
     status: string;
     monthly_fee_amount: number;
     admission_fee_total: number;
