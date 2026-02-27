@@ -25,6 +25,9 @@ import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import InitialPaymentSection, { type InitialPaymentData } from "@/components/finance/InitialPaymentSection";
 import { useToast } from "@/hooks/use-toast";
 import { useBatches, type Batch } from "@/hooks/useBatches";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 
 
 const yyyyMmRegex = /^\d{4}-\d{2}$/;
@@ -81,6 +84,8 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   const { toast } = useToast();
   const { data: batches = [] } = useBatches({ status: "active" });
+  const { activeCompanyId } = useCompany();
+  const { user } = useAuth();
 
   const now = new Date();
   const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -165,6 +170,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
     try {
       setSavingStep("Creating student...");
       const billingMonth = data.billing_start_month || data.course_start_month || currentYearMonth;
+      const newBatchId = selectedBatchId !== "none" ? selectedBatchId : null;
       const result = await onSave({
         name: data.name,
         student_id_number: data.student_id_number || null,
@@ -178,8 +184,33 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
         monthly_fee_amount: data.monthly_fee_amount,
         status: data.status,
         notes: data.notes || null,
-        batch_id: selectedBatchId !== "none" ? selectedBatchId : undefined,
+        batch_id: newBatchId || undefined,
       } as StudentInsert);
+
+      // Sync batch enrollment
+      if (activeCompanyId && user) {
+        try {
+          if (isEdit && student) {
+            await syncBatchEnrollment(
+              student.id,
+              student.batch_id,
+              newBatchId,
+              activeCompanyId,
+              user.id
+            );
+          } else if (result && "id" in result) {
+            await syncBatchEnrollment(
+              result.id,
+              null,
+              newBatchId,
+              activeCompanyId,
+              user.id
+            );
+          }
+        } catch (e: any) {
+          console.error("Failed to sync batch enrollment:", e);
+        }
+      }
 
       // Record initial payment if configured
       if (hasInitialPayment && result && "id" in result) {

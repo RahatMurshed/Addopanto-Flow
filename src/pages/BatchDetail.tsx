@@ -36,6 +36,9 @@ import BatchEnrollDialog from "@/components/dialogs/BatchEnrollDialog";
 import StudentPaymentDialog from "@/components/dialogs/StudentPaymentDialog";
 import { useUpdateStudent, useDeleteStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
+import { useCreateBatchHistory } from "@/hooks/useStudentBatchHistory";
+import { useAuth } from "@/contexts/AuthContext";
+import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/shared/TablePagination";
 
@@ -43,7 +46,7 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, isModerator, canEditBatch, isLoading: companyLoading } = useCompany();
+  const { canAddRevenue, canEdit, isModerator, canEditBatch, isLoading: companyLoading, activeCompanyId } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: batch, isLoading: batchLoading } = useBatch(id);
@@ -57,6 +60,8 @@ export default function BatchDetail() {
   const updateStudentMutation = useUpdateStudent();
   const deleteStudentMutation = useDeleteStudent();
   const createPaymentMutation = useCreateStudentPayment();
+  const createBatchHistory = useCreateBatchHistory();
+  const { user } = useAuth();
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
@@ -349,12 +354,24 @@ export default function BatchDetail() {
     }
   };
 
-  const handleDeleteStudent = async () => {
-    if (!deleteStudentId) return;
+  const handleRemoveFromBatch = async () => {
+    if (!deleteStudentId || !id) return;
     setDeleting(true);
     try {
-      await deleteStudentMutation.mutateAsync(deleteStudentId);
-      toast({ title: "Student deleted" });
+      // Set batch_id to null (remove from batch, keep student)
+      await updateStudentMutation.mutateAsync({ id: deleteStudentId, batch_id: null } as any);
+      // Sync enrollment: mark as dropped
+      if (activeCompanyId && user) {
+        await syncBatchEnrollment(deleteStudentId, id, null, activeCompanyId, user.id);
+        // Record batch history
+        await createBatchHistory.mutateAsync({
+          student_id: deleteStudentId,
+          from_batch_id: id,
+          to_batch_id: null,
+          reason: "Removed from batch",
+        });
+      }
+      toast({ title: "Student removed from batch" });
       setDeleteStudentId(null);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -797,8 +814,8 @@ export default function BatchDetail() {
                                 );
                               })()}
                               {canEdit && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteStudentId(s.id)}>
-                                  <Trash2 className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700" onClick={() => setDeleteStudentId(s.id)} title="Remove from batch">
+                                  <X className="h-4 w-4" />
                                 </Button>
                               )}
                             </div>
@@ -847,23 +864,23 @@ export default function BatchDetail() {
         />
       )}
 
-      {/* Delete Student Confirmation */}
+      {/* Remove from Batch Confirmation */}
       <AlertDialog open={!!deleteStudentId} onOpenChange={(o) => { if (!o) setDeleteStudentId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Student</AlertDialogTitle>
+            <AlertDialogTitle>Remove from Batch</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this student and all their payment records. This action cannot be undone.
+              This will remove the student from this batch and mark their enrollment as dropped. The student will remain in the Students list and their payment history will be preserved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteStudent(); }}
+              onClick={(e) => { e.preventDefault(); handleRemoveFromBatch(); }}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-orange-600 text-white hover:bg-orange-700"
             >
-              {deleting ? "Deleting..." : "Delete"}
+              {deleting ? "Removing..." : "Remove from Batch"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

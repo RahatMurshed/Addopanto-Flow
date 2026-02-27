@@ -15,6 +15,7 @@ import { Search, Users, Loader2, CheckCircle2, AlertTriangle } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 
 interface Props {
   open: boolean;
@@ -99,16 +100,9 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
           const currentStudent = studentMap.get(id);
           const fromBatchId = currentStudent?.batch_id || null;
           await updateStudent.mutateAsync({ id, batch_id: selectedBatchId } as any);
-          // Create batch_enrollments record
+          // Sync batch enrollment (drops old, creates new)
           if (activeCompanyId && user) {
-            await supabase.from("batch_enrollments").insert({
-              student_id: id,
-              batch_id: selectedBatchId,
-              company_id: activeCompanyId,
-              created_by: user.id,
-              status: "active",
-              total_fee: 0,
-            });
+            await syncBatchEnrollment(id, fromBatchId, selectedBatchId, activeCompanyId, user.id);
           }
           // Record transfer history
           await createHistory.mutateAsync({
