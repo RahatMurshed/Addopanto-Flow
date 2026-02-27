@@ -40,6 +40,7 @@ import { ProfileStickyBar } from "@/components/students/profile/ProfileStickyBar
 import { ProfileAccessDenied, ProfileNotFound } from "@/components/students/profile/ProfileAccessGate";
 import { ProfileSkeleton } from "@/components/students/profile/ProfileSkeleton";
 import { PlaceholderCard } from "@/components/students/profile/ProfilePlaceholder";
+import { LifetimeValueBanner } from "@/components/students/profile/LifetimeValueBanner";
 
 // ── helpers ──
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -297,6 +298,9 @@ export default function StudentProfilePage() {
           canEdit={effectiveCanEdit}
           onEdit={() => navigate(`/students/${student.id}`)}
         />
+
+        {/* Lifetime Value Hero Banner */}
+        <LifetimeValueBanner studentId={student.id} student={student} />
 
         {/* 2-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
