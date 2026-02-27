@@ -650,8 +650,8 @@ export default function StudentDetail() {
                         <TableCell className="font-semibold text-primary">{formatCurrency(Number(p.amount), currency)}</TableCell>
                         <TableCell>
                           <Badge
-                            variant="secondary"
-                            className={`capitalize ${p.payment_type === "admission" ? "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" : "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30"}`}
+                            variant="outline"
+                            className={`capitalize ${p.payment_type === "admission" ? "bg-transparent text-purple-700 dark:text-purple-400 border-purple-500/30" : "bg-transparent text-blue-700 dark:text-blue-400 border-blue-500/30"}`}
                           >
                             {p.payment_type}
                           </Badge>
@@ -720,8 +720,8 @@ export default function StudentDetail() {
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium">{format(new Date(p.payment_date), "MMM d, yyyy")}</span>
                 <Badge
-                  variant="secondary"
-                  className={`capitalize text-xs ${p.payment_type === "admission" ? "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" : "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30"}`}
+                  variant="outline"
+                  className={`capitalize text-xs ${p.payment_type === "admission" ? "bg-transparent text-purple-700 dark:text-purple-400 border-purple-500/30" : "bg-transparent text-blue-700 dark:text-blue-400 border-blue-500/30"}`}
                 >
                   {p.payment_type}
                 </Badge>
