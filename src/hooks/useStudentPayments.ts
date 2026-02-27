@@ -16,6 +16,7 @@ export interface StudentPayment {
   user_id: string;
   company_id: string;
   created_at: string;
+  batch_enrollment_id: string | null;
 }
 
 export interface StudentPaymentInsert {
