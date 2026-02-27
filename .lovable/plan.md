@@ -1,60 +1,69 @@
 
 
-# Implement Remaining Fund Tracking Integration
+# Fix: Rejected Company Creation Requests Not Visible to Users
 
-## What's Already Done
-- Database migration (columns on investments, loans, expenses + trigger)
-- `SourceOfFundsStep` and `LoanDisbursementStep` components
-- `FundUsageTab` component
-- `useFundTracking.ts` hooks
-- `ExpenseDialog` with funding source UI
-- `AddStakeholder` with Step 4 flow
-- Type definitions updated
+## Problem
 
-## What's Missing
+When a cipher user rejects a company creation request, the requesting user never sees the rejection. This happens because:
 
-### 1. Fund Usage Tab Not Rendered in Stakeholder Detail
-`FundUsageTab` is imported in `StakeholderDetail.tsx` but never used. Both `InvestorDetails` and `LenderDetails` need Tabs wrapping their content with an "Overview" tab (existing cards) and a "Fund Usage" tab rendering `FundUsageTab`.
+1. **Missing query**: `CompanySelection.tsx` only fetches creation requests with `status = 'pending'` (line 64). Rejected creation requests are never fetched.
+2. **Auto-redirect bug**: The redirect logic (line 160) doesn't account for rejected creation requests, so a user with only rejected requests and no companies gets bounced to `/companies/join` immediately -- they never even see the rejection.
+3. **No polling for status changes**: Unlike join requests which poll every 7 seconds for approval, creation requests have no polling. A user waiting on a pending creation request gets no live update when it's approved or rejected.
 
-**File:** `src/pages/StakeholderDetail.tsx`
-- Wrap `InvestorDetails` content in a `Tabs` component with "Overview" and "Fund Usage" tabs
-- Wrap `LenderDetails` content in a `Tabs` component with "Overview", "Repayments" (existing history), and "Fund Usage" tabs
-- Pass investment/loan IDs and stakeholder type to `FundUsageTab`
+## Solution
 
-### 2. Expense Funding Fields Not Passed to Backend
-The `handleCreate` and `handleUpdate` functions in `Expenses.tsx` only destructure 4 fields (amount, date, expense_account_id, description), discarding the funding fields from `ExpenseFormResult`.
+### 1. Add Rejected Creation Requests Query (`CompanySelection.tsx`)
 
-**File:** `src/pages/Expenses.tsx`
-- Update `handleCreate` to accept and pass all `ExpenseFormResult` fields (funded_by_type, funded_by_id, funded_by_reference, matches_loan_purpose, purpose_notes, invoice_number, vendor_name)
-- Update `handleUpdate` similarly
+Add a new `useQuery` to fetch rejected creation requests:
 
-### 3. Dashboard Expense Dialog Not Passing Funding Fields
-Same issue in Dashboard -- the expense dialog's `onSave` callback only passes 4 basic fields.
+```
+status = 'rejected'
+order by reviewed_at desc
+```
 
-**File:** `src/pages/Dashboard.tsx`
-- Update the `ExpenseDialog` onSave handler to pass all funding fields through to `createExpense.mutateAsync`
+This mirrors the existing `rejectedJoinRequests` pattern.
 
-### 4. Query Invalidation for Fund Tracking
-When expenses with funding sources are created/updated/deleted, fund-related queries need to be invalidated so balances refresh.
+### 2. Render Rejected Creation Requests Section
 
-**File:** `src/hooks/useExpenses.ts`
-- Add invalidation for `fundable-investments`, `fundable-loans`, `fund-utilization-summary`, and `funded-expenses` query keys in `useCreateExpense`, `useUpdateExpense`, and `useDeleteExpense`
+Display rejected creation requests in a styled card section (similar to rejected join requests), showing:
+- Company name that was requested
+- Rejection date
+- Rejection reason (if provided by cipher)
+- A dismiss button (same pattern as join rejections)
+- A "Submit New Request" button linking to `/companies/create`
 
-### 5. Dashboard Fund Utilization Overview
-The Financial Obligations section needs a fund utilization summary showing total received, allocated, and unallocated amounts.
+### 3. Fix Auto-Redirect Logic
 
-**File:** `src/pages/Dashboard.tsx`
-- Import `useFundUtilizationSummary` from `useFundTracking`
-- Add a utilization overview section below the existing Financial Obligations card showing:
-  - Summary cards: Total Received, Total Allocated, Unallocated
-  - Breakdown by source type (Investment vs Loan funds)
-  - Individual fund status with progress bars
+Update the redirect condition (line 160) to also check for rejected creation requests, so users aren't bounced away before seeing their rejection message:
 
-## Files to Modify
+```
+companies.length === 0 && !isCipher
+  && pendingJoinRequests.length === 0
+  && rejectedJoinRequests.length === 0
+  && rejectedCreationRequests.length === 0  // NEW
+  && pendingCreationRequests.length === 0   // already there implicitly
+  && newlyJoinedIds.length === 0
+```
+
+### 4. Add Polling for Creation Request Status Changes
+
+Add polling logic (similar to join request polling) that checks if a pending creation request has been approved or rejected. When a change is detected:
+- If **approved**: show a success toast and refresh company list (the user should now see the new company in "My Businesses")
+- If **rejected**: invalidate queries so the rejection card appears immediately
+
+### 5. Better UX Improvements
+
+- Add a dismissable state for rejected creation requests (same `dismissedRejections` pattern, extended to creation requests)
+- Show the pending creation request card with a subtle pulsing dot animation to indicate "waiting for review"
+- When no companies exist and only rejected requests are present, show an encouraging message with a clear call-to-action
+
+## Files Modified
+
 | File | Change |
 |---|---|
-| `src/pages/StakeholderDetail.tsx` | Add Fund Usage tab to investor and lender views |
-| `src/pages/Expenses.tsx` | Pass funding fields in handleCreate/handleUpdate |
-| `src/pages/Dashboard.tsx` | Pass funding fields in expense dialog + add utilization overview |
-| `src/hooks/useExpenses.ts` | Add fund query invalidation |
+| `src/pages/CompanySelection.tsx` | Add rejected creation requests query, render rejection cards, fix auto-redirect, add polling for creation request status changes |
+
+## No Database Changes Required
+
+RLS policies already allow users to read their own creation requests (`auth.uid() = user_id`). The `rejection_reason` column already exists on the table.
 
