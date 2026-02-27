@@ -33,6 +33,22 @@ export interface Investment {
   user_id: string;
   created_at: string;
   updated_at: string;
+  // Source tracking fields
+  transfer_method: string | null;
+  source_bank: string | null;
+  source_account_name: string | null;
+  source_account_number_masked: string | null;
+  destination_bank: string | null;
+  destination_account_masked: string | null;
+  transfer_date: string | null;
+  transaction_reference: string | null;
+  proof_document_url: string | null;
+  expected_amount: number | null;
+  received_amount: number | null;
+  receipt_status: "pending" | "partial" | "received";
+  allocated_to_expenses: number;
+  remaining_unallocated: number | null;
+  receipt_notes: string | null;
 }
 
 export interface ProfitDistribution {
@@ -76,6 +92,28 @@ export interface Loan {
   user_id: string;
   created_at: string;
   updated_at: string;
+  // Disbursement tracking fields
+  disbursement_method: string | null;
+  disbursement_date: string | null;
+  source_bank: string | null;
+  source_account_name: string | null;
+  source_account_number_masked: string | null;
+  destination_bank: string | null;
+  destination_account_masked: string | null;
+  loan_agreement_number: string | null;
+  transaction_reference: string | null;
+  disbursement_proof_url: string | null;
+  gross_loan_amount: number | null;
+  processing_fee: number;
+  documentation_charges: number;
+  other_deductions: number;
+  net_disbursed_amount: number | null;
+  disbursement_status: "pending" | "partial" | "disbursed";
+  allocated_to_expenses: number;
+  remaining_unallocated: number | null;
+  stated_purpose: string | null;
+  purpose_compliant: boolean;
+  disbursement_notes: string | null;
 }
 
 export interface LoanRepayment {
@@ -118,6 +156,23 @@ export interface InvestmentInput {
   terms_and_conditions?: string;
 }
 
+export interface InvestmentSourceInput {
+  transfer_method?: string;
+  source_bank?: string;
+  source_account_name?: string;
+  source_account_number_masked?: string;
+  destination_bank?: string;
+  destination_account_masked?: string;
+  transfer_date?: string;
+  transaction_reference?: string;
+  proof_document_url?: string;
+  expected_amount?: number;
+  received_amount?: number;
+  receipt_status?: string;
+  remaining_unallocated?: number;
+  receipt_notes?: string;
+}
+
 export interface LoanInput {
   loan_amount: number;
   interest_rate: number;
@@ -132,3 +187,52 @@ export interface LoanInput {
   collateral_description?: string;
   notes?: string;
 }
+
+export interface LoanDisbursementInput {
+  disbursement_method?: string;
+  disbursement_date?: string;
+  source_bank?: string;
+  source_account_name?: string;
+  source_account_number_masked?: string;
+  destination_bank?: string;
+  destination_account_masked?: string;
+  loan_agreement_number?: string;
+  transaction_reference?: string;
+  disbursement_proof_url?: string;
+  gross_loan_amount?: number;
+  processing_fee?: number;
+  documentation_charges?: number;
+  other_deductions?: number;
+  net_disbursed_amount?: number;
+  disbursement_status?: string;
+  remaining_unallocated?: number;
+  stated_purpose?: string;
+  disbursement_notes?: string;
+}
+
+export interface FundedExpense {
+  id: string;
+  amount: number;
+  date: string;
+  description: string | null;
+  expense_account_id: string;
+  funded_by_type: string | null;
+  funded_by_id: string | null;
+  funded_by_reference: string | null;
+  matches_loan_purpose: boolean | null;
+  purpose_notes: string | null;
+  invoice_number: string | null;
+  vendor_name: string | null;
+  expense_accounts: { name: string; color: string } | null;
+}
+
+export type TransferMethod = "bank_transfer" | "cheque" | "cash" | "wire_transfer" | "demand_draft" | "upi";
+
+export const TRANSFER_METHODS: { value: TransferMethod; label: string }[] = [
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "cash", label: "Cash" },
+  { value: "wire_transfer", label: "Wire Transfer" },
+  { value: "demand_draft", label: "Demand Draft" },
+  { value: "upi", label: "UPI / Digital Payment" },
+];
