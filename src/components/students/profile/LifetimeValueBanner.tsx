@@ -172,7 +172,24 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
     enabled: !!activeCompanyId,
   });
 
-  const isLoading = paymentsLoading || salesLoading;
+  const { data: futureUnpaidPayments = [], isLoading: unpaidLoading } = useQuery({
+    queryKey: ["student-future-unpaid", activeCompanyId, studentId],
+    queryFn: async () => {
+      if (!activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("student_payments")
+        .select("amount, due_date, status")
+        .eq("student_id", studentId)
+        .eq("company_id", activeCompanyId)
+        .in("status", ["unpaid", "partial"])
+        .gt("due_date", new Date().toISOString());
+      if (error) throw error;
+      return (data ?? []) as Array<{ amount: number; due_date: string; status: string }>;
+    },
+    enabled: !!activeCompanyId,
+  });
+
+  const isLoading = paymentsLoading || salesLoading || unpaidLoading;
   const hasError = !!salesError;
 
   const metrics = useMemo(() => {
@@ -181,9 +198,10 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
       payments,
       productSales as any,
       student,
-      batch
+      batch,
+      futureUnpaidPayments
     );
-  }, [payments, productSales, student, batch, isLoading]);
+  }, [payments, productSales, student, batch, isLoading, futureUnpaidPayments]);
 
   // Count-up values
   const animatedLTV = useCountUp(metrics?.lifetimeValue ?? 0);

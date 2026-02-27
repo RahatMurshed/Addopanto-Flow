@@ -2447,6 +2447,7 @@ export type Database = {
           company_id: string
           created_at: string
           description: string | null
+          due_date: string
           id: string
           months_covered: string[] | null
           payment_date: string
@@ -2454,6 +2455,7 @@ export type Database = {
           payment_type: string
           receipt_number: string | null
           source_id: string | null
+          status: string
           student_id: string
           user_id: string
         }
@@ -2462,6 +2464,7 @@ export type Database = {
           company_id: string
           created_at?: string
           description?: string | null
+          due_date?: string
           id?: string
           months_covered?: string[] | null
           payment_date?: string
@@ -2469,6 +2472,7 @@ export type Database = {
           payment_type: string
           receipt_number?: string | null
           source_id?: string | null
+          status?: string
           student_id: string
           user_id: string
         }
@@ -2477,6 +2481,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           description?: string | null
+          due_date?: string
           id?: string
           months_covered?: string[] | null
           payment_date?: string
@@ -2484,6 +2489,7 @@ export type Database = {
           payment_type?: string
           receipt_number?: string | null
           source_id?: string | null
+          status?: string
           student_id?: string
           user_id?: string
         }
