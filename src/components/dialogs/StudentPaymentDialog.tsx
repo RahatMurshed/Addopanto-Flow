@@ -47,9 +47,10 @@ interface StudentPaymentDialogProps {
   batchDefaultMonthlyFee?: number;
   courseName?: string;
   batchName?: string;
+  batchEnrollmentId?: string;
 }
 
-export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee, courseName, batchName }: StudentPaymentDialogProps) {
+export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee, courseName, batchName, batchEnrollmentId }: StudentPaymentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -268,6 +269,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           description: data.description || null,
           source_id: selectedSourceId || null,
           due_date: computedDueDate,
+          batch_enrollment_id: batchEnrollmentId || null,
           studentName: student.name,
         });
       }

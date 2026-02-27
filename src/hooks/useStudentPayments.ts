@@ -96,6 +96,7 @@ export function useCreateStudentPayment() {
                 receipt_number: paymentData.receipt_number || null,
                 description: paymentData.description || null,
                 ...(source_id ? { source_id } : {}),
+                ...(batch_enrollment_id ? { batch_enrollment_id } : {}),
               })
               .eq("id", row.id);
           }
@@ -132,6 +133,7 @@ export function useCreateStudentPayment() {
               receipt_number: paymentData.receipt_number || null,
               description: paymentData.description || null,
               ...(source_id ? { source_id } : {}),
+              ...(batch_enrollment_id ? { batch_enrollment_id } : {}),
             })
             .eq("id", existingAdmission[0].id)
             .select()

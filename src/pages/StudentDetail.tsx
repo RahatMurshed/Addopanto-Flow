@@ -7,6 +7,8 @@ import {
   useMonthlyFeeHistory, computeStudentSummary,
 } from "@/hooks/useStudentPayments";
 import { useBatch, useBatches } from "@/hooks/useBatches";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCourse } from "@/hooks/useCourses";
 import { useStudentBatchHistory } from "@/hooks/useStudentBatchHistory";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -56,6 +58,25 @@ export default function StudentDetail() {
   const { data: course } = useCourse(courseId);
   const { data: batchHistory = [] } = useStudentBatchHistory(id);
   const { data: allBatches = [] } = useBatches();
+
+  // Resolve active enrollment for current batch
+  const { data: activeEnrollment } = useQuery({
+    queryKey: ["batch_enrollment_for_student", id, batchId],
+    queryFn: async () => {
+      if (!id || !batchId) return null;
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("id")
+        .eq("student_id", id)
+        .eq("batch_id", batchId)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id && !!batchId,
+  });
 
   const updateMutation = useUpdateStudent();
   const createPaymentMutation = useCreateStudentPayment();
@@ -790,6 +811,7 @@ export default function StudentDetail() {
         batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
         courseName={course?.course_name}
         batchName={batch?.batch_name}
+        batchEnrollmentId={activeEnrollment?.id}
       />
 
       {/* Delete Payment Confirmation */}

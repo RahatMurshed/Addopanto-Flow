@@ -182,7 +182,8 @@ export function FinancialBreakdown({ studentId, companyId, initialTab }: Financi
 
   const coursePayments: CoursePaymentRow[] = useMemo(() => {
     if (!data) return [];
-    const fallbackEnrollment = data.enrollmentMap.size > 0
+    // Only use fallback for single-enrollment students to avoid misattribution
+    const fallbackEnrollment = data.enrollmentMap.size === 1
       ? data.enrollmentMap.values().next().value
       : null;
     return data.payments.map((p) => {
@@ -199,7 +200,7 @@ export function FinancialBreakdown({ studentId, companyId, initialTab }: Financi
         payment_type: p.payment_type,
         user_id: p.user_id,
         courseName: enrollment?.courseName ?? "Uncategorized",
-        batchName: enrollment?.batchName ?? "No Batch",
+        batchName: enrollment?.batchName ?? (data.enrollmentMap.size > 1 ? "Uncategorized" : "No Batch"),
       };
     });
   }, [data]);
