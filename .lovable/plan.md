@@ -1,103 +1,118 @@
 
 
-# Fix: Payments Linked to Wrong Batch in Financial Overview
+# Auto-Detect Batch Enrollment in Payment Recording Form
 
 ## Problem
+The payment dialog receives `batchEnrollmentId` as an optional prop from parent pages, but:
+- It never shows the admin which batch a payment is for
+- Students with multiple enrollments have no way to select the correct batch
+- The prop is silently null when callers don't resolve it, producing orphaned payments
 
-All payment records have `batch_enrollment_id = null` because `StudentPaymentDialog` never passes this field when saving. The `FinancialBreakdown` component then falls back to the **first** enrollment found in the enrollment map, causing all payments to display under the wrong batch (e.g., "English Mastery Batch-1" instead of "Practice Club Batch-1").
+## Solution
 
-## Root Cause (Two Issues)
+### 1. Fetch enrollments inside StudentPaymentDialog itself
 
-1. **`StudentPaymentDialog` does not accept or pass `batch_enrollment_id`**: The dialog has no way to know which enrollment a payment belongs to, so it never includes it in the save payload.
+Instead of relying on each calling page to resolve and pass `batchEnrollmentId`, the dialog will query `batch_enrollments` (joined with `batches` and `courses`) directly for the student when it opens. This is self-contained and eliminates all caller-side enrollment resolution code.
 
-2. **`FinancialBreakdown` fallback is too naive**: When `batch_enrollment_id` is null, it uses `enrollmentMap.values().next().value` -- the first enrollment in the map -- which is arbitrary and often wrong for multi-enrollment students.
+**File: `src/components/dialogs/StudentPaymentDialog.tsx`**
 
-## Fix Plan
+- Add a `useQuery` call inside the dialog that fetches all active enrollments for `student.id` (joined to `batches` and `courses` for display names)
+- Add local state `selectedEnrollmentId` to track admin's selection
+- If exactly 1 active enrollment: auto-select it, no dropdown shown (just display the batch name)
+- If multiple active enrollments: show a required `<Select>` dropdown listing each batch (with course name), and block form submission if none selected
+- If 0 enrollments: allow saving without enrollment (edge case for students not yet enrolled)
+- On submit, use `selectedEnrollmentId` as `batch_enrollment_id` instead of the prop
 
-### 1. Pass `batch_enrollment_id` through the payment recording flow
+### 2. Show fee summary for selected batch
 
-**`StudentPaymentDialog.tsx`** -- Add a new optional prop `batchEnrollmentId?: string` and include it in the `onSave` payload:
-- Add `batchEnrollmentId` to `StudentPaymentDialogProps`
-- Pass it as `batch_enrollment_id` in the save call
+When a batch is selected (auto or manual), display a small info card showing:
+- **Total fee** (from `batch_enrollments.total_fee` or batch defaults)
+- **Already paid** (sum of existing payments with that `batch_enrollment_id`)
+- **Remaining due** (total - paid)
 
-**`BatchDetail.tsx`** -- Look up the enrollment ID for the selected student in this batch and pass it to `StudentPaymentDialog`:
-- Query `batch_enrollments` to find the active enrollment for `selectedStudent.id` + current `batch.id`
-- Pass it as `batchEnrollmentId` prop
+This requires a secondary query or computation from the student's existing payments. The dialog already receives `summary` which has global payment data -- but for per-batch breakdown, we'll filter the student's payments by the selected `batch_enrollment_id`.
 
-**`StudentDetail.tsx`** -- Look up the enrollment ID for the student's current batch and pass it:
-- Use the already-fetched batch data to find the active enrollment
-- Pass it as `batchEnrollmentId` prop
+**File: `src/components/dialogs/StudentPaymentDialog.tsx`**
 
-**`Students.tsx`** -- Same pattern: resolve enrollment from `selectedStudent.batch_id` if available.
+- Add a `useStudentPayments(student.id)` call to get all payments
+- When `selectedEnrollmentId` changes, compute: paid amount for that enrollment, total fee from the enrollment record, and remaining
 
-### 2. Fix the upsert logic in `useStudentPayments.ts`
+### 3. Clean up caller pages
 
-Currently when upserting an existing unpaid schedule row (lines 86-110), the mutation does not preserve or set `batch_enrollment_id`. Update the upsert path to also check `batch_enrollment_id` when matching unpaid rows, so payments are linked to the correct batch's schedule.
+Remove the enrollment resolution queries from `BatchDetail.tsx`, `StudentDetail.tsx`, and `Students.tsx` since the dialog now handles this internally. The `batchEnrollmentId` prop becomes unnecessary but can be kept as an optional hint to pre-select (useful when opening from BatchDetail context).
 
-### 3. Improve `FinancialBreakdown` fallback for historical data
+**Files:**
+- `src/pages/BatchDetail.tsx` -- Keep enrollment query (used elsewhere), but dialog no longer depends on it
+- `src/pages/StudentDetail.tsx` -- Remove standalone enrollment query if only used for dialog
+- `src/pages/Students.tsx` -- Remove standalone enrollment query if only used for dialog
 
-Replace the naive "first enrollment" fallback with a smarter approach:
-- When `batch_enrollment_id` is null, try to match the payment to an enrollment based on the student's `batch_id` on the `students` table (the current or most recent batch)
-- If multiple enrollments exist, show as "Uncategorized" rather than incorrectly assigning to the wrong batch
+### 4. Update "Uncategorized" label in FinancialBreakdown
 
-### 4. Backfill existing payment records
+**File: `src/components/students/profile/FinancialBreakdown.tsx`** (lines 202-203)
 
-For existing payments with `batch_enrollment_id = null`, attempt to link them to the correct enrollment:
-- For students with exactly one enrollment, set `batch_enrollment_id` to that enrollment's ID
-- For students with multiple enrollments, leave as null (the improved fallback in step 3 handles display)
-
-## Files Changed
-
-1. **`src/components/dialogs/StudentPaymentDialog.tsx`** -- Add `batchEnrollmentId` prop, pass in save payload
-2. **`src/pages/BatchDetail.tsx`** -- Resolve enrollment ID for selected student, pass to dialog
-3. **`src/pages/StudentDetail.tsx`** -- Resolve enrollment ID for student's batch, pass to dialog
-4. **`src/pages/Students.tsx`** -- Resolve enrollment ID when batch context is available, pass to dialog
-5. **`src/hooks/useStudentPayments.ts`** -- Include `batch_enrollment_id` in upsert matching logic
-6. **`src/components/students/profile/FinancialBreakdown.tsx`** -- Replace naive fallback with "Uncategorized" for multi-enrollment students
-7. **Database** -- Run a one-time backfill UPDATE for single-enrollment students
+Change `"Uncategorized"` to `"Unlinked (pre-tracking)"` for payments with null `batch_enrollment_id` when multiple enrollments exist. This is honest about historical data.
 
 ## Technical Details
 
-### StudentPaymentDialog change
+### Enrollment query inside dialog
 ```typescript
-// New prop
-batchEnrollmentId?: string;
-
-// In handleSubmit, add to onSave call:
-batch_enrollment_id: batchEnrollmentId || null,
+const { data: enrollments = [] } = useQuery({
+  queryKey: ["student_active_enrollments", student.id],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("batch_enrollments")
+      .select("id, batch_id, total_fee, batches(batch_name, default_admission_fee, default_monthly_fee, course_id, courses(course_name))")
+      .eq("student_id", student.id)
+      .eq("status", "active");
+    return data || [];
+  },
+  enabled: open,
+});
 ```
 
-### BatchDetail enrollment resolution
+### Batch selector UI (only shown for multi-enrollment)
+```text
++------------------------------------------+
+| Batch *                                  |
+| [v] Practice Club Batch-1 (English...)   |
++------------------------------------------+
+| Fee Summary for selected batch:          |
+| Total: 12,000 | Paid: 3,000 | Due: 9,000|
++------------------------------------------+
+```
+
+### Per-batch fee summary computation
 ```typescript
-// BatchDetail already knows batch.id — look up enrollment
-const activeEnrollment = useMemo(() => {
-  if (!selectedStudent || !enrollments) return undefined;
-  return enrollments.find(e => 
-    e.student_id === selectedStudent.id && 
-    e.batch_id === id && 
-    e.status === "active"
-  );
-}, [selectedStudent, enrollments, id]);
+const batchFeeSummary = useMemo(() => {
+  if (!selectedEnrollmentId || !allPayments) return null;
+  const enrollment = enrollments.find(e => e.id === selectedEnrollmentId);
+  const paid = allPayments
+    .filter(p => p.batch_enrollment_id === selectedEnrollmentId)
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const total = Number(enrollment?.total_fee || 0);
+  return { total, paid, remaining: Math.max(0, total - paid) };
+}, [selectedEnrollmentId, enrollments, allPayments]);
 ```
 
-### FinancialBreakdown improved fallback
+### Submission guard
 ```typescript
-// Only use fallback for single-enrollment students
-const fallbackEnrollment = data.enrollmentMap.size === 1
-  ? data.enrollmentMap.values().next().value
-  : null;  // Multi-enrollment: show "Uncategorized" rather than wrong batch
+// In handleSubmit, before saving:
+if (enrollments.length > 0 && !selectedEnrollmentId) {
+  setFeeError("Please select a batch before recording payment.");
+  return;
+}
 ```
 
-### Backfill SQL
-```sql
-UPDATE student_payments sp
-SET batch_enrollment_id = (
-  SELECT be.id FROM batch_enrollments be
-  WHERE be.student_id = sp.student_id AND be.company_id = sp.company_id
-  LIMIT 1
-)
-WHERE sp.batch_enrollment_id IS NULL
-AND (SELECT count(*) FROM batch_enrollments be 
-     WHERE be.student_id = sp.student_id AND be.company_id = sp.company_id) = 1;
-```
+## Files Changed
 
+1. **`src/components/dialogs/StudentPaymentDialog.tsx`** -- Add enrollment query, batch selector, fee summary display, submission guard
+2. **`src/components/students/profile/FinancialBreakdown.tsx`** -- Update "Uncategorized" to "Unlinked (pre-tracking)"
+3. **`src/pages/Students.tsx`** -- Remove enrollment resolution query (dialog handles it now)
+4. **`src/pages/StudentDetail.tsx`** -- Remove enrollment resolution query (dialog handles it now)
+5. **`src/pages/BatchDetail.tsx`** -- Optionally keep passing `batchEnrollmentId` as a pre-select hint
+
+## Edge Cases
+- Student with 0 enrollments: No batch selector shown, `batch_enrollment_id` saved as null
+- Student with 1 enrollment: Auto-selected, shown as read-only text (not a dropdown)
+- Editing existing payment: Pre-select from `editingPayment.batch_enrollment_id` if available
+- BatchDetail context: Pre-select the batch being viewed via `batchEnrollmentId` prop hint
