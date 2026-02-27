@@ -22,7 +22,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen, Loader2, UserPlus } from "lucide-react";
+import { ArrowLeft, Pencil, Eye, CreditCard, Users, TrendingUp, CalendarDays, Layers, Plus, AlertTriangle, Search, X, Info, Trash2, SlidersHorizontal, BookOpen, Loader2, UserPlus, UserMinus, PauseCircle } from "lucide-react";
 import StudentOverdueSection from "@/components/students/StudentOverdueSection";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
@@ -88,6 +88,9 @@ export default function BatchDetail() {
   const [editStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
+  const [removeConfirmText, setRemoveConfirmText] = useState("");
+  const [removePaymentTotal, setRemovePaymentTotal] = useState(0);
+  const [inactiveStudentId, setInactiveStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
@@ -372,25 +375,59 @@ export default function BatchDetail() {
     }
   };
 
+  // Calculate payment total when a student is selected for removal
+  useEffect(() => {
+    if (!deleteStudentId || !id || !activeCompanyId) {
+      setRemovePaymentTotal(0);
+      setRemoveConfirmText("");
+      return;
+    }
+    // Find enrollment and sum payments
+    const enrollment = batchEnrollments.find(e => e.student_id === deleteStudentId);
+    if (!enrollment) { setRemovePaymentTotal(0); return; }
+    supabase
+      .from("student_payments")
+      .select("amount")
+      .eq("batch_enrollment_id", enrollment.id)
+      .eq("company_id", activeCompanyId)
+      .then(({ data }) => {
+        const total = (data ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+        setRemovePaymentTotal(total);
+      });
+  }, [deleteStudentId, id, activeCompanyId, batchEnrollments]);
+
   const handleRemoveFromBatch = async () => {
-    if (!deleteStudentId || !id) return;
+    if (!deleteStudentId || !id || !activeCompanyId || !user) return;
     setDeleting(true);
     try {
-      // Set batch_id to null (remove from batch, keep student)
-      await updateStudentMutation.mutateAsync({ id: deleteStudentId, batch_id: null } as any);
-      // Sync enrollment: mark as dropped
-      if (activeCompanyId && user) {
-        await syncBatchEnrollment(deleteStudentId, id, null, activeCompanyId, user.id);
-        // Record batch history
-        await createBatchHistory.mutateAsync({
-          student_id: deleteStudentId,
-          from_batch_id: id,
-          to_batch_id: null,
-          reason: "Removed from batch",
-        });
-      }
-      toast({ title: "Student removed from batch" });
+      const { data, error } = await supabase.rpc("remove_student_from_batch", {
+        p_student_id: deleteStudentId,
+        p_batch_id: id,
+        p_company_id: activeCompanyId,
+        p_user_id: user.id,
+        p_user_email: user.email ?? null,
+      });
+      if (error) throw error;
+
+      const studentName = allBatchStudents.find(s => s.id === deleteStudentId)?.name ?? "Student";
+      toast({ title: `${studentName} removed from ${batch?.batch_name}. Revenue updated.` });
       setDeleteStudentId(null);
+      setRemoveConfirmText("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleSetInactive = async () => {
+    if (!inactiveStudentId) return;
+    setDeleting(true);
+    try {
+      await updateStudentMutation.mutateAsync({ id: inactiveStudentId, status: "inactive" as any });
+      const studentName = allBatchStudents.find(s => s.id === inactiveStudentId)?.name ?? "Student";
+      toast({ title: `${studentName} set as inactive. Payments preserved, overdue tracking stopped.` });
+      setInactiveStudentId(null);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -832,8 +869,13 @@ export default function BatchDetail() {
                                 );
                               })()}
                               {canEdit && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700" onClick={() => setDeleteStudentId(s.id)} title="Remove from batch">
-                                  <X className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setDeleteStudentId(s.id)} title="Remove from batch">
+                                  <UserMinus className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" onClick={() => setInactiveStudentId(s.id)} title="Set inactive">
+                                  <PauseCircle className="h-4 w-4" />
                                 </Button>
                               )}
                             </div>
@@ -884,22 +926,59 @@ export default function BatchDetail() {
       )}
 
       {/* Remove from Batch Confirmation */}
-      <AlertDialog open={!!deleteStudentId} onOpenChange={(o) => { if (!o) setDeleteStudentId(null); }}>
+      <AlertDialog open={!!deleteStudentId} onOpenChange={(o) => { if (!o) { setDeleteStudentId(null); setRemoveConfirmText(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove from Batch</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove the student from this batch and mark their enrollment as dropped. The student will remain in the Students list and their payment history will be preserved.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Removing <strong>{allBatchStudents.find(s => s.id === deleteStudentId)?.name}</strong> from <strong>{batch?.batch_name}</strong> will permanently delete all payment records for this enrollment
+                  {removePaymentTotal > 0 && <> and deduct <strong>{formatCurrency(removePaymentTotal, currency)}</strong> from company revenue</>}.
+                  This cannot be undone.
+                </p>
+                <div>
+                  <label className="text-xs font-medium text-foreground">Type "REMOVE" to confirm:</label>
+                  <Input
+                    value={removeConfirmText}
+                    onChange={(e) => setRemoveConfirmText(e.target.value)}
+                    placeholder="REMOVE"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); handleRemoveFromBatch(); }}
-              disabled={deleting}
-              className="bg-orange-600 text-white hover:bg-orange-700"
+              disabled={deleting || removeConfirmText !== "REMOVE"}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {deleting ? "Removing..." : "Remove from Batch"}
+              {deleting ? "Removing..." : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Set Inactive Confirmation */}
+      <AlertDialog open={!!inactiveStudentId} onOpenChange={(o) => { if (!o) setInactiveStudentId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Set Student Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Set <strong>{allBatchStudents.find(s => s.id === inactiveStudentId)?.name}</strong> as inactive? Payments will be preserved but overdue tracking will stop.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleSetInactive(); }}
+              disabled={deleting}
+              className="bg-yellow-600 text-white hover:bg-yellow-700"
+            >
+              {deleting ? "Updating..." : "Set Inactive"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

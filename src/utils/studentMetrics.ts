@@ -10,6 +10,7 @@ export interface LifetimeMetrics {
   revenueProjection: number;
   hasActiveEnrollments: boolean;
   studentSinceDate: Date | null;
+  isInactive: boolean;
 }
 
 export function computeLifetimeMetrics(
@@ -34,6 +35,8 @@ export function computeLifetimeMetrics(
   futureUnpaidPayments?: Array<{ amount: number; status: string; paid_amount?: number | null }>,
   totalExpected?: number
 ): LifetimeMetrics {
+  const isInactive = student.status === "inactive";
+
   // 1. LIFETIME VALUE — total confirmed payments + product sales
   const totalCoursesPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const totalProductsPaid = productSales.reduce((sum, p) => sum + Number(p.total_amount), 0);
@@ -54,30 +57,34 @@ export function computeLifetimeMetrics(
   );
 
   // 5. PAYMENT RATE — totalCoursesPaid / denominator
+  // For inactive students: freeze at current paid percentage (don't calculate future dues)
   const denominator = totalExpected != null && totalExpected > 0
     ? totalExpected
     : (batch
         ? Number(batch.default_admission_fee ?? 0) + (Number(batch.course_duration_months ?? 0) * Number(batch.default_monthly_fee ?? 0))
         : 0);
+  
   const paymentRate = denominator > 0
     ? Math.min(100, Math.round((totalCoursesPaid / denominator) * 100))
     : 0;
 
-  // 6. REVENUE PROJECTION — use future unpaid rows if available, else time-based fallback
+  // 6. REVENUE PROJECTION — exclude inactive students entirely
   const isActive = student.status === "active";
-  const unpaidRows = futureUnpaidPayments ?? [];
   let revenueProjection = 0;
 
-  if (unpaidRows.length > 0) {
-    revenueProjection = unpaidRows.reduce((sum, p) => {
-      const unpaidAmount = p.status === "partial"
-        ? Number(p.amount) - Number(p.paid_amount ?? 0)
-        : Number(p.amount);
-      return sum + unpaidAmount;
-    }, 0);
-  } else if (isActive && denominator > 0) {
-    // Simple fallback: total expected minus what's already been paid for courses
-    revenueProjection = Math.max(0, Math.round(denominator - totalCoursesPaid));
+  if (isActive) {
+    const unpaidRows = futureUnpaidPayments ?? [];
+    if (unpaidRows.length > 0) {
+      revenueProjection = unpaidRows.reduce((sum, p) => {
+        const unpaidAmount = p.status === "partial"
+          ? Number(p.amount) - Number(p.paid_amount ?? 0)
+          : Number(p.amount);
+        return sum + unpaidAmount;
+      }, 0);
+    } else if (denominator > 0) {
+      // Simple fallback: total expected minus what's already been paid for courses
+      revenueProjection = Math.max(0, Math.round(denominator - totalCoursesPaid));
+    }
   }
 
   return {
@@ -89,5 +96,6 @@ export function computeLifetimeMetrics(
     revenueProjection,
     hasActiveEnrollments: isActive && !!batch,
     studentSinceDate: enrollmentDate,
+    isInactive,
   };
 }

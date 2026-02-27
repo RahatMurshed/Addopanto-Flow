@@ -3,7 +3,7 @@ import { addMonths, format } from "date-fns";
 
 /**
  * Synchronizes batch_enrollments when a student's batch changes.
- * - Marks old enrollment as "dropped" if oldBatchId differs from newBatchId
+ * - Deletes old enrollment if oldBatchId differs from newBatchId
  * - Creates new "active" enrollment if newBatchId differs from oldBatchId
  * - Auto-generates payment schedule rows for the new batch
  * - No-op if both are the same or both null
@@ -21,11 +21,11 @@ export async function syncBatchEnrollment(
   // No change
   if (oldId === newId) return;
 
-  // Mark old enrollment as dropped
+  // Delete old enrollment entirely
   if (oldId) {
     await supabase
       .from("batch_enrollments")
-      .update({ status: "dropped", updated_at: new Date().toISOString() })
+      .delete()
       .eq("student_id", studentId)
       .eq("batch_id", oldId)
       .eq("company_id", companyId)

@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import {
   DollarSign, BookOpen, ShoppingBag, CalendarDays,
-  TrendingUp, Info, Lock, RefreshCw,
+  TrendingUp, Info, Lock, RefreshCw, PauseCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -252,6 +252,16 @@ export function LifetimeValueBanner({ studentId, student, totalExpected }: Lifet
         </span>
       </div>
 
+      {/* Inactive notice */}
+      {metrics.isInactive && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-muted dark:bg-white/5 border border-border">
+          <PauseCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">
+            Overdue tracking paused — student is inactive. Revenue projection excluded.
+          </span>
+        </div>
+      )}
+
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* 1. Lifetime Value */}
@@ -311,7 +321,7 @@ export function LifetimeValueBanner({ studentId, student, totalExpected }: Lifet
         <StatBlock
           icon={<PaymentRateRing rate={metrics.paymentRate} />}
           value={null}
-          label="Payment Rate"
+          label={metrics.isInactive ? "Payment Rate (Frozen)" : "Payment Rate"}
         />
 
         {/* 6. Revenue Projection */}
@@ -324,14 +334,18 @@ export function LifetimeValueBanner({ studentId, student, totalExpected }: Lifet
               </div>
             }
             value={
-              metrics.hasActiveEnrollments
-                ? formatCurrency(animatedProjection, currency)
-                : "—"
+              metrics.isInactive
+                ? "Paused"
+                : metrics.hasActiveEnrollments
+                  ? formatCurrency(animatedProjection, currency)
+                  : "—"
             }
-            valueClassName="text-amber-600 dark:text-amber-300"
+            valueClassName={metrics.isInactive ? "text-muted-foreground" : "text-amber-600 dark:text-amber-300"}
             label="Projected Revenue"
             sublabel={
-              metrics.hasActiveEnrollments ? (
+              metrics.isInactive ? (
+                <span className="text-[10px] text-muted-foreground">Student is inactive</span>
+              ) : metrics.hasActiveEnrollments ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="cursor-help">
