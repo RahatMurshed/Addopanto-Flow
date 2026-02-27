@@ -55,6 +55,10 @@ export function useCreateExpense() {
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
+      queryClient.invalidateQueries({ queryKey: ["fundable-loans"] });
+      queryClient.invalidateQueries({ queryKey: ["fund-utilization-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["funded-expenses"] });
     },
   });
 }
@@ -78,6 +82,10 @@ export function useUpdateExpense() {
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
+      queryClient.invalidateQueries({ queryKey: ["fundable-loans"] });
+      queryClient.invalidateQueries({ queryKey: ["fund-utilization-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["funded-expenses"] });
     },
   });
 }
@@ -95,6 +103,10 @@ export function useDeleteExpense() {
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
+      queryClient.invalidateQueries({ queryKey: ["fundable-loans"] });
+      queryClient.invalidateQueries({ queryKey: ["fund-utilization-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["funded-expenses"] });
     },
   });
 }

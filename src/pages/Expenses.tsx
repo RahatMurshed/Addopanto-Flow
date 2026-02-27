@@ -228,14 +228,21 @@ export default function Expenses() {
     await exportToPDF("expenses-content", "expenses", "Expenses Report", dateRange.label, activeCompany?.name || undefined);
   };
 
-  const handleCreate = async (data: {
-    amount: number;
-    date: string;
-    expense_account_id: string;
-    description: string | null;
-  }) => {
+  const handleCreate = async (data: Record<string, any>) => {
     try {
-      await createMutation.mutateAsync(data);
+      await createMutation.mutateAsync({
+        amount: data.amount,
+        date: data.date,
+        expense_account_id: data.expense_account_id,
+        description: data.description,
+        funded_by_type: data.funded_by_type || null,
+        funded_by_id: data.funded_by_id || null,
+        funded_by_reference: data.funded_by_reference || null,
+        matches_loan_purpose: data.matches_loan_purpose ?? null,
+        purpose_notes: data.purpose_notes || null,
+        invoice_number: data.invoice_number || null,
+        vendor_name: data.vendor_name || null,
+      });
       const account = accounts.find((a) => a.id === data.expense_account_id);
       toast({ title: "Expense recorded", description: `${formatCurrency(data.amount, currency)} from ${account?.name}` });
     } catch (err: any) {
@@ -244,15 +251,23 @@ export default function Expenses() {
     }
   };
 
-  const handleUpdate = async (data: {
-    amount: number;
-    date: string;
-    expense_account_id: string;
-    description: string | null;
-  }) => {
+  const handleUpdate = async (data: Record<string, any>) => {
     if (!editingExpense) return;
     try {
-      await updateMutation.mutateAsync({ id: editingExpense.id, ...data });
+      await updateMutation.mutateAsync({
+        id: editingExpense.id,
+        amount: data.amount,
+        date: data.date,
+        expense_account_id: data.expense_account_id,
+        description: data.description,
+        funded_by_type: data.funded_by_type || null,
+        funded_by_id: data.funded_by_id || null,
+        funded_by_reference: data.funded_by_reference || null,
+        matches_loan_purpose: data.matches_loan_purpose ?? null,
+        purpose_notes: data.purpose_notes || null,
+        invoice_number: data.invoice_number || null,
+        vendor_name: data.vendor_name || null,
+      });
       toast({ title: "Expense updated" });
       setEditingExpense(null);
     } catch (err: any) {

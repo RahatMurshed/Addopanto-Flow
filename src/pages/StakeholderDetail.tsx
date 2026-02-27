@@ -299,71 +299,94 @@ function InvestorDetails({ stakeholderId, investments, fc, symbol }: { stakehold
     .reduce((s, d) => s + d.amount_paid, 0);
 
   return (
-    <>
-      {investments.map((inv, idx) => {
-        const invDists = allDistributions.filter(d => d.investment_id === inv.id);
-        const invDistTotal = invDists.reduce((s, d) => s + d.amount_paid, 0);
-        const roi = inv.investment_amount > 0 ? (invDistTotal / inv.investment_amount * 100).toFixed(1) : "0";
+    <Tabs defaultValue="overview" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="fund-usage">Fund Usage</TabsTrigger>
+      </TabsList>
 
-        return (
-          <Card key={inv.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  Investment #{idx + 1} — {format(new Date(inv.investment_date), "dd MMM yyyy")}
-                </CardTitle>
-                <Button size="sm" variant="outline" onClick={() => { setSelectedInvestment(inv); setShowDistribute(true); }}>
-                  <Plus className="h-3 w-3 mr-1" /> Distribute Profit
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div><p className="text-muted-foreground">Amount</p><p className="font-semibold">{fc(inv.investment_amount)}</p></div>
-                <div><p className="text-muted-foreground">Ownership</p><p className="font-semibold">{inv.ownership_percentage}%</p></div>
-                <div><p className="text-muted-foreground">Profit Share</p><p className="font-semibold">{inv.profit_share_percentage}%</p></div>
-                <div><p className="text-muted-foreground">ROI</p><p className="font-semibold text-emerald-600">{roi}%</p></div>
-                <div><p className="text-muted-foreground">Type</p><p className="font-semibold capitalize">{inv.investment_type.replace("_", " ")}</p></div>
-                <div><p className="text-muted-foreground">Status</p><Badge variant={inv.status === "active" ? "default" : "secondary"} className="capitalize">{inv.status}</Badge></div>
-                <div><p className="text-muted-foreground">Total Distributed</p><p className="font-semibold">{fc(invDistTotal)}</p></div>
-              </div>
+      <TabsContent value="overview" className="space-y-4">
+        {investments.map((inv, idx) => {
+          const invDists = allDistributions.filter(d => d.investment_id === inv.id);
+          const invDistTotal = invDists.reduce((s, d) => s + d.amount_paid, 0);
+          const roi = inv.investment_amount > 0 ? (invDistTotal / inv.investment_amount * 100).toFixed(1) : "0";
 
-              {invDists.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">Distribution History</h4>
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Period</TableHead>
-                          <TableHead className="text-right">Company Profit</TableHead>
-                          <TableHead className="text-right">Amount Paid</TableHead>
-                          <TableHead>Method</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {invDists.map(d => (
-                          <TableRow key={d.id}>
-                            <TableCell>{format(new Date(d.distribution_date), "dd/MM/yyyy")}</TableCell>
-                            <TableCell className="text-xs">{format(new Date(d.profit_period_start), "MMM yy")} – {format(new Date(d.profit_period_end), "MMM yy")}</TableCell>
-                            <TableCell className="text-right">{fc(d.total_company_profit)}</TableCell>
-                            <TableCell className="text-right font-medium">{fc(d.amount_paid)}</TableCell>
-                            <TableCell className="capitalize">{d.payment_method.replace("_", " ")}</TableCell>
-                            <TableCell><Badge variant={d.status === "paid" ? "default" : "secondary"} className="capitalize">{d.status}</Badge></TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+          return (
+            <Card key={inv.id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                    Investment #{idx + 1} — {format(new Date(inv.investment_date), "dd MMM yyyy")}
+                  </CardTitle>
+                  <Button size="sm" variant="outline" onClick={() => { setSelectedInvestment(inv); setShowDistribute(true); }}>
+                    <Plus className="h-3 w-3 mr-1" /> Distribute Profit
+                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div><p className="text-muted-foreground">Amount</p><p className="font-semibold">{fc(inv.investment_amount)}</p></div>
+                  <div><p className="text-muted-foreground">Ownership</p><p className="font-semibold">{inv.ownership_percentage}%</p></div>
+                  <div><p className="text-muted-foreground">Profit Share</p><p className="font-semibold">{inv.profit_share_percentage}%</p></div>
+                  <div><p className="text-muted-foreground">ROI</p><p className="font-semibold text-emerald-600">{roi}%</p></div>
+                  <div><p className="text-muted-foreground">Type</p><p className="font-semibold capitalize">{inv.investment_type.replace("_", " ")}</p></div>
+                  <div><p className="text-muted-foreground">Status</p><Badge variant={inv.status === "active" ? "default" : "secondary"} className="capitalize">{inv.status}</Badge></div>
+                  <div><p className="text-muted-foreground">Total Distributed</p><p className="font-semibold">{fc(invDistTotal)}</p></div>
+                </div>
+
+                {invDists.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium mb-2">Distribution History</h4>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Period</TableHead>
+                            <TableHead className="text-right">Company Profit</TableHead>
+                            <TableHead className="text-right">Amount Paid</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {invDists.map(d => (
+                            <TableRow key={d.id}>
+                              <TableCell>{format(new Date(d.distribution_date), "dd/MM/yyyy")}</TableCell>
+                              <TableCell className="text-xs">{format(new Date(d.profit_period_start), "MMM yy")} – {format(new Date(d.profit_period_end), "MMM yy")}</TableCell>
+                              <TableCell className="text-right">{fc(d.total_company_profit)}</TableCell>
+                              <TableCell className="text-right font-medium">{fc(d.amount_paid)}</TableCell>
+                              <TableCell className="capitalize">{d.payment_method.replace("_", " ")}</TableCell>
+                              <TableCell><Badge variant={d.status === "paid" ? "default" : "secondary"} className="capitalize">{d.status}</Badge></TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </TabsContent>
+
+      <TabsContent value="fund-usage">
+        {investments.map((inv) => (
+          <FundUsageTab
+            key={inv.id}
+            fundType="investment"
+            fundId={inv.id}
+            totalFunds={Number(inv.received_amount || inv.investment_amount)}
+            allocatedToExpenses={Number(inv.allocated_to_expenses || 0)}
+            remainingUnallocated={Number(inv.remaining_unallocated || inv.received_amount || inv.investment_amount)}
+          />
+        ))}
+        {investments.length === 0 && (
+          <p className="text-muted-foreground text-center py-8">No investments to show fund usage for.</p>
+        )}
+      </TabsContent>
 
       {/* Distribute Profit Modal */}
       <Dialog open={showDistribute} onOpenChange={setShowDistribute}>
@@ -417,7 +440,7 @@ function InvestorDetails({ stakeholderId, investments, fc, symbol }: { stakehold
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </Tabs>
   );
 }
 
@@ -475,97 +498,122 @@ function LenderDetails({ stakeholderId, loans, fc, symbol }: { stakeholderId: st
   };
 
   return (
-    <>
-      {loans.map((loan, idx) => {
-        const loanReps = allRepayments.filter(r => r.loan_id === loan.id);
-        const totalPaid = loanReps.reduce((s, r) => s + r.amount_paid, 0);
-        const pctPaid = loan.total_repayable > 0 ? (totalPaid / loan.total_repayable * 100) : 0;
+    <Tabs defaultValue="overview" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="fund-usage">Fund Usage</TabsTrigger>
+      </TabsList>
 
-        return (
-          <Card key={loan.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Landmark className="h-4 w-4 text-orange-500" />
-                  Loan #{idx + 1} — {format(new Date(loan.loan_date), "dd MMM yyyy")}
-                </CardTitle>
-                <div className="flex gap-2">
-                  <Badge variant={loan.status === "active" ? "default" : loan.status === "paid_off" ? "secondary" : "destructive"} className="capitalize">
-                    {loan.status.replace("_", " ")}
-                  </Badge>
-                  {loan.status !== "paid_off" && (
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedLoan(loan); setShowRepayment(true); }}>
-                      <Plus className="h-3 w-3 mr-1" /> Record Payment
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div><p className="text-muted-foreground">Principal</p><p className="font-semibold">{fc(loan.loan_amount)}</p></div>
-                <div><p className="text-muted-foreground">Interest ({loan.interest_rate}%)</p><p className="font-semibold">{fc(loan.interest_amount)}</p></div>
-                <div><p className="text-muted-foreground">Total Repayable</p><p className="font-semibold">{fc(loan.total_repayable)}</p></div>
-                <div><p className="text-muted-foreground">Remaining</p><p className="font-semibold text-destructive">{fc(loan.remaining_balance)}</p></div>
-                <div><p className="text-muted-foreground">Repayment Type</p><p className="font-semibold capitalize">{loan.repayment_type.replace("_", " ")}</p></div>
-                {loan.monthly_installment && <div><p className="text-muted-foreground">Monthly</p><p className="font-semibold">{fc(loan.monthly_installment)}</p></div>}
-                <div><p className="text-muted-foreground">Due Date</p><p className="font-semibold">{format(new Date(loan.repayment_due_date), "dd/MM/yyyy")}</p></div>
-              </div>
+      <TabsContent value="overview" className="space-y-4">
+        {loans.map((loan, idx) => {
+          const loanReps = allRepayments.filter(r => r.loan_id === loan.id);
+          const totalPaid = loanReps.reduce((s, r) => s + r.amount_paid, 0);
+          const pctPaid = loan.total_repayable > 0 ? (totalPaid / loan.total_repayable * 100) : 0;
 
-              {/* Progress bar */}
-              <div className="mt-4">
-                <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                  <span>Paid: {fc(totalPaid)}</span>
-                  <span>{pctPaid.toFixed(0)}%</span>
-                </div>
-                <Progress value={pctPaid} className="h-2" />
-              </div>
-
-              {loan.loan_purpose && <p className="mt-3 text-sm text-muted-foreground">Purpose: {loan.loan_purpose}</p>}
-              {loan.collateral_description && <p className="text-sm text-muted-foreground">Collateral: {loan.collateral_description}</p>}
-
-              {loanReps.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">Repayment History</h4>
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">Principal</TableHead>
-                          <TableHead className="text-right">Interest</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                          <TableHead>Method</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {loanReps.map(r => (
-                          <TableRow key={r.id}>
-                            <TableCell>{format(new Date(r.repayment_date), "dd/MM/yyyy")}</TableCell>
-                            <TableCell className="text-right font-medium">{fc(r.amount_paid)}</TableCell>
-                            <TableCell className="text-right">{fc(r.principal_portion)}</TableCell>
-                            <TableCell className="text-right">{fc(r.interest_portion)}</TableCell>
-                            <TableCell className="text-right">{fc(r.remaining_balance)}</TableCell>
-                            <TableCell className="capitalize">{r.payment_method.replace("_", " ")}</TableCell>
-                            <TableCell>
-                              <Badge variant={r.payment_status === "on_time" ? "default" : r.payment_status === "late" ? "destructive" : "secondary"} className="capitalize">
-                                {r.payment_status.replace("_", " ")}
-                                {r.days_overdue > 0 && ` (${r.days_overdue}d)`}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+          return (
+            <Card key={loan.id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-orange-500" />
+                    Loan #{idx + 1} — {format(new Date(loan.loan_date), "dd MMM yyyy")}
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Badge variant={loan.status === "active" ? "default" : loan.status === "paid_off" ? "secondary" : "destructive"} className="capitalize">
+                      {loan.status.replace("_", " ")}
+                    </Badge>
+                    {loan.status !== "paid_off" && (
+                      <Button size="sm" variant="outline" onClick={() => { setSelectedLoan(loan); setShowRepayment(true); }}>
+                        <Plus className="h-3 w-3 mr-1" /> Record Payment
+                      </Button>
+                    )}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div><p className="text-muted-foreground">Principal</p><p className="font-semibold">{fc(loan.loan_amount)}</p></div>
+                  <div><p className="text-muted-foreground">Interest ({loan.interest_rate}%)</p><p className="font-semibold">{fc(loan.interest_amount)}</p></div>
+                  <div><p className="text-muted-foreground">Total Repayable</p><p className="font-semibold">{fc(loan.total_repayable)}</p></div>
+                  <div><p className="text-muted-foreground">Remaining</p><p className="font-semibold text-destructive">{fc(loan.remaining_balance)}</p></div>
+                  <div><p className="text-muted-foreground">Repayment Type</p><p className="font-semibold capitalize">{loan.repayment_type.replace("_", " ")}</p></div>
+                  {loan.monthly_installment && <div><p className="text-muted-foreground">Monthly</p><p className="font-semibold">{fc(loan.monthly_installment)}</p></div>}
+                  <div><p className="text-muted-foreground">Due Date</p><p className="font-semibold">{format(new Date(loan.repayment_due_date), "dd/MM/yyyy")}</p></div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                    <span>Paid: {fc(totalPaid)}</span>
+                    <span>{pctPaid.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={pctPaid} className="h-2" />
+                </div>
+
+                {loan.loan_purpose && <p className="mt-3 text-sm text-muted-foreground">Purpose: {loan.loan_purpose}</p>}
+                {loan.collateral_description && <p className="text-sm text-muted-foreground">Collateral: {loan.collateral_description}</p>}
+
+                {loanReps.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium mb-2">Repayment History</h4>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Principal</TableHead>
+                            <TableHead className="text-right">Interest</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {loanReps.map(r => (
+                            <TableRow key={r.id}>
+                              <TableCell>{format(new Date(r.repayment_date), "dd/MM/yyyy")}</TableCell>
+                              <TableCell className="text-right font-medium">{fc(r.amount_paid)}</TableCell>
+                              <TableCell className="text-right">{fc(r.principal_portion)}</TableCell>
+                              <TableCell className="text-right">{fc(r.interest_portion)}</TableCell>
+                              <TableCell className="text-right">{fc(r.remaining_balance)}</TableCell>
+                              <TableCell className="capitalize">{r.payment_method.replace("_", " ")}</TableCell>
+                              <TableCell>
+                                <Badge variant={r.payment_status === "on_time" ? "default" : r.payment_status === "late" ? "destructive" : "secondary"} className="capitalize">
+                                  {r.payment_status.replace("_", " ")}
+                                  {r.days_overdue > 0 && ` (${r.days_overdue}d)`}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </TabsContent>
+
+      <TabsContent value="fund-usage">
+        {loans.map((loan) => (
+          <FundUsageTab
+            key={loan.id}
+            fundType="loan"
+            fundId={loan.id}
+            totalFunds={Number(loan.net_disbursed_amount || loan.loan_amount)}
+            allocatedToExpenses={Number(loan.allocated_to_expenses || 0)}
+            remainingUnallocated={Number(loan.remaining_unallocated || loan.net_disbursed_amount || loan.loan_amount)}
+            statedPurpose={loan.stated_purpose}
+            purposeCompliant={loan.purpose_compliant}
+          />
+        ))}
+        {loans.length === 0 && (
+          <p className="text-muted-foreground text-center py-8">No loans to show fund usage for.</p>
+        )}
+      </TabsContent>
 
       {/* Record Repayment Modal */}
       <Dialog open={showRepayment} onOpenChange={setShowRepayment}>
@@ -614,6 +662,6 @@ function LenderDetails({ stakeholderId, loans, fc, symbol }: { stakeholderId: st
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </Tabs>
   );
 }
