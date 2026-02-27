@@ -11,6 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, UserPlus, Users, Loader2, AlertTriangle, X, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAllStudents, useUpdateStudent, type Student } from "@/hooks/useStudents";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface BatchEnrollDialogProps {
   open: boolean;
@@ -30,6 +33,8 @@ export default function BatchEnrollDialog({
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
 
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const { data: allStudents = [], isLoading } = useAllStudents();
   const updateStudentMutation = useUpdateStudent();
 
@@ -80,6 +85,17 @@ export default function BatchEnrollDialog({
     setEnrollingId(student.id);
     try {
       await updateStudentMutation.mutateAsync({ id: student.id, batch_id: batchId });
+      // Create batch_enrollments record
+      if (activeCompanyId && user) {
+        await supabase.from("batch_enrollments").insert({
+          student_id: student.id,
+          batch_id: batchId,
+          company_id: activeCompanyId,
+          created_by: user.id,
+          status: "active",
+          total_fee: 0,
+        });
+      }
       toast({ title: "Student enrolled", description: `${student.name} has been enrolled in ${batchName}.` });
       onOpenChange(false);
     } catch (err: any) {
