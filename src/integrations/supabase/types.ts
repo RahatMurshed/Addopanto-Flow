@@ -2251,6 +2251,51 @@ export type Database = {
           },
         ]
       }
+      sales_note_categories: {
+        Row: {
+          color_class: string
+          company_id: string
+          created_at: string
+          created_by: string
+          id: string
+          label: string
+          value: string
+        }
+        Insert: {
+          color_class?: string
+          company_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          label: string
+          value: string
+        }
+        Update: {
+          color_class?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          label?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_note_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_note_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stakeholders: {
         Row: {
           address: string | null
