@@ -1,39 +1,73 @@
 
 
-# Fix Employee Performance Tab & Workflow Bugs
+# Add Custom Category Feature for Sales Notes
 
-## Bugs Found
+## Problem
 
-### Bug 1: Performance tab not synced with Attendance, Salary, and Leaves (CRITICAL)
-The performance hook uses separate query keys (`employee-perf-attendance`, `employee-perf-salary`) from the other tabs (`employee-attendance`, `employee-salary`). When attendance is marked, salary is paid, or leaves are added/deleted, only the tab-specific queries are invalidated -- the performance queries are never refreshed. This makes the Performance tab show stale/wrong data until a full page reload.
+Currently, note categories are hardcoded in `NOTE_CATEGORIES` array. Users cannot create their own custom categories for sales/follow-up notes, limiting flexibility.
 
-### Bug 2: Dynamic Tailwind class `grid-cols-${tabCount}` broken
-Line 301 uses a template literal for the grid columns class. Tailwind cannot detect dynamic class names at build time, so the grid layout for tabs may not render correctly.
+## Solution
 
-### Bug 3: Leave delete has no confirmation dialog
-The Leaves tab delete button immediately deletes without any confirmation, unlike the Salary tab which uses an AlertDialog.
+Create a `sales_note_categories` database table to store company-specific custom categories. Merge them with the existing default categories in the UI. Users (Admin/Cipher) can add and delete custom categories directly from the category dropdown.
 
-## Fix Plan
+## Changes
 
-### File: `src/hooks/useEmployees.ts`
-Add performance query invalidation to all relevant mutation hooks:
+### 1. Database Migration -- New `sales_note_categories` table
 
-- **`useMarkAttendance`** (line 340-342): Also invalidate `["employee-perf-attendance"]` for the employee
-- **`useCreateSalaryPayment`** (line 287-290): Also invalidate `["employee-perf-salary"]` for the employee
-- **`useDeleteSalaryPayment`** (line 302-304): Also invalidate `["employee-perf-salary"]` for the employee
-- **`useCreateLeave`** (line 373-375): Also invalidate `["employee-perf-attendance"]` (leaves affect performance attendance data)
-- **`useDeleteLeave`** (line 387-389): Also invalidate `["employee-perf-attendance"]`
+Create table with columns:
+- `id` (uuid, PK)
+- `company_id` (uuid, FK to companies)
+- `label` (text, NOT NULL) -- display name
+- `value` (text, NOT NULL) -- slug/key
+- `color_class` (text) -- Tailwind color classes
+- `created_by` (uuid, FK to auth.users)
+- `created_at` (timestamptz)
 
-### File: `src/pages/EmployeeDetail.tsx`
+RLS: Company members can SELECT; Admin/Cipher can INSERT/DELETE.
+Unique constraint on `(company_id, value)` to prevent duplicates.
 
-1. **Fix dynamic grid class** (line 301): Replace `grid-cols-${tabCount}` with a conditional expression using explicit Tailwind classes: `salaryVisible ? "grid-cols-5" : "grid-cols-4"`
+### 2. `src/hooks/useStudentSalesNotes.ts` -- Add custom category hooks
 
-2. **Add confirmation dialog for leave deletion** (lines 802-805): Wrap the delete button in an `AlertDialog` (same pattern as salary tab) to prevent accidental deletions
+- Add `useCustomNoteCategories(companyId)` hook to fetch custom categories
+- Add `useCreateCustomCategory()` mutation
+- Add `useDeleteCustomCategory()` mutation
+- Update `getCategoryInfo()` to accept custom categories as a parameter
+- Keep `NOTE_CATEGORIES` as the default/built-in list
 
-## Files Changed
+### 3. `src/pages/StudentProfilePage.tsx` -- Update UI
 
-| File | Change |
-|------|--------|
-| `src/hooks/useEmployees.ts` | Add performance query invalidation to 5 mutation hooks |
-| `src/pages/EmployeeDetail.tsx` | Fix dynamic grid class; add leave delete confirmation dialog |
+- Fetch custom categories using the new hook
+- Merge default + custom categories into `allCategories` list
+- In the category Select dropdowns (add note form, edit form, filter bar):
+  - Show all categories (defaults + custom)
+  - Add a separator and "Add Custom Category..." option at the bottom (visible to Admin/Cipher only)
+- Clicking "Add Custom Category..." opens a small inline dialog/popover with:
+  - Text input for category name
+  - Color picker (preset color options as clickable swatches)
+  - Save button
+- Custom categories show a delete (X) icon next to them in the dropdown (Admin/Cipher only)
+- Custom category badges use the stored color class
+
+## Technical Details
+
+- **Security:** RLS ensures company-level isolation. Only Admin/Cipher can create/delete custom categories.
+- **Edge cases:** Deleting a custom category does NOT delete notes using that category -- they'll fall back to "General Note" styling via `getCategoryInfo`.
+- **Patterns:** Follows existing hook patterns with React Query invalidation.
+- **Color presets:** 8 preset color combinations (teal, pink, indigo, amber, emerald, rose, cyan, lime) to choose from when creating a custom category.
+
+## Testing Checklist
+
+| # | Test | Expected Result |
+|---|------|----------------|
+| 1 | Admin creates a custom category | Category appears in all dropdowns |
+| 2 | User creates a note with custom category | Note saves with custom category badge |
+| 3 | Admin deletes a custom category | Category removed from dropdowns; existing notes show fallback style |
+| 4 | Non-admin user | Cannot see "Add Custom Category" option |
+| 5 | Filter by custom category | Notes filtered correctly |
+
+## Files Modified
+
+- New migration for `sales_note_categories` table
+- `src/hooks/useStudentSalesNotes.ts`
+- `src/pages/StudentProfilePage.tsx`
 
