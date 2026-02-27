@@ -18,6 +18,7 @@ interface Props {
   onPaymentChange: (data: InitialPaymentData) => void;
   onGoToStep: (step: number) => void;
   disabled?: boolean;
+  hidePayment?: boolean;
 }
 
 function Section({ title, step, onEdit, children }: { title: string; step: number; onEdit: (s: number) => void; children: React.ReactNode }) {
@@ -44,7 +45,7 @@ function Field({ label, value }: { label: string; value: string | number | null 
   );
 }
 
-export default function ReviewStep({ personal, contact, family, academic, initialPayment, onPaymentChange, onGoToStep, disabled }: Props) {
+export default function ReviewStep({ personal, contact, family, academic, initialPayment, onPaymentChange, onGoToStep, disabled, hidePayment }: Props) {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const admFee = academic.admission_fee_total;
@@ -92,7 +93,7 @@ export default function ReviewStep({ personal, contact, family, academic, initia
       </Section>
 
       {/* Initial Payment */}
-      {(admFee > 0 || monthFee > 0) && (
+      {!hidePayment && (admFee > 0 || monthFee > 0) && (
         <>
           <Separator />
           <InitialPaymentSection
