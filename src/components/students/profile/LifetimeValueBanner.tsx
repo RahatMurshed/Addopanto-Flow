@@ -147,9 +147,10 @@ interface LifetimeValueBannerProps {
     batch_id: string | null;
     course_end_month?: string | null;
   };
+  totalExpected?: number;
 }
 
-export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerProps) {
+export function LifetimeValueBanner({ studentId, student, totalExpected }: LifetimeValueBannerProps) {
   const { isDataEntryModerator, activeCompanyId, canViewFinancialData } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
@@ -199,9 +200,10 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
       productSales as any,
       student,
       batch,
-      futureUnpaidPayments
+      futureUnpaidPayments,
+      totalExpected
     );
-  }, [payments, productSales, student, batch, isLoading, futureUnpaidPayments]);
+  }, [payments, productSales, student, batch, isLoading, futureUnpaidPayments, totalExpected]);
 
   // Count-up values
   const animatedLTV = useCountUp(metrics?.lifetimeValue ?? 0);

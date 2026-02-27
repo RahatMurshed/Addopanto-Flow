@@ -300,7 +300,7 @@ export default function StudentProfilePage() {
         />
 
         {/* Lifetime Value Hero Banner */}
-        <LifetimeValueBanner studentId={student.id} student={student} />
+        <LifetimeValueBanner studentId={student.id} student={student} totalExpected={summary?.totalExpected} />
 
         {/* 2-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
