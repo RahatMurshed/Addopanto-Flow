@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, Users, Loader2, AlertTriangle, X, GraduationCap } from "lucide-react";
+import { Search, UserPlus, Users, Loader2, AlertTriangle, X, GraduationCap, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAllStudents, useUpdateStudent, type Student } from "@/hooks/useStudents";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ interface BatchEnrollDialogProps {
   onOpenChange: (open: boolean) => void;
   batchId: string;
   batchName: string;
+  courseId?: string | null;
 }
 
 export default function BatchEnrollDialog({
@@ -27,11 +29,13 @@ export default function BatchEnrollDialog({
   onOpenChange,
   batchId,
   batchName,
+  courseId,
 }: BatchEnrollDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [enrolledStudentIds, setEnrolledStudentIds] = useState<Set<string>>(new Set());
+  const [sameCourseMap, setSameCourseMap] = useState<Map<string, string>>(new Map());
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -56,6 +60,7 @@ export default function BatchEnrollDialog({
       setDebouncedQuery("");
       setEnrollingId(null);
       setEnrolledStudentIds(new Set());
+      setSameCourseMap(new Map());
     } else {
       // Fetch students already enrolled in this batch
       supabase
@@ -68,8 +73,27 @@ export default function BatchEnrollDialog({
             setEnrolledStudentIds(new Set(data.map((r) => r.student_id)));
           }
         });
+
+      // Fetch students already in another batch of the same course
+      if (courseId) {
+        supabase
+          .from("batch_enrollments")
+          .select("student_id, batches!batch_enrollments_batch_id_fkey(batch_name, course_id)")
+          .eq("status", "active")
+          .neq("batch_id", batchId)
+          .then(({ data }) => {
+            const map = new Map<string, string>();
+            (data ?? []).forEach((row: any) => {
+              const batch = row.batches;
+              if (batch && batch.course_id === courseId) {
+                map.set(row.student_id, batch.batch_name);
+              }
+            });
+            setSameCourseMap(map);
+          });
+      }
     }
-  }, [open, batchId]);
+  }, [open, batchId, courseId]);
 
   // Filter students for search results
   const searchResults = useMemo(() => {
@@ -198,39 +222,41 @@ export default function BatchEnrollDialog({
                   searchResults.map((student) => {
                     const isAlreadyEnrolled = enrolledStudentIds.has(student.id);
                     const isEnrolling = enrollingId === student.id;
+                    const sameCourseOtherBatch = sameCourseMap.get(student.id);
                     return (
-                      <Card key={student.id} className={`transition-colors ${isAlreadyEnrolled ? "opacity-60" : "hover:bg-accent/50"}`}>
-                        <CardContent className="flex items-center justify-between p-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm shrink-0">
-                              {student.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm truncate">{student.name}</p>
-                                {student.student_id_number && (
-                                  <Badge variant="outline" className="text-[10px] shrink-0">{student.student_id_number}</Badge>
+                      <div key={student.id} className="space-y-1">
+                        <Card className={`transition-colors ${isAlreadyEnrolled ? "opacity-60" : "hover:bg-accent/50"}`}>
+                          <CardContent className="flex items-center justify-between p-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm shrink-0">
+                                {student.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-sm truncate">{student.name}</p>
+                                  {student.student_id_number && (
+                                    <Badge variant="outline" className="text-[10px] shrink-0">{student.student_id_number}</Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                  {student.father_name && <span>Father: {student.father_name}</span>}
+                                  {student.phone && <span>📱 {student.phone}</span>}
+                                </div>
+                                {student.batch_id && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {isAlreadyEnrolled ? (
+                                      <span className="text-warning flex items-center gap-1">
+                                        <AlertTriangle className="h-3 w-3" /> Already in this batch
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1">
+                                        <GraduationCap className="h-3 w-3" /> Currently in another batch
+                                      </span>
+                                    )}
+                                  </p>
                                 )}
                               </div>
-                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                {student.father_name && <span>Father: {student.father_name}</span>}
-                                {student.phone && <span>📱 {student.phone}</span>}
-                              </div>
-                              {student.batch_id && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">
-                                  {isAlreadyEnrolled ? (
-                                    <span className="text-warning flex items-center gap-1">
-                                      <AlertTriangle className="h-3 w-3" /> Already in this batch
-                                    </span>
-                                  ) : (
-                                    <span className="flex items-center gap-1">
-                                      <GraduationCap className="h-3 w-3" /> Currently in another batch
-                                    </span>
-                                  )}
-                                </p>
-                              )}
                             </div>
-                          </div>
                           <Button
                             size="sm"
                             variant={isAlreadyEnrolled ? "secondary" : "default"}
@@ -248,6 +274,15 @@ export default function BatchEnrollDialog({
                           </Button>
                         </CardContent>
                       </Card>
+                      {sameCourseOtherBatch && !isAlreadyEnrolled && (
+                        <Alert variant="default" className="border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30 py-2 px-3">
+                          <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
+                          <AlertDescription className="text-xs text-yellow-700 dark:text-yellow-300">
+                            Already enrolled in <strong>{sameCourseOtherBatch}</strong> (same course). Enrolling here will create a second enrollment for this course.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
                     );
                   })
                 )}
