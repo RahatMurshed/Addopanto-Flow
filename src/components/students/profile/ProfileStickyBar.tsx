@@ -22,7 +22,6 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }>
   active: { bg: "bg-green-100 dark:bg-green-800/40", text: "text-green-800 dark:text-green-300", label: "Active" },
   inactive: { bg: "bg-red-100 dark:bg-red-800/40", text: "text-red-800 dark:text-red-300", label: "Inactive" },
   graduated: { bg: "bg-blue-100 dark:bg-blue-800/40", text: "text-blue-800 dark:text-blue-300", label: "Graduated" },
-  on_hold: { bg: "bg-yellow-100 dark:bg-yellow-800/40", text: "text-yellow-800 dark:text-yellow-300", label: "On Hold" },
 };
 
 export function ProfileStickyBar({ visible, student, canEdit, onEdit }: ProfileStickyBarProps) {

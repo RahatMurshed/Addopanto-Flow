@@ -20,27 +20,24 @@ interface EnrollmentTimelineProps {
   companyId: string;
 }
 
-type EnrollmentStatus = "active" | "completed" | "dropped" | "on_hold";
+type EnrollmentStatus = "active" | "completed" | "dropped";
 
 const STATUS_DOT: Record<EnrollmentStatus, string> = {
   active: "bg-green-500",
   completed: "bg-blue-400",
   dropped: "bg-red-400",
-  on_hold: "bg-yellow-400",
 };
 
 const STATUS_BADGE: Record<EnrollmentStatus, string> = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   completed: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   dropped: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  on_hold: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
 };
 
 const STATUS_LABEL: Record<EnrollmentStatus, string> = {
   active: "Active",
   completed: "Completed",
   dropped: "Dropped",
-  on_hold: "On Hold",
 };
 
 function useEnrollmentData(studentId: string, companyId: string) {
