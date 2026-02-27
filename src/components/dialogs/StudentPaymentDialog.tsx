@@ -116,10 +116,13 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
       setSelectedEnrollmentId(batchEnrollmentId);
     } else if (enrollments.length === 1) {
       setSelectedEnrollmentId(enrollments[0].id);
+    } else if (student.batch_id && enrollments.length > 1) {
+      const match = enrollments.find(e => e.batch_id === student.batch_id);
+      if (match) setSelectedEnrollmentId(match.id);
     } else if (enrollments.length === 0) {
       setSelectedEnrollmentId(null);
     }
-  }, [open, enrollments, batchEnrollmentId, isEditing, editingPayment]);
+  }, [open, enrollments, batchEnrollmentId, isEditing, editingPayment, student.batch_id]);
 
   // Per-batch fee summary
   const batchFeeSummary = useMemo(() => {
