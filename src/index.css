@@ -282,4 +282,18 @@ All colors MUST be HSL.
   [class*="gradient"] {
     background: transparent !important;
   }
+
+  /* Hide sticky bar and FAB in print */
+  .no-print,
+  [class*="sticky"] {
+    display: none !important;
+  }
+
+  /* Expand all collapsed sections */
+  details {
+    open: true;
+  }
+  details > * {
+    display: block !important;
+  }
 }
