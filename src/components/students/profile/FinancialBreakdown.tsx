@@ -182,8 +182,13 @@ export function FinancialBreakdown({ studentId, companyId, initialTab }: Financi
 
   const coursePayments: CoursePaymentRow[] = useMemo(() => {
     if (!data) return [];
+    const fallbackEnrollment = data.enrollmentMap.size > 0
+      ? data.enrollmentMap.values().next().value
+      : null;
     return data.payments.map((p) => {
-      const enrollment = p.batch_enrollment_id ? data.enrollmentMap.get(p.batch_enrollment_id) : null;
+      const enrollment = p.batch_enrollment_id
+        ? data.enrollmentMap.get(p.batch_enrollment_id)
+        : fallbackEnrollment;
       return {
         id: p.id,
         amount: Number(p.amount),
