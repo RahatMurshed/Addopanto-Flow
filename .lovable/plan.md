@@ -1,69 +1,69 @@
 
 
-# Fix: Rejected Company Creation Requests Not Visible to Users
+# Student Enrollment Details Popover and Table Cleanup
 
-## Problem
+## Overview
+When an authorized user clicks the "Enrolled" badge in the students table, a popover will appear showing the student's enrolled course (via their batch) and any products they've purchased. The Batch column will be removed from the table.
 
-When a cipher user rejects a company creation request, the requesting user never sees the rejection. This happens because:
+## Changes
 
-1. **Missing query**: `CompanySelection.tsx` only fetches creation requests with `status = 'pending'` (line 64). Rejected creation requests are never fetched.
-2. **Auto-redirect bug**: The redirect logic (line 160) doesn't account for rejected creation requests, so a user with only rejected requests and no companies gets bounced to `/companies/join` immediately -- they never even see the rejection.
-3. **No polling for status changes**: Unlike join requests which poll every 7 seconds for approval, creation requests have no polling. A user waiting on a pending creation request gets no live update when it's approved or rejected.
+### 1. Remove Batch Column from Students Table
+**File:** `src/pages/Students.tsx`
+- Remove the `<TableHead>Batch</TableHead>` column header (line 451)
+- Remove the `<TableCell>{batchName}</TableCell>` cell (line 492)
+- The `batchNameMap` can stay since it may be used elsewhere (drag-drop)
 
-## Solution
+### 2. Make "Enrolled" Badge Clickable with Popover
+**File:** `src/pages/Students.tsx`
+- Import `Popover`, `PopoverTrigger`, `PopoverContent` from UI components
+- Wrap the "Enrolled" badge in a `PopoverTrigger` that opens a popover
+- The popover will show:
+  - **Course name** (looked up via batch -> course relationship)
+  - **Batch name** (since we removed the column, this info moves here)
+  - **Product purchases** for this student (fetched from `product_sales` joined with `products`)
+- The "Not Enrolled" badge remains static (no popover, or a popover saying "Not enrolled in any batch")
 
-### 1. Add Rejected Creation Requests Query (`CompanySelection.tsx`)
+### 3. Fetch Course and Product Data
+**File:** `src/pages/Students.tsx`
+- Add `useCourses()` import to get course data for name lookups
+- Add a query or use existing `useProductSales` to get product sales linked to students
+- Build lookup maps:
+  - `batchCourseMap`: batch_id -> course info (name, code) via batches + courses data
+  - Student product purchases from product_sales where `student_id` matches
 
-Add a new `useQuery` to fetch rejected creation requests:
+### 4. Popover Content Design
+The popover will display a compact card with two sections:
 
+```text
++-------------------------------+
+| Course & Batch                |
+| Course: Web Development       |
+| Batch: WD-2025-A              |
++-------------------------------+
+| Products Purchased (2)        |
+| - JavaScript Book  x1  $25   |
+| - Notebook Set     x3  $15   |
++-------------------------------+
 ```
-status = 'rejected'
-order by reviewed_at desc
-```
 
-This mirrors the existing `rejectedJoinRequests` pattern.
+- If no course is linked to the batch, show "No course assigned"
+- If no product purchases exist, show "No purchases yet"
+- Include a "View Details" link to navigate to the student detail page
 
-### 2. Render Rejected Creation Requests Section
+## Technical Details
 
-Display rejected creation requests in a styled card section (similar to rejected join requests), showing:
-- Company name that was requested
-- Rejection date
-- Rejection reason (if provided by cipher)
-- A dismiss button (same pattern as join rejections)
-- A "Submit New Request" button linking to `/companies/create`
+### Data Flow
+- Batches are already fetched (`useBatches`)
+- Courses need to be fetched (`useCourses` from `useCourses.ts`)
+- Product sales need a lightweight query filtered by company -- can use existing `useProductSales` hook or a targeted query
+- Products need to be fetched for name lookups (`useProducts`)
 
-### 3. Fix Auto-Redirect Logic
+### Performance Consideration
+- Course and batch data are already cached via React Query
+- Product sales data will be fetched once and filtered client-side per student
+- Popover is lazy -- content only renders when opened
 
-Update the redirect condition (line 160) to also check for rejected creation requests, so users aren't bounced away before seeing their rejection message:
-
-```
-companies.length === 0 && !isCipher
-  && pendingJoinRequests.length === 0
-  && rejectedJoinRequests.length === 0
-  && rejectedCreationRequests.length === 0  // NEW
-  && pendingCreationRequests.length === 0   // already there implicitly
-  && newlyJoinedIds.length === 0
-```
-
-### 4. Add Polling for Creation Request Status Changes
-
-Add polling logic (similar to join request polling) that checks if a pending creation request has been approved or rejected. When a change is detected:
-- If **approved**: show a success toast and refresh company list (the user should now see the new company in "My Businesses")
-- If **rejected**: invalidate queries so the rejection card appears immediately
-
-### 5. Better UX Improvements
-
-- Add a dismissable state for rejected creation requests (same `dismissedRejections` pattern, extended to creation requests)
-- Show the pending creation request card with a subtle pulsing dot animation to indicate "waiting for review"
-- When no companies exist and only rejected requests are present, show an encouraging message with a clear call-to-action
-
-## Files Modified
-
+### Files Modified
 | File | Change |
 |---|---|
-| `src/pages/CompanySelection.tsx` | Add rejected creation requests query, render rejection cards, fix auto-redirect, add polling for creation request status changes |
-
-## No Database Changes Required
-
-RLS policies already allow users to read their own creation requests (`auth.uid() = user_id`). The `rejection_reason` column already exists on the table.
-
+| `src/pages/Students.tsx` | Remove Batch column, add Popover to Enrolled badge, import course/product data |
