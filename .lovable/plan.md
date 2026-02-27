@@ -1,27 +1,60 @@
 
 
-# Add Delete Product Category Feature
+# Fix Employee Workflow (Attendance, Performance, Leaves)
 
-## Overview
-The `useDeleteProductCategory` hook already exists and is imported but unused. Category cards currently have no delete option. This plan adds a delete button on each category card (for admins) with a confirmation dialog.
+## Root Cause
 
-## Changes
+The **attendance calendar** is broken due to a date query bug. The `useEmployeeAttendance` hook queries with `.lte("date", "${month}-31")` -- but months like February don't have 31 days, causing a **400 error** from the database (`date/time field value out of range: "2026-02-31"`).
 
-### File: `src/pages/Products.tsx`
+This cascading failure means:
+- Attendance calendar shows no data for Feb (and other short months)
+- The attendance tab appears non-functional
+- Performance data (which uses a separate, correct query via `useEmployeePerformance`) actually works fine
 
-1. **Add state for category deletion**: Add `deleteCategoryId` state variable to track which category is being deleted.
+There is also a minor React warning about `AlertDialog` being given a ref without `forwardRef`.
 
-2. **Add delete button to category cards**: On each category card (lines 165-184), add a small delete (trash) icon button in the top-right corner, visible only to admin users. This button will set `deleteCategoryId` to trigger the confirmation dialog. System categories (`is_system: true`) will not show the delete button.
+## Fix
 
-3. **Add confirmation AlertDialog for category deletion**: Add a second `AlertDialog` (after the existing product delete one) that warns the user about deleting the category and confirms the action. On confirm, call `deleteCategory.mutateAsync(deleteCategoryId)`.
+### 1. Fix date range in `useEmployeeAttendance` (`src/hooks/useEmployees.ts`)
 
-4. **Wire up `useDeleteProductCategory`**: Initialize the `useDeleteProductCategory` hook (already imported) and use it in the delete handler.
+**Current (broken):**
+```typescript
+query = query.gte("date", `${month}-01`).lte("date", `${month}-31`);
+```
 
-5. **Add edit button to category cards**: While we're at it, add an edit (pencil) icon button next to delete so admins can edit categories directly from the card (currently only accessible via the Settings2 button in the header). This opens the existing `ProductCategoryDialog` with the selected category.
+**Fixed:** Use `date-fns` to compute the actual last day of the month:
+```typescript
+import { endOfMonth, format } from "date-fns";
 
-## Technical Details
+const lastDay = format(endOfMonth(new Date(`${month}-01`)), "yyyy-MM-dd");
+query = query.gte("date", `${month}-01`).lte("date", lastDay);
+```
 
-- The `useDeleteProductCategory` hook is already defined in `src/hooks/useProductCategories.ts` and imported in Products.tsx -- just needs to be called
-- Category cards will get a small action overlay (edit + delete icons) visible on hover or always for mobile, only for admin users
-- Non-system categories only (`is_system === false`) can be deleted
-- If a category has products assigned to it, the delete will either fail at the DB level (if FK constraint exists) or succeed -- the confirmation dialog will warn about this
+This correctly handles February (28/29 days), April/June/Sep/Nov (30 days), etc.
+
+### 2. Fix AlertDialog ref warning in `EmployeeDetail.tsx`
+
+The `AlertDialog` component in the salary and leaves tables is being rendered inline without proper wrapping. Wrap the `AlertDialogTrigger` pattern correctly to avoid the ref forwarding warning.
+
+## How Performance Score Is Calculated
+
+The performance score (from `useEmployeePerformance.ts`) works as follows:
+
+1. **Working Days**: For each of the last 6 months, count all non-Sunday days (Mon-Sat)
+2. **Effective Days**: `days present + (half days x 0.5)`
+3. **Attendance %**: `(effective days / working days) x 100`, capped at 100%
+4. **Average Attendance**: Mean of the 6 monthly attendance percentages
+5. **Salary Score** (if salary visible): `(months with salary paid / total months) x 100`
+6. **Overall Score**:
+   - If salary is visible: `(attendance x 0.7) + (salary score x 0.3)`
+   - If salary is hidden: just the attendance score
+
+So an employee present every working day with all salary months paid scores 100. Sundays are excluded from working days. Leave days and absent days reduce the score. Half days count as 0.5.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/hooks/useEmployees.ts` | Fix date range query to use actual end-of-month |
+| `src/pages/EmployeeDetail.tsx` | Fix AlertDialog ref warning |
+
