@@ -59,7 +59,7 @@ function PaymentRateRing({ rate }: { rate: number }) {
         <circle
           cx="28" cy="28" r={radius}
           fill="none"
-          stroke="rgba(255,255,255,0.2)"
+          className="stroke-muted-foreground/20 dark:stroke-white/20"
           strokeWidth="4"
         />
         <circle
