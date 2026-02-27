@@ -18,7 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download, ScanSearch } from "lucide-react";
+import { Plus, Eye, CreditCard, Trash2, GraduationCap, Users, AlertTriangle, Loader2, Search, Upload, Layers, GripVertical, Download, ScanSearch, BookOpen, ShoppingBag } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import StudentDialog from "@/components/dialogs/StudentDialog";
@@ -36,6 +36,11 @@ import StudentFilters, { defaultFilters, type StudentFilterValues } from "@/comp
 import StudentsDashboard from "@/components/students/StudentsDashboard";
 import StudentProfileDialog from "@/components/dialogs/StudentProfileDialog";
 import { useBatches } from "@/hooks/useBatches";
+import { useCourses } from "@/hooks/useCourses";
+import { useProducts } from "@/hooks/useProducts";
+import { useProductSales } from "@/hooks/useProductSales";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import PiiRestrictionBanner from "@/components/shared/PiiRestrictionBanner";
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
@@ -212,6 +217,47 @@ export default function Students() {
     batchesData.forEach(b => map.set(b.id, b.batch_name));
     return map;
   }, [batchesData]);
+
+  // Course & product data for enrollment popover
+  const { data: coursesData = [] } = useCourses();
+  const { data: productsData = [] } = useProducts();
+  const { data: productSalesData = [] } = useProductSales();
+
+  const batchCourseMap = useMemo(() => {
+    const courseMap = new Map<string, { course_name: string; course_code: string }>();
+    coursesData.forEach(c => courseMap.set(c.id, { course_name: c.course_name, course_code: c.course_code }));
+    const map = new Map<string, { course_name: string; course_code: string; batch_name: string }>();
+    batchesData.forEach(b => {
+      const course = b.course_id ? courseMap.get(b.course_id) : null;
+      map.set(b.id, {
+        course_name: course?.course_name || "No course assigned",
+        course_code: course?.course_code || "",
+        batch_name: b.batch_name,
+      });
+    });
+    return map;
+  }, [batchesData, coursesData]);
+
+  const productNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    productsData.forEach(p => map.set(p.id, p.product_name));
+    return map;
+  }, [productsData]);
+
+  const studentProductSales = useMemo(() => {
+    const map = new Map<string, Array<{ product_name: string; quantity: number; total_amount: number }>>();
+    productSalesData.forEach(sale => {
+      if (!sale.student_id) return;
+      const list = map.get(sale.student_id) || [];
+      list.push({
+        product_name: productNameMap.get(sale.product_id) || "Unknown Product",
+        quantity: sale.quantity,
+        total_amount: sale.total_amount,
+      });
+      map.set(sale.student_id, list);
+    });
+    return map;
+  }, [productSalesData, productNameMap]);
 
   const handleDragStart = useCallback((e: React.DragEvent, studentId: string) => {
     e.dataTransfer.setData("text/student-id", studentId);
@@ -448,7 +494,6 @@ export default function Students() {
                       <TableHead className="hidden lg:table-cell">Father Name</TableHead>
                       <TableHead className="hidden md:table-cell">Contact</TableHead>
                       <TableHead>Enrollment</TableHead>
-                      <TableHead className="hidden sm:table-cell">Batch</TableHead>
                       <TableHead className="w-28">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -484,12 +529,60 @@ export default function Students() {
                           <TableCell className="hidden md:table-cell text-muted-foreground">{s.phone || "—"}</TableCell>
                           <TableCell>
                             {isEnrolled ? (
-                              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Enrolled</Badge>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30 cursor-pointer hover:bg-green-500/25 transition-colors">Enrolled</Badge>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 p-0" align="start">
+                                  {(() => {
+                                    const info = batchCourseMap.get(s.batch_id!);
+                                    const purchases = studentProductSales.get(s.id) || [];
+                                    return (
+                                      <div>
+                                        <div className="p-3 space-y-1.5">
+                                          <div className="flex items-center gap-2 text-sm font-medium">
+                                            <BookOpen className="h-4 w-4 text-primary" />
+                                            Course & Batch
+                                          </div>
+                                          <div className="text-sm space-y-0.5 pl-6">
+                                            <p><span className="text-muted-foreground">Course:</span> {info?.course_name || "No course assigned"}</p>
+                                            <p><span className="text-muted-foreground">Batch:</span> {info?.batch_name || batchName}</p>
+                                          </div>
+                                        </div>
+                                        <Separator />
+                                        <div className="p-3 space-y-1.5">
+                                          <div className="flex items-center gap-2 text-sm font-medium">
+                                            <ShoppingBag className="h-4 w-4 text-primary" />
+                                            Products Purchased ({purchases.length})
+                                          </div>
+                                          {purchases.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground pl-6">No purchases yet</p>
+                                          ) : (
+                                            <div className="space-y-1 pl-6">
+                                              {purchases.map((p, i) => (
+                                                <div key={i} className="flex items-center justify-between text-sm">
+                                                  <span className="truncate mr-2">{p.product_name} <span className="text-muted-foreground">×{p.quantity}</span></span>
+                                                  <span className="text-muted-foreground whitespace-nowrap">{formatCurrency(p.total_amount)}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <Separator />
+                                        <div className="p-2">
+                                          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => navigate(`/students/${s.id}`)}>
+                                            View Details
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </PopoverContent>
+                              </Popover>
                             ) : (
                               <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Not Enrolled</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-muted-foreground">{batchName}</TableCell>
                           <TableCell>
                             <div className="flex gap-1">
                               <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setProfileStudent(s); setProfileOpen(true); }}>
