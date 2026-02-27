@@ -1,54 +1,51 @@
 
-# Fix: Batch Detail Page Not Showing Multi-Enrolled Students
 
-## Problem
+# Fix: Enrollment Modal vs Student List Inconsistency
 
-The Batch Detail page filters students using `students.batch_id === batchId` (line 139 of `BatchDetail.tsx`). After the recent fix to support multi-batch enrollment (where `student.batch_id` is no longer overwritten), students enrolled in additional batches don't appear on the batch page because their `batch_id` still points to their primary batch.
+## Root Cause
 
-Database confirms: Rahat Murshed and Technoboa ARE actively enrolled in Batch-3 via `batch_enrollments`, but their `student.batch_id` points to a different batch (`e5271b03...`).
+Two queries use **different logic** to determine batch membership:
 
-## Solution
+| Query | Location | Logic | Result for Taosif |
+|---|---|---|---|
+| Enrollment modal check | `BatchEnrollDialog.tsx` line 66-71 | `batch_enrollments WHERE batch_id = X AND status = 'active'` | Found -- shows "Already in this batch" |
+| Enrolled students list | `BatchDetail.tsx` line 142 | `allStudents.filter(s => s.batch_id === id)` | Not found -- Taosif's `batch_id` points to his first batch |
 
-Fetch active `batch_enrollments` for the current batch and use those student IDs to filter `allStudents`, instead of relying on `students.batch_id`.
+Taosif has two active enrollments (two different batches). His `students.batch_id` field only points to one batch, so he appears in one batch's list but not the other, even though he has valid `batch_enrollments` records for both.
 
-## Changes
+This was identified in the earlier enrollment fix plan but the student list query in `BatchDetail.tsx` was never updated.
 
-### `src/pages/BatchDetail.tsx`
+## Fix
 
-1. **Add a query to fetch enrolled student IDs** for this batch from `batch_enrollments`:
-   - Query `batch_enrollments` where `batch_id = id` and `status = 'active'`
-   - Extract the set of `student_id` values
+### 1. `src/pages/BatchDetail.tsx` -- Use enrollment records for batch membership (the main fix)
 
-2. **Update `allBatchStudents` filter** (line 137-140):
-   - Change from: `allStudents.filter(s => s.batch_id === id)`
-   - Change to: `allStudents.filter(s => enrolledStudentIds.has(s.id))`
-   - This correctly includes all students with an active enrollment in this batch, regardless of their primary `batch_id`
+Change `allBatchStudents` (lines 140-143) from filtering by `s.batch_id === id` to filtering by the already-fetched `batchEnrollments` data:
 
-3. **Update `useBatchStudentCount` dependency** -- the batch student count hook in the header also uses `students.batch_id`. We'll update it to use the enrollment-based count instead.
+```typescript
+// Build a Set of student IDs from active batch_enrollments
+const enrolledStudentIdSet = useMemo(() => {
+  return new Set(batchEnrollments.map((e: any) => e.student_id));
+}, [batchEnrollments]);
 
-### `src/hooks/useBatches.ts` -- `useBatchStudentCount`
+// Filter students using enrollment records, not student.batch_id
+const allBatchStudents = useMemo(() => {
+  if (!id) return [];
+  return allStudents.filter((s: any) => enrolledStudentIdSet.has(s.id));
+}, [allStudents, id, enrolledStudentIdSet]);
+```
 
-Update the `useBatchStudentCount` hook (line 145-158) to count from `batch_enrollments` table instead of `students.batch_id`:
-- Change from: `supabase.from("students").select("id", { count: "exact", head: true }).eq("batch_id", batchId)`
-- Change to: `supabase.from("batch_enrollments").select("id", { count: "exact", head: true }).eq("batch_id", batchId).eq("status", "active")`
+The `batchEnrollments` query already exists at lines 61-74 and correctly filters by `status = 'active'`. This makes both queries consistent.
 
-## Technical Details
+### 2. `src/hooks/useBatches.ts` -- Update `useBatchStudentCount`
 
-- This aligns the batch detail page with the multi-enrollment model
-- Students with `batch_id` pointing to another batch will now correctly appear in all batches they're enrolled in
-- The `batch_enrollments` table is the source of truth for batch membership
-- No database changes needed -- only frontend query logic
+The student count hook also uses `students.batch_id` filtering. Update it to count from `batch_enrollments` where `status = 'active'` instead, so batch cards and headers show correct counts.
 
-## Testing Checklist
+### 3. No duplicate cleanup needed
 
-| # | Test | Expected Result |
-|---|------|----------------|
-| 1 | Open Batch-3 detail page | Rahat Murshed and Technoboa appear in enrolled students list |
-| 2 | Student count shows correctly | Shows 2 students, not 0 |
-| 3 | Students still appear in their primary batch page | No regression on primary batch view |
-| 4 | Payment and stats calculations work | Collected/Pending/Overdue stats reflect enrolled students |
+Database query confirmed zero duplicate active enrollments for any student-batch pair. The partial unique index (`batch_enrollments_active_unique`) is working correctly.
 
 ## Files Modified
 
-- `src/pages/BatchDetail.tsx` -- Use `batch_enrollments` to determine batch membership
-- `src/hooks/useBatches.ts` -- Update `useBatchStudentCount` to query `batch_enrollments`
+1. **`src/pages/BatchDetail.tsx`** -- Change `allBatchStudents` filter logic (2 lines)
+2. **`src/hooks/useBatches.ts`** -- Update `useBatchStudentCount` to query `batch_enrollments`
+
