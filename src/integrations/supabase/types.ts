@@ -1097,10 +1097,17 @@ export type Database = {
           date: string
           description: string | null
           expense_account_id: string
+          funded_by_id: string | null
+          funded_by_reference: string | null
+          funded_by_type: string | null
           id: string
+          invoice_number: string | null
+          matches_loan_purpose: boolean | null
+          purpose_notes: string | null
           receipt_url: string | null
           updated_at: string
           user_id: string
+          vendor_name: string | null
         }
         Insert: {
           amount: number
@@ -1109,10 +1116,17 @@ export type Database = {
           date?: string
           description?: string | null
           expense_account_id: string
+          funded_by_id?: string | null
+          funded_by_reference?: string | null
+          funded_by_type?: string | null
           id?: string
+          invoice_number?: string | null
+          matches_loan_purpose?: boolean | null
+          purpose_notes?: string | null
           receipt_url?: string | null
           updated_at?: string
           user_id: string
+          vendor_name?: string | null
         }
         Update: {
           amount?: number
@@ -1121,10 +1135,17 @@ export type Database = {
           date?: string
           description?: string | null
           expense_account_id?: string
+          funded_by_id?: string | null
+          funded_by_reference?: string | null
+          funded_by_type?: string | null
           id?: string
+          invoice_number?: string | null
+          matches_loan_purpose?: boolean | null
+          purpose_notes?: string | null
           receipt_url?: string | null
           updated_at?: string
           user_id?: string
+          vendor_name?: string | null
         }
         Relationships: [
           {
@@ -1152,56 +1173,101 @@ export type Database = {
       }
       investments: {
         Row: {
+          allocated_to_expenses: number | null
           company_id: string
           company_valuation_at_investment: number | null
           created_at: string
+          destination_account_masked: string | null
+          destination_bank: string | null
           exit_amount: number | null
           exit_date: string | null
+          expected_amount: number | null
           id: string
           investment_amount: number
           investment_date: string
           investment_type: string
           ownership_percentage: number
           profit_share_percentage: number
+          proof_document_url: string | null
+          receipt_notes: string | null
+          receipt_status: string | null
+          received_amount: number | null
+          remaining_unallocated: number | null
+          source_account_name: string | null
+          source_account_number_masked: string | null
+          source_bank: string | null
           stakeholder_id: string
           status: string
           terms_and_conditions: string | null
+          transaction_reference: string | null
+          transfer_date: string | null
+          transfer_method: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          allocated_to_expenses?: number | null
           company_id: string
           company_valuation_at_investment?: number | null
           created_at?: string
+          destination_account_masked?: string | null
+          destination_bank?: string | null
           exit_amount?: number | null
           exit_date?: string | null
+          expected_amount?: number | null
           id?: string
           investment_amount: number
           investment_date: string
           investment_type?: string
           ownership_percentage?: number
           profit_share_percentage?: number
+          proof_document_url?: string | null
+          receipt_notes?: string | null
+          receipt_status?: string | null
+          received_amount?: number | null
+          remaining_unallocated?: number | null
+          source_account_name?: string | null
+          source_account_number_masked?: string | null
+          source_bank?: string | null
           stakeholder_id: string
           status?: string
           terms_and_conditions?: string | null
+          transaction_reference?: string | null
+          transfer_date?: string | null
+          transfer_method?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          allocated_to_expenses?: number | null
           company_id?: string
           company_valuation_at_investment?: number | null
           created_at?: string
+          destination_account_masked?: string | null
+          destination_bank?: string | null
           exit_amount?: number | null
           exit_date?: string | null
+          expected_amount?: number | null
           id?: string
           investment_amount?: number
           investment_date?: string
           investment_type?: string
           ownership_percentage?: number
           profit_share_percentage?: number
+          proof_document_url?: string | null
+          receipt_notes?: string | null
+          receipt_status?: string | null
+          received_amount?: number | null
+          remaining_unallocated?: number | null
+          source_account_name?: string | null
+          source_account_number_masked?: string | null
+          source_bank?: string | null
           stakeholder_id?: string
           status?: string
           terms_and_conditions?: string | null
+          transaction_reference?: string | null
+          transfer_date?: string | null
+          transfer_method?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1369,71 +1435,134 @@ export type Database = {
       }
       loans: {
         Row: {
+          allocated_to_expenses: number | null
           collateral_description: string | null
           company_id: string
           created_at: string
+          destination_account_masked: string | null
+          destination_bank: string | null
+          disbursement_date: string | null
+          disbursement_method: string | null
+          disbursement_notes: string | null
+          disbursement_proof_url: string | null
+          disbursement_status: string | null
+          documentation_charges: number | null
+          gross_loan_amount: number | null
           id: string
           interest_amount: number
           interest_rate: number
+          loan_agreement_number: string | null
           loan_agreement_url: string | null
           loan_amount: number
           loan_date: string
           loan_purpose: string | null
           monthly_installment: number | null
+          net_disbursed_amount: number | null
           notes: string | null
+          other_deductions: number | null
+          processing_fee: number | null
+          purpose_compliant: boolean | null
           remaining_balance: number
+          remaining_unallocated: number | null
           repayment_due_date: string
           repayment_start_date: string | null
           repayment_type: string
+          source_account_name: string | null
+          source_account_number_masked: string | null
+          source_bank: string | null
           stakeholder_id: string
+          stated_purpose: string | null
           status: string
           total_repayable: number
+          transaction_reference: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          allocated_to_expenses?: number | null
           collateral_description?: string | null
           company_id: string
           created_at?: string
+          destination_account_masked?: string | null
+          destination_bank?: string | null
+          disbursement_date?: string | null
+          disbursement_method?: string | null
+          disbursement_notes?: string | null
+          disbursement_proof_url?: string | null
+          disbursement_status?: string | null
+          documentation_charges?: number | null
+          gross_loan_amount?: number | null
           id?: string
           interest_amount?: number
           interest_rate?: number
+          loan_agreement_number?: string | null
           loan_agreement_url?: string | null
           loan_amount: number
           loan_date: string
           loan_purpose?: string | null
           monthly_installment?: number | null
+          net_disbursed_amount?: number | null
           notes?: string | null
+          other_deductions?: number | null
+          processing_fee?: number | null
+          purpose_compliant?: boolean | null
           remaining_balance: number
+          remaining_unallocated?: number | null
           repayment_due_date: string
           repayment_start_date?: string | null
           repayment_type?: string
+          source_account_name?: string | null
+          source_account_number_masked?: string | null
+          source_bank?: string | null
           stakeholder_id: string
+          stated_purpose?: string | null
           status?: string
           total_repayable: number
+          transaction_reference?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          allocated_to_expenses?: number | null
           collateral_description?: string | null
           company_id?: string
           created_at?: string
+          destination_account_masked?: string | null
+          destination_bank?: string | null
+          disbursement_date?: string | null
+          disbursement_method?: string | null
+          disbursement_notes?: string | null
+          disbursement_proof_url?: string | null
+          disbursement_status?: string | null
+          documentation_charges?: number | null
+          gross_loan_amount?: number | null
           id?: string
           interest_amount?: number
           interest_rate?: number
+          loan_agreement_number?: string | null
           loan_agreement_url?: string | null
           loan_amount?: number
           loan_date?: string
           loan_purpose?: string | null
           monthly_installment?: number | null
+          net_disbursed_amount?: number | null
           notes?: string | null
+          other_deductions?: number | null
+          processing_fee?: number | null
+          purpose_compliant?: boolean | null
           remaining_balance?: number
+          remaining_unallocated?: number | null
           repayment_due_date?: string
           repayment_start_date?: string | null
           repayment_type?: string
+          source_account_name?: string | null
+          source_account_number_masked?: string | null
+          source_bank?: string | null
           stakeholder_id?: string
+          stated_purpose?: string | null
           status?: string
           total_repayable?: number
+          transaction_reference?: string | null
           updated_at?: string
           user_id?: string
         }

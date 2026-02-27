@@ -12,13 +12,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ImageUpload } from "@/components/shared/ImageUpload";
-import { ArrowLeft, TrendingUp, Landmark, Plus, Calendar, DollarSign, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, TrendingUp, Landmark, Plus, Calendar, DollarSign, Pencil, Save, X, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import FundUsageTab from "@/components/stakeholders/FundUsageTab";
 
 export default function StakeholderDetailPage() {
   const { id } = useParams<{ id: string }>();
