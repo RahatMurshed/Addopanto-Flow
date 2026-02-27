@@ -73,7 +73,7 @@ function PaymentRateRing({ rate }: { rate: number }) {
           style={{ transition: "stroke-dashoffset 1s ease-out" }}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-foreground dark:text-white">
         {rate}%
       </span>
     </div>
@@ -94,8 +94,8 @@ function StatBlock({ icon, value, label, sublabel, className, valueClassName }: 
   return (
     <div className={cn("flex flex-col items-center text-center gap-1.5 px-4", className)}>
       {icon}
-      <div className={cn("text-3xl font-bold text-white", valueClassName)}>{value}</div>
-      <p className="text-white/60 text-xs">{label}</p>
+      <div className={cn("text-3xl font-bold text-foreground dark:text-white", valueClassName)}>{value}</div>
+      <p className="text-muted-foreground dark:text-white/60 text-xs">{label}</p>
       {sublabel}
     </div>
   );
@@ -105,11 +105,11 @@ function LockedStat({ label }: { label: string }) {
   return (
     <StatBlock
       icon={
-        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-          <Lock className="h-5 w-5 text-white/50" />
+        <div className="w-10 h-10 rounded-full bg-muted dark:bg-white/10 flex items-center justify-center">
+          <Lock className="h-5 w-5 text-muted-foreground dark:text-white/50" />
         </div>
       }
-      value={<span className="text-white/40 text-sm italic">Restricted</span>}
+      value={<span className="text-muted-foreground dark:text-white/40 text-sm italic">Restricted</span>}
       label={label}
     />
   );
@@ -118,17 +118,17 @@ function LockedStat({ label }: { label: string }) {
 // ─── Skeleton ───
 function BannerSkeleton() {
   return (
-    <div className="w-full rounded-xl bg-gradient-to-r from-secondary to-[hsl(224,60%,30%)] p-6 md:p-8 shadow-lg">
+    <div className="w-full rounded-xl bg-card dark:bg-gradient-to-r dark:from-secondary dark:to-[hsl(224,60%,30%)] border border-border p-6 md:p-8 shadow-lg">
       <div className="flex items-center justify-between mb-6">
-        <div className="h-3 w-40 rounded bg-white/20 animate-pulse" />
-        <div className="h-5 w-28 rounded-full bg-white/10 animate-pulse" />
+        <div className="h-3 w-40 rounded bg-muted dark:bg-white/20 animate-pulse" />
+        <div className="h-5 w-28 rounded-full bg-muted dark:bg-white/10 animate-pulse" />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="flex flex-col items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
-            <div className="w-16 h-8 rounded bg-white/20 animate-pulse" />
-            <div className="w-20 h-3 rounded bg-white/10 animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-muted dark:bg-white/10 animate-pulse" />
+            <div className="w-16 h-8 rounded bg-muted dark:bg-white/20 animate-pulse" />
+            <div className="w-20 h-3 rounded bg-muted/60 dark:bg-white/10 animate-pulse" />
           </div>
         ))}
       </div>
@@ -236,13 +236,13 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
   const showFinancials = canViewFinancialData !== false;
 
   return (
-    <div className="w-full rounded-xl bg-gradient-to-r from-secondary to-[hsl(224,60%,30%)] p-6 md:p-8 shadow-lg no-print">
+    <div className="w-full rounded-xl bg-card dark:bg-gradient-to-r dark:from-secondary dark:to-[hsl(224,60%,30%)] border border-border p-6 md:p-8 shadow-lg no-print">
       {/* Header row */}
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-white/70 text-sm font-medium uppercase tracking-widest">
+        <h3 className="text-muted-foreground dark:text-white/70 text-sm font-medium uppercase tracking-widest">
           Student Lifetime Overview
         </h3>
-        <span className="bg-white/10 text-white/80 text-xs px-3 py-1 rounded-full">
+        <span className="bg-muted dark:bg-white/10 text-muted-foreground dark:text-white/80 text-xs px-3 py-1 rounded-full">
           {metrics.studentSinceDate
             ? `Student Since ${format(metrics.studentSinceDate, "MMM yyyy")}`
             : "Not yet enrolled"}
@@ -255,8 +255,8 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
         {showFinancials ? (
           <StatBlock
             icon={
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-white/80" />
+              <div className="w-10 h-10 rounded-full bg-muted dark:bg-white/10 flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-muted-foreground dark:text-white/80" />
               </div>
             }
             value={formatCurrency(animatedLTV, currency)}
@@ -269,8 +269,8 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
         {/* 2. Courses Enrolled */}
         <StatBlock
           icon={
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-              <BookOpen className="h-5 w-5 text-white/80" />
+            <div className="w-10 h-10 rounded-full bg-muted dark:bg-white/10 flex items-center justify-center">
+              <BookOpen className="h-5 w-5 text-muted-foreground dark:text-white/80" />
             </div>
           }
           value={metrics.coursesEnrolled}
@@ -280,8 +280,8 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
         {/* 3. Products Purchased */}
         <StatBlock
           icon={
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-              <ShoppingBag className="h-5 w-5 text-white/80" />
+            <div className="w-10 h-10 rounded-full bg-muted dark:bg-white/10 flex items-center justify-center">
+              <ShoppingBag className="h-5 w-5 text-muted-foreground dark:text-white/80" />
             </div>
           }
           value={metrics.productsPurchased}
@@ -291,14 +291,14 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
         {/* 4. Days Since Joining */}
         <StatBlock
           icon={
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-              <CalendarDays className="h-5 w-5 text-white/80" />
+            <div className="w-10 h-10 rounded-full bg-muted dark:bg-white/10 flex items-center justify-center">
+              <CalendarDays className="h-5 w-5 text-muted-foreground dark:text-white/80" />
             </div>
           }
           value={
             <span>
               {animatedDays.toLocaleString()}
-              <span className="text-lg text-white/70 ml-1">days</span>
+              <span className="text-lg text-muted-foreground dark:text-white/70 ml-1">days</span>
             </span>
           }
           label="Since First Enrollment"
@@ -316,8 +316,8 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
           <StatBlock
             className="col-span-2 md:col-span-1"
             icon={
-              <div className="w-10 h-10 rounded-full bg-amber-400/20 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-amber-300" />
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-400/20 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-300" />
               </div>
             }
             value={
@@ -325,14 +325,14 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
                 ? formatCurrency(animatedProjection, currency)
                 : "—"
             }
-            valueClassName="text-amber-300"
+            valueClassName="text-amber-600 dark:text-amber-300"
             label="Projected Revenue"
             sublabel={
               metrics.hasActiveEnrollments ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="cursor-help">
-                      <Info className="h-3 w-3 text-amber-200/50" />
+                      <Info className="h-3 w-3 text-amber-500 dark:text-amber-200/50" />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[250px] text-xs">
@@ -342,7 +342,7 @@ export function LifetimeValueBanner({ studentId, student }: LifetimeValueBannerP
               ) : (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-amber-200/50 text-[10px] cursor-help">No active batches</span>
+                    <span className="text-amber-600/60 dark:text-amber-200/50 text-[10px] cursor-help">No active batches</span>
                   </TooltipTrigger>
                   <TooltipContent>No active enrollments to project revenue from</TooltipContent>
                 </Tooltip>
