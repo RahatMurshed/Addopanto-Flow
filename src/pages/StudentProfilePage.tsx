@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
-import { useStudent } from "@/hooks/useStudents";
+import { useStudent, useUpdateStudent } from "@/hooks/useStudents";
+import StudentDialog from "@/components/dialogs/StudentDialog";
 import { useStudentPayments, computeStudentSummary, useMonthlyFeeHistory } from "@/hooks/useStudentPayments";
 import { useBatch, useBatches } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
@@ -248,6 +249,19 @@ export default function StudentProfilePage() {
   const canEditNote = (note: { created_by: string }) => note.created_by === user?.id || isAdmin || isCipher;
   const canDeleteNote = (note: { created_by: string }) => note.created_by === user?.id || isAdmin || isCipher;
   const effectiveCanEdit = canEdit || canEditStudent;
+  const [editOpen, setEditOpen] = useState(false);
+  const updateStudent = useUpdateStudent();
+
+  const handleUpdateStudent = async (data: any) => {
+    if (!student) return;
+    try {
+      await updateStudent.mutateAsync({ id: student.id, ...data });
+      toast({ title: "Student updated successfully" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  };
 
   const lastPayment = payments.length > 0 ? payments.reduce((a, b) => new Date(a.payment_date) > new Date(b.payment_date) ? a : b) : null;
 
@@ -280,7 +294,7 @@ export default function StudentProfilePage() {
         visible={!isHeaderVisible}
         student={student}
         canEdit={effectiveCanEdit}
-        onEdit={() => navigate(`/students/${student.id}`)}
+        onEdit={() => setEditOpen(true)}
       />
 
       <div className="max-w-[1280px] mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6">
@@ -296,7 +310,7 @@ export default function StudentProfilePage() {
           ref={headerRef}
           student={student}
           canEdit={effectiveCanEdit}
-          onEdit={() => navigate(`/students/${student.id}`)}
+          onEdit={() => setEditOpen(true)}
         />
 
         {/* Lifetime Value Hero Banner */}
@@ -655,6 +669,13 @@ export default function StudentProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Edit Student Dialog */}
+      <StudentDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        student={student}
+        onSave={handleUpdateStudent}
+      />
     </div>
   );
 }
