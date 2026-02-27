@@ -43,6 +43,7 @@ import { ProfileSkeleton } from "@/components/students/profile/ProfileSkeleton";
 import { PlaceholderCard } from "@/components/students/profile/ProfilePlaceholder";
 import { LifetimeValueBanner } from "@/components/students/profile/LifetimeValueBanner";
 import { EnrollmentTimeline } from "@/components/students/profile/EnrollmentTimeline";
+import { FinancialBreakdown } from "@/components/students/profile/FinancialBreakdown";
 
 // ── helpers ──
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -388,6 +389,11 @@ export default function StudentProfilePage() {
             {/* Enrollment History Timeline */}
             {activeCompanyId && (
               <EnrollmentTimeline studentId={student.id} companyId={activeCompanyId} />
+            )}
+
+            {/* Financial Breakdown */}
+            {activeCompanyId && (
+              <FinancialBreakdown studentId={student.id} companyId={activeCompanyId} />
             )}
           </div>
 
