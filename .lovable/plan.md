@@ -1,43 +1,59 @@
 
-# Fix "Record Payment" Button in Quick Actions Panel
 
-## Problem
-The "Record Payment" button in `QuickActionsPanel` currently shows a toast saying "Use the Financial Breakdown section" instead of opening a payment modal.
+# Fix Three Batch Enrollment Bugs
 
-## Solution
-Wire the existing `StudentPaymentDialog` component into the Student Profile Page, triggered by the Quick Actions panel.
+## Bug 1: Wrong student count on Batches and Courses pages
 
-### Changes
+**Root Cause:** Three files still use the old `s.batch_id === b.id` filtering instead of `batch_enrollments`:
+- `src/pages/Batches.tsx` line 65: `allStudents.filter((s: any) => s.batch_id === b.id)`
+- `src/pages/CourseDetail.tsx` line 66: `allStudents.filter((s: any) => s.batch_id === b.id)`
+- `src/pages/Courses.tsx` line 72: `allStudents.filter((s: any) => s.batch_id === b.id)`
 
-**1. `src/components/students/profile/QuickActionsPanel.tsx`**
-- Add `onRecordPayment` callback prop to `QuickActionsPanelProps`
-- Change the "Record Payment" action's `onClick` from the toast message to calling `onRecordPayment()`
-- Remove the `disabledTooltip` / toast logic for this button entirely
+**Fix:** Each of these pages needs to fetch `batch_enrollments` (active status) and use enrollment records to determine which students belong to each batch. The approach:
 
-**2. `src/pages/StudentProfilePage.tsx`**
-- Import `StudentPaymentDialog` and `useCreateStudentPayment`
-- Add state: `paymentDialogOpen` (boolean)
-- Initialize `useCreateStudentPayment()` hook
-- Pass `onRecordPayment={() => setPaymentDialogOpen(true)}` to `QuickActionsPanel`
-- Render `StudentPaymentDialog` with:
-  - `student`, `summary` (already computed), batch/course defaults from existing data
-  - `onSave` calls `createPaymentMutation.mutateAsync()` which already invalidates `student_payments` and related queries, triggering re-renders of the Financial Breakdown and hero banner stats
-- No `batchEnrollmentId` hint passed (the dialog will show all active enrollments and let the user pick)
+1. **`src/pages/Batches.tsx`**: Add a query to fetch all active `batch_enrollments` for the company. Build a `Map<batchId, Set<studentId>>` from enrollment records. Replace `allStudents.filter(s => s.batch_id === b.id)` with filtering by enrollment set.
 
-### How it works
-- The `StudentPaymentDialog` already fetches all active `batch_enrollments` for the student (line 70-93 of the dialog)
-- It already shows enrollment selector with course + batch names (line 387-403), though currently `disabled` -- we will remove the `disabled` prop so users can select a batch
-- It shows fee summary per selected batch (total, paid, remaining)
-- It has all the required fields: amount, payment method, date, notes
-- On save, it passes `batch_enrollment_id` from the selected enrollment
-- React Query invalidation in `useCreateStudentPayment` automatically refreshes all payment-related data
+2. **`src/pages/CourseDetail.tsx`**: Same approach -- fetch active `batch_enrollments`, build enrollment map, replace the student filter.
 
-### What's NOT changed
-- No changes to payment creation logic, validation, or database operations
-- No changes to `StudentPaymentDialog` internal logic beyond removing the `disabled` attribute on the batch selector
-- No changes to Financial Breakdown or other components
+3. **`src/pages/Courses.tsx`**: Same approach.
 
-### Technical Details
-- The batch selector in `StudentPaymentDialog` (line 390) has `disabled` hardcoded -- this will be removed so users can switch between enrollments when opening from the profile page
-- The dialog already handles single-enrollment auto-selection (line 117) and multi-enrollment display
-- Query invalidation in `useCreateStudentPayment` already covers `student_payments`, `student_all_payments_for_dialog`, and related keys
+---
+
+## Bug 2: Capacity limit not enforced during enrollment
+
+**Root Cause:** The `BatchEnrollDialog.tsx` `handleEnroll` function (line 118-159) creates enrollment records without checking batch capacity at all. The `BatchAssignDialog` and `BatchDropZone` show capacity warnings but don't block enrollment either (line 200 in BatchAssignDialog explicitly says "Students exceeding capacity will still be assigned").
+
+**Fix:** Add capacity validation before creating enrollment in these three places:
+
+1. **`src/components/dialogs/BatchEnrollDialog.tsx`**: Before inserting into `batch_enrollments`, query the batch's `max_capacity` and current active enrollment count. If at capacity, show a destructive toast: "This batch is full. Maximum capacity of X students reached." and return early. Treat `null` capacity as unlimited.
+
+2. **`src/components/dialogs/BatchAssignDialog.tsx`**: In `handleAssign`, before processing, check if adding `studentIds.length` students would exceed capacity. If so, block and show error toast. Remove the "will still be assigned" warning text.
+
+3. **`src/components/shared/BatchDropZone.tsx`**: The `handleDrop` function already checks `atCapacity` but only for current count. Update to also check if adding the number of students being dropped would exceed capacity.
+
+---
+
+## Bug 3: Wrong page opens when clicking student in batch
+
+**Root Cause:** In `BatchDetail.tsx` line 785, clicking a student row navigates to `/students/${s.id}`. The `StudentDetail.tsx` page then resolves the batch context using `student.batch_id` (line 55), which may point to a different batch than the one being viewed.
+
+**Fix:** Pass the current batch ID as a query parameter when navigating from BatchDetail:
+- Change navigation to: `navigate(\`/students/${s.id}?from_batch=${id}\`)`
+- In `StudentDetail.tsx`, read the `from_batch` query param and use it to resolve the batch context instead of `student.batch_id` when present.
+- Also update the "View" button (line 855) with the same query parameter.
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/pages/Batches.tsx` | Fetch batch_enrollments, replace student count logic |
+| `src/pages/CourseDetail.tsx` | Fetch batch_enrollments, replace student count logic |
+| `src/pages/Courses.tsx` | Fetch batch_enrollments, replace student count logic |
+| `src/components/dialogs/BatchEnrollDialog.tsx` | Add capacity check before enrollment |
+| `src/components/dialogs/BatchAssignDialog.tsx` | Add capacity check, block over-capacity assignment |
+| `src/components/shared/BatchDropZone.tsx` | Add multi-student capacity check |
+| `src/pages/BatchDetail.tsx` | Pass `from_batch` query param on student click |
+| `src/pages/StudentDetail.tsx` | Read `from_batch` query param for batch context |
+
