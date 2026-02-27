@@ -3,6 +3,9 @@ import { useBatches, type Batch, useBatchStudentCount } from "@/hooks/useBatches
 import { useUpdateStudent, useAllStudents } from "@/hooks/useStudents";
 import { useCreateBatchHistory } from "@/hooks/useStudentBatchHistory";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Users, Layers, Loader2, CheckCircle2 } from "lucide-react";
@@ -15,13 +18,15 @@ interface BatchDropZoneProps {
   onSuccess?: () => void;
 }
 
-function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSuccess, allStudents }: {
+function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSuccess, allStudents, companyId, userId }: {
   batch: Batch;
   selectedIds: Set<string>;
   dragStudentId: string | null;
   studentNameMap: Map<string, string>;
   onSuccess?: () => void;
   allStudents: any[];
+  companyId: string | null;
+  userId: string | null;
 }) {
   const [over, setOver] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -63,6 +68,10 @@ function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSucce
           const currentStudent = studentMap.get(id);
           const fromBatchId = currentStudent?.batch_id || null;
           await updateStudent.mutateAsync({ id, batch_id: batch.id } as any);
+          // Sync enrollment records
+          if (companyId && userId) {
+            await syncBatchEnrollment(id, fromBatchId, batch.id, companyId, userId);
+          }
           await createHistory.mutateAsync({
             student_id: id,
             from_batch_id: fromBatchId,
@@ -125,6 +134,8 @@ export default function BatchDropZone({ selectedIds, studentNameMap, onSuccess }
   const { data: batches = [] } = useBatches({ status: "active" });
   const { data: allStudents = [] } = useAllStudents();
   const [isDragging, setIsDragging] = useState(false);
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   
   if (batches.length === 0) return null;
 
@@ -150,6 +161,8 @@ export default function BatchDropZone({ selectedIds, studentNameMap, onSuccess }
               studentNameMap={studentNameMap}
               onSuccess={onSuccess}
               allStudents={allStudents}
+              companyId={activeCompanyId}
+              userId={user?.id || null}
             />
           ))}
         </div>

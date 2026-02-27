@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useSaveSiblings } from "@/hooks/useStudentSiblings";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
+import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 import type { InitialPaymentData } from "@/components/finance/InitialPaymentSection";
 import PersonalStep, { type PersonalData } from "@/components/StudentWizardSteps/PersonalStep";
 import ContactStep, { type ContactData } from "@/components/StudentWizardSteps/ContactStep";
@@ -307,19 +308,30 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
 
       const result = await onSave(insertData);
 
-      // Create batch_enrollments record for new students with a batch
-      if (!isEditMode && result && "id" in result && insertData.batch_id && activeCompanyId && user) {
+      // Sync batch enrollments
+      if (activeCompanyId && user) {
         try {
-          await supabase.from("batch_enrollments").insert({
-            student_id: result.id,
-            batch_id: insertData.batch_id,
-            company_id: activeCompanyId,
-            created_by: user.id,
-            status: "active",
-            total_fee: 0,
-          });
+          if (isEditMode && editStudent) {
+            // Edit mode: sync old → new batch
+            await syncBatchEnrollment(
+              editStudent.id,
+              editStudent.batch_id,
+              insertData.batch_id,
+              activeCompanyId,
+              user.id
+            );
+          } else if (result && "id" in result && insertData.batch_id) {
+            // Create mode: create new enrollment
+            await syncBatchEnrollment(
+              result.id,
+              null,
+              insertData.batch_id,
+              activeCompanyId,
+              user.id
+            );
+          }
         } catch (e: any) {
-          console.error("Failed to create batch enrollment record:", e);
+          console.error("Failed to sync batch enrollment:", e);
         }
       }
 
