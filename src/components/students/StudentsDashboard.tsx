@@ -157,7 +157,7 @@ const StudentsDashboard = memo(function StudentsDashboard({
 
         <Card className="cursor-pointer hover:shadow-md transition-shadow border-orange-500/20" onClick={() => onSetFilters({ batchId: "none", status: "all" })}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Unenrolled</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Not Enrolled</CardTitle>
             <div className="rounded-lg bg-orange-500/10 p-2">
               <UserMinus className="h-4 w-4 text-orange-600 dark:text-orange-400" />
             </div>
@@ -303,7 +303,7 @@ const StudentsDashboard = memo(function StudentsDashboard({
                       }}
                     />
                     <Line type="monotone" dataKey="enrolled" stroke="hsl(142, 76%, 30%)" strokeWidth={2} dot={{ r: 3 }} name="Enrolled" />
-                    <Line type="monotone" dataKey="unenrolled" stroke="hsl(30, 100%, 35%)" strokeWidth={2} dot={{ r: 3 }} name="Unenrolled" />
+                    <Line type="monotone" dataKey="unenrolled" stroke="hsl(30, 100%, 35%)" strokeWidth={2} dot={{ r: 3 }} name="Not Enrolled" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
