@@ -1,73 +1,65 @@
 
-# Fix: Enrollment Flows Not Creating `batch_enrollments` Records
 
-## Problem
+# Fix: Batch Removal Should Update Enrollment History, Not Delete Student
 
-When a student is enrolled in a batch (via the Student Wizard, Batch Enroll Dialog, or Batch Assign Dialog), the code only updates the `students.batch_id` column. It never inserts a row into the `batch_enrollments` table.
+## Two Issues
 
-The Enrollment Timeline and Financial Breakdown cards both query `batch_enrollments` to display data, so they show "No enrollments yet" even for enrolled students.
+### Issue 1: No enrollment sync when batch changes
+When a student's batch is changed or removed (via StudentWizardDialog edit, StudentDialog edit, or BatchDropZone), the `batch_enrollments` table is never updated. The old enrollment stays "active" and no new enrollment is created for the new batch.
 
-## Root Cause
+### Issue 2: BatchDetail "Delete Student" permanently deletes the student
+The BatchDetail page's delete button calls `deleteStudentMutation` which permanently removes the student from the database. Instead, it should only remove the student from the batch (set `batch_id = null`) and mark the enrollment as "dropped". The student should remain in the Students list.
 
-Three enrollment code paths all have the same gap:
-
-1. **StudentWizardDialog** (new student creation) -- sets `batch_id` on the student record, no enrollment row created
-2. **BatchEnrollDialog** (enroll existing student from batch page) -- calls `updateStudent({ batch_id })`, no enrollment row
-3. **BatchAssignDialog** (assign student to batch) -- calls `updateStudent({ batch_id })`, no enrollment row
+---
 
 ## Solution
 
-Add a `batch_enrollments` insert after every `students.batch_id` update in all three flows. No database migration needed -- the table and schema already exist.
+### 1. Create shared utility: `src/utils/enrollmentSync.ts`
 
-### 1. `src/components/dialogs/BatchEnrollDialog.tsx`
+A reusable function to handle all batch change scenarios:
 
-After the `updateStudentMutation.mutateAsync` call on line 82, insert a `batch_enrollments` record:
-
-```typescript
-await supabase.from("batch_enrollments").insert({
-  student_id: student.id,
-  batch_id: batchId,
-  company_id: activeCompanyId,
-  created_by: user.id,
-  status: "active",
-  total_fee: 0,
-});
+```text
+syncBatchEnrollment(studentId, oldBatchId, newBatchId, companyId, userId)
 ```
 
-This requires importing `supabase`, `useAuth`, and `useCompany` into the component.
+- If `oldBatchId` exists and differs from `newBatchId`: UPDATE existing `batch_enrollments` record to `status = 'dropped'`
+- If `newBatchId` exists and differs from `oldBatchId`: INSERT new `batch_enrollments` record with `status = 'active'`
+- If `newBatchId` is null (removed from batch): just mark old enrollment as `'dropped'`
+- If both are the same: no-op
 
-### 2. `src/components/dialogs/BatchAssignDialog.tsx`
+### 2. Update `StudentWizardDialog.tsx` (edit mode)
 
-Inside the `Promise.all` loop (around line 96), after updating the student's `batch_id`, also insert a `batch_enrollments` record for each student being assigned. The component already has access to `useAuth` context indirectly -- will need to add `supabase` import and user/company context.
+After `onSave(insertData)` succeeds in edit mode, call `syncBatchEnrollment` comparing `editStudent.batch_id` with the new `insertData.batch_id`.
 
-### 3. `src/components/dialogs/StudentWizardDialog.tsx`
+### 3. Update `StudentDialog.tsx` (edit mode)
 
-After the student is saved (around line 310-320 in `handleSubmit`), if `academic.batch_id` is not `"none"`, insert a `batch_enrollments` record for the newly created student.
+After `onSave()` succeeds, call `syncBatchEnrollment` comparing original `student.batch_id` with new `selectedBatchId`.
 
-### 4. Fix Existing Data
+### 4. Update `BatchDropZone.tsx`
 
-For the student already enrolled (`d6a2d736-cfd1-46a4-919a-35ee60d81dcf`), we need to backfill the missing `batch_enrollments` record. A small migration will handle all students that have a `batch_id` set but no corresponding enrollment record:
+After `updateStudent.mutateAsync`, call `syncBatchEnrollment` to mark old enrollment as dropped and create new one.
 
-```sql
-INSERT INTO public.batch_enrollments (student_id, batch_id, company_id, created_by, status, total_fee)
-SELECT s.id, s.batch_id, s.company_id, s.user_id, 'active', 0
-FROM public.students s
-WHERE s.batch_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM public.batch_enrollments be
-    WHERE be.student_id = s.id AND be.batch_id = s.batch_id
-  );
-```
+### 5. Update `BatchAssignDialog.tsx`
+
+Already inserts new enrollment but doesn't mark old one as dropped. Add the drop step when `fromBatchId` exists.
+
+### 6. Change BatchDetail "Delete" to "Remove from Batch"
+
+Replace the destructive delete action in `BatchDetail.tsx`:
+- Change button label/icon from "Delete Student" to "Remove from Batch"
+- Change the confirmation dialog text accordingly
+- Replace `deleteStudentMutation.mutateAsync(id)` with:
+  - `updateStudentMutation.mutateAsync({ id, batch_id: null })`
+  - Call `syncBatchEnrollment(id, batchId, null, ...)` to mark enrollment as dropped
+  - Create a `student_batch_history` record for the removal
+- Student stays in the Students page; only the batch association is removed
 
 ## Files Changed
 
-- **Database migration** (1 new file) -- backfill missing enrollment records
-- `src/components/dialogs/BatchEnrollDialog.tsx` -- add enrollment insert after batch assignment
-- `src/components/dialogs/BatchAssignDialog.tsx` -- add enrollment insert after batch assignment
-- `src/components/dialogs/StudentWizardDialog.tsx` -- add enrollment insert when creating student with a batch
+- **New**: `src/utils/enrollmentSync.ts`
+- **Modified**: `src/components/dialogs/StudentWizardDialog.tsx` -- sync on edit
+- **Modified**: `src/components/dialogs/StudentDialog.tsx` -- sync on edit  
+- **Modified**: `src/components/shared/BatchDropZone.tsx` -- sync on drag-drop
+- **Modified**: `src/components/dialogs/BatchAssignDialog.tsx` -- mark old enrollment dropped
+- **Modified**: `src/pages/BatchDetail.tsx` -- change delete to "Remove from Batch"
 
-## Technical Notes
-
-- The `batch_enrollments` table has sensible defaults (`enrollment_date = CURRENT_DATE`, `status = 'active'`, `total_fee = 0`), so minimal fields need to be provided
-- The `total_fee` can be set to 0 initially; it represents the fee agreement for that specific enrollment
-- No RLS changes needed -- existing policies on `batch_enrollments` already allow company members to insert
