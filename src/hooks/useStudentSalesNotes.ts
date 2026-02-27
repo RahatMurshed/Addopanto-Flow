@@ -22,6 +22,16 @@ export interface StudentSalesNoteInsert {
   note_date: string;
 }
 
+export interface CustomNoteCategory {
+  id: string;
+  company_id: string;
+  label: string;
+  value: string;
+  color_class: string;
+  created_by: string;
+  created_at: string;
+}
+
 export const NOTE_CATEGORIES = [
   { value: "follow_up_call", label: "Follow-up Call", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
   { value: "meeting", label: "Meeting", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
@@ -31,8 +41,87 @@ export const NOTE_CATEGORIES = [
   { value: "general", label: "General Note", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400" },
 ] as const;
 
-export function getCategoryInfo(category: string) {
-  return NOTE_CATEGORIES.find((c) => c.value === category) || NOTE_CATEGORIES[5];
+const FALLBACK_CATEGORY = { value: "general", label: "General Note", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400" };
+
+export function getCategoryInfo(category: string, customCategories?: CustomNoteCategory[]) {
+  const builtIn = NOTE_CATEGORIES.find((c) => c.value === category);
+  if (builtIn) return builtIn;
+  if (customCategories) {
+    const custom = customCategories.find((c) => c.value === category);
+    if (custom) return { value: custom.value, label: custom.label, color: custom.color_class };
+  }
+  return FALLBACK_CATEGORY;
+}
+
+export const COLOR_PRESETS = [
+  { name: "Teal", class: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400" },
+  { name: "Pink", class: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400" },
+  { name: "Indigo", class: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400" },
+  { name: "Amber", class: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" },
+  { name: "Emerald", class: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  { name: "Rose", class: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400" },
+  { name: "Cyan", class: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400" },
+  { name: "Lime", class: "bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-400" },
+];
+
+export function useCustomNoteCategories() {
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["custom_note_categories", activeCompanyId],
+    queryFn: async () => {
+      if (!user || !activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("sales_note_categories" as any)
+        .select("*")
+        .eq("company_id", activeCompanyId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as CustomNoteCategory[];
+    },
+    enabled: !!user && !!activeCompanyId,
+  });
+}
+
+export function useCreateCustomCategory() {
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ label, value, color_class }: { label: string; value: string; color_class: string }) => {
+      if (!user) throw new Error("Not authenticated");
+      if (!activeCompanyId) throw new Error("No active company");
+      const { data, error } = await supabase
+        .from("sales_note_categories" as any)
+        .insert({ company_id: activeCompanyId, label, value, color_class, created_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as unknown as CustomNoteCategory;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom_note_categories"] });
+    },
+  });
+}
+
+export function useDeleteCustomCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("sales_note_categories" as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom_note_categories"] });
+    },
+  });
 }
 
 export function useStudentSalesNotes(studentId?: string) {

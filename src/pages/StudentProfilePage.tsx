@@ -5,13 +5,13 @@ import { useStudent } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary, useMonthlyFeeHistory } from "@/hooks/useStudentPayments";
 import { useBatch, useBatches } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
-import { useStudentSalesNotes, useCreateSalesNote, useUpdateSalesNote, useDeleteSalesNote, NOTE_CATEGORIES, getCategoryInfo } from "@/hooks/useStudentSalesNotes";
+import { useStudentSalesNotes, useCreateSalesNote, useUpdateSalesNote, useDeleteSalesNote, NOTE_CATEGORIES, getCategoryInfo, useCustomNoteCategories, useCreateCustomCategory, useDeleteCustomCategory, COLOR_PRESETS } from "@/hooks/useStudentSalesNotes";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useRole } from "@/contexts/RoleContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -82,6 +84,18 @@ export default function StudentProfilePage() {
   const updateNote = useUpdateSalesNote();
   const deleteNote = useDeleteSalesNote();
 
+  // ── custom categories ──
+  const { data: customCategories = [] } = useCustomNoteCategories();
+  const createCustomCategory = useCreateCustomCategory();
+  const deleteCustomCategory = useDeleteCustomCategory();
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [newCatColor, setNewCatColor] = useState(COLOR_PRESETS[0].class);
+
+  const allCategories = useMemo(() => [
+    ...NOTE_CATEGORIES.map((c) => ({ value: c.value, label: c.label, color: c.color, isCustom: false, id: c.value })),
+    ...customCategories.map((c) => ({ value: c.value, label: c.label, color: c.color_class, isCustom: true, id: c.id })),
+  ], [customCategories]);
   // ── note form state ──
   const [noteText, setNoteText] = useState("");
   const [noteCategory, setNoteCategory] = useState("general");
@@ -198,6 +212,30 @@ export default function StudentProfilePage() {
     }
   };
 
+  const handleAddCustomCategory = async () => {
+    const trimmed = newCatLabel.trim();
+    if (!trimmed) return;
+    const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (!slug) return;
+    try {
+      await createCustomCategory.mutateAsync({ label: trimmed, value: slug, color_class: newCatColor });
+      setNewCatLabel("");
+      setNewCatColor(COLOR_PRESETS[0].class);
+      setShowAddCategory(false);
+      toast({ title: "Category added" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteCustomCategory = async (id: string) => {
+    try {
+      await deleteCustomCategory.mutateAsync(id);
+      toast({ title: "Category deleted" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
   const canEditNote = (note: { created_by: string }) => {
     return note.created_by === user?.id || isAdmin || isCipher;
   };
@@ -391,12 +429,27 @@ export default function StudentProfilePage() {
             <div className="flex flex-wrap gap-2 items-end">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Category</label>
-                <Select value={noteCategory} onValueChange={setNoteCategory}>
+                <Select value={noteCategory} onValueChange={(v) => { if (v === "__add_custom__") { setShowAddCategory(true); } else { setNoteCategory(v); } }}>
                   <SelectTrigger className="w-[160px] h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {NOTE_CATEGORIES.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    {allCategories.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        <span className="flex items-center gap-2">
+                          {c.label}
+                          {c.isCustom && isAdmin && (
+                            <button type="button" className="ml-1 text-destructive hover:text-destructive/80" onClick={(e) => { e.stopPropagation(); handleDeleteCustomCategory(c.id); }}>
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      </SelectItem>
                     ))}
+                    {isAdmin && (
+                      <>
+                        <Separator className="my-1" />
+                        <SelectItem value="__add_custom__"><span className="flex items-center gap-1"><Plus className="h-3 w-3" /> Add Custom Category...</span></SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -427,7 +480,7 @@ export default function StudentProfilePage() {
               <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue placeholder="All Categories" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {NOTE_CATEGORIES.map((c) => (
+                {allCategories.map((c) => (
                   <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -463,7 +516,7 @@ export default function StudentProfilePage() {
           ) : (
             <div className="space-y-3">
               {pagination.paginatedItems.map((note) => {
-                const catInfo = getCategoryInfo(note.category);
+                const catInfo = getCategoryInfo(note.category, customCategories);
                 const profile = userProfileMap.get(note.created_by);
                 const userInitials = (profile?.full_name || profile?.email || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
                 const isEditing = editingNoteId === note.id;
@@ -496,7 +549,7 @@ export default function StudentProfilePage() {
                           <Select value={editCategory} onValueChange={setEditCategory}>
                             <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {NOTE_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                              {allCategories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <Button size="sm" className="h-8" onClick={handleUpdateNote} disabled={updateNote.isPending}>
@@ -571,6 +624,58 @@ export default function StudentProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Custom Category Dialog */}
+      <Dialog open={showAddCategory} onOpenChange={setShowAddCategory}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Add Custom Category</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Category Name</label>
+              <Input
+                placeholder="e.g. Site Visit"
+                value={newCatLabel}
+                onChange={(e) => setNewCatLabel(e.target.value)}
+                maxLength={30}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Color</label>
+              <div className="flex flex-wrap gap-2">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-medium transition-all",
+                      preset.class,
+                      newCatColor === preset.class ? "ring-2 ring-primary ring-offset-2" : "opacity-70 hover:opacity-100"
+                    )}
+                    onClick={() => setNewCatColor(preset.class)}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Preview</label>
+              <div className="mt-1">
+                <Badge className={cn("text-xs", newCatColor)}>{newCatLabel || "Category Name"}</Badge>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddCategory(false)}>Cancel</Button>
+            <Button onClick={handleAddCustomCategory} disabled={!newCatLabel.trim() || createCustomCategory.isPending}>
+              {createCustomCategory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Add Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
