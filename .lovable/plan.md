@@ -1,51 +1,73 @@
 
+# Fix: Enrollment Flows Not Creating `batch_enrollments` Records
 
-# Remove `on_hold` Enrollment Status
+## Problem
 
-## Overview
-Remove `on_hold` from the batch enrollment status options, keeping only `active`, `completed`, and `dropped`. Update the database constraint, fix existing data, and update all UI references.
+When a student is enrolled in a batch (via the Student Wizard, Batch Enroll Dialog, or Batch Assign Dialog), the code only updates the `students.batch_id` column. It never inserts a row into the `batch_enrollments` table.
 
-## Changes
+The Enrollment Timeline and Financial Breakdown cards both query `batch_enrollments` to display data, so they show "No enrollments yet" even for enrolled students.
 
-### 1. Database Migration
-A new migration that:
-- Drops the existing CHECK constraint on `batch_enrollments.status`
-- Adds a new CHECK constraint allowing only `('active', 'completed', 'dropped')`
-- Updates existing rows: set `status = 'active'` where the linked batch's `end_date` is NULL or in the future; set `status = 'completed'` where `end_date` is in the past
-- Ensures the default remains `'active'`
+## Root Cause
 
-```sql
--- Fix existing on_hold rows based on batch end_date
-UPDATE public.batch_enrollments be
-SET status = CASE
-  WHEN b.end_date IS NULL OR b.end_date >= CURRENT_DATE THEN 'active'
-  ELSE 'completed'
-END
-FROM public.batches b
-WHERE be.batch_id = b.id
-AND be.status = 'on_hold';
+Three enrollment code paths all have the same gap:
 
--- Drop old constraint, add new one
-ALTER TABLE public.batch_enrollments
-  DROP CONSTRAINT batch_enrollments_status_check;
+1. **StudentWizardDialog** (new student creation) -- sets `batch_id` on the student record, no enrollment row created
+2. **BatchEnrollDialog** (enroll existing student from batch page) -- calls `updateStudent({ batch_id })`, no enrollment row
+3. **BatchAssignDialog** (assign student to batch) -- calls `updateStudent({ batch_id })`, no enrollment row
 
-ALTER TABLE public.batch_enrollments
-  ADD CONSTRAINT batch_enrollments_status_check
-  CHECK (status IN ('active', 'completed', 'dropped'));
+## Solution
+
+Add a `batch_enrollments` insert after every `students.batch_id` update in all three flows. No database migration needed -- the table and schema already exist.
+
+### 1. `src/components/dialogs/BatchEnrollDialog.tsx`
+
+After the `updateStudentMutation.mutateAsync` call on line 82, insert a `batch_enrollments` record:
+
+```typescript
+await supabase.from("batch_enrollments").insert({
+  student_id: student.id,
+  batch_id: batchId,
+  company_id: activeCompanyId,
+  created_by: user.id,
+  status: "active",
+  total_fee: 0,
+});
 ```
 
-### 2. `src/components/students/profile/EnrollmentTimeline.tsx`
-- Remove `on_hold` from `EnrollmentStatus` type: `"active" | "completed" | "dropped"`
-- Remove `on_hold` entries from `STATUS_DOT`, `STATUS_BADGE`, and `STATUS_LABEL` maps
+This requires importing `supabase`, `useAuth`, and `useCompany` into the component.
 
-### 3. `src/components/students/profile/ProfileHeader.tsx` (line 39)
-- Remove the `on_hold` entry from the student status style map (this maps student-level statuses, not enrollment statuses, but the user wants it cleaned up)
+### 2. `src/components/dialogs/BatchAssignDialog.tsx`
 
-### 4. `src/components/students/profile/ProfileStickyBar.tsx` (line 25)
-- Remove the `on_hold` entry from the sticky bar status style map
+Inside the `Promise.all` loop (around line 96), after updating the student's `batch_id`, also insert a `batch_enrollments` record for each student being assigned. The component already has access to `useAuth` context indirectly -- will need to add `supabase` import and user/company context.
+
+### 3. `src/components/dialogs/StudentWizardDialog.tsx`
+
+After the student is saved (around line 310-320 in `handleSubmit`), if `academic.batch_id` is not `"none"`, insert a `batch_enrollments` record for the newly created student.
+
+### 4. Fix Existing Data
+
+For the student already enrolled (`d6a2d736-cfd1-46a4-919a-35ee60d81dcf`), we need to backfill the missing `batch_enrollments` record. A small migration will handle all students that have a `batch_id` set but no corresponding enrollment record:
+
+```sql
+INSERT INTO public.batch_enrollments (student_id, batch_id, company_id, created_by, status, total_fee)
+SELECT s.id, s.batch_id, s.company_id, s.user_id, 'active', 0
+FROM public.students s
+WHERE s.batch_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.batch_enrollments be
+    WHERE be.student_id = s.id AND be.batch_id = s.batch_id
+  );
+```
 
 ## Files Changed
-- New database migration (1 file)
-- `EnrollmentTimeline.tsx` -- remove on_hold from 4 places
-- `ProfileHeader.tsx` -- remove on_hold line
-- `ProfileStickyBar.tsx` -- remove on_hold line
+
+- **Database migration** (1 new file) -- backfill missing enrollment records
+- `src/components/dialogs/BatchEnrollDialog.tsx` -- add enrollment insert after batch assignment
+- `src/components/dialogs/BatchAssignDialog.tsx` -- add enrollment insert after batch assignment
+- `src/components/dialogs/StudentWizardDialog.tsx` -- add enrollment insert when creating student with a batch
+
+## Technical Notes
+
+- The `batch_enrollments` table has sensible defaults (`enrollment_date = CURRENT_DATE`, `status = 'active'`, `total_fee = 0`), so minimal fields need to be provided
+- The `total_fee` can be set to 0 initially; it represents the fee agreement for that specific enrollment
+- No RLS changes needed -- existing policies on `batch_enrollments` already allow company members to insert
