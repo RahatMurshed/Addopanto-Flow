@@ -31,6 +31,7 @@ export default function BatchEnrollDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
+  const [enrolledStudentIds, setEnrolledStudentIds] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -54,8 +55,21 @@ export default function BatchEnrollDialog({
       setSearchQuery("");
       setDebouncedQuery("");
       setEnrollingId(null);
+      setEnrolledStudentIds(new Set());
+    } else {
+      // Fetch students already enrolled in this batch
+      supabase
+        .from("batch_enrollments")
+        .select("student_id")
+        .eq("batch_id", batchId)
+        .eq("status", "active")
+        .then(({ data }) => {
+          if (data) {
+            setEnrolledStudentIds(new Set(data.map((r) => r.student_id)));
+          }
+        });
     }
-  }, [open]);
+  }, [open, batchId]);
 
   // Filter students for search results
   const searchResults = useMemo(() => {
@@ -78,14 +92,23 @@ export default function BatchEnrollDialog({
   }, [allStudents, debouncedQuery]);
 
   const handleEnroll = useCallback(async (student: Student) => {
-    if (student.batch_id === batchId) {
-      toast({ title: "Already enrolled", description: `${student.name} is already in this batch.`, variant: "destructive" });
-      return;
-    }
     setEnrollingId(student.id);
     try {
-      await updateStudentMutation.mutateAsync({ id: student.id, batch_id: batchId });
-      // Create batch_enrollments record
+      // Check for existing active enrollment in this batch
+      const { data: existing } = await supabase
+        .from("batch_enrollments")
+        .select("id")
+        .eq("student_id", student.id)
+        .eq("batch_id", batchId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (existing) {
+        toast({ title: "Already enrolled", description: `${student.name} is already enrolled in this batch.`, variant: "destructive" });
+        return;
+      }
+
+      // Create enrollment record WITHOUT overwriting student.batch_id
       if (activeCompanyId && user) {
         await supabase.from("batch_enrollments").insert({
           student_id: student.id,
@@ -96,6 +119,12 @@ export default function BatchEnrollDialog({
           total_fee: 0,
         });
       }
+
+      // Only set batch_id if student has no primary batch
+      if (!student.batch_id) {
+        await updateStudentMutation.mutateAsync({ id: student.id, batch_id: batchId });
+      }
+
       toast({ title: "Student enrolled", description: `${student.name} has been enrolled in ${batchName}.` });
       onOpenChange(false);
     } catch (err: any) {
@@ -103,7 +132,7 @@ export default function BatchEnrollDialog({
     } finally {
       setEnrollingId(null);
     }
-  }, [batchId, batchName, updateStudentMutation, toast, onOpenChange]);
+  }, [batchId, batchName, activeCompanyId, user, updateStudentMutation, toast, onOpenChange]);
 
   const isSearching = searchQuery.length >= 3 && debouncedQuery !== searchQuery;
 
@@ -167,7 +196,7 @@ export default function BatchEnrollDialog({
                   </div>
                 ) : (
                   searchResults.map((student) => {
-                    const isAlreadyEnrolled = student.batch_id === batchId;
+                    const isAlreadyEnrolled = enrolledStudentIds.has(student.id);
                     const isEnrolling = enrollingId === student.id;
                     return (
                       <Card key={student.id} className={`transition-colors ${isAlreadyEnrolled ? "opacity-60" : "hover:bg-accent/50"}`}>
