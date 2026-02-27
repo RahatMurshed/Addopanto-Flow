@@ -28,6 +28,8 @@ export interface StudentPaymentInsert {
   receipt_number?: string | null;
   description?: string | null;
   source_id?: string | null;
+  due_date?: string | null;
+  batch_enrollment_id?: string | null;
 }
 
 export function useStudentPayments(studentId?: string) {
@@ -64,13 +66,97 @@ export function useCreateStudentPayment() {
     mutationFn: async (payment: StudentPaymentInsert & { studentName?: string }) => {
       if (!user) throw new Error("Not authenticated");
       if (!activeCompanyId) throw new Error("No active company");
-      const { studentName, source_id, ...paymentData } = payment;
+      const { studentName, source_id, due_date, batch_enrollment_id, ...paymentData } = payment;
 
-      // Insert student payment — the database trigger automatically creates
-      // the linked revenue entry and allocations
+      // If monthly payment with months_covered, check for existing unpaid schedule rows
+      if (paymentData.payment_type === "monthly" && paymentData.months_covered && paymentData.months_covered.length > 0) {
+        const { data: existingRows } = await supabase
+          .from("student_payments")
+          .select("id, months_covered")
+          .eq("student_id", paymentData.student_id)
+          .eq("company_id", activeCompanyId)
+          .eq("payment_type", "monthly")
+          .eq("status", "unpaid");
+
+        // Find matching unpaid rows for the selected months
+        const matchingRows = (existingRows || []).filter(row =>
+          row.months_covered && paymentData.months_covered!.some(m => row.months_covered!.includes(m))
+        );
+
+        if (matchingRows.length > 0) {
+          // Update existing unpaid rows to paid
+          for (const row of matchingRows) {
+            await supabase
+              .from("student_payments")
+              .update({
+                status: "paid",
+                amount: paymentData.amount / paymentData.months_covered!.length * (row.months_covered?.length || 1),
+                payment_date: paymentData.payment_date,
+                payment_method: paymentData.payment_method,
+                receipt_number: paymentData.receipt_number || null,
+                description: paymentData.description || null,
+                ...(source_id ? { source_id } : {}),
+              })
+              .eq("id", row.id);
+          }
+
+          // Return the first updated row
+          const { data: updated } = await supabase
+            .from("student_payments")
+            .select("*")
+            .eq("id", matchingRows[0].id)
+            .single();
+          return updated as StudentPayment;
+        }
+      }
+
+      // If admission payment, check for existing unpaid admission schedule row
+      if (paymentData.payment_type === "admission") {
+        const { data: existingAdmission } = await supabase
+          .from("student_payments")
+          .select("id")
+          .eq("student_id", paymentData.student_id)
+          .eq("company_id", activeCompanyId)
+          .eq("payment_type", "admission")
+          .eq("status", "unpaid")
+          .limit(1);
+
+        if (existingAdmission && existingAdmission.length > 0) {
+          const { data: updated, error: updateError } = await supabase
+            .from("student_payments")
+            .update({
+              status: "paid",
+              amount: paymentData.amount,
+              payment_date: paymentData.payment_date,
+              payment_method: paymentData.payment_method,
+              receipt_number: paymentData.receipt_number || null,
+              description: paymentData.description || null,
+              ...(source_id ? { source_id } : {}),
+            })
+            .eq("id", existingAdmission[0].id)
+            .select()
+            .single();
+          if (updateError) throw updateError;
+          return updated as StudentPayment;
+        }
+      }
+
+      // No existing unpaid row found — insert new with due_date
+      const computedDueDate = due_date ||
+        (paymentData.payment_type === "monthly" && paymentData.months_covered && paymentData.months_covered.length > 0
+          ? `${paymentData.months_covered[0]}-01`
+          : paymentData.payment_date);
+
       const { data, error } = await supabase
         .from("student_payments")
-        .insert({ ...paymentData, user_id: user.id, company_id: activeCompanyId, ...(source_id ? { source_id } : {}) } as any)
+        .insert({
+          ...paymentData,
+          user_id: user.id,
+          company_id: activeCompanyId,
+          due_date: computedDueDate,
+          ...(source_id ? { source_id } : {}),
+          ...(batch_enrollment_id ? { batch_enrollment_id } : {}),
+        } as any)
         .select()
         .single();
       if (error) throw error;

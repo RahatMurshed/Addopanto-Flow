@@ -252,6 +252,11 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           description: data.description || null,
         });
       } else {
+        // Calculate due_date from months_covered or use payment_date for admission
+        const computedDueDate = data.payment_type === "monthly" && selectedMonths.length > 0
+          ? `${selectedMonths.sort()[0]}-01`
+          : data.payment_date;
+
         await onSave({
           student_id: student.id,
           payment_type: data.payment_type,
@@ -262,6 +267,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           receipt_number: data.receipt_number || null,
           description: data.description || null,
           source_id: selectedSourceId || null,
+          due_date: computedDueDate,
           studentName: student.name,
         });
       }

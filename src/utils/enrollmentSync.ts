@@ -1,9 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
+import { addMonths, format } from "date-fns";
 
 /**
  * Synchronizes batch_enrollments when a student's batch changes.
  * - Marks old enrollment as "dropped" if oldBatchId differs from newBatchId
  * - Creates new "active" enrollment if newBatchId differs from oldBatchId
+ * - Auto-generates payment schedule rows for the new batch
  * - No-op if both are the same or both null
  */
 export async function syncBatchEnrollment(
@@ -32,13 +34,111 @@ export async function syncBatchEnrollment(
 
   // Create new active enrollment
   if (newId) {
-    await supabase.from("batch_enrollments").insert({
+    const { data: enrollment, error: enrollError } = await supabase
+      .from("batch_enrollments")
+      .insert({
+        student_id: studentId,
+        batch_id: newId,
+        company_id: companyId,
+        created_by: userId,
+        status: "active",
+        total_fee: 0,
+      })
+      .select("id")
+      .single();
+
+    if (enrollError) {
+      console.error("Failed to create enrollment:", enrollError);
+      return;
+    }
+
+    // Generate payment schedule for the new enrollment
+    await generatePaymentSchedule(
+      studentId,
+      newId,
+      companyId,
+      userId,
+      enrollment.id
+    );
+  }
+}
+
+/**
+ * Generates unpaid payment schedule rows for a batch enrollment.
+ * Creates one row per month based on batch duration + an admission fee row.
+ */
+async function generatePaymentSchedule(
+  studentId: string,
+  batchId: string,
+  companyId: string,
+  userId: string,
+  enrollmentId: string
+) {
+  // Fetch batch details
+  const { data: batch, error: batchError } = await supabase
+    .from("batches")
+    .select("start_date, course_duration_months, default_admission_fee, default_monthly_fee")
+    .eq("id", batchId)
+    .single();
+
+  if (batchError || !batch) {
+    console.error("Failed to fetch batch for schedule generation:", batchError);
+    return;
+  }
+
+  const scheduleRows: any[] = [];
+  const startDate = new Date(batch.start_date);
+
+  // Generate admission fee row if applicable
+  if (batch.default_admission_fee && Number(batch.default_admission_fee) > 0) {
+    scheduleRows.push({
       student_id: studentId,
-      batch_id: newId,
       company_id: companyId,
-      created_by: userId,
-      status: "active",
-      total_fee: 0,
+      user_id: userId,
+      batch_enrollment_id: enrollmentId,
+      payment_type: "admission",
+      amount: Number(batch.default_admission_fee),
+      status: "unpaid",
+      due_date: batch.start_date,
+      payment_date: batch.start_date,
+      payment_method: "cash",
+      months_covered: null,
     });
+  }
+
+  // Generate monthly fee rows
+  const durationMonths = batch.course_duration_months;
+  const monthlyFee = Number(batch.default_monthly_fee);
+
+  if (durationMonths && durationMonths > 0 && monthlyFee > 0) {
+    for (let i = 0; i < durationMonths; i++) {
+      const dueDate = addMonths(startDate, i);
+      const dueDateStr = format(dueDate, "yyyy-MM-dd");
+      const monthStr = format(dueDate, "yyyy-MM");
+
+      scheduleRows.push({
+        student_id: studentId,
+        company_id: companyId,
+        user_id: userId,
+        batch_enrollment_id: enrollmentId,
+        payment_type: "monthly",
+        amount: monthlyFee,
+        status: "unpaid",
+        due_date: dueDateStr,
+        payment_date: dueDateStr,
+        payment_method: "cash",
+        months_covered: [monthStr],
+      });
+    }
+  }
+
+  if (scheduleRows.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from("student_payments")
+    .insert(scheduleRows);
+
+  if (insertError) {
+    console.error("Failed to generate payment schedule:", insertError);
   }
 }

@@ -227,6 +227,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
               payment_date: format(new Date(), "yyyy-MM-dd"),
               payment_method: initialPayment.paymentMethod,
               receipt_number: initialPayment.receiptNumber || null,
+              due_date: format(new Date(), "yyyy-MM-dd"),
               studentName: data.name,
             });
           }
@@ -239,6 +240,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
               payment_method: initialPayment.paymentMethod,
               months_covered: initialPayment.monthlyMonths,
               receipt_number: initialPayment.receiptNumber || null,
+              due_date: `${initialPayment.monthlyMonths.sort()[0]}-01`,
               studentName: data.name,
             });
           }

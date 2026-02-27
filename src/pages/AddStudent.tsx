@@ -246,6 +246,7 @@ export default function AddStudent() {
               payment_date: format(new Date(), "yyyy-MM-dd"),
               payment_method: initialPayment.paymentMethod,
               receipt_number: initialPayment.receiptNumber || null,
+              due_date: format(new Date(), "yyyy-MM-dd"),
               studentName: personal.name,
             });
           }
@@ -258,6 +259,7 @@ export default function AddStudent() {
               payment_method: initialPayment.paymentMethod,
               months_covered: initialPayment.monthlyMonths,
               receipt_number: initialPayment.receiptNumber || null,
+              due_date: `${initialPayment.monthlyMonths.sort()[0]}-01`,
               studentName: personal.name,
             });
           }
