@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import {
-  MessageCircle, MessageSquarePlus, CreditCard, Pencil,
+  MessageCircle, MessageSquarePlus, Pencil,
   FileDown, Tag, Zap, X, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ interface QuickActionsPanelProps {
   userPermissions: string[];
   onStatusChange?: (newStatus: string) => void;
   onEdit: () => void;
-  onRecordPayment?: () => void;
   isLoading?: boolean;
 }
 
@@ -44,7 +43,7 @@ type ActionItem = {
 };
 
 export function QuickActionsPanel({
-  student, companyId, userRole, userPermissions, onEdit, onRecordPayment, isLoading,
+  student, companyId, userRole, userPermissions, onEdit, isLoading,
 }: QuickActionsPanelProps) {
   const { toast } = useToast();
   const [saving] = useState(false);
@@ -96,19 +95,6 @@ export function QuickActionsPanel({
       group: "actions",
     });
 
-    // Record Payment
-    if (isAdminOrCipher || (isModerator && userPermissions.includes("manage_payments"))) {
-      items.push({
-        id: "record-payment",
-        icon: CreditCard,
-        label: "Record Payment",
-        iconColor: "#1E3A8A",
-        className: "bg-blue-50 text-[#1E3A8A] border border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:border-blue-800 dark:hover:bg-blue-950/50",
-        fabColor: "#1E3A8A",
-        onClick: () => { onRecordPayment?.(); setFabOpen(false); },
-        group: "actions",
-      });
-    }
 
     // Edit Student
     if (isAdminOrCipher || (isModerator && userPermissions.includes("edit_students"))) {

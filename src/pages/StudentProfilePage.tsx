@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { useStudent, useUpdateStudent } from "@/hooks/useStudents";
 import StudentWizardDialog from "@/components/dialogs/StudentWizardDialog";
-import StudentPaymentDialog from "@/components/dialogs/StudentPaymentDialog";
-import { useStudentPayments, computeStudentSummary, useMonthlyFeeHistory, useCreateStudentPayment } from "@/hooks/useStudentPayments";
+import { useStudentPayments, computeStudentSummary, useMonthlyFeeHistory } from "@/hooks/useStudentPayments";
 import { useBatch, useBatches } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
 import { useStudentSalesNotes, useCreateSalesNote, useUpdateSalesNote, useDeleteSalesNote, NOTE_CATEGORIES, getCategoryInfo, useCustomNoteCategories, useCreateCustomCategory, useDeleteCustomCategory, COLOR_PRESETS } from "@/hooks/useStudentSalesNotes";
@@ -112,8 +111,6 @@ function ProductPurchaseHistoryWrapper({ studentId, companyId, fc }: { studentId
 
 export default function StudentProfilePage() {
   const { studentId } = useParams<{ studentId: string }>();
-  const [searchParams] = useSearchParams();
-  const contextBatchId = searchParams.get("from_batch") || undefined;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -314,8 +311,6 @@ export default function StudentProfilePage() {
   const canDeleteNote = (note: { created_by: string }) => note.created_by === user?.id || isAdmin || isCipher;
   const effectiveCanEdit = canEdit || canEditStudent;
   const [editOpen, setEditOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const createPaymentMutation = useCreateStudentPayment();
   const [financialTab, setFinancialTab] = useState<"summary" | "course" | "products" | undefined>(undefined);
   const financialRef = useRef<HTMLDivElement>(null);
   const updateStudent = useUpdateStudent();
@@ -490,30 +485,12 @@ export default function StudentProfilePage() {
                   // The status badge in header/sticky bar reads from `student.status`
                 }}
                 onEdit={() => setEditOpen(true)}
-                onRecordPayment={() => setPaymentDialogOpen(true)}
               />
             )}
             {/* Future: Financial Mini, Tags, Recent Activity */}
           </div>
         </div>
 
-        {/* Payment Dialog triggered from Quick Actions */}
-        {summary && (
-          <StudentPaymentDialog
-            open={paymentDialogOpen}
-            onOpenChange={setPaymentDialogOpen}
-            student={student}
-            summary={summary}
-            onSave={async (data) => {
-              await createPaymentMutation.mutateAsync(data);
-            }}
-            batchDefaultAdmissionFee={Number(batch?.default_admission_fee) || 0}
-            batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
-            courseName={course?.course_name}
-            batchName={batch?.batch_name}
-            contextBatchId={contextBatchId}
-          />
-        )}
 
         {/* BOTTOM FULL-WIDTH — Sales & Follow-up Notes */}
         <Card className="rounded-xl shadow-sm" data-section="sales-notes">
