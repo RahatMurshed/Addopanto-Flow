@@ -28,7 +28,8 @@ export function computeLifetimeMetrics(
     end_date?: string | null;
     course_duration_months?: number | null;
     default_monthly_fee?: number;
-  } | null | undefined
+  } | null | undefined,
+  futureUnpaidPayments?: Array<{ amount: number; status: string; paid_amount?: number | null }>
 ): LifetimeMetrics {
   // 1. LIFETIME VALUE — total confirmed payments + product sales
   const totalCoursesPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -60,26 +61,14 @@ export function computeLifetimeMetrics(
     ? Math.min(100, Math.round((totalCoursesPaid / totalInvoiced) * 100))
     : 0;
 
-  // 6. REVENUE PROJECTION — remaining months × monthly fee for active students
-  let revenueProjection = 0;
+  // 6. REVENUE PROJECTION — sum of future unpaid/partial payment records
   const isActive = student.status === "active";
-
-  if (isActive && batch) {
-    const endDateStr = batch.end_date || student.course_end_month;
-    if (endDateStr && batch.course_duration_months && effectiveMonthlyFee) {
-      // Parse end date — could be "YYYY-MM-DD" or "YYYY-MM"
-      const endDate = endDateStr.length <= 7
-        ? new Date(`${endDateStr}-28`)
-        : new Date(endDateStr);
-      const today = new Date();
-
-      if (endDate > today) {
-        const remainingMs = endDate.getTime() - today.getTime();
-        const remainingMonths = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24 * 30)));
-        revenueProjection = remainingMonths * effectiveMonthlyFee;
-      }
-    }
-  }
+  const revenueProjection = (futureUnpaidPayments ?? []).reduce((sum, p) => {
+    const unpaidAmount = p.status === "partial"
+      ? Number(p.amount) - Number(p.paid_amount ?? 0)
+      : Number(p.amount);
+    return sum + unpaidAmount;
+  }, 0);
 
   return {
     lifetimeValue,
