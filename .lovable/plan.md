@@ -1,38 +1,27 @@
 
 
-# Fix: Rejected Request Visibility and Persistent Dismissal
+# Add Delete Product Category Feature
 
-## Problems Found
+## Overview
+The `useDeleteProductCategory` hook already exists and is imported but unused. Category cards currently have no delete option. This plan adds a delete button on each category card (for admins) with a confirmation dialog.
 
-1. **Cipher users see everyone's rejected requests**: The rejected creation requests query (line 78) doesn't filter by `user_id`. RLS allows cipher users to see ALL rows, so cipher users see rejection messages meant for other users.
+## Changes
 
-2. **Same issue with pending creation requests query** (line 63): No `user_id` filter -- cipher users see all pending requests too.
+### File: `src/pages/Products.tsx`
 
-3. **Dismissals don't persist**: Both `dismissedRejections` and `dismissedCreationRejections` use React `useState`, so dismissed cards reappear every time the user refreshes or logs in.
+1. **Add state for category deletion**: Add `deleteCategoryId` state variable to track which category is being deleted.
 
-## Solution
+2. **Add delete button to category cards**: On each category card (lines 165-184), add a small delete (trash) icon button in the top-right corner, visible only to admin users. This button will set `deleteCategoryId` to trigger the confirmation dialog. System categories (`is_system: true`) will not show the delete button.
 
-### 1. Add `user_id` filter to creation request queries
+3. **Add confirmation AlertDialog for category deletion**: Add a second `AlertDialog` (after the existing product delete one) that warns the user about deleting the category and confirms the action. On confirm, call `deleteCategory.mutateAsync(deleteCategoryId)`.
 
-Add `.eq("user_id", user.id)` to both the pending and rejected creation request queries so each user only sees their own requests, regardless of RLS.
+4. **Wire up `useDeleteProductCategory`**: Initialize the `useDeleteProductCategory` hook (already imported) and use it in the delete handler.
 
-### 2. Persist dismissals in `localStorage`
-
-Replace `useState` with `localStorage`-backed state for both `dismissedRejections` and `dismissedCreationRejections`. Use a user-specific key (e.g., `dismissed-join-rejections-{userId}` and `dismissed-creation-rejections-{userId}`) so dismissals are per-user and survive page refreshes and logins.
+5. **Add edit button to category cards**: While we're at it, add an edit (pencil) icon button next to delete so admins can edit categories directly from the card (currently only accessible via the Settings2 button in the header). This opens the existing `ProductCategoryDialog` with the selected category.
 
 ## Technical Details
 
-### File: `src/pages/CompanySelection.tsx`
-
-**Query fixes (lines 60-87):**
-- Add `.eq("user_id", user.id)` to the pending creation requests query (line 66)
-- Add `.eq("user_id", user.id)` to the rejected creation requests query (line 81)
-
-**Dismissal persistence (lines 21-22, 240-246):**
-- Initialize `dismissedRejections` from `localStorage` using key `dismissed-join-rejections-${user?.id}`
-- Initialize `dismissedCreationRejections` from `localStorage` using key `dismissed-creation-rejections-${user?.id}`
-- Update the dismiss handlers to write to `localStorage` in addition to state
-- Read from `localStorage` on mount (lazy initializer in `useState`)
-
-No database changes required.
-
+- The `useDeleteProductCategory` hook is already defined in `src/hooks/useProductCategories.ts` and imported in Products.tsx -- just needs to be called
+- Category cards will get a small action overlay (edit + delete icons) visible on hover or always for mobile, only for admin users
+- Non-system categories only (`is_system === false`) can be deleted
+- If a category has products assigned to it, the delete will either fail at the DB level (if FK constraint exists) or succeed -- the confirmation dialog will warn about this
