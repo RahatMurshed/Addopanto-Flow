@@ -1,14 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   MessageCircle, MessageSquarePlus, CreditCard, Pencil,
-  RefreshCw, FileDown, Tag, Zap, X, Loader2, Check,
+  FileDown, Tag, Zap, X, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,16 +22,12 @@ interface QuickActionsPanelProps {
   companyId: string;
   userRole: string;
   userPermissions: string[];
-  onStatusChange: (newStatus: string) => void;
+  onStatusChange?: (newStatus: string) => void;
   onEdit: () => void;
   isLoading?: boolean;
 }
 
-const STATUS_OPTIONS = [
-  { value: "active", label: "Active", color: "bg-green-500" },
-  { value: "inactive", label: "Inactive", color: "bg-red-500" },
-  { value: "graduated", label: "Graduated", color: "bg-blue-500" },
-];
+// Status options removed — status changes handled elsewhere
 
 type ActionItem = {
   id: string;
@@ -51,12 +43,10 @@ type ActionItem = {
 };
 
 export function QuickActionsPanel({
-  student, companyId, userRole, userPermissions, onStatusChange, onEdit, isLoading,
+  student, companyId, userRole, userPermissions, onEdit, isLoading,
 }: QuickActionsPanelProps) {
   const { toast } = useToast();
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [confirmStatus, setConfirmStatus] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
 
   const isAdminOrCipher = userRole === "cipher" || userRole === "admin";
@@ -74,25 +64,7 @@ export function QuickActionsPanel({
     setFabOpen(false);
   }, []);
 
-  const handleStatusConfirm = useCallback(async () => {
-    if (!confirmStatus) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("students")
-        .update({ status: confirmStatus as any })
-        .eq("id", student.id);
-      if (error) throw error;
-      onStatusChange(confirmStatus);
-      toast({ title: `Status updated to ${STATUS_OPTIONS.find(s => s.value === confirmStatus)?.label}` });
-      setConfirmStatus(null);
-      setStatusOpen(false);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  }, [confirmStatus, student.id, onStatusChange, toast]);
+  // Status change logic removed
 
   const actions = useMemo<ActionItem[]>(() => {
     const items: ActionItem[] = [];
@@ -151,19 +123,7 @@ export function QuickActionsPanel({
       });
     }
 
-    // Change Status
-    if (isAdminOrCipher || (isModerator && userPermissions.includes("edit_students"))) {
-      items.push({
-        id: "change-status",
-        icon: RefreshCw,
-        label: "Change Status",
-        iconColor: "#1E3A8A",
-        className: "bg-muted/50 text-foreground border border-border hover:bg-muted",
-        fabColor: "#1E3A8A",
-        onClick: () => setStatusOpen(!statusOpen),
-        group: "actions",
-      });
-    }
+    // Change Status removed
 
     // Export PDF
     if (isAdminOrCipher) {
@@ -194,7 +154,7 @@ export function QuickActionsPanel({
     }
 
     return items;
-  }, [student.phone, isAdminOrCipher, isModerator, userPermissions, handleWhatsApp, handleScrollToNotes, onEdit, toast, statusOpen]);
+  }, [student.phone, isAdminOrCipher, isModerator, userPermissions, handleWhatsApp, handleScrollToNotes, onEdit, toast]);
 
   const groupedActions = useMemo(() => {
     const communication = actions.filter(a => a.group === "communication");
@@ -262,29 +222,6 @@ export function QuickActionsPanel({
           {/* Actions group */}
           {groupedActions.actions.map(renderActionButton)}
 
-          {/* Status dropdown inline */}
-          {statusOpen && (
-            <div className="ml-7 flex flex-col gap-1 py-1 animate-fade-in">
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  className={cn(
-                    "flex items-center gap-2 w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors",
-                    "hover:bg-muted",
-                    student.status === opt.value && "bg-muted font-medium"
-                  )}
-                  onClick={() => {
-                    if (opt.value !== student.status) setConfirmStatus(opt.value);
-                  }}
-                  disabled={saving}
-                >
-                  <span className={cn("w-2.5 h-2.5 rounded-full", opt.color)} />
-                  {opt.label}
-                  {student.status === opt.value && <Check className="h-3.5 w-3.5 ml-auto text-muted-foreground" />}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Admin group */}
           {groupedActions.admin.length > 0 && (
@@ -326,7 +263,7 @@ export function QuickActionsPanel({
               <button
                 className="w-12 h-12 rounded-full shadow-md flex items-center justify-center text-white transition-transform hover:scale-110"
                 style={{ backgroundColor: action.fabColor }}
-                onClick={() => { action.onClick(); if (action.id !== "change-status") setFabOpen(false); }}
+                onClick={() => { action.onClick(); setFabOpen(false); }}
               >
                 <action.icon className="h-5 w-5" />
               </button>
@@ -343,29 +280,8 @@ export function QuickActionsPanel({
         </div>
       </div>
 
-      {/* Status confirmation dialog */}
-      <AlertDialog open={!!confirmStatus} onOpenChange={(open) => { if (!open) setConfirmStatus(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change Student Status</AlertDialogTitle>
-            <AlertDialogDescription>
-              Change {student.name}'s status to{" "}
-              <strong>{STATUS_OPTIONS.find(s => s.value === confirmStatus)?.label}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleStatusConfirm}
-              disabled={saving}
-              className="bg-[#1E3A8A] text-white hover:bg-[#1E3A8A]/90"
-            >
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+
     </>
   );
 }
