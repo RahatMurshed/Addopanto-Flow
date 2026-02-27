@@ -89,6 +89,7 @@ export default function StudentProfilePage() {
   const createCustomCategory = useCreateCustomCategory();
   const deleteCustomCategory = useDeleteCustomCategory();
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showManageCategories, setShowManageCategories] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState("");
   const [newCatColor, setNewCatColor] = useState(COLOR_PRESETS[0].class);
 
@@ -429,25 +430,19 @@ export default function StudentProfilePage() {
             <div className="flex flex-wrap gap-2 items-end">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Category</label>
-                <Select value={noteCategory} onValueChange={(v) => { if (v === "__add_custom__") { setShowAddCategory(true); } else { setNoteCategory(v); } }}>
+                <Select value={noteCategory} onValueChange={(v) => { if (v === "__add_custom__") { setShowAddCategory(true); } else if (v === "__manage_cats__") { setShowManageCategories(true); } else { setNoteCategory(v); } }}>
                   <SelectTrigger className="w-[160px] h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {allCategories.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
-                        <span className="flex items-center gap-2">
-                          {c.label}
-                          {c.isCustom && isAdmin && (
-                            <button type="button" className="ml-1 text-destructive hover:text-destructive/80" onClick={(e) => { e.stopPropagation(); handleDeleteCustomCategory(c.id); }}>
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                        </span>
-                      </SelectItem>
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                     ))}
                     {isAdmin && (
                       <>
                         <Separator className="my-1" />
                         <SelectItem value="__add_custom__"><span className="flex items-center gap-1"><Plus className="h-3 w-3" /> Add Custom Category...</span></SelectItem>
+                        {customCategories.length > 0 && (
+                          <SelectItem value="__manage_cats__"><span className="flex items-center gap-1"><Pencil className="h-3 w-3" /> Manage Categories...</span></SelectItem>
+                        )}
                       </>
                     )}
                   </SelectContent>
@@ -673,6 +668,39 @@ export default function StudentProfilePage() {
               {createCustomCategory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
               Add Category
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Custom Categories Dialog */}
+      <Dialog open={showManageCategories} onOpenChange={setShowManageCategories}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Manage Custom Categories</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1">
+            {customCategories.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No custom categories yet.</p>
+            ) : (
+              customCategories.map((cat) => (
+                <div key={cat.id} className="flex items-center justify-between rounded-md px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <Badge className={cn("text-xs", cat.color_class)}>{cat.label}</Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    onClick={() => handleDeleteCustomCategory(cat.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowManageCategories(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
