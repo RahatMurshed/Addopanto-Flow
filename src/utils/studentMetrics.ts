@@ -17,6 +17,7 @@ export function computeLifetimeMetrics(
   productSales: ProductSale[],
   student: {
     enrollment_date: string;
+    created_at: string;
     status: string;
     monthly_fee_amount: number;
     admission_fee_total: number;
@@ -44,11 +45,12 @@ export function computeLifetimeMetrics(
   // 3. PRODUCTS PURCHASED
   const productsPurchased = productSales.length;
 
-  // 4. DAYS SINCE JOINING
+  // 4. DAYS SINCE JOINING (use created_at for accuracy, enrollment_date is manually entered)
+  const createdAtDate = new Date(student.created_at);
   const enrollmentDate = new Date(student.enrollment_date);
   const daysSinceJoining = Math.max(
     0,
-    Math.floor((Date.now() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24))
+    Math.floor((Date.now() - createdAtDate.getTime()) / (1000 * 60 * 60 * 24))
   );
 
   // 5. PAYMENT RATE — totalCoursesPaid / denominator
