@@ -18,8 +18,18 @@ export default function CompanySelection() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { companies, memberships, switchCompany, isCipher, isLoading } = useCompany();
-  const [dismissedRejections, setDismissedRejections] = useState<string[]>([]);
-  const [dismissedCreationRejections, setDismissedCreationRejections] = useState<string[]>([]);
+  const [dismissedRejections, setDismissedRejections] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(`dismissed-join-rejections-${user?.id}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const [dismissedCreationRejections, setDismissedCreationRejections] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(`dismissed-creation-rejections-${user?.id}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   const [newlyJoinedIds, setNewlyJoinedIds] = useState<string[]>([]);
   const prevCreationStatusesRef = useRef<Record<string, string>>({});
 
@@ -64,6 +74,7 @@ export default function CompanySelection() {
         .from("company_creation_requests")
         .select("*")
         .eq("status", "pending")
+        .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -79,6 +90,7 @@ export default function CompanySelection() {
         .from("company_creation_requests")
         .select("*")
         .eq("status", "rejected")
+        .eq("user_id", user!.id)
         .order("reviewed_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -238,11 +250,19 @@ export default function CompanySelection() {
   };
 
   const handleDismissRejection = (requestId: string) => {
-    setDismissedRejections(prev => [...prev, requestId]);
+    setDismissedRejections(prev => {
+      const updated = [...prev, requestId];
+      try { localStorage.setItem(`dismissed-join-rejections-${user?.id}`, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   };
 
   const handleDismissCreationRejection = (requestId: string) => {
-    setDismissedCreationRejections(prev => [...prev, requestId]);
+    setDismissedCreationRejections(prev => {
+      const updated = [...prev, requestId];
+      try { localStorage.setItem(`dismissed-creation-rejections-${user?.id}`, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   };
 
   const visibleRejections = rejectedJoinRequests.filter(r => !dismissedRejections.includes(r.id));
