@@ -54,12 +54,14 @@ export default function Products() {
   const { data: allSales = [] } = useProductSales();
   const { data: categories = [] } = useProductCategories();
   const deleteProduct = useDeleteProduct();
+  const deleteCategory = useDeleteProductCategory();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const [saleProduct, setSaleProduct] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
@@ -107,6 +109,17 @@ export default function Products() {
       setDeleteId(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to delete");
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deleteCategoryId) return;
+    try {
+      await deleteCategory.mutateAsync(deleteCategoryId);
+      toast.success("Category deleted");
+      setDeleteCategoryId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete category. It may still have products assigned.");
     }
   };
 
@@ -168,11 +181,33 @@ export default function Products() {
           return (
             <Card
               key={cat.slug}
-              className={`cursor-pointer transition-all hover:shadow-md ${categoryFilter === cat.slug ? "ring-2 ring-primary" : ""}`}
+              className={`relative cursor-pointer transition-all hover:shadow-md ${categoryFilter === cat.slug ? "ring-2 ring-primary" : ""}`}
               onClick={() => {
                 setCategoryFilter(categoryFilter === cat.slug ? "all" : cat.slug);
               }}
             >
+              {isAdmin && !cat.is_system && (
+                <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 sm:opacity-100">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => { e.stopPropagation(); setEditingCategory(cat); setCategoryDialogOpen(true); }}
+                    title="Edit category"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-destructive hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setDeleteCategoryId(cat.id); }}
+                    title="Delete category"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
               <CardContent className="flex flex-col items-center gap-2 p-4">
                 <IconComp className="h-8 w-8" style={{ color: cat.color }} />
                 <span className="text-sm font-medium">{cat.name}</span>
@@ -327,6 +362,19 @@ export default function Products() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteCategoryId} onOpenChange={(o) => !o && setDeleteCategoryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete this category. If products are still assigned to it, the deletion may fail.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteCategory} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
