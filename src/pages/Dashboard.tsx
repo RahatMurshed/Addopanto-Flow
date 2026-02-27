@@ -575,6 +575,13 @@ export default function Dashboard() {
               date: data.date,
               expense_account_id: data.expense_account_id,
               description: data.description,
+              funded_by_type: data.funded_by_type || null,
+              funded_by_id: data.funded_by_id || null,
+              funded_by_reference: data.funded_by_reference || null,
+              matches_loan_purpose: data.matches_loan_purpose ?? null,
+              purpose_notes: data.purpose_notes || null,
+              invoice_number: data.invoice_number || null,
+              vendor_name: data.vendor_name || null,
             });
           }}
         />
@@ -1036,6 +1043,13 @@ export default function Dashboard() {
             date: data.date,
             expense_account_id: data.expense_account_id,
             description: data.description,
+            funded_by_type: data.funded_by_type || null,
+            funded_by_id: data.funded_by_id || null,
+            funded_by_reference: data.funded_by_reference || null,
+            matches_loan_purpose: data.matches_loan_purpose ?? null,
+            purpose_notes: data.purpose_notes || null,
+            invoice_number: data.invoice_number || null,
+            vendor_name: data.vendor_name || null,
           });
         }}
       />
