@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Users, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Props {
   open: boolean;
@@ -70,6 +73,8 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
   const updateStudent = useUpdateStudent();
   const createHistory = useCreateBatchHistory();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
 
   const filteredBatches = useMemo(() => {
     if (!search.trim()) return batches;
@@ -94,6 +99,17 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
           const currentStudent = studentMap.get(id);
           const fromBatchId = currentStudent?.batch_id || null;
           await updateStudent.mutateAsync({ id, batch_id: selectedBatchId } as any);
+          // Create batch_enrollments record
+          if (activeCompanyId && user) {
+            await supabase.from("batch_enrollments").insert({
+              student_id: id,
+              batch_id: selectedBatchId,
+              company_id: activeCompanyId,
+              created_by: user.id,
+              status: "active",
+              total_fee: 0,
+            });
+          }
           // Record transfer history
           await createHistory.mutateAsync({
             student_id: id,

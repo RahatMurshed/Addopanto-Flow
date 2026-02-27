@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
 import { useSaveSiblings } from "@/hooks/useStudentSiblings";
 import type { Student, StudentInsert } from "@/hooks/useStudents";
@@ -77,6 +79,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { activeCompanyId } = useCompany();
+  const { user } = useAuth();
   const createPaymentMutation = useCreateStudentPayment();
   const saveSiblingsMutation = useSaveSiblings();
 
@@ -303,6 +306,22 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
       };
 
       const result = await onSave(insertData);
+
+      // Create batch_enrollments record for new students with a batch
+      if (!isEditMode && result && "id" in result && insertData.batch_id && activeCompanyId && user) {
+        try {
+          await supabase.from("batch_enrollments").insert({
+            student_id: result.id,
+            batch_id: insertData.batch_id,
+            company_id: activeCompanyId,
+            created_by: user.id,
+            status: "active",
+            total_fee: 0,
+          });
+        } catch (e: any) {
+          console.error("Failed to create batch enrollment record:", e);
+        }
+      }
 
       // Save siblings
       if (result && "id" in result && family.siblings.length > 0) {
