@@ -900,7 +900,7 @@ export default function BatchDetail() {
 
       {/* Dialogs */}
       <BatchDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} batch={batch} onSave={handleUpdate} />
-      <BatchEnrollDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} batchId={id!} batchName={batch.batch_name} />
+      <BatchEnrollDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} batchId={id!} batchName={batch.batch_name} courseId={batch.course_id} />
       <StudentDialog
         open={editStudentDialogOpen}
         onOpenChange={(o) => { setEditStudentDialogOpen(o); if (!o) setEditingStudent(null); }}
