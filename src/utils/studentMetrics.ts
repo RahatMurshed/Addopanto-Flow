@@ -73,26 +73,9 @@ export function computeLifetimeMetrics(
         : Number(p.amount);
       return sum + unpaidAmount;
     }, 0);
-  } else if (isActive && batch && batch.end_date) {
-    // Time-based fallback using pure monthly fee
-    const monthlyFee = Number(batch.default_monthly_fee ?? 0);
-    const endDate = new Date(batch.end_date);
-    const now = new Date();
-    const remainingMonths = Math.max(0,
-      (endDate.getFullYear() - now.getFullYear()) * 12 + (endDate.getMonth() - now.getMonth())
-    );
-    // Only count monthly-type payments for paid months
-    const monthlyPaidCount = payments.filter(p => (p as any).payment_type === "monthly").length;
-    const unpaidMonths = Math.max(0, remainingMonths - monthlyPaidCount);
-
-    // Unpaid admission balance
-    const effectiveAdmissionFee = Number(batch.default_admission_fee ?? 0);
-    const admissionPaid = payments
-      .filter(p => (p as any).payment_type === "admission")
-      .reduce((sum, p) => sum + Number(p.amount), 0);
-    const unpaidAdmission = Math.max(0, effectiveAdmissionFee - admissionPaid);
-
-    revenueProjection = Math.round(unpaidMonths * monthlyFee + unpaidAdmission);
+  } else if (isActive && denominator > 0) {
+    // Simple fallback: total expected minus what's already been paid for courses
+    revenueProjection = Math.max(0, Math.round(denominator - totalCoursesPaid));
   }
 
   return {
