@@ -50,9 +50,10 @@ interface StudentPaymentDialogProps {
   courseName?: string;
   batchName?: string;
   batchEnrollmentId?: string;
+  contextBatchId?: string;
 }
 
-export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee, courseName, batchName, batchEnrollmentId }: StudentPaymentDialogProps) {
+export default function StudentPaymentDialog({ open, onOpenChange, student, summary, onSave, editingPayment, onUpdate, batchDefaultAdmissionFee, batchDefaultMonthlyFee, courseName, batchName, batchEnrollmentId, contextBatchId }: StudentPaymentDialogProps) {
   const [saving, setSaving] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -114,6 +115,10 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     } else if (batchEnrollmentId) {
       // Pre-select hint from caller (e.g. BatchDetail context)
       setSelectedEnrollmentId(batchEnrollmentId);
+    } else if (contextBatchId && enrollments.length > 0) {
+      // Auto-select from URL batch context (e.g. from_batch query param)
+      const match = enrollments.find(e => e.batch_id === contextBatchId);
+      if (match) setSelectedEnrollmentId(match.id);
     } else if (enrollments.length === 1) {
       setSelectedEnrollmentId(enrollments[0].id);
     } else if (student.batch_id && enrollments.length > 1) {
@@ -122,7 +127,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     } else if (enrollments.length === 0) {
       setSelectedEnrollmentId(null);
     }
-  }, [open, enrollments, batchEnrollmentId, isEditing, editingPayment, student.batch_id]);
+  }, [open, enrollments, batchEnrollmentId, contextBatchId, isEditing, editingPayment, student.batch_id]);
 
   // Per-batch fee summary
   const batchFeeSummary = useMemo(() => {

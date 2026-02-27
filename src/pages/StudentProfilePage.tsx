@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { useStudent, useUpdateStudent } from "@/hooks/useStudents";
 import StudentWizardDialog from "@/components/dialogs/StudentWizardDialog";
@@ -112,6 +112,8 @@ function ProductPurchaseHistoryWrapper({ studentId, companyId, fc }: { studentId
 
 export default function StudentProfilePage() {
   const { studentId } = useParams<{ studentId: string }>();
+  const [searchParams] = useSearchParams();
+  const contextBatchId = searchParams.get("from_batch") || undefined;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -509,6 +511,7 @@ export default function StudentProfilePage() {
             batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
             courseName={course?.course_name}
             batchName={batch?.batch_name}
+            contextBatchId={contextBatchId}
           />
         )}
 
