@@ -1,32 +1,103 @@
 
-# Disable Batch Selector Field (Read-Only Auto-Selection)
 
-## Change
+# Fix: Allow Students to Be Enrolled in Multiple Batches Simultaneously
 
-Make the batch selector always disabled so the auto-selected batch cannot be changed by the admin. The system determines the correct batch from the student's current `batch_id`, and the field will display it as read-only.
+## Problem
 
-## File: `src/components/dialogs/StudentPaymentDialog.tsx`
+When you enroll a student in a new batch, the system **replaces** their current batch instead of **adding** the new one. This happens because:
 
-**Line 390** -- Change `disabled={saving}` to `disabled` (always disabled):
+1. The `students` table has a single `batch_id` field -- it can only hold one batch at a time
+2. Every enrollment action overwrites this field with the new batch ID
+3. The `syncBatchEnrollment` utility then marks the old batch enrollment as "dropped"
+
+So the system treats every enrollment as a **transfer**, not an addition.
+
+## Solution
+
+The `batch_enrollments` table already supports multiple active enrollments per student. The fix is to stop overwriting `student.batch_id` when enrolling from the **Batch Enroll Dialog** (the "Enroll Student" button on the batch detail page). Instead, only create a new `batch_enrollments` record without touching `student.batch_id`.
+
+The `student.batch_id` field will continue to represent the student's **primary/latest** batch (used for display on the Students list page), but additional enrollments won't disturb it.
+
+### Key distinction
+
+- **Batch Enroll Dialog** (enrolling a student into an additional batch from the batch page): Should **add** an enrollment without removing the existing one
+- **Batch Assignment / Drag-and-Drop** (reassigning a student's primary batch from the Students page): Should continue to **transfer** as it does today, since the intent is to change the student's main batch
+
+## Changes
+
+### 1. `src/components/dialogs/BatchEnrollDialog.tsx`
+
+Update the `handleEnroll` function:
+
+- **Remove** the call to `updateStudentMutation.mutateAsync({ id: student.id, batch_id: batchId })` -- this is what overwrites the student's batch
+- **Keep** the `batch_enrollments` insert (this is the correct multi-enrollment record)
+- **Only update** `student.batch_id` if the student currently has **no batch** (`batch_id` is null) -- in that case, set it as their primary batch
+- Check for existing active enrollment in the same batch before inserting a duplicate
+
+### 2. `src/components/dialogs/BatchEnrollDialog.tsx` (UI update)
+
+- Change the "already enrolled" check from `student.batch_id === batchId` to checking `batch_enrollments` for an existing active record for this student + batch combination
+- Query active enrollments for each search result to show accurate enrollment status
+
+### 3. No changes needed to
+
+- `syncBatchEnrollment` -- still correct for batch transfers/reassignments
+- `BatchDropZone` / `BatchAssignDialog` -- these are meant for reassignment, not additional enrollment
+
+## Technical Details
+
+### Updated handleEnroll logic
 
 ```typescript
-// Before
-<Select value={selectedEnrollmentId || ""} onValueChange={...} disabled={saving}>
+const handleEnroll = useCallback(async (student: Student) => {
+  setEnrollingId(student.id);
+  try {
+    // Check for existing active enrollment in this batch
+    const { data: existing } = await supabase
+      .from("batch_enrollments")
+      .select("id")
+      .eq("student_id", student.id)
+      .eq("batch_id", batchId)
+      .eq("status", "active")
+      .maybeSingle();
 
-// After
-<Select value={selectedEnrollmentId || ""} onValueChange={...} disabled>
+    if (existing) {
+      toast({ title: "Already enrolled", description: "..." });
+      return;
+    }
+
+    // Create enrollment record WITHOUT overwriting student.batch_id
+    await supabase.from("batch_enrollments").insert({
+      student_id: student.id,
+      batch_id: batchId,
+      company_id: activeCompanyId,
+      created_by: user.id,
+      status: "active",
+      total_fee: 0,
+    });
+
+    // Only set batch_id if student has none (first enrollment)
+    if (!student.batch_id) {
+      await updateStudentMutation.mutateAsync({ id: student.id, batch_id: batchId });
+    }
+
+    toast({ title: "Student enrolled", description: "..." });
+  } catch (err) { ... }
+}, [...]);
 ```
 
-This ensures the batch field is always locked to the auto-selected value. The `onValueChange` handler stays in place (harmless since the field is disabled) and no other logic changes are needed since the auto-selection `useEffect` already handles all cases.
+### Updated "already enrolled" detection
 
-## Also show batch info for single-enrollment students
+Instead of checking `student.batch_id === batchId` (which only works for the primary batch), fetch batch enrollments for search results and check enrollment status properly.
 
-Currently the batch selector only renders when `enrollments.length > 1` (line 387). For single-enrollment students, no batch info is shown at all. We should also display the batch name as a read-only field for single-enrollment students so every payment form clearly shows which batch it belongs to.
+## Files Changed
 
-**Line 387** -- Change the condition from `enrollments.length > 1` to `enrollments.length >= 1` so the disabled selector always appears when there are enrollments.
+1. **`src/components/dialogs/BatchEnrollDialog.tsx`** -- Stop overwriting `student.batch_id` on enroll; check `batch_enrollments` for duplicate detection; only set `batch_id` if student has no primary batch
 
-## Summary of changes
+## Edge Cases
 
-One file, two small edits:
-1. Show batch field for all students with enrollments (not just multi-enrollment)
-2. Make the field permanently disabled so it can't be changed
+- Student with no batch: Sets batch_id AND creates enrollment (becomes primary batch)
+- Student already in another batch: Only creates enrollment record, keeps existing batch_id
+- Student already enrolled in this batch: Shows "already enrolled" toast, no changes
+- Batch at capacity: Still blocked as before
+
