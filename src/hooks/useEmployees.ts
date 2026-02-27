@@ -286,6 +286,7 @@ export function useCreateSalaryPayment() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-salary", vars.employee_id] });
+      qc.invalidateQueries({ queryKey: ["employee-perf-salary", vars.employee_id] });
       qc.invalidateQueries({ queryKey: ["employees"] });
     },
   });
@@ -301,6 +302,7 @@ export function useDeleteSalaryPayment() {
     },
     onSuccess: (employeeId) => {
       qc.invalidateQueries({ queryKey: ["employee-salary", employeeId] });
+      qc.invalidateQueries({ queryKey: ["employee-perf-salary", employeeId] });
     },
   });
 }
@@ -339,6 +341,7 @@ export function useMarkAttendance() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-attendance", vars.employee_id] });
+      qc.invalidateQueries({ queryKey: ["employee-perf-attendance", vars.employee_id] });
     },
   });
 }
@@ -372,6 +375,7 @@ export function useCreateLeave() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-leaves", vars.employee_id] });
+      qc.invalidateQueries({ queryKey: ["employee-perf-attendance", vars.employee_id] });
     },
   });
 }
@@ -386,6 +390,7 @@ export function useDeleteLeave() {
     },
     onSuccess: (employeeId) => {
       qc.invalidateQueries({ queryKey: ["employee-leaves", employeeId] });
+      qc.invalidateQueries({ queryKey: ["employee-perf-attendance", employeeId] });
     },
   });
 }
