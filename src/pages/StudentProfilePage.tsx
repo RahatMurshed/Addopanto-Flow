@@ -370,35 +370,7 @@ export default function StudentProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Financial Summary */}
-            {!isDataEntryModerator && summary && (
-              <Card className="rounded-xl shadow-sm">
-                <CardContent className="pt-6">
-                  <SectionHeader icon={DollarSign} title="Financial Summary" />
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div className="rounded-lg border p-4 space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Fee</p>
-                      <p className="text-xl font-bold">{formatCurrency(summary.totalExpected, currency)}</p>
-                    </div>
-                    <div className="rounded-lg border p-4 space-y-1 border-green-200 dark:border-green-800">
-                      <p className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide">Total Paid</p>
-                      <p className="text-xl font-bold text-green-700 dark:text-green-400">{formatCurrency(summary.totalPaid, currency)}</p>
-                    </div>
-                    <div className="rounded-lg border p-4 space-y-1 border-red-200 dark:border-red-800">
-                      <p className="text-xs text-red-600 dark:text-red-400 uppercase tracking-wide">Total Due</p>
-                      <p className="text-xl font-bold text-red-700 dark:text-red-400">{formatCurrency(summary.totalPending, currency)}</p>
-                    </div>
-                    <div className="rounded-lg border p-4 space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Payment</p>
-                      <p className="text-sm font-medium">{lastPayment ? format(new Date(lastPayment.payment_date), "MMM d, yyyy") : "No payments yet"}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/students/${student.id}`)}>
-                    <CreditCard className="mr-2 h-4 w-4" /> View Full Payments
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            {/* Financial Summary removed */}
 
             {/* Future: Enrollment Timeline, Product Cards, Financial Tabs */}
           </div>
