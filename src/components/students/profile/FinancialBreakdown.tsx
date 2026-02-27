@@ -97,6 +97,27 @@ export function FinancialBreakdown({ studentId, companyId }: FinancialBreakdownP
         .order("payment_date", { ascending: false });
       if (e1) throw e1;
 
+      // Fetch student fee structure to compute true totalInvoiced
+      const { data: studentRow, error: eStudent } = await supabase
+        .from("students")
+        .select("admission_fee_total, monthly_fee_amount, course_start_month, course_end_month")
+        .eq("id", studentId)
+        .eq("company_id", companyId)
+        .single();
+      if (eStudent) throw eStudent;
+
+      // Calculate total months for monthly fee
+      let totalMonthlyMonths = 0;
+      if (studentRow.course_start_month && studentRow.course_end_month) {
+        const [startY, startM] = studentRow.course_start_month.split("-").map(Number);
+        const [endY, endM] = studentRow.course_end_month.split("-").map(Number);
+        totalMonthlyMonths = Math.max(0, (endY - startY) * 12 + (endM - startM) + 1);
+      }
+
+      const totalInvoicedFromFees =
+        (Number(studentRow.admission_fee_total) || 0) +
+        (Number(studentRow.monthly_fee_amount) || 0) * totalMonthlyMonths;
+
       const { data: enrollments, error: e2 } = await supabase
         .from("batch_enrollments")
         .select(`
@@ -173,6 +194,7 @@ export function FinancialBreakdown({ studentId, companyId }: FinancialBreakdownP
         productMap,
         userMap,
         revenueProjection,
+        totalInvoicedFromFees,
       };
     },
     enabled: shouldFetch && !!studentId && !!companyId,
@@ -216,7 +238,7 @@ export function FinancialBreakdown({ studentId, companyId }: FinancialBreakdownP
   }, [data]);
 
   const summaryData = useMemo(() => {
-    const totalCourseFee = coursePayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalCourseFee = data?.totalInvoicedFromFees ?? 0;
     const totalCoursePaid = coursePayments
       .filter((p) => p.status === "paid")
       .reduce((sum, p) => sum + p.amount, 0);
