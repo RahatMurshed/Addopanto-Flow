@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -16,6 +16,7 @@ import { ProductPurchasesTab, type ProductPurchaseRow } from "./ProductPurchases
 
 interface FinancialBreakdownProps {
   studentId: string;
+  initialTab?: TabId;
   companyId: string;
 }
 
@@ -74,8 +75,9 @@ function FinancialSkeleton() {
   );
 }
 
-export function FinancialBreakdown({ studentId, companyId }: FinancialBreakdownProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("summary");
+export function FinancialBreakdown({ studentId, companyId, initialTab }: FinancialBreakdownProps) {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? "summary");
+  useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab]);
   const { fc } = useCompanyCurrency();
   const { isDataEntryModerator, isCompanyAdmin, canViewFinancialData } = useCompany();
   const { isCipher } = useRole();
