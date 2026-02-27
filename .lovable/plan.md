@@ -1,53 +1,51 @@
 
 
-# Fix: Outstanding Shows 0 in Financial Breakdown
+# Fix: Course Payments showing "Uncategorized / No Batch"
 
 ## Root Cause
 
-`totalInvoiced` is currently derived from the student's fee structure fields (`admission_fee_total`, `monthly_fee_amount`, `course_start_month`, `course_end_month`) rather than from actual payment rows. When `course_start_month` or `course_end_month` are null, `totalMonthlyMonths` = 0, and `totalInvoicedFromFees` collapses to just the admission fee or zero -- making Outstanding appear as 0.
+In `FinancialBreakdown.tsx` line 186, each payment resolves its course/batch name via `batch_enrollment_id`:
 
-Meanwhile, `totalPaid` sums only `status === "paid"` rows. Since all existing payment rows likely have `status = "paid"`, the two values end up equal.
+```typescript
+const enrollment = p.batch_enrollment_id ? data.enrollmentMap.get(p.batch_enrollment_id) : null;
+```
+
+For payments recorded before the `batch_enrollments` table existed, `batch_enrollment_id` is null, so enrollment resolves to null and the fallback strings "Uncategorized" / "No Batch" are shown.
 
 ## Fix
 
-In `src/components/students/profile/FinancialBreakdown.tsx`, change the `summaryData` memo (lines 240-267) to:
+When `batch_enrollment_id` is null, fall back to the student's enrollments already fetched in `enrollmentMap`. Since these are all enrollments for this specific student, use the first available one as a reasonable default.
 
-- **totalInvoiced**: Sum the `amount` field of ALL `coursePayments` rows regardless of status
-- **totalPaid**: Sum only rows where `status === "paid"`
-- **Outstanding**: `totalInvoiced - totalPaid`
-
-The `totalInvoicedFromFees` query (lines 100-119) and its return value (line 197) can be removed since they are no longer used.
-
-### Specific changes in `summaryData` useMemo (lines 240-249):
+### Change in `coursePayments` useMemo (lines 183-200)
 
 ```typescript
-// BEFORE
-const totalCourseFee = data?.totalInvoicedFromFees ?? 0;
-const totalCoursePaid = coursePayments
-  .filter((p) => p.status === "paid")
-  .reduce((sum, p) => sum + p.amount, 0);
-const totalCourseOutstanding = Math.max(0, totalCourseFee - totalCoursePaid);
-
-// AFTER
-const totalCourseFee = coursePayments.reduce((sum, p) => sum + p.amount, 0);
-const totalCoursePaid = coursePayments
-  .filter((p) => p.status === "paid")
-  .reduce((sum, p) => sum + p.amount, 0);
-const totalCourseOutstanding = Math.max(0, totalCourseFee - totalCoursePaid);
+const coursePayments: CoursePaymentRow[] = useMemo(() => {
+  if (!data) return [];
+  // Fallback: first enrollment for this student (for payments without batch_enrollment_id)
+  const fallbackEnrollment = data.enrollmentMap.size > 0
+    ? data.enrollmentMap.values().next().value
+    : null;
+  return data.payments.map((p) => {
+    const enrollment = p.batch_enrollment_id
+      ? data.enrollmentMap.get(p.batch_enrollment_id)
+      : fallbackEnrollment;
+    return {
+      id: p.id,
+      amount: Number(p.amount),
+      status: p.status,
+      payment_date: p.payment_date,
+      payment_method: p.payment_method,
+      due_date: p.due_date,
+      payment_type: p.payment_type,
+      user_id: p.user_id,
+      courseName: enrollment?.courseName ?? "Uncategorized",
+      batchName: enrollment?.batchName ?? "No Batch",
+    };
+  });
+}, [data]);
 ```
-
-### Cleanup -- remove dead code:
-
-- Lines 100-119: Remove the student fee structure query (`studentRow` fetch and `totalInvoicedFromFees` calculation)
-- Line 197: Remove `totalInvoicedFromFees` from the return object
 
 ## Files Changed
 
-- `src/components/students/profile/FinancialBreakdown.tsx` -- fix totalInvoiced calculation and remove unused fee-structure query
-
-## What stays the same
-
-- Payment fetching query (no status filter on the main query -- already correct)
-- Course Payments tab, Product Purchases tab, revenue projection logic
-- All other components untouched
+- `src/components/students/profile/FinancialBreakdown.tsx` -- add fallback enrollment lookup when `batch_enrollment_id` is null
 
