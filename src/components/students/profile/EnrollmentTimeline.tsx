@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 interface EnrollmentTimelineProps {
   studentId: string;
   companyId: string;
+  onViewPayments?: () => void;
 }
 
 type EnrollmentStatus = "active" | "completed" | "dropped";
@@ -125,7 +126,7 @@ interface CourseGroup {
   enrollments: any[];
 }
 
-export function EnrollmentTimeline({ studentId, companyId }: EnrollmentTimelineProps) {
+export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: EnrollmentTimelineProps) {
   const { enrollments, isLoading, paymentsByEnrollment } = useEnrollmentData(studentId, companyId);
   const { fc } = useCompanyCurrency();
   const { isDataEntryModerator, isCompanyAdmin } = useCompany();
@@ -346,7 +347,7 @@ export function EnrollmentTimeline({ studentId, companyId }: EnrollmentTimelineP
                             {canViewPayments && (
                               <div className="flex justify-end mt-2">
                                 <button
-                                  onClick={() => navigate(`/students/${studentId}`)}
+                                  onClick={() => onViewPayments ? onViewPayments() : navigate(`/students/${studentId}`)}
                                   className="text-xs text-primary hover:underline font-medium"
                                 >
                                   View Payments →

@@ -293,6 +293,8 @@ export default function StudentProfilePage() {
   const canDeleteNote = (note: { created_by: string }) => note.created_by === user?.id || isAdmin || isCipher;
   const effectiveCanEdit = canEdit || canEditStudent;
   const [editOpen, setEditOpen] = useState(false);
+  const [financialTab, setFinancialTab] = useState<"summary" | "course" | "products" | undefined>(undefined);
+  const financialRef = useRef<HTMLDivElement>(null);
   const updateStudent = useUpdateStudent();
 
   const handleUpdateStudent = async (data: any) => {
@@ -429,12 +431,21 @@ export default function StudentProfilePage() {
 
             {/* Enrollment History Timeline */}
             {activeCompanyId && (
-              <EnrollmentTimeline studentId={student.id} companyId={activeCompanyId} />
+              <EnrollmentTimeline
+                studentId={student.id}
+                companyId={activeCompanyId}
+                onViewPayments={() => {
+                  setFinancialTab("course");
+                  setTimeout(() => financialRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+                }}
+              />
             )}
 
             {/* Financial Breakdown */}
             {activeCompanyId && (
-              <FinancialBreakdown studentId={student.id} companyId={activeCompanyId} />
+              <div ref={financialRef}>
+                <FinancialBreakdown studentId={student.id} companyId={activeCompanyId} initialTab={financialTab} />
+              </div>
             )}
 
             {/* Product Purchase History */}
