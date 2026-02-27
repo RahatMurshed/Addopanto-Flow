@@ -6,6 +6,8 @@ import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
 import { useAllStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,22 @@ export default function BatchDetail() {
   const { data: course } = useCourse(courseId);
   const { data: allStudents = [], isLoading: studentsLoading } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
+
+  // Fetch batch enrollments for this batch to resolve batchEnrollmentId
+  const { data: batchEnrollments = [] } = useQuery({
+    queryKey: ["batch_enrollments", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("id, student_id, status")
+        .eq("batch_id", id)
+        .eq("status", "active");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
 
   const updateMutation = useUpdateBatch();
   
@@ -861,6 +879,7 @@ export default function BatchDetail() {
           batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
           courseName={course?.course_name}
           batchName={batch?.batch_name}
+          batchEnrollmentId={batchEnrollments.find(e => e.student_id === selectedStudent.id)?.id}
         />
       )}
 
