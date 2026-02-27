@@ -1,42 +1,29 @@
 
 
-# Open Full Wizard Dialog for Editing Students on Profile Page
+# Fix: "Days Since Enrollment" Using Incorrect Date
 
 ## Problem
-The current "Edit" button opens a simple `StudentDialog` with limited fields. The user wants the full multi-step wizard (`StudentWizardDialog`) to open instead, pre-filled with the student's existing data, so all fields are editable.
+The "Since First Enrollment" stat uses the `enrollment_date` field, which is manually entered and can be set to any date -- even before the student record was actually created. For this student, `enrollment_date` is Feb 13 but the record was created Feb 17, causing the "14 days" count to be inaccurate (should be 10 days).
+
+## Solution
+Use `created_at` as the source for "days since joining" instead of `enrollment_date`, since it reflects when the student was actually added to the system. This matches the "Added on" date shown in the profile header.
 
 ## Changes
 
-### 1. Update `StudentWizardDialog.tsx` to support edit mode
-- Add optional `student?: Student` prop to the `Props` interface
-- When `student` is provided, pre-fill all step states (personal, contact, family, academic) from the student's data instead of defaults
-- Skip loading localStorage drafts when in edit mode
-- Change dialog title from "Add New Student" to "Edit Student" when editing
-- Change submit button label from "Add Student" to "Update Student"
-- In `handleSubmit`, if editing, call `onSave` with the student data (the parent handles whether it's create or update)
-- Skip the initial payment section in the Review step when editing (payments are managed separately)
+### 1. `src/utils/studentMetrics.ts`
+- Change the `student` parameter type to include `created_at: string`
+- Use `created_at` instead of `enrollment_date` for the `daysSinceJoining` calculation
+- Keep using `enrollment_date` for `studentSinceDate` display (the "Student Since" badge) since that represents the conceptual enrollment period
 
-### 2. Update `StudentProfilePage.tsx`
-- Replace `StudentDialog` import with `StudentWizardDialog`
-- Update `handleUpdateStudent` to accept `StudentInsert` (matching the wizard's `onSave` signature) and call `updateStudent.mutateAsync({ id: student.id, ...data })`
-- Render `StudentWizardDialog` instead of `StudentDialog`, passing the current `student` object
+### 2. `src/components/students/profile/LifetimeValueBanner.tsx`
+- Update the `student` prop interface to include `created_at: string`
+- Pass `created_at` through to the metrics computation
 
-### 3. Update `ReviewStep.tsx` (minor)
-- Accept an optional `hidePayment?: boolean` prop to hide the initial payment section when in edit mode
+### 3. `src/pages/StudentProfilePage.tsx`
+- Ensure `created_at` is included when passing the student object to the banner component (it likely already is from the query, just needs to flow through)
 
-## Technical Details
-
-**Pre-filling student data into wizard steps:**
-
+## Technical Detail
 ```text
-PersonalData <- student.name, date_of_birth, gender, blood_group, religion_category, nationality, aadhar_id_number
-ContactData  <- student.phone, whatsapp_number, alt_contact_number, email, address_*, perm_address_*, permanent_address_same
-FamilyData   <- student.father_*, mother_*, guardian_*  (siblings fetched separately or left empty)
-AcademicData <- student.student_id_number, previous_school, class_grade, enrollment_date, billing_start_month, fees, batch_id, status, notes, etc.
+Before: daysSinceJoining = now - enrollment_date  (manually entered, can be inaccurate)
+After:  daysSinceJoining = now - created_at        (system-generated, always accurate)
 ```
-
-**Key behavior differences in edit mode:**
-- No localStorage draft loading/saving (edit uses live DB data)
-- No initial payment recording on submit
-- Dialog title and button text reflect "Edit" instead of "Add"
-
