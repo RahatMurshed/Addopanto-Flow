@@ -51,6 +51,7 @@ function useEnrollmentData(studentId: string, companyId: string) {
         .from("batch_enrollments")
         .select(`
           id,
+          student_id,
           enrollment_date,
           status,
           total_fee,
@@ -348,7 +349,7 @@ export function EnrollmentTimeline({ studentId, companyId }: EnrollmentTimelineP
                             {canViewPayments && (
                               <div className="flex justify-end mt-2">
                                 <button
-                                  onClick={() => navigate(`/students/${enrollment.student_id}/profile`)}
+                                  onClick={() => navigate(`/students/${studentId}`)}
                                   className="text-xs text-primary hover:underline font-medium"
                                 >
                                   View Payments →
