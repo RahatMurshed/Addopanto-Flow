@@ -387,7 +387,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           {enrollments.length >= 1 && (
             <div className="space-y-2">
               <Label>Batch <span className="text-destructive">*</span></Label>
-              <Select value={selectedEnrollmentId || ""} onValueChange={(v) => { setSelectedEnrollmentId(v); setFeeError(null); }} disabled>
+              <Select value={selectedEnrollmentId || ""} onValueChange={(v) => { setSelectedEnrollmentId(v); setFeeError(null); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select batch..." />
                 </SelectTrigger>

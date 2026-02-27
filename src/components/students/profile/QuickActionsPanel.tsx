@@ -24,6 +24,7 @@ interface QuickActionsPanelProps {
   userPermissions: string[];
   onStatusChange?: (newStatus: string) => void;
   onEdit: () => void;
+  onRecordPayment?: () => void;
   isLoading?: boolean;
 }
 
@@ -43,7 +44,7 @@ type ActionItem = {
 };
 
 export function QuickActionsPanel({
-  student, companyId, userRole, userPermissions, onEdit, isLoading,
+  student, companyId, userRole, userPermissions, onEdit, onRecordPayment, isLoading,
 }: QuickActionsPanelProps) {
   const { toast } = useToast();
   const [saving] = useState(false);
@@ -104,7 +105,7 @@ export function QuickActionsPanel({
         iconColor: "#1E3A8A",
         className: "bg-blue-50 text-[#1E3A8A] border border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:border-blue-800 dark:hover:bg-blue-950/50",
         fabColor: "#1E3A8A",
-        onClick: () => toast({ title: "Payment recording", description: "Use the Financial Breakdown section below to record payments." }),
+        onClick: () => { onRecordPayment?.(); setFabOpen(false); },
         group: "actions",
       });
     }
