@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { endOfMonth, format as fnsFormat } from "date-fns";
 
 export interface Employee {
   id: string;
@@ -313,7 +314,8 @@ export function useEmployeeAttendance(employeeId: string | undefined, month?: st
       if (!user || !employeeId) return [];
       let query = supabase.from("employee_attendance" as any).select("*").eq("employee_id", employeeId);
       if (month) {
-        query = query.gte("date", `${month}-01`).lte("date", `${month}-31`);
+        const lastDay = fnsFormat(endOfMonth(new Date(`${month}-01`)), "yyyy-MM-dd");
+        query = query.gte("date", `${month}-01`).lte("date", lastDay);
       }
       const { data, error } = await query.order("date", { ascending: true });
       if (error) throw error;
