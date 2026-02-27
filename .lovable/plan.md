@@ -1,63 +1,103 @@
 
 
-# Fix: Payment Due Dates and Schedule Generation
+# Fix: Payments Linked to Wrong Batch in Financial Overview
 
 ## Problem
 
-1. **All payments show today's date as due_date**: The `due_date` column on `student_payments` defaults to `CURRENT_DATE` in the database. Neither `StudentPaymentInsert` nor the payment dialog ever sets `due_date`, so every payment gets today's date.
+All payment records have `batch_enrollment_id = null` because `StudentPaymentDialog` never passes this field when saving. The `FinancialBreakdown` component then falls back to the **first** enrollment found in the enrollment map, causing all payments to display under the wrong batch (e.g., "English Mastery Batch-1" instead of "Practice Club Batch-1").
 
-2. **No payment schedule is generated on enrollment**: When a student is enrolled in a batch, no "unpaid" payment rows are created. The system only creates rows when payments are manually recorded.
+## Root Cause (Two Issues)
 
-## Root Cause
+1. **`StudentPaymentDialog` does not accept or pass `batch_enrollment_id`**: The dialog has no way to know which enrollment a payment belongs to, so it never includes it in the save payload.
 
-- `useCreateStudentPayment` (line 71-73 in `useStudentPayments.ts`) inserts payment data without a `due_date` field, so the DB default `CURRENT_DATE` is used.
-- `syncBatchEnrollment` (in `enrollmentSync.ts`) only creates a `batch_enrollments` row -- it does not generate any payment schedule rows.
-- `StudentPaymentInsert` interface does not include `due_date`.
+2. **`FinancialBreakdown` fallback is too naive**: When `batch_enrollment_id` is null, it uses `enrollmentMap.values().next().value` -- the first enrollment in the map -- which is arbitrary and often wrong for multi-enrollment students.
 
-## Fix -- Two Parts
+## Fix Plan
 
-### Part 1: Auto-generate payment schedule on enrollment
+### 1. Pass `batch_enrollment_id` through the payment recording flow
 
-Update `syncBatchEnrollment` in `src/utils/enrollmentSync.ts` so that when a new enrollment is created (`newId` is set), the function:
+**`StudentPaymentDialog.tsx`** -- Add a new optional prop `batchEnrollmentId?: string` and include it in the `onSave` payload:
+- Add `batchEnrollmentId` to `StudentPaymentDialogProps`
+- Pass it as `batch_enrollment_id` in the save call
 
-1. Fetches the batch details (start_date, course_duration_months, default_admission_fee, default_monthly_fee)
-2. If `course_duration_months` exists, generates one "unpaid" `student_payments` row per month with:
-   - `payment_type = "monthly"`
-   - `amount = default_monthly_fee`
-   - `status = "unpaid"`
-   - `due_date = start_date + N months` (1st of each month)
-   - `months_covered = [that month string]`
-   - `batch_enrollment_id = the new enrollment id`
-3. Optionally generates one "unpaid" admission fee row with `due_date = start_date`
+**`BatchDetail.tsx`** -- Look up the enrollment ID for the selected student in this batch and pass it to `StudentPaymentDialog`:
+- Query `batch_enrollments` to find the active enrollment for `selectedStudent.id` + current `batch.id`
+- Pass it as `batchEnrollmentId` prop
 
-This gives students a proper payment schedule with correct due dates from day one.
+**`StudentDetail.tsx`** -- Look up the enrollment ID for the student's current batch and pass it:
+- Use the already-fetched batch data to find the active enrollment
+- Pass it as `batchEnrollmentId` prop
 
-### Part 2: Fix payment recording to update existing rows
+**`Students.tsx`** -- Same pattern: resolve enrollment from `selectedStudent.batch_id` if available.
 
-Update `StudentPaymentDialog` and `useCreateStudentPayment` to:
+### 2. Fix the upsert logic in `useStudentPayments.ts`
 
-1. Add `due_date` to `StudentPaymentInsert` interface
-2. When recording a monthly payment against selected months:
-   - Check if unpaid schedule rows already exist for those months
-   - If yes, UPDATE those rows (set `status = "paid"`, `amount`, `payment_date`, `payment_method`, etc.) instead of inserting new rows
-   - If no matching unpaid row exists, INSERT with `due_date` set to the 1st of the first covered month
-3. When recording admission payments, set `due_date` to the enrollment date or batch start date
+Currently when upserting an existing unpaid schedule row (lines 86-110), the mutation does not preserve or set `batch_enrollment_id`. Update the upsert path to also check `batch_enrollment_id` when matching unpaid rows, so payments are linked to the correct batch's schedule.
 
-### Part 3: Handle existing data gracefully
+### 3. Improve `FinancialBreakdown` fallback for historical data
 
-- For students already enrolled (no schedule rows), the payment dialog continues to work as before -- it inserts new rows but now sets `due_date` correctly from `months_covered`
-- The `computeStudentSummary` logic remains unchanged (it uses `months_covered`, not schedule rows)
+Replace the naive "first enrollment" fallback with a smarter approach:
+- When `batch_enrollment_id` is null, try to match the payment to an enrollment based on the student's `batch_id` on the `students` table (the current or most recent batch)
+- If multiple enrollments exist, show as "Uncategorized" rather than incorrectly assigning to the wrong batch
+
+### 4. Backfill existing payment records
+
+For existing payments with `batch_enrollment_id = null`, attempt to link them to the correct enrollment:
+- For students with exactly one enrollment, set `batch_enrollment_id` to that enrollment's ID
+- For students with multiple enrollments, leave as null (the improved fallback in step 3 handles display)
 
 ## Files Changed
 
-1. **`src/utils/enrollmentSync.ts`** -- Add schedule generation logic when creating new enrollment
-2. **`src/hooks/useStudentPayments.ts`** -- Add `due_date` to `StudentPaymentInsert`; add `useUpsertSchedulePayment` hook that checks for existing unpaid rows before inserting
-3. **`src/components/dialogs/StudentPaymentDialog.tsx`** -- Calculate and pass `due_date` on save; use upsert logic for months with existing schedule rows
-4. **`src/components/finance/InitialPaymentSection.tsx`** -- Pass `due_date` when creating initial payments
+1. **`src/components/dialogs/StudentPaymentDialog.tsx`** -- Add `batchEnrollmentId` prop, pass in save payload
+2. **`src/pages/BatchDetail.tsx`** -- Resolve enrollment ID for selected student, pass to dialog
+3. **`src/pages/StudentDetail.tsx`** -- Resolve enrollment ID for student's batch, pass to dialog
+4. **`src/pages/Students.tsx`** -- Resolve enrollment ID when batch context is available, pass to dialog
+5. **`src/hooks/useStudentPayments.ts`** -- Include `batch_enrollment_id` in upsert matching logic
+6. **`src/components/students/profile/FinancialBreakdown.tsx`** -- Replace naive fallback with "Uncategorized" for multi-enrollment students
+7. **Database** -- Run a one-time backfill UPDATE for single-enrollment students
 
-## Edge Cases
+## Technical Details
 
-- Batches without `course_duration_months` set: Skip schedule generation (no way to know how many months)
-- Student transferred between batches: Old batch schedule rows remain as-is (historical); new batch generates new schedule
-- Editing existing payments: Continue to work as before since the update mutation already exists
+### StudentPaymentDialog change
+```typescript
+// New prop
+batchEnrollmentId?: string;
+
+// In handleSubmit, add to onSave call:
+batch_enrollment_id: batchEnrollmentId || null,
+```
+
+### BatchDetail enrollment resolution
+```typescript
+// BatchDetail already knows batch.id — look up enrollment
+const activeEnrollment = useMemo(() => {
+  if (!selectedStudent || !enrollments) return undefined;
+  return enrollments.find(e => 
+    e.student_id === selectedStudent.id && 
+    e.batch_id === id && 
+    e.status === "active"
+  );
+}, [selectedStudent, enrollments, id]);
+```
+
+### FinancialBreakdown improved fallback
+```typescript
+// Only use fallback for single-enrollment students
+const fallbackEnrollment = data.enrollmentMap.size === 1
+  ? data.enrollmentMap.values().next().value
+  : null;  // Multi-enrollment: show "Uncategorized" rather than wrong batch
+```
+
+### Backfill SQL
+```sql
+UPDATE student_payments sp
+SET batch_enrollment_id = (
+  SELECT be.id FROM batch_enrollments be
+  WHERE be.student_id = sp.student_id AND be.company_id = sp.company_id
+  LIMIT 1
+)
+WHERE sp.batch_enrollment_id IS NULL
+AND (SELECT count(*) FROM batch_enrollments be 
+     WHERE be.student_id = sp.student_id AND be.company_id = sp.company_id) = 1;
+```
 
