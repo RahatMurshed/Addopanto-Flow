@@ -169,9 +169,10 @@ export function useBatchStudentCount(batchId: string | undefined) {
     queryFn: async () => {
       if (!user || !batchId) return 0;
       const { count, error } = await (supabase
-        .from("students")
+        .from("batch_enrollments")
         .select("id", { count: "exact", head: true }) as any)
-        .eq("batch_id", batchId);
+        .eq("batch_id", batchId)
+        .eq("status", "active");
       if (error) throw error;
       return count ?? 0;
     },
