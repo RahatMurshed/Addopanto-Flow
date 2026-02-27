@@ -28,6 +28,7 @@ export function computeLifetimeMetrics(
     end_date?: string | null;
     course_duration_months?: number | null;
     default_monthly_fee?: number;
+    default_admission_fee?: number;
   } | null | undefined,
   futureUnpaidPayments?: Array<{ amount: number; status: string; paid_amount?: number | null }>
 ): LifetimeMetrics {
@@ -49,26 +50,39 @@ export function computeLifetimeMetrics(
     Math.floor((Date.now() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24))
   );
 
-  // 5. PAYMENT RATE — total paid / total invoiced
-  const effectiveMonthlyFee = Number(student.monthly_fee_amount) || Number(batch?.default_monthly_fee) || 0;
-  const admissionFee = Number(student.admission_fee_total) || 0;
-
-  let totalInvoiced = admissionFee;
-  if (batch?.course_duration_months && effectiveMonthlyFee) {
-    totalInvoiced += batch.course_duration_months * effectiveMonthlyFee;
-  }
-  const paymentRate = totalInvoiced > 0
-    ? Math.min(100, Math.round((totalCoursesPaid / totalInvoiced) * 100))
+  // 5. PAYMENT RATE — totalCoursesPaid / totalCourseFee from batch
+  const totalCourseFee = batch
+    ? Number(batch.default_admission_fee ?? 0) + (Number(batch.course_duration_months ?? 0) * Number(batch.default_monthly_fee ?? 0))
+    : 0;
+  const paymentRate = totalCourseFee > 0
+    ? Math.min(100, Math.round((totalCoursesPaid / totalCourseFee) * 100))
     : 0;
 
-  // 6. REVENUE PROJECTION — sum of future unpaid/partial payment records
+  // 6. REVENUE PROJECTION — use future unpaid rows if available, else time-based fallback
   const isActive = student.status === "active";
-  const revenueProjection = (futureUnpaidPayments ?? []).reduce((sum, p) => {
-    const unpaidAmount = p.status === "partial"
-      ? Number(p.amount) - Number(p.paid_amount ?? 0)
-      : Number(p.amount);
-    return sum + unpaidAmount;
-  }, 0);
+  const unpaidRows = futureUnpaidPayments ?? [];
+  let revenueProjection = 0;
+
+  if (unpaidRows.length > 0) {
+    revenueProjection = unpaidRows.reduce((sum, p) => {
+      const unpaidAmount = p.status === "partial"
+        ? Number(p.amount) - Number(p.paid_amount ?? 0)
+        : Number(p.amount);
+      return sum + unpaidAmount;
+    }, 0);
+  } else if (isActive && batch && batch.course_duration_months && batch.end_date) {
+    // Time-based fallback
+    const batchTotalFee = Number(batch.default_admission_fee ?? 0) + (Number(batch.course_duration_months) * Number(batch.default_monthly_fee ?? 0));
+    const monthlyFee = batchTotalFee / batch.course_duration_months;
+    const endDate = new Date(batch.end_date);
+    const now = new Date();
+    const remainingMonths = Math.max(0,
+      (endDate.getFullYear() - now.getFullYear()) * 12 + (endDate.getMonth() - now.getMonth())
+    );
+    const paidMonths = payments.filter(p => Number(p.amount) > 0).length;
+    const unpaidMonths = Math.max(0, remainingMonths - paidMonths);
+    revenueProjection = Math.round(unpaidMonths * monthlyFee);
+  }
 
   return {
     lifetimeValue,
