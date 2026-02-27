@@ -66,9 +66,11 @@ interface Props {
   onSave: (data: StudentInsert) => Promise<Student | void>;
   defaultBatchId?: string;
   lockedBatch?: boolean;
+  student?: Student;
 }
 
-export default function StudentWizardDialog({ open, onOpenChange, onSave, defaultBatchId, lockedBatch }: Props) {
+export default function StudentWizardDialog({ open, onOpenChange, onSave, defaultBatchId, lockedBatch, student: editStudent }: Props) {
+  const isEditMode = !!editStudent;
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [savingStep, setSavingStep] = useState("");
@@ -84,10 +86,85 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
   const [academic, setAcademic] = useState<AcademicData>({ ...defaultAcademic, batch_id: defaultBatchId || "none" });
   const [initialPayment, setInitialPayment] = useState<InitialPaymentData>(defaultPayment);
 
-  // Auto-save draft to localStorage
+  // Pre-fill from student data in edit mode
+  useEffect(() => {
+    if (open && isEditMode && editStudent) {
+      setPersonal({
+        name: editStudent.name || "",
+        date_of_birth: editStudent.date_of_birth || "",
+        gender: editStudent.gender || "",
+        blood_group: editStudent.blood_group || "",
+        religion_category: editStudent.religion_category || "",
+        nationality: editStudent.nationality || "",
+        aadhar_id_number: editStudent.aadhar_id_number || "",
+      });
+      setContact({
+        phone: editStudent.phone || "",
+        whatsapp_number: editStudent.whatsapp_number || "",
+        alt_contact_number: editStudent.alt_contact_number || "",
+        email: editStudent.email || "",
+        address_house: editStudent.address_house || "",
+        address_street: editStudent.address_street || "",
+        address_area: editStudent.address_area || "",
+        address_city: editStudent.address_city || "",
+        address_state: editStudent.address_state || "",
+        address_pin_zip: editStudent.address_pin_zip || "",
+        permanent_address_same: editStudent.permanent_address_same ?? true,
+        perm_address_house: editStudent.perm_address_house || "",
+        perm_address_street: editStudent.perm_address_street || "",
+        perm_address_area: editStudent.perm_address_area || "",
+        perm_address_city: editStudent.perm_address_city || "",
+        perm_address_state: editStudent.perm_address_state || "",
+        perm_address_pin_zip: editStudent.perm_address_pin_zip || "",
+      });
+      setFamily({
+        father_name: editStudent.father_name || "",
+        father_occupation: editStudent.father_occupation || "",
+        father_contact: editStudent.father_contact || "",
+        father_annual_income: editStudent.father_annual_income != null ? String(editStudent.father_annual_income) : "",
+        mother_name: editStudent.mother_name || "",
+        mother_occupation: editStudent.mother_occupation || "",
+        mother_contact: editStudent.mother_contact || "",
+        guardian_name: editStudent.guardian_name || "",
+        guardian_contact: editStudent.guardian_contact || "",
+        guardian_relationship: editStudent.guardian_relationship || "",
+        siblings: [],
+      });
+      setAcademic({
+        student_id_number: editStudent.student_id_number || "",
+        previous_school: editStudent.previous_school || "",
+        class_grade: editStudent.class_grade || "",
+        roll_number: editStudent.roll_number || "",
+        academic_year: editStudent.academic_year || "",
+        section_division: editStudent.section_division || "",
+        previous_qualification: editStudent.previous_qualification || "",
+        previous_percentage: editStudent.previous_percentage || "",
+        board_university: editStudent.board_university || "",
+        enrollment_date: editStudent.enrollment_date || format(new Date(), "yyyy-MM-dd"),
+        billing_start_month: editStudent.billing_start_month || currentYearMonth,
+        course_start_month: editStudent.course_start_month || "",
+        course_end_month: editStudent.course_end_month || "",
+        admission_fee_total: editStudent.admission_fee_total ?? 0,
+        monthly_fee_amount: editStudent.monthly_fee_amount ?? 0,
+        status: (["active", "inactive", "graduated"].includes(editStudent.status) ? editStudent.status : "active") as AcademicData["status"],
+        batch_id: editStudent.batch_id || "none",
+        special_needs_medical: editStudent.special_needs_medical || "",
+        emergency_contact_name: editStudent.emergency_contact_name || "",
+        emergency_contact_number: editStudent.emergency_contact_number || "",
+        transportation_mode: editStudent.transportation_mode || "",
+        distance_from_institution: editStudent.distance_from_institution || "",
+        extracurricular_interests: editStudent.extracurricular_interests || "",
+        language_proficiency: editStudent.language_proficiency || "",
+        notes: editStudent.notes || "",
+      });
+      setInitialPayment(defaultPayment);
+    }
+  }, [open, isEditMode]);
+
+  // Auto-save draft to localStorage (skip in edit mode)
   const draftKey = `student-draft-${activeCompanyId}`;
   useEffect(() => {
-    if (open && activeCompanyId) {
+    if (open && activeCompanyId && !isEditMode) {
       const saved = localStorage.getItem(draftKey);
       if (saved) {
         try {
@@ -102,7 +179,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
   }, [open, activeCompanyId]);
 
   useEffect(() => {
-    if (open && activeCompanyId) {
+    if (open && activeCompanyId && !isEditMode) {
       const timer = setTimeout(() => {
         localStorage.setItem(draftKey, JSON.stringify({ personal, contact, family, academic }));
       }, 500);
@@ -161,7 +238,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
 
     setSaving(true);
     try {
-      setSavingStep("Creating student...");
+      setSavingStep(isEditMode ? "Updating student..." : "Creating student...");
       const insertData: StudentInsert = {
         name: personal.name.trim(),
         student_id_number: academic.student_id_number || null,
@@ -237,41 +314,43 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
         }
       }
 
-      // Record initial payment
-      const hasPayment =
-        (initialPayment.paymentType === "admission" || initialPayment.paymentType === "both") && initialPayment.admissionAmount > 0 ||
-        (initialPayment.paymentType === "monthly" || initialPayment.paymentType === "both") && initialPayment.monthlyMonths.length > 0;
+      // Record initial payment (skip in edit mode)
+      if (!isEditMode) {
+        const hasPayment =
+          (initialPayment.paymentType === "admission" || initialPayment.paymentType === "both") && initialPayment.admissionAmount > 0 ||
+          (initialPayment.paymentType === "monthly" || initialPayment.paymentType === "both") && initialPayment.monthlyMonths.length > 0;
 
-      if (hasPayment && result && "id" in result) {
-        setSavingStep("Recording payment...");
-        const showAdmission = initialPayment.paymentType === "admission" || initialPayment.paymentType === "both";
-        const showMonthly = initialPayment.paymentType === "monthly" || initialPayment.paymentType === "both";
-        try {
-          if (showAdmission && initialPayment.admissionAmount > 0) {
-            await createPaymentMutation.mutateAsync({
-              student_id: result.id,
-              payment_type: "admission",
-              amount: initialPayment.admissionAmount,
-              payment_date: format(new Date(), "yyyy-MM-dd"),
-              payment_method: initialPayment.paymentMethod,
-              receipt_number: initialPayment.receiptNumber || null,
-              studentName: personal.name,
-            });
+        if (hasPayment && result && "id" in result) {
+          setSavingStep("Recording payment...");
+          const showAdmission = initialPayment.paymentType === "admission" || initialPayment.paymentType === "both";
+          const showMonthly = initialPayment.paymentType === "monthly" || initialPayment.paymentType === "both";
+          try {
+            if (showAdmission && initialPayment.admissionAmount > 0) {
+              await createPaymentMutation.mutateAsync({
+                student_id: result.id,
+                payment_type: "admission",
+                amount: initialPayment.admissionAmount,
+                payment_date: format(new Date(), "yyyy-MM-dd"),
+                payment_method: initialPayment.paymentMethod,
+                receipt_number: initialPayment.receiptNumber || null,
+                studentName: personal.name,
+              });
+            }
+            if (showMonthly && initialPayment.monthlyMonths.length > 0 && initialPayment.monthlyAmount > 0) {
+              await createPaymentMutation.mutateAsync({
+                student_id: result.id,
+                payment_type: "monthly",
+                amount: initialPayment.monthlyAmount,
+                payment_date: format(new Date(), "yyyy-MM-dd"),
+                payment_method: initialPayment.paymentMethod,
+                months_covered: initialPayment.monthlyMonths,
+                receipt_number: initialPayment.receiptNumber || null,
+                studentName: personal.name,
+              });
+            }
+          } catch (payErr: any) {
+            toast({ title: "Student created but payment failed", description: payErr.message, variant: "destructive" });
           }
-          if (showMonthly && initialPayment.monthlyMonths.length > 0 && initialPayment.monthlyAmount > 0) {
-            await createPaymentMutation.mutateAsync({
-              student_id: result.id,
-              payment_type: "monthly",
-              amount: initialPayment.monthlyAmount,
-              payment_date: format(new Date(), "yyyy-MM-dd"),
-              payment_method: initialPayment.paymentMethod,
-              months_covered: initialPayment.monthlyMonths,
-              receipt_number: initialPayment.receiptNumber || null,
-              studentName: personal.name,
-            });
-          }
-        } catch (payErr: any) {
-          toast({ title: "Student created but payment failed", description: payErr.message, variant: "destructive" });
         }
       }
 
@@ -297,7 +376,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
     <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => { if (saving) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (saving) e.preventDefault(); }}>
         <DialogHeader>
-          <DialogTitle>Add New Student</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Student" : "Add New Student"}</DialogTitle>
           <DialogDescription>
             Step {step + 1} of {STEPS.length}: {STEPS[step]}
           </DialogDescription>
@@ -335,7 +414,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
             <ReviewStep
               personal={personal} contact={contact} family={family} academic={academic}
               initialPayment={initialPayment} onPaymentChange={setInitialPayment}
-              onGoToStep={setStep} disabled={saving}
+              onGoToStep={setStep} disabled={saving} hidePayment={isEditMode}
             />
           )}
         </div>
@@ -361,7 +440,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
                 {saving ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{savingStep || "Saving..."}</>
                 ) : (
-                  <><Check className="mr-1 h-4 w-4" /> Add Student</>
+                  <><Check className="mr-1 h-4 w-4" /> {isEditMode ? "Update Student" : "Add Student"}</>
                 )}
               </Button>
             )}

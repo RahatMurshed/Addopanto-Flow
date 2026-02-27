@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { useStudent, useUpdateStudent } from "@/hooks/useStudents";
-import StudentDialog from "@/components/dialogs/StudentDialog";
+import StudentWizardDialog from "@/components/dialogs/StudentWizardDialog";
 import { useStudentPayments, computeStudentSummary, useMonthlyFeeHistory } from "@/hooks/useStudentPayments";
 import { useBatch, useBatches } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
@@ -669,8 +669,8 @@ export default function StudentProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Edit Student Dialog */}
-      <StudentDialog
+      {/* Edit Student Wizard Dialog */}
+      <StudentWizardDialog
         open={editOpen}
         onOpenChange={setEditOpen}
         student={student}
