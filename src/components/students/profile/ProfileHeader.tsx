@@ -121,7 +121,7 @@ export const ProfileHeader = forwardRef<HTMLDivElement, ProfileHeaderProps>(
               <Button
                 variant="outline"
                 size="sm"
-                className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground transition-colors"
+                className="border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400 dark:hover:text-white transition-colors"
                 onClick={onEdit}
               >
                 <Pencil className="mr-2 h-4 w-4" />
