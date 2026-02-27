@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import BatchDateFilter, { type BatchFilterValue, getDefaultBatchFilter, getFilterLabel, isMonthIncluded } from "@/components/shared/BatchDateFilter";
 import { useBatches, useCreateBatch, useDeleteBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -39,7 +41,7 @@ export default function Batches() {
   const { data: rawBatches = [], isLoading } = useBatches({ search, status: statusFilter });
   const { data: allStudents = [] } = useAllStudents();
   const { data: allPayments = [] } = useStudentPayments();
-  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch, activeCompanyId } = useCompany();
   const { user } = useAuth();
   
   const batches = useMemo(() => {
@@ -58,11 +60,38 @@ export default function Batches() {
   const [editBatch, setEditBatch] = useState<Batch | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Fetch all active batch_enrollments for the company
+  const { data: allEnrollments = [] } = useQuery({
+    queryKey: ["batch_enrollments_all", activeCompanyId],
+    queryFn: async () => {
+      if (!activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("batch_id, student_id")
+        .eq("company_id", activeCompanyId)
+        .eq("status", "active");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!activeCompanyId,
+  });
+
+  // Build enrollment map: batchId -> Set<studentId>
+  const enrollmentMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const e of allEnrollments) {
+      if (!map.has(e.batch_id)) map.set(e.batch_id, new Set());
+      map.get(e.batch_id)!.add(e.student_id);
+    }
+    return map;
+  }, [allEnrollments]);
+
   // Build per-batch analytics based on filter
   const batchAnalytics = useMemo(() => {
     const map = new Map<string, { studentCount: number; monthRevenue: number; monthPending: number; overdueCount: number; monthOverdueCount: number; monthOverdueAmount: number }>();
     for (const b of batches) {
-      const students = allStudents.filter((s: any) => s.batch_id === b.id);
+      const enrolledIds = enrollmentMap.get(b.id) ?? new Set<string>();
+      const students = allStudents.filter((s: any) => enrolledIds.has(s.id));
       let monthRevenue = 0;
       let monthPending = 0;
       let overdueCount = 0;
@@ -111,7 +140,7 @@ export default function Batches() {
       map.set(b.id, { studentCount: students.length, monthRevenue, monthPending, overdueCount, monthOverdueCount, monthOverdueAmount });
     }
     return map;
-  }, [batches, allStudents, allPayments, filterValue]);
+  }, [batches, allStudents, allPayments, filterValue, enrollmentMap]);
 
   // Sort batches
   const sortedBatches = useMemo(() => {

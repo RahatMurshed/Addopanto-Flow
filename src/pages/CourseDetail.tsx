@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCourse, useUpdateCourse, useDeleteCourse, type CourseInsert } from "@/hooks/useCourses";
 import { useBatches, useCreateBatch, useUpdateBatch, useDeleteBatch, type Batch, type BatchInsert } from "@/hooks/useBatches";
 import { useAllStudents } from "@/hooks/useStudents";
@@ -33,7 +35,7 @@ export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, canAddBatch, canEditBatch, canDeleteBatch, activeCompanyId } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: course, isLoading: courseLoading } = useCourse(id);
@@ -59,11 +61,37 @@ export default function CourseDetail() {
     return allBatches.filter((b: any) => b.course_id === id);
   }, [allBatches, id]);
 
+  // Fetch all active batch_enrollments for the company
+  const { data: allEnrollments = [] } = useQuery({
+    queryKey: ["batch_enrollments_all", activeCompanyId],
+    queryFn: async () => {
+      if (!activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("batch_id, student_id")
+        .eq("company_id", activeCompanyId)
+        .eq("status", "active");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!activeCompanyId,
+  });
+
+  const enrollmentMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const e of allEnrollments) {
+      if (!map.has(e.batch_id)) map.set(e.batch_id, new Set());
+      map.get(e.batch_id)!.add(e.student_id);
+    }
+    return map;
+  }, [allEnrollments]);
+
   // Batch analytics
   const batchAnalytics = useMemo(() => {
     const map = new Map<string, { studentCount: number; revenue: number; pending: number }>();
     for (const b of courseBatches) {
-      const students = allStudents.filter((s: any) => s.batch_id === b.id);
+      const enrolledIds = enrollmentMap.get(b.id) ?? new Set<string>();
+      const students = allStudents.filter((s: any) => enrolledIds.has(s.id));
       let revenue = 0, pending = 0;
       for (const s of students) {
         const effAdm = Number(s.admission_fee_total) || Number(b.default_admission_fee) || 0;
@@ -85,7 +113,7 @@ export default function CourseDetail() {
       map.set(b.id, { studentCount: students.length, revenue, pending });
     }
     return map;
-  }, [courseBatches, allStudents, allPayments]);
+  }, [courseBatches, allStudents, allPayments, enrollmentMap]);
 
   // Totals
   const totals = useMemo(() => {

@@ -132,6 +132,26 @@ export default function BatchEnrollDialog({
         return;
       }
 
+      // Check capacity before enrolling
+      const { data: batchData } = await supabase
+        .from("batches")
+        .select("max_capacity")
+        .eq("id", batchId)
+        .single();
+
+      if (batchData?.max_capacity != null) {
+        const { count } = await supabase
+          .from("batch_enrollments")
+          .select("id", { count: "exact", head: true })
+          .eq("batch_id", batchId)
+          .eq("status", "active");
+
+        if ((count ?? 0) >= batchData.max_capacity) {
+          toast({ title: "Batch is full", description: `Maximum capacity of ${batchData.max_capacity} students reached.`, variant: "destructive" });
+          return;
+        }
+      }
+
       // Create enrollment record WITHOUT overwriting student.batch_id
       if (activeCompanyId && user) {
         await supabase.from("batch_enrollments").insert({

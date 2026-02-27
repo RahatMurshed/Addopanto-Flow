@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudent, useUpdateStudent, type StudentInsert } from "@/hooks/useStudents";
 import {
@@ -44,6 +44,7 @@ import TablePagination from "@/components/shared/TablePagination";
 import PiiRestrictionBanner from "@/components/shared/PiiRestrictionBanner";
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { canAddRevenue, canEdit, canDelete, isModerator, isDataEntryModerator, canEditStudent, canDeleteStudent, canViewStudentPII, isLoading: companyLoading } = useCompany();
@@ -52,7 +53,9 @@ export default function StudentDetail() {
   const { data: student, isLoading: studentLoading } = useStudent(id);
   const { data: payments = [], isLoading: paymentsLoading } = useStudentPayments(id);
   const { data: feeHistory = [] } = useMonthlyFeeHistory(id);
-  const batchId = (student as any)?.batch_id;
+  // Use from_batch query param if present (when navigating from a batch detail page), otherwise fall back to student.batch_id
+  const fromBatch = searchParams.get("from_batch");
+  const batchId = fromBatch || (student as any)?.batch_id;
   const { data: batch } = useBatch(batchId);
   const courseId = (batch as any)?.course_id;
   const { data: course } = useCourse(courseId);

@@ -782,7 +782,7 @@ export default function BatchDetail() {
                         .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
 
                       return (
-                        <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/students/${s.id}`)}>
+                        <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/students/${s.id}?from_batch=${id}`)}>
                           <TableCell>
                             <div>
                               <span className="font-medium text-primary">{s.name}</span>
@@ -852,7 +852,7 @@ export default function BatchDetail() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/students/${s.id}`)}>
+                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/students/${s.id}?from_batch=${id}`)}>
                                 <Eye className="h-3.5 w-3.5" />
                                 <span className="hidden lg:inline">View</span>
                               </Button>

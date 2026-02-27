@@ -50,7 +50,7 @@ function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSucce
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setOver(false);
-    if (atCapacity || assigning) return;
+    if (assigning) return;
 
     const droppedId = e.dataTransfer.getData("text/student-id");
     if (!droppedId) return;
@@ -59,6 +59,15 @@ function DropTarget({ batch, selectedIds, dragStudentId, studentNameMap, onSucce
     const idsToAssign = selectedIds.has(droppedId) && selectedIds.size > 1
       ? Array.from(selectedIds)
       : [droppedId];
+
+    // Check capacity before assigning
+    if (batch.max_capacity != null) {
+      const totalAfter = count + idsToAssign.length;
+      if (totalAfter > batch.max_capacity) {
+        toast({ title: "Batch is full", description: `Maximum capacity of ${batch.max_capacity} students reached.`, variant: "destructive" });
+        return;
+      }
+    }
 
     setAssigning(true);
     const studentMap = new Map(allStudents.map((s: any) => [s.id, s]));

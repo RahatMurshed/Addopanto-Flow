@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Users, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { syncBatchEnrollment } from "@/utils/enrollmentSync";
@@ -91,6 +92,22 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
     if (!selectedBatchId || studentIds.length === 0) return;
     setAssigning(true);
     try {
+      // Check capacity before assigning
+      const selectedBatch = batches.find((b) => b.id === selectedBatchId);
+      if (selectedBatch?.max_capacity != null) {
+        const { count } = await supabase
+          .from("batch_enrollments")
+          .select("id", { count: "exact", head: true })
+          .eq("batch_id", selectedBatchId)
+          .eq("status", "active");
+
+        const currentCount = count ?? 0;
+        if (currentCount + studentIds.length > selectedBatch.max_capacity) {
+          toast({ title: "Batch is full", description: `Maximum capacity of ${selectedBatch.max_capacity} students reached. Currently ${currentCount} enrolled.`, variant: "destructive" });
+          setAssigning(false);
+          return;
+        }
+      }
       // Get current batch_ids for history tracking
       const studentMap = new Map(allStudents.map(s => [s.id, s]));
 
@@ -190,14 +207,14 @@ export default function BatchAssignDialog({ open, onOpenChange, studentIds, stud
           </div>
         </ScrollArea>
 
-        {/* Capacity warning */}
+        {/* Capacity info */}
         {selectedBatchId && (() => {
           const batch = batches.find((b) => b.id === selectedBatchId);
           if (batch?.max_capacity) {
             return (
               <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>Capacity limit: {batch.max_capacity}. Students exceeding capacity will still be assigned.</span>
+                <span>Capacity limit: {batch.max_capacity}. Assignment will be blocked if capacity is exceeded.</span>
               </div>
             );
           }
