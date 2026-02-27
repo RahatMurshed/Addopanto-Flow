@@ -21,24 +21,21 @@ interface EnrollmentTimelineProps {
   onViewPayments?: () => void;
 }
 
-type EnrollmentStatus = "active" | "completed" | "dropped";
+type EnrollmentStatus = "active" | "completed";
 
 const STATUS_DOT: Record<EnrollmentStatus, string> = {
   active: "bg-green-500",
   completed: "bg-blue-400",
-  dropped: "bg-red-400",
 };
 
 const STATUS_BADGE: Record<EnrollmentStatus, string> = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   completed: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  dropped: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
 const STATUS_LABEL: Record<EnrollmentStatus, string> = {
   active: "Active",
   completed: "Completed",
-  dropped: "Dropped",
 };
 
 function useEnrollmentData(studentId: string, companyId: string) {
@@ -262,7 +259,8 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
                   <div className="space-y-4">
                     {group.enrollments.map((enrollment) => {
                       const batch = enrollment.batches as any;
-                      const status = (enrollment.status as EnrollmentStatus) || "active";
+                      const rawStatus = enrollment.status as string;
+                      const status: EnrollmentStatus = rawStatus === "completed" ? "completed" : "active";
                       const totalFee = Number(enrollment.total_fee) || 0;
                       const paymentSummary = paymentsByEnrollment.get(enrollment.id);
                       const paidAmount = paymentSummary?.paid ?? 0;

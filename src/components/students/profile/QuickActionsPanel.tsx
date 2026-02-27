@@ -35,7 +35,6 @@ const STATUS_OPTIONS = [
   { value: "active", label: "Active", color: "bg-green-500" },
   { value: "inactive", label: "Inactive", color: "bg-red-500" },
   { value: "graduated", label: "Graduated", color: "bg-blue-500" },
-  { value: "on_hold", label: "On Hold", color: "bg-yellow-500" },
 ];
 
 type ActionItem = {

@@ -3482,6 +3482,19 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      remove_student_from_batch: {
+        Args: {
+          p_batch_id: string
+          p_company_id: string
+          p_student_id: string
+          p_user_email?: string
+          p_user_id: string
+        }
+        Returns: {
+          deleted_payment_count: number
+          deleted_payment_total: number
+        }[]
+      }
     }
     Enums: {
       app_role: "cipher" | "admin" | "moderator" | "user"
