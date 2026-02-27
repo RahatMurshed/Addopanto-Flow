@@ -298,7 +298,7 @@ export default function EmployeeDetail() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full grid-cols-${tabCount}`}>
+        <TabsList className={`grid w-full ${salaryVisible ? "grid-cols-5" : "grid-cols-4"}`}>
           <TabsTrigger value="profile" className="gap-1"><FileText className="h-3 w-3 hidden sm:inline" /> Profile</TabsTrigger>
           {salaryVisible && <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>}
           <TabsTrigger value="attendance" className="gap-1"><Calendar className="h-3 w-3 hidden sm:inline" /> Attendance</TabsTrigger>
@@ -801,7 +801,21 @@ export default function EmployeeDetail() {
                       <TableCell><Badge variant={l.approval_status === "approved" ? "default" : "secondary"} className="capitalize">{l.approval_status}</Badge></TableCell>
                       {canManage && (
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteLeave.mutate({ id: l.id, employeeId: id! })}><Trash2 className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Leave Record</AlertDialogTitle>
+                                <AlertDialogDescription>This will permanently delete this leave record. This action cannot be undone.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteLeave.mutate({ id: l.id, employeeId: id! })}>Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       )}
                     </TableRow>
