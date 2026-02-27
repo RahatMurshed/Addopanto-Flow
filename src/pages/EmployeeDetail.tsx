@@ -37,7 +37,7 @@ const STATUS_BADGES: Record<string, { label: string; variant: "default" | "secon
 };
 
 const TYPE_LABELS: Record<string, string> = { full_time: "Full-time", part_time: "Part-time", contract: "Contract" };
-const ATTENDANCE_COLORS: Record<string, string> = { present: "bg-success/20 text-success", absent: "bg-destructive/20 text-destructive", half_day: "bg-warning/20 text-warning", leave: "bg-primary/20 text-primary" };
+const ATTENDANCE_COLORS: Record<string, string> = { present: "bg-success/20 text-success", absent: "bg-destructive/20 text-destructive", half_day: "bg-warning/20 text-warning", leave: "bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400" };
 
 function getScoreColor(score: number) {
   if (score >= 80) return "hsl(var(--success))";
@@ -526,7 +526,7 @@ export default function EmployeeDetail() {
                 <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-success/20" /> Present</span>
                 <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-destructive/20" /> Absent</span>
                 <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-warning/20" /> Half Day</span>
-                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-primary/20" /> Leave</span>
+                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-sky-100 dark:bg-sky-900/30" /> Leave</span>
               </div>
             </CardContent>
           </Card>
