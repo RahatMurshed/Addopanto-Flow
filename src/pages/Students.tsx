@@ -585,7 +585,7 @@ export default function Students() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setProfileStudent(s); setProfileOpen(true); }}>
+                              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/students/${s.id}/profile`)}>
                                   <Eye className="h-3.5 w-3.5" />
                                   <span className="hidden lg:inline">View</span>
                                 </Button>

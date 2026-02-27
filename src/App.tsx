@@ -55,6 +55,7 @@ const EmployeesPage = lazy(() => import("@/pages/Employees"));
 const EmployeeDetailPage = lazy(() => import("@/pages/EmployeeDetail"));
 const Products = lazy(() => import("@/pages/Products"));
 const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
+const StudentProfilePage = lazy(() => import("@/pages/StudentProfilePage"));
 
 const CategoryProducts = lazy(() => import("@/pages/CategoryProducts"));
 const Stakeholders = lazy(() => import("@/pages/Stakeholders"));
@@ -181,6 +182,7 @@ const App = () => (
                   <Route path="/students" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><CriticalRouteErrorBoundary routeName="Students"><Students /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/new" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><AddStudent /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/duplicates" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.moderatorDuplicates]}><StudentDuplicates /></AccessGuard></ProtectedRoute>} />
+                  <Route path="/students/:studentId/profile" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><StudentProfilePage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
                   <Route path="/courses" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCoursePages, ACCESS_RULES.deoCourses]}><Courses /></AccessGuard></ProtectedRoute>} />
                   <Route path="/courses/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCoursePages]}><CourseDetail /></AccessGuard></ProtectedRoute>} />
