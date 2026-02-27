@@ -797,6 +797,7 @@ export default function StudentDetail() {
         batchDefaultMonthlyFee={Number(batch?.default_monthly_fee) || 0}
         courseName={course?.course_name}
         batchName={batch?.batch_name}
+        contextBatchId={fromBatch || undefined}
       />
 
       {/* Delete Payment Confirmation */}
