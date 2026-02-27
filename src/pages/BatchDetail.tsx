@@ -136,11 +136,16 @@ export default function BatchDetail() {
 
   const batchTotalMonths = batch?.course_duration_months || 0;
 
+  // Build a Set of student IDs from active batch_enrollments
+  const enrolledStudentIdSet = useMemo(() => {
+    return new Set(batchEnrollments.map((e: any) => e.student_id));
+  }, [batchEnrollments]);
+
   // All students in this batch (unfiltered, for stats)
   const allBatchStudents = useMemo(() => {
     if (!id) return [];
-    return allStudents.filter((s: any) => s.batch_id === id);
-  }, [allStudents, id]);
+    return allStudents.filter((s: any) => enrolledStudentIdSet.has(s.id));
+  }, [allStudents, id, enrolledStudentIdSet]);
 
   // Summaries for all batch students
   const allSummaries = useMemo(() => {
