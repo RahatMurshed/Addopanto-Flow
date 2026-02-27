@@ -83,7 +83,7 @@ export function ProfileStickyBar({ visible, student, canEdit, onEdit }: ProfileS
           <Button
             variant="outline"
             size="sm"
-            className="hidden sm:flex border-white/60 text-white hover:bg-white/20"
+            className="hidden sm:flex bg-transparent border-white/70 text-white hover:bg-white/15 hover:text-white"
             onClick={onEdit}
           >
             <Pencil className="mr-1.5 h-3.5 w-3.5" />
