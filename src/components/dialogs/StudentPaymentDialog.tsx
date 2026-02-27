@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -16,7 +18,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
@@ -57,11 +59,88 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const [feeError, setFeeError] = useState<string | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [newSourceName, setNewSourceName] = useState("");
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string | null>(null);
   const { fc: formatCurrency } = useCompanyCurrency();
   const { data: revenueSources = [] } = useRevenueSources();
   const createSourceMutation = useCreateRevenueSource();
 
   const isEditing = !!editingPayment;
+
+  // Fetch all active enrollments for this student
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ["student_active_enrollments", student.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("id, batch_id, total_fee, batches(batch_name, default_admission_fee, default_monthly_fee, course_id, courses(course_name))")
+        .eq("student_id", student.id)
+        .eq("status", "active");
+      if (error) throw error;
+      return (data || []) as Array<{
+        id: string;
+        batch_id: string;
+        total_fee: number;
+        batches: {
+          batch_name: string;
+          default_admission_fee: number;
+          default_monthly_fee: number;
+          course_id: string | null;
+          courses: { course_name: string } | null;
+        } | null;
+      }>;
+    },
+    enabled: open,
+  });
+
+  // Fetch all payments for this student (for per-batch fee summary)
+  const { data: allStudentPayments = [] } = useQuery({
+    queryKey: ["student_all_payments_for_dialog", student.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("student_payments")
+        .select("id, amount, batch_enrollment_id")
+        .eq("student_id", student.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Auto-select enrollment logic
+  useEffect(() => {
+    if (!open) return;
+    if (isEditing && editingPayment?.batch_enrollment_id) {
+      setSelectedEnrollmentId(editingPayment.batch_enrollment_id);
+    } else if (batchEnrollmentId) {
+      // Pre-select hint from caller (e.g. BatchDetail context)
+      setSelectedEnrollmentId(batchEnrollmentId);
+    } else if (enrollments.length === 1) {
+      setSelectedEnrollmentId(enrollments[0].id);
+    } else if (enrollments.length === 0) {
+      setSelectedEnrollmentId(null);
+    }
+  }, [open, enrollments, batchEnrollmentId, isEditing, editingPayment]);
+
+  // Per-batch fee summary
+  const batchFeeSummary = useMemo(() => {
+    if (!selectedEnrollmentId) return null;
+    const enrollment = enrollments.find(e => e.id === selectedEnrollmentId);
+    if (!enrollment) return null;
+    const paid = allStudentPayments
+      .filter(p => p.batch_enrollment_id === selectedEnrollmentId)
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const total = Number(enrollment.total_fee || 0);
+    return { total, paid, remaining: Math.max(0, total - paid) };
+  }, [selectedEnrollmentId, enrollments, allStudentPayments]);
+
+  // Get display names from selected enrollment
+  const selectedEnrollment = useMemo(() => {
+    if (!selectedEnrollmentId) return null;
+    return enrollments.find(e => e.id === selectedEnrollmentId) || null;
+  }, [selectedEnrollmentId, enrollments]);
+
+  const effectiveCourseName = selectedEnrollment?.batches?.courses?.course_name || courseName;
+  const effectiveBatchName = selectedEnrollment?.batches?.batch_name || batchName;
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -105,7 +184,6 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const isFullyPaid = summary.totalPending <= 0 && !isEditing;
 
   // Available unpaid months for monthly payments (including partial)
-  // When editing, also include the months from the editing payment
   const unpaidMonths = useMemo(() => {
     const base = [...summary.monthlyOverdueMonths, ...summary.monthlyPartialMonths, ...summary.monthlyPendingMonths];
     if (editingPayment?.months_covered) {
@@ -160,26 +238,22 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
 
   // Auto-set revenue source based on payment type + course/batch context
   const dynamicSourceName = useMemo(() => {
-    const context = [courseName, batchName].filter(Boolean).join(" ");
+    const context = [effectiveCourseName, effectiveBatchName].filter(Boolean).join(" ");
     if (paymentType === "admission") {
       return context ? `Admission - ${context}` : "Admission";
     }
     return context ? `Monthly Fees - ${context}` : "Monthly Fees";
-  }, [paymentType, courseName, batchName]);
+  }, [paymentType, effectiveCourseName, effectiveBatchName]);
 
   useEffect(() => {
     if (!open || isEditing) return;
-    // Find existing source matching the dynamic name
     const existing = revenueSources.find(s => s.name === dynamicSourceName);
     if (existing) {
       setSelectedSourceId(existing.id);
     } else if (dynamicSourceName && revenueSources.length > 0) {
-      // Auto-create the source
       createSourceMutation.mutateAsync(dynamicSourceName).then((created) => {
         setSelectedSourceId(created.id);
-      }).catch(() => {
-        // Fallback: leave unset
-      });
+      }).catch(() => {});
     }
   }, [open, isEditing, dynamicSourceName, revenueSources]);
 
@@ -206,10 +280,15 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const handleSubmit = async (data: PaymentFormData) => {
     setFeeError(null);
 
+    // Enrollment guard: require batch selection when enrollments exist
+    if (enrollments.length > 0 && !selectedEnrollmentId) {
+      setFeeError("Please select a batch before recording payment.");
+      return;
+    }
+
     // Validate against batch fee limits
     if (data.payment_type === "admission" && batchDefaultAdmissionFee && batchDefaultAdmissionFee > 0) {
       const maxAdmission = batchDefaultAdmissionFee;
-      // For editing, allow up to max; for new, allow up to remaining
       const alreadyPaid = isEditing
         ? summary.admissionPaid - Number(editingPayment?.amount || 0)
         : summary.admissionPaid;
@@ -253,7 +332,6 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           description: data.description || null,
         });
       } else {
-        // Calculate due_date from months_covered or use payment_date for admission
         const computedDueDate = data.payment_type === "monthly" && selectedMonths.length > 0
           ? `${selectedMonths.sort()[0]}-01`
           : data.payment_date;
@@ -269,7 +347,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           description: data.description || null,
           source_id: selectedSourceId || null,
           due_date: computedDueDate,
-          batch_enrollment_id: batchEnrollmentId || null,
+          batch_enrollment_id: selectedEnrollmentId || null,
           studentName: student.name,
         });
       }
@@ -302,6 +380,52 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         )}
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          {/* Batch Enrollment Selector */}
+          {enrollments.length > 1 && (
+            <div className="space-y-2">
+              <Label>Batch <span className="text-destructive">*</span></Label>
+              <Select value={selectedEnrollmentId || ""} onValueChange={(v) => { setSelectedEnrollmentId(v); setFeeError(null); }} disabled={saving}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select batch..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {enrollments.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.batches?.batch_name || "Unknown Batch"}
+                      {e.batches?.courses?.course_name ? ` (${e.batches.courses.course_name})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {enrollments.length === 1 && selectedEnrollment && (
+            <div className="rounded-md border p-3 text-sm bg-muted/50">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Info className="h-4 w-4 shrink-0" />
+                <span>
+                  Batch: <span className="font-medium text-foreground">{selectedEnrollment.batches?.batch_name}</span>
+                  {selectedEnrollment.batches?.courses?.course_name && (
+                    <span className="text-muted-foreground"> ({selectedEnrollment.batches.courses.course_name})</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Fee Summary for selected batch */}
+          {batchFeeSummary && batchFeeSummary.total > 0 && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm">
+              <p className="font-medium text-foreground mb-1">Fee Summary</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                <span>Total: <span className="font-medium text-foreground">{formatCurrency(batchFeeSummary.total)}</span></span>
+                <span>Paid: <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(batchFeeSummary.paid)}</span></span>
+                <span>Due: <span className="font-medium text-orange-600 dark:text-orange-400">{formatCurrency(batchFeeSummary.remaining)}</span></span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Payment Type</Label>
             <Select value={paymentType} onValueChange={(v) => { form.setValue("payment_type", v as any); setSelectedMonths([]); setFeeError(null); }} disabled={saving}>

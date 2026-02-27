@@ -199,8 +199,8 @@ export function FinancialBreakdown({ studentId, companyId, initialTab }: Financi
         due_date: p.due_date,
         payment_type: p.payment_type,
         user_id: p.user_id,
-        courseName: enrollment?.courseName ?? "Uncategorized",
-        batchName: enrollment?.batchName ?? (data.enrollmentMap.size > 1 ? "Uncategorized" : "No Batch"),
+        courseName: enrollment?.courseName ?? (data.enrollmentMap.size > 1 ? "Unlinked (pre-tracking)" : "Uncategorized"),
+        batchName: enrollment?.batchName ?? (data.enrollmentMap.size > 1 ? "Unlinked (pre-tracking)" : "No Batch"),
       };
     });
   }, [data]);

@@ -1,6 +1,4 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudents, useAllStudents, useCreateStudent, useDeleteStudent, useBulkDeleteStudents, type StudentInsert, type Student } from "@/hooks/useStudents";
@@ -111,24 +109,7 @@ export default function Students() {
   const [profileStudent, setProfileStudent] = useState<any>(null);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Resolve active enrollment for selected student (for payment dialog)
-  const { data: selectedStudentEnrollment } = useQuery({
-    queryKey: ["batch_enrollment_for_student", selectedStudent?.id, selectedStudent?.batch_id],
-    queryFn: async () => {
-      if (!selectedStudent?.id || !selectedStudent?.batch_id) return null;
-      const { data, error } = await supabase
-        .from("batch_enrollments")
-        .select("id")
-        .eq("student_id", selectedStudent.id)
-        .eq("batch_id", selectedStudent.batch_id)
-        .eq("status", "active")
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedStudent?.id && !!selectedStudent?.batch_id,
-  });
+  // Enrollment resolution is now handled inside StudentPaymentDialog itself
 
   // Compute summaries for all students (for summary cards)
   const allStudentSummaries = useMemo(() => {
@@ -679,7 +660,6 @@ export default function Students() {
           student={selectedStudent}
           summary={studentSummaries.get(selectedStudent.id) || { admissionPaid: 0, admissionTotal: 0, admissionPending: 0, admissionStatus: "pending", monthlyPaidMonths: [], monthlyPartialMonths: [], monthlyOverdueMonths: [], monthlyPendingMonths: [], monthlyPaymentsByMonth: new Map(), monthlyPaidTotal: 0, monthlyPendingTotal: 0, totalPaid: 0, totalPending: 0, totalExpected: 0, overallPercent: 0 }}
           onSave={handlePayment}
-          batchEnrollmentId={selectedStudentEnrollment?.id}
         />
       )}
 
