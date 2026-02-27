@@ -127,6 +127,84 @@ export type Database = {
           },
         ]
       }
+      batch_enrollments: {
+        Row: {
+          batch_id: string
+          company_id: string
+          created_at: string
+          created_by: string
+          enrollment_date: string
+          id: string
+          notes: string | null
+          status: string
+          student_id: string
+          total_fee: number
+          updated_at: string
+        }
+        Insert: {
+          batch_id: string
+          company_id: string
+          created_at?: string
+          created_by: string
+          enrollment_date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id: string
+          total_fee?: number
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          enrollment_date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id?: string
+          total_fee?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_enrollments_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_enrollments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_enrollments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batches: {
         Row: {
           batch_code: string
@@ -2444,6 +2522,7 @@ export type Database = {
       student_payments: {
         Row: {
           amount: number
+          batch_enrollment_id: string | null
           company_id: string
           created_at: string
           description: string | null
@@ -2461,6 +2540,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          batch_enrollment_id?: string | null
           company_id: string
           created_at?: string
           description?: string | null
@@ -2478,6 +2558,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          batch_enrollment_id?: string | null
           company_id?: string
           created_at?: string
           description?: string | null
@@ -2494,6 +2575,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "student_payments_batch_enrollment_id_fkey"
+            columns: ["batch_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "batch_enrollments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "student_payments_company_id_fkey"
             columns: ["company_id"]
