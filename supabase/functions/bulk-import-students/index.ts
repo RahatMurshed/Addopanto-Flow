@@ -45,7 +45,7 @@ const VALID_DB_COLUMNS = new Set([
 ]);
 
 const NUMERIC_COLUMNS = new Set(["admission_fee_total", "monthly_fee_amount", "father_annual_income"]);
-const VALID_STATUSES = new Set(["active", "inactive", "graduated"]);
+const VALID_STATUSES = new Set(["active", "inactive", "graduated", "dropout", "transferred"]);
 
 function validateRow(row: Record<string, unknown>, rowIndex: number): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
       const batch = validRows.slice(i, i + BATCH_SIZE);
-      const { error: insertError, data: inserted } = await authClient.from("students").insert(batch as any).select("id, monthly_fee_amount, billing_start_month");
+      const { error: insertError, data: inserted } = await authClient.from("students").insert(batch as any).select("id, monthly_fee_amount, billing_start_month, batch_id");
 
       if (insertError) {
         for (let j = i; j < validRows.length; j++) failedRows.push({ row: j + 1, errors: [`Database error: ${insertError.message}`], data: validRows[j] });
@@ -205,10 +205,20 @@ Deno.serve(async (req) => {
       }
 
       if (inserted) {
+        // Create monthly fee history entries
         const feeHistoryEntries = inserted.filter((s: any) => (s.monthly_fee_amount || 0) > 0).map((s: any) => ({
           student_id: s.id, monthly_amount: s.monthly_fee_amount, effective_from: s.billing_start_month, user_id: user.id, company_id,
         }));
         if (feeHistoryEntries.length > 0) await authClient.from("monthly_fee_history").insert(feeHistoryEntries);
+
+        // Create batch enrollment records for students with batch_id
+        const enrollmentEntries = inserted.filter((s: any) => s.batch_id).map((s: any) => ({
+          student_id: s.id, batch_id: s.batch_id, company_id, created_by: user.id, status: "active", total_fee: 0,
+        }));
+        if (enrollmentEntries.length > 0) {
+          const { error: enrollError } = await authClient.from("batch_enrollments").insert(enrollmentEntries);
+          if (enrollError) console.error("Failed to create batch enrollments:", enrollError.message);
+        }
       }
 
       successCount += batch.length;
