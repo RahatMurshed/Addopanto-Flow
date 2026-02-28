@@ -663,6 +663,7 @@ export default function BatchDetail() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="inquiry">Inquiry</SelectItem>
                 <SelectItem value="graduated">Graduated</SelectItem>
               </SelectContent>
             </Select>

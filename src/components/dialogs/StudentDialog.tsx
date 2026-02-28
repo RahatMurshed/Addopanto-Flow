@@ -43,7 +43,7 @@ const studentSchema = z.object({
   course_end_month: z.string().regex(yyyyMmRegex, "Format: YYYY-MM").nullable().optional().or(z.literal("")),
   admission_fee_total: z.number().min(0, "Must be >= 0"),
   monthly_fee_amount: z.number().min(0, "Must be >= 0"),
-  status: z.enum(["active", "inactive", "graduated", "dropout", "transferred"]),
+  status: z.enum(["active", "inactive", "graduated", "dropout", "transferred", "inquiry"]),
   notes: z.string().max(500).nullable().optional(),
 }).refine((data) => {
   if (data.course_start_month && data.course_end_month) {
@@ -406,6 +406,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inquiry">Inquiry</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
                 <SelectItem value="graduated">Graduated</SelectItem>
               </SelectContent>
