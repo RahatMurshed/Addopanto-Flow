@@ -33,7 +33,12 @@ export function computeLifetimeMetrics(
     default_admission_fee?: number;
   } | null | undefined,
   futureUnpaidPayments?: Array<{ amount: number; status: string; paid_amount?: number | null }>,
-  totalExpected?: number
+  totalExpected?: number,
+  allEnrollments?: Array<{
+    admission_fee: number;
+    monthly_fee: number;
+    duration_months: number;
+  }>
 ): LifetimeMetrics {
   const isInactive = student.status !== "active";
 
@@ -57,12 +62,18 @@ export function computeLifetimeMetrics(
   );
 
   // 5. PAYMENT RATE — totalCoursesPaid / denominator
-  // For inactive students: freeze at current paid percentage (don't calculate future dues)
-  const denominator = totalExpected != null && totalExpected > 0
-    ? totalExpected
-    : (batch
-        ? Number(batch.default_admission_fee ?? 0) + (Number(batch.course_duration_months ?? 0) * Number(batch.default_monthly_fee ?? 0))
-        : 0);
+  // Fix 5: Sum fees across ALL enrollments for multi-enrolled students
+  let denominator: number;
+  if (totalExpected != null && totalExpected > 0) {
+    denominator = totalExpected;
+  } else if (allEnrollments && allEnrollments.length > 0) {
+    denominator = allEnrollments.reduce((sum, e) => 
+      sum + Number(e.admission_fee) + (Number(e.duration_months) * Number(e.monthly_fee)), 0);
+  } else if (batch) {
+    denominator = Number(batch.default_admission_fee ?? 0) + (Number(batch.course_duration_months ?? 0) * Number(batch.default_monthly_fee ?? 0));
+  } else {
+    denominator = 0;
+  }
   
   const paymentRate = denominator > 0
     ? Math.min(100, Math.round((totalCoursesPaid / denominator) * 100))

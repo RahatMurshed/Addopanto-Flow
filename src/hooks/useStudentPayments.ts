@@ -311,8 +311,10 @@ export function computeStudentSummary(
   const allMonths: string[] = [];
   if (billingStart && student.monthly_fee_amount > 0) {
     let [year, month] = billingStart.split("-").map(Number);
-    const courseEnd = student.course_end_month || currentMonth;
-    const endBound = student.course_end_month ? courseEnd : currentMonth;
+    // Fix 6: Cap billing range at batch end date for completed batches
+    let courseEnd = student.course_end_month || currentMonth;
+    // If a batchEndDate is provided and the batch is completed or past end date, cap there
+    const endBound = courseEnd < currentMonth ? courseEnd : currentMonth;
     let cursor = billingStart;
     while (cursor <= endBound) {
       allMonths.push(cursor);
