@@ -210,6 +210,7 @@ export type Database = {
           batch_code: string
           batch_name: string
           company_id: string
+          course_duration_days: number | null
           course_duration_months: number | null
           course_id: string | null
           created_at: string
@@ -220,6 +221,7 @@ export type Database = {
           end_date: string | null
           id: string
           max_capacity: number | null
+          payment_mode: string
           start_date: string
           status: string
           updated_at: string
@@ -229,6 +231,7 @@ export type Database = {
           batch_code: string
           batch_name: string
           company_id: string
+          course_duration_days?: number | null
           course_duration_months?: number | null
           course_id?: string | null
           created_at?: string
@@ -239,6 +242,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           max_capacity?: number | null
+          payment_mode?: string
           start_date: string
           status?: string
           updated_at?: string
@@ -248,6 +252,7 @@ export type Database = {
           batch_code?: string
           batch_name?: string
           company_id?: string
+          course_duration_days?: number | null
           course_duration_months?: number | null
           course_id?: string | null
           created_at?: string
@@ -258,6 +263,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           max_capacity?: number | null
+          payment_mode?: string
           start_date?: string
           status?: string
           updated_at?: string

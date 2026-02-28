@@ -78,7 +78,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batch_enrollments")
-        .select("id, batch_id, total_fee, batches(batch_name, default_admission_fee, default_monthly_fee, course_id, courses(course_name))")
+        .select("id, batch_id, total_fee, batches(batch_name, default_admission_fee, default_monthly_fee, course_id, payment_mode, courses(course_name))")
         .eq("student_id", student.id)
         .eq("status", "active");
       if (error) throw error;
@@ -91,6 +91,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
           default_admission_fee: number;
           default_monthly_fee: number;
           course_id: string | null;
+          payment_mode: string;
           courses: { course_name: string } | null;
         } | null;
       }>;
@@ -154,6 +155,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
 
   const effectiveCourseName = selectedEnrollment?.batches?.courses?.course_name || courseName;
   const effectiveBatchName = selectedEnrollment?.batches?.batch_name || batchName;
+  const isOneTimeBatch = selectedEnrollment?.batches?.payment_mode === "one_time";
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -240,6 +242,14 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
       setNewSourceName("");
     }
   }, [open, summary, form, editingPayment, revenueSources]);
+
+  // Force admission type for one-time batches
+  useEffect(() => {
+    if (isOneTimeBatch && paymentType !== "admission") {
+      form.setValue("payment_type", "admission");
+      setSelectedMonths([]);
+    }
+  }, [isOneTimeBatch, paymentType, form]);
 
   // Auto-fill admission amount when type switches to admission
   useEffect(() => {
@@ -467,11 +477,11 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
 
           <div className="space-y-2">
             <Label>Payment Type</Label>
-            <Select value={paymentType} onValueChange={(v) => { form.setValue("payment_type", v as any); setSelectedMonths([]); setFeeError(null); }} disabled={saving}>
+            <Select value={paymentType} onValueChange={(v) => { form.setValue("payment_type", v as any); setSelectedMonths([]); setFeeError(null); }} disabled={saving || isOneTimeBatch}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="admission">Admission Fee</SelectItem>
-                <SelectItem value="monthly">Monthly Tuition</SelectItem>
+                <SelectItem value="admission">{isOneTimeBatch ? "Course Fee (One-Time)" : "Admission Fee"}</SelectItem>
+                {!isOneTimeBatch && <SelectItem value="monthly">Monthly Tuition</SelectItem>}
               </SelectContent>
             </Select>
           </div>

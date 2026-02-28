@@ -28,6 +28,7 @@ import { useBatches, type Batch } from "@/hooks/useBatches";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { syncBatchEnrollment } from "@/utils/enrollmentSync";
+import { formatDuration } from "@/utils/durationFormat";
 
 
 const yyyyMmRegex = /^\d{4}-\d{2}$/;
@@ -310,11 +311,14 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
                 <Badge variant="secondary">
                   Monthly: {formatCurrency(Number(selectedBatch!.default_monthly_fee), currency)}
                 </Badge>
-                {selectedBatch!.course_duration_months && (
+                {(selectedBatch!.course_duration_months || (selectedBatch as any).course_duration_days) && (
                   <Badge variant="secondary">
-                    Duration: {selectedBatch!.course_duration_months} months
+                    Duration: {formatDuration(selectedBatch!.course_duration_months, (selectedBatch as any).course_duration_days)}
                   </Badge>
                 )}
+                <Badge variant="secondary">
+                  {(selectedBatch as any).payment_mode === "one_time" ? "One-Time Payment" : "Monthly Payment"}
+                </Badge>
                 {batchCourseStartMonth && (
                   <Badge variant="outline">
                     {batchCourseStartMonth} → {batchCourseEndMonth || "—"}

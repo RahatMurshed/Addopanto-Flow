@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatDuration } from "@/utils/durationFormat";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -59,6 +60,8 @@ function useEnrollmentData(studentId: string, companyId: string) {
             start_date,
             end_date,
             course_duration_months,
+            course_duration_days,
+            payment_mode,
             course_id,
             courses!batches_course_id_fkey (
               id,
@@ -303,7 +306,7 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
                               {batch?.course_duration_months && (
                                 <>
                                   <Clock className="w-3.5 h-3.5 ml-2" />
-                                  <span>{batch.course_duration_months} months</span>
+                                  <span>{formatDuration(batch.course_duration_months, (batch as any).course_duration_days)}</span>
                                 </>
                               )}
                             </div>

@@ -43,6 +43,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/shared/TablePagination";
+import { formatDuration } from "@/utils/durationFormat";
 
 export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
@@ -528,7 +529,11 @@ export default function BatchDetail() {
             )}
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Course Duration</p>
-              <p className="text-sm font-semibold">{batch.course_duration_months ? `${batch.course_duration_months} months` : "—"}</p>
+              <p className="text-sm font-semibold">{formatDuration((batch as any).course_duration_months, (batch as any).course_duration_days)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Payment Mode</p>
+              <p className="text-sm font-semibold">{(batch as any).payment_mode === "one_time" ? "One-Time" : "Monthly"}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Default Admission Fee</p>

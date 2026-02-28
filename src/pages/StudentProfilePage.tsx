@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useRole } from "@/contexts/RoleContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDuration } from "@/utils/durationFormat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -456,7 +457,8 @@ export default function StudentProfilePage() {
                   <InfoRow label="Section / Division" value={student.section_division} />
                   <InfoRow label="Academic Year" value={student.academic_year} />
                   <InfoRow label="Enrollment Date" value={format(new Date(student.enrollment_date), "MMM d, yyyy")} />
-                  <InfoRow label="Course Duration" value={batch?.course_duration_months ? `${batch.course_duration_months} months` : null} />
+                  <InfoRow label="Course Duration" value={batch ? formatDuration(batch.course_duration_months, (batch as any).course_duration_days) : null} />
+                  <InfoRow label="Payment Mode" value={batch ? ((batch as any).payment_mode === "one_time" ? "One-Time" : "Monthly") : null} />
                   <InfoRow label="Previous Institution" value={student.previous_school} />
                   <InfoRow label="Previous Qualification" value={student.previous_qualification} />
                   <InfoRow label="Previous Percentage" value={student.previous_percentage} />
