@@ -1,16 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
-const ALLOWED_ORIGINS = [
-  "https://addopantoflow.lovable.app",
-  "https://id-preview--58aee540-d716-4564-805b-e26d9615ae54.lovable.app",
-];
+function isAllowedOrigin(origin: string): boolean {
+  if (origin === "https://addopantoflow.lovable.app") return true;
+  if (origin === "https://58aee540-d716-4564-805b-e26d9615ae54.lovableproject.com") return true;
+  if (/^https:\/\/[a-z0-9-]+--58aee540-d716-4564-805b-e26d9615ae54\.lovable\.app$/.test(origin)) return true;
+  return false;
+}
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("Origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin) ? origin : "https://addopantoflow.lovable.app",
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   };
@@ -97,21 +98,53 @@ Deno.serve(async (req) => {
       return json(400, { error: "No active company selected" }, cors);
     }
 
-    // Delete data scoped to company (order matters for FK constraints)
+    // Delete data scoped to company (FK-safe order: children before parents)
     const tables = [
+      // Tags & notes (leaf tables)
+      "student_tag_assignments",
+      "student_tags",
+      "student_sales_notes",
+      "sales_note_categories",
+      "duplicate_dismissals",
+      // Products
+      "product_sales",
+      "product_stock_movements",
+      "products",
+      "product_categories",
+      // Stakeholders (investments/loans)
+      "profit_distributions",
+      "loan_repayments",
+      "loans",
+      "investments",
+      "stakeholders",
+      // Employees
+      "employee_attendance",
+      "employee_leaves",
+      "employee_salary_payments",
+      "employees",
+      // Suppliers
+      "suppliers",
+      // Finance
       "allocations",
       "khata_transfers",
       "expenses",
-      "revenues",
-      "expense_accounts",
-      "revenue_sources",
-      "student_siblings",
-      "student_batch_history",
+      // Enrollments & payments (BEFORE revenue_sources to avoid v_batch trigger)
+      "batch_enrollments",
       "student_payments",
       "monthly_fee_history",
+      "student_siblings",
+      "student_batch_history",
+      // Revenue (after student_payments)
+      "revenues",
+      "revenue_sources",
+      "expense_accounts",
+      // Core entities
       "students",
       "batches",
       "courses",
+      // System/logs
+      "moderator_permissions",
+      "registration_requests",
       "audit_logs",
       "currency_change_logs",
       "dashboard_access_logs",
