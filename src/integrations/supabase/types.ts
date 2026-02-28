@@ -3624,6 +3624,7 @@ export type Database = {
         Returns: {
           deleted_payment_count: number
           deleted_payment_total: number
+          status_changed: boolean
         }[]
       }
     }
