@@ -315,7 +315,24 @@ export default function BulkImportDialog({
                 </p>
               </div>
 
-              {!requiredFieldsMapped && (
+              {mappedFieldCount === 0 && (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 space-y-3">
+                  <div className="flex items-start gap-2 text-destructive text-sm font-medium">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    No columns were auto-matched to student fields
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Your CSV headers don't match any expected student fields. This usually means the file isn't a student data CSV.
+                    You can either map columns manually below, or download the template for the correct format.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                    <Download className="mr-2 h-3 w-3" />
+                    Download CSV Template
+                  </Button>
+                </div>
+              )}
+
+              {mappedFieldCount > 0 && !requiredFieldsMapped && (
                 <div className="flex items-center gap-2 bg-destructive/10 text-destructive rounded-lg p-3 text-sm">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   Required fields (name, enrollment_date, billing_start_month) must be mapped.
