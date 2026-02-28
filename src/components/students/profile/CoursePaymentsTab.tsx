@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, isBefore } from "date-fns";
-import { ArrowUpDown, Download } from "lucide-react";
+import { ArrowUpDown, Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,7 @@ export interface CoursePaymentRow {
   user_id: string;
   courseName: string;
   batchName: string;
+  batch_enrollment_id?: string | null;
 }
 
 interface CoursePaymentsTabProps {
@@ -43,8 +44,27 @@ export function CoursePaymentsTab({ payments, userMap, fc, isAdmin, isLoading }:
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "due_date", dir: "desc" });
   const [page, setPage] = useState(1);
 
+  // Split linked vs unlinked payments
+  const { linkedPayments, unlinkedPayments } = useMemo(() => {
+    const linked: CoursePaymentRow[] = [];
+    const unlinked: CoursePaymentRow[] = [];
+    for (const p of payments) {
+      if (p.batch_enrollment_id === null || p.batch_enrollment_id === undefined) {
+        // Only treat as unlinked if there are multiple enrollments (courseName will say "Unlinked")
+        if (p.courseName === "Unlinked (pre-tracking)") {
+          unlinked.push(p);
+        } else {
+          linked.push(p);
+        }
+      } else {
+        linked.push(p);
+      }
+    }
+    return { linkedPayments: linked, unlinkedPayments: unlinked };
+  }, [payments]);
+
   const sorted = useMemo(() => {
-    return [...payments].sort((a, b) => {
+    return [...linkedPayments].sort((a, b) => {
       const dir = sort.dir === "asc" ? 1 : -1;
       switch (sort.key) {
         case "courseName": return dir * a.courseName.localeCompare(b.courseName);
@@ -56,7 +76,7 @@ export function CoursePaymentsTab({ payments, userMap, fc, isAdmin, isLoading }:
         default: return 0;
       }
     });
-  }, [payments, sort]);
+  }, [linkedPayments, sort]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const pageData = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -72,7 +92,7 @@ export function CoursePaymentsTab({ payments, userMap, fc, isAdmin, isLoading }:
 
   const handleExport = () => {
     const headers = ["Course", "Batch", "Due Date", "Amount", "Status", "Payment Date", "Method", "Recorded By"];
-    const rows = sorted.map((p) => [
+    const rows = [...sorted, ...unlinkedPayments].map((p) => [
       p.courseName,
       p.batchName,
       format(new Date(p.due_date), "MMM d, yyyy"),
@@ -128,7 +148,7 @@ export function CoursePaymentsTab({ payments, userMap, fc, isAdmin, isLoading }:
         </div>
       )}
 
-      {/* Table */}
+      {/* Main linked payments table */}
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
@@ -186,28 +206,72 @@ export function CoursePaymentsTab({ payments, userMap, fc, isAdmin, isLoading }:
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination for linked payments */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
             Previous
           </Button>
-          <span className="text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <span className="text-muted-foreground">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
             Next
           </Button>
+        </div>
+      )}
+
+      {/* Unlinked Payments Section */}
+      {unlinkedPayments.length > 0 && (
+        <div className="space-y-3 mt-6">
+          {/* Warning banner */}
+          <div className="flex items-start gap-3 rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-700 dark:bg-yellow-900/20">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                Unlinked Payments (pre-enrollment tracking)
+              </p>
+              <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                The following {unlinkedPayments.length} payment{unlinkedPayments.length > 1 ? "s were" : " was"} recorded before the enrollment tracking system was introduced. They are preserved as historical records and have not been automatically assigned to any batch.
+              </p>
+            </div>
+          </div>
+
+          {/* Unlinked payments table */}
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Due Date</th>
+                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Amount</th>
+                  <th className="text-center p-3 text-xs font-medium text-muted-foreground">Status</th>
+                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Payment Date</th>
+                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Method</th>
+                  <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Recorded By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unlinkedPayments.map((p) => (
+                  <tr key={p.id} className="border-b border-border last:border-0 bg-yellow-50/30 dark:bg-yellow-900/5">
+                    <td className="p-3 text-sm">{format(new Date(p.due_date), "MMM d, yyyy")}</td>
+                    <td className="p-3 text-right font-medium text-foreground">{fc(p.amount)}</td>
+                    <td className="p-3 text-center">
+                      <Badge className={cn("text-xs rounded-full border-0 capitalize", STATUS_STYLES[p.status] ?? STATUS_STYLES.unpaid)}>
+                        {p.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-sm text-muted-foreground">
+                      {p.status !== "unpaid" ? format(new Date(p.payment_date), "MMM d, yyyy") : "—"}
+                    </td>
+                    <td className="p-3 text-sm text-muted-foreground capitalize">
+                      {p.status !== "unpaid" ? p.payment_method : "—"}
+                    </td>
+                    <td className="p-3 text-sm text-muted-foreground hidden md:table-cell">
+                      {userMap.get(p.user_id) ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

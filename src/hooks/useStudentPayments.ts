@@ -8,6 +8,7 @@ export interface StudentPayment {
   student_id: string;
   payment_date: string;
   amount: number;
+  status: string;
   payment_type: "admission" | "monthly";
   payment_method: string;
   months_covered: string[] | null;
