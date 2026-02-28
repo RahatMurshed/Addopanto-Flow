@@ -87,8 +87,24 @@ async function generatePaymentSchedule(
   }
 
   const scheduleRows: any[] = [];
-  const startDate = new Date(batch.start_date);
+  const batchStartDate = new Date(batch.start_date);
 
+  // Check student's billing_start_month to respect it
+  const { data: student } = await supabase
+    .from("students")
+    .select("billing_start_month")
+    .eq("id", studentId)
+    .single();
+
+  // Determine effective start: use student's billing_start_month if later than batch start
+  let effectiveStart = batchStartDate;
+  if (student?.billing_start_month) {
+    const [year, month] = student.billing_start_month.split("-").map(Number);
+    const billingStart = new Date(year, month - 1, 1);
+    if (billingStart > batchStartDate) {
+      effectiveStart = billingStart;
+    }
+  }
   // Generate admission fee row if applicable
   if (batch.default_admission_fee && Number(batch.default_admission_fee) > 0) {
     scheduleRows.push({
@@ -111,8 +127,13 @@ async function generatePaymentSchedule(
   const monthlyFee = Number(batch.default_monthly_fee);
 
   if (durationMonths && durationMonths > 0 && monthlyFee > 0) {
-    for (let i = 0; i < durationMonths; i++) {
-      const dueDate = addMonths(startDate, i);
+    // Calculate offset based on billing_start_month
+    const startOffset = (effectiveStart.getFullYear() - batchStartDate.getFullYear()) * 12
+      + (effectiveStart.getMonth() - batchStartDate.getMonth());
+    const actualOffset = Math.max(0, Math.min(startOffset, durationMonths));
+
+    for (let i = actualOffset; i < durationMonths; i++) {
+      const dueDate = addMonths(batchStartDate, i);
       const dueDateStr = format(dueDate, "yyyy-MM-dd");
       const monthStr = format(dueDate, "yyyy-MM");
 

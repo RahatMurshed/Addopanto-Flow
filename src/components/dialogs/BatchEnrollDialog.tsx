@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { addMonths, format } from "date-fns";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -15,6 +16,108 @@ import { useAllStudents, useUpdateStudent, type Student } from "@/hooks/useStude
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useQueryClient } from "@tanstack/react-query";
+
+/**
+ * Generates payment schedule rows for a new batch enrollment.
+ * Creates admission fee + monthly fee rows based on batch configuration.
+ */
+async function generateEnrollmentPaymentSchedule(
+  studentId: string,
+  batchId: string,
+  companyId: string,
+  userId: string,
+  enrollmentId: string
+) {
+  const { data: batch, error: batchError } = await supabase
+    .from("batches")
+    .select("start_date, course_duration_months, default_admission_fee, default_monthly_fee")
+    .eq("id", batchId)
+    .single();
+
+  if (batchError || !batch) {
+    console.error("Failed to fetch batch for schedule generation:", batchError);
+    return;
+  }
+
+  // Check student's billing_start_month to respect it
+  const { data: student } = await supabase
+    .from("students")
+    .select("billing_start_month")
+    .eq("id", studentId)
+    .single();
+
+  const scheduleRows: any[] = [];
+  const batchStartDate = new Date(batch.start_date);
+
+  // Determine effective start: use student's billing_start_month if later than batch start
+  let effectiveStart = batchStartDate;
+  if (student?.billing_start_month) {
+    const [year, month] = student.billing_start_month.split("-").map(Number);
+    const billingStart = new Date(year, month - 1, 1);
+    if (billingStart > batchStartDate) {
+      effectiveStart = billingStart;
+    }
+  }
+
+  // Admission fee row
+  if (batch.default_admission_fee && Number(batch.default_admission_fee) > 0) {
+    scheduleRows.push({
+      student_id: studentId,
+      company_id: companyId,
+      user_id: userId,
+      batch_enrollment_id: enrollmentId,
+      payment_type: "admission",
+      amount: Number(batch.default_admission_fee),
+      status: "unpaid",
+      due_date: batch.start_date,
+      payment_date: batch.start_date,
+      payment_method: "cash",
+      months_covered: null,
+    });
+  }
+
+  // Monthly fee rows
+  const durationMonths = batch.course_duration_months;
+  const monthlyFee = Number(batch.default_monthly_fee);
+
+  if (durationMonths && durationMonths > 0 && monthlyFee > 0) {
+    // Calculate how many months from batch start the effective start is
+    const startOffset = (effectiveStart.getFullYear() - batchStartDate.getFullYear()) * 12
+      + (effectiveStart.getMonth() - batchStartDate.getMonth());
+    const actualOffset = Math.max(0, Math.min(startOffset, durationMonths));
+
+    for (let i = actualOffset; i < durationMonths; i++) {
+      const dueDate = addMonths(batchStartDate, i);
+      const dueDateStr = format(dueDate, "yyyy-MM-dd");
+      const monthStr = format(dueDate, "yyyy-MM");
+
+      scheduleRows.push({
+        student_id: studentId,
+        company_id: companyId,
+        user_id: userId,
+        batch_enrollment_id: enrollmentId,
+        payment_type: "monthly",
+        amount: monthlyFee,
+        status: "unpaid",
+        due_date: dueDateStr,
+        payment_date: dueDateStr,
+        payment_method: "cash",
+        months_covered: [monthStr],
+      });
+    }
+  }
+
+  if (scheduleRows.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from("student_payments")
+    .insert(scheduleRows);
+
+  if (insertError) {
+    console.error("Failed to generate payment schedule:", insertError);
+  }
+}
 
 interface BatchEnrollDialogProps {
   open: boolean;
@@ -42,6 +145,7 @@ export default function BatchEnrollDialog({
   const { activeCompanyId } = useCompany();
   const { data: allStudents = [], isLoading } = useAllStudents();
   const updateStudentMutation = useUpdateStudent();
+  const queryClient = useQueryClient();
 
   // Debounce search with 500ms delay
   useEffect(() => {
@@ -152,16 +256,27 @@ export default function BatchEnrollDialog({
         }
       }
 
-      // Create enrollment record WITHOUT overwriting student.batch_id
+      // Create enrollment record and generate payment schedule
       if (activeCompanyId && user) {
-        await supabase.from("batch_enrollments").insert({
-          student_id: student.id,
-          batch_id: batchId,
-          company_id: activeCompanyId,
-          created_by: user.id,
-          status: "active",
-          total_fee: 0,
-        });
+        const { data: enrollment, error: enrollError } = await supabase
+          .from("batch_enrollments")
+          .insert({
+            student_id: student.id,
+            batch_id: batchId,
+            company_id: activeCompanyId,
+            created_by: user.id,
+            status: "active",
+            total_fee: 0,
+          })
+          .select("id")
+          .single();
+
+        if (enrollError) throw enrollError;
+
+        // Generate payment schedule for the new enrollment
+        await generateEnrollmentPaymentSchedule(
+          student.id, batchId, activeCompanyId, user.id, enrollment.id
+        );
       }
 
       // Only set batch_id if student has no primary batch
@@ -169,7 +284,12 @@ export default function BatchEnrollDialog({
         await updateStudentMutation.mutateAsync({ id: student.id, batch_id: batchId });
       }
 
-      toast({ title: "Student enrolled", description: `${student.name} has been enrolled in ${batchName}.` });
+      // Invalidate queries for enrollment timeline
+      queryClient.invalidateQueries({ queryKey: ["batch_enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["student_payments"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-student-count", batchId] });
+
+      toast({ title: "Student enrolled", description: `${student.name} has been enrolled in ${batchName}. Payment schedule generated.` });
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });

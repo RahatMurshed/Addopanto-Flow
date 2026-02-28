@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { Batch, BatchInsert } from "@/hooks/useBatches";
 
 const batchSchema = z.object({
@@ -58,6 +60,7 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
   const [saving, setSaving] = useState(false);
   const [startCalOpen, setStartCalOpen] = useState(false);
   const [endCalOpen, setEndCalOpen] = useState(false);
+  const { toast } = useToast();
   const isEdit = !!batch;
 
   const form = useForm<BatchFormData>({
@@ -104,6 +107,25 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
   const handleSubmit = async (data: BatchFormData) => {
     setSaving(true);
     try {
+      // Validate capacity isn't being set below current enrollment count
+      if (isEdit && batch && data.max_capacity != null) {
+        const { count } = await supabase
+          .from("batch_enrollments")
+          .select("id", { count: "exact", head: true })
+          .eq("batch_id", batch.id)
+          .eq("status", "active");
+        const currentCount = count ?? 0;
+        if (data.max_capacity < currentCount) {
+          toast({
+            title: "Invalid capacity",
+            description: `Cannot set capacity to ${data.max_capacity}. There are currently ${currentCount} enrolled students.`,
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
       await onSave({
         batch_name: data.batch_name,
         batch_code: data.batch_code,

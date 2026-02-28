@@ -188,9 +188,9 @@ export default function CourseDetail() {
     }
   };
 
-  const effectiveCanAdd = canAddRevenue || canAddBatch;
-  const effectiveCanEdit = canEdit || canEditBatch;
-  const effectiveCanDelete = canDelete || canDeleteBatch;
+  const effectiveCanAdd = !isModerator && (canAddRevenue || canAddBatch);
+  const effectiveCanEdit = !isModerator && (canEdit || canEditBatch);
+  const effectiveCanDelete = !isModerator && (canDelete || canDeleteBatch);
 
   const statusBadge = (status: string) => {
     switch (status) {
