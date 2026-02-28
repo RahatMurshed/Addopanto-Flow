@@ -1,67 +1,134 @@
 
-## Fix Student Page Filters (Monthly Paid, Admission Status, and Others)
 
-### Root Cause Analysis
+## Server-Side Search with Click-to-Search Across the Entire System
 
-There are **3 interconnected bugs** causing the filters to malfunction:
+### Overview
 
----
-
-### Bug 1: Client-side filters don't work with server-side pagination (Critical)
-
-The `admissionStatus` and `monthlyStatus` filters are applied **client-side on the current page only** (lines 134-160 in `Students.tsx`). This fundamentally breaks with server-side pagination:
-
-- User selects "Monthly Paid" -- only students on page 1 are checked
-- Students matching "Monthly Paid" on pages 2-10 are never shown
-- The pagination count still says "200 students" but the table shows fewer rows
-- Changing pages doesn't help because each page is independently filtered
-
-**Fix:** Move these filters to work across ALL students by filtering against `allStudents` + `allPayments` (which are already fetched), then paginate the filtered result client-side. This means:
-- Compute summaries for ALL students (already done at line 115-122)
-- Apply admission/monthly filters on the full `allStudents` list
-- Client-side paginate the filtered result
-- The server-side pagination continues to handle search, status, batch, and other DB-level filters
-- When admission/monthly filters are active, switch to client-side pagination mode
-
-### Bug 2: Students with no `billing_start_month` pass "Monthly Paid" filter incorrectly
-
-In `computeStudentSummary`, if `billing_start_month` is null/empty, `allMonths` ends up empty. This makes all month arrays (overdue, pending, partial) empty. The "Monthly Paid" filter check (line 154) returns `true` for these students since there are no overdue/pending/partial months -- but they haven't actually paid anything.
-
-**Fix:** In the monthly filter logic, add a check: if a student has a monthly fee > 0 but no billing_start_month set, treat them as "pending" (not "paid").
-
-### Bug 3: `useStudentPayments()` hits 1000-row default limit
-
-The `useStudentPayments()` hook (line 46-54) fetches ALL payments for the company without any `.limit()` or batched fetching. Supabase silently caps at 1000 rows. For companies with >1000 payment records, summaries become inaccurate and filters produce wrong results.
-
-**Fix:** Add batched fetching (same pattern as `useAllStudents`) to `useStudentPayments` when fetching all payments (no `studentId` parameter).
+Two fundamental changes system-wide:
+1. Replace all auto-search/debounce patterns with a **click-to-search** UX (user types, clicks Search button or presses Enter, then results load)
+2. Move all **client-side search and filtering to server-side** queries where possible
 
 ---
 
-### Technical Changes
+### 1. Reusable SearchBar Component
 
-**File: `src/pages/Students.tsx`**
-- When `admissionStatus` or `monthlyStatus` filters are active, compute filtered students from `allStudents` + `allStudentSummaries` instead of just the current page
-- Implement client-side pagination for the filtered result
-- Update the pagination display to show correct counts
-- When these filters are "all", use existing server-side pagination as-is
-
-**File: `src/hooks/useStudentPayments.ts`**
-- In `useStudentPayments()`, when no `studentId` is provided (fetching all), use batched fetching with `.range()` to handle >1000 payments
-- Add the missing billing_start_month null check in the filter logic
-
-**File: `src/pages/Students.tsx` (filter logic)**
-- Fix the "Monthly Paid" filter: if student has `monthly_fee_amount > 0` but no `billing_start_month`, classify as "pending" not "paid"
-- Fix the "Monthly Pending" filter: same null-check to avoid false negatives
+Create `src/components/shared/SearchBar.tsx` -- a standardized search input used across all pages:
+- Text input + Search button (icon button beside the input)
+- Pressing Enter also triggers search
+- Clear button (X) to reset and immediately re-fetch with empty search
+- Optional `placeholder` and `isLoading` props
+- Controlled: parent passes `onSearch(value: string)` callback
+- Does NOT auto-search on typing; only fires on button click or Enter
 
 ---
 
-### How it works after the fix
+### 2. Page-by-Page Changes
 
-1. User selects "Monthly Paid" filter
-2. System iterates ALL students (from `allStudents` cache), computes each summary
-3. Filters to only students where all billed months are paid
-4. Paginates the filtered list client-side
-5. Shows correct count: "Showing 1-50 of 87 students"
-6. Page navigation works correctly within the filtered set
+#### A. Students Page (`StudentFilters.tsx`)
+- Replace the debounced search input with the new `SearchBar` component
+- Remove the 500ms debounce timer and "min 3 chars" logic
+- Search triggers on button click / Enter, updating `filters.search` immediately
+- All advanced text filters (class, city, state, area, PIN, academic year) also switch to explicit apply: add an "Apply Filters" button in the advanced section instead of individual debounce timers
+- Remove all 6 debounce `useEffect` hooks for text inputs
 
-Server-side filters (search, status, batch, gender, class, address) continue to work as before. The admission/monthly filters overlay on top.
+#### B. Courses Page (`Courses.tsx` + `useCourses.ts`)
+- Replace the inline search `<Input>` with `SearchBar`
+- Hook already does server-side search -- no hook changes needed
+- Search state updates only on click/Enter
+
+#### C. Batches Page (`Batches.tsx` + `useBatches.ts`)
+- Replace inline search `<Input>` with `SearchBar`
+- Hook already does server-side search -- no hook changes needed
+
+#### D. Employees Page (`Employees.tsx`)
+- Replace inline search `<Input>` with `SearchBar`
+- Hook already does server-side search/filter/pagination -- no hook changes needed
+
+#### E. Products Page (`Products.tsx` + `useProducts.ts`)
+- Replace inline search `<Input>` with `SearchBar`
+- **Hook change**: `useProducts` already accepts `search` filter and does server-side ilike -- verify it works, just need to wire it up properly instead of the client-side `.filter()` in the page
+- Remove the in-memory `products` filter memo; pass search/status/category to the hook directly
+- Update `useProducts` to also accept category filter server-side (add `.eq("category", category)` when not "all")
+
+#### F. Revenue Page (`Revenue.tsx` + `useRevenues.ts`)
+- Replace inline search `<Input>` with `SearchBar`
+- **Hook change**: Update `useRevenues()` to accept `{ search, sourceFilter }` params
+  - Server-side search: `.or("description.ilike.%search%")` on the revenues query
+  - Server-side source filter: `.eq("source_id", sourceId)` when not "all"
+- Remove the client-side `searchedRevenues` and `filteredBySource` memos
+- Remove the debounce `useEffect`
+
+#### G. Expenses Page (`Expenses.tsx` + `useExpenses.ts`)
+- Replace inline search `<Input>` with `SearchBar`
+- **Hook change**: Update `useExpenses()` to accept `{ search, accountFilter }` params
+  - Server-side search: `.or("description.ilike.%search%")` on expenses query
+  - Server-side account filter: `.eq("expense_account_id", accountId)` when not "all"
+- Remove client-side search/filter memos
+- Remove the debounce `useEffect`
+
+#### H. BatchDetail Page (`BatchDetail.tsx`)
+- Replace the student search input with `SearchBar`
+- Student filtering within a batch is inherently client-side (students are already loaded for analytics), so this stays client-side but uses click-to-search UX
+
+#### I. CategoryProducts Page (`CategoryProducts.tsx`)
+- Replace inline search with `SearchBar`
+- Products within a category are already loaded client-side, use click-to-search UX
+
+#### J. AuditLog Page (`AuditLog.tsx`)
+- Replace inline search with `SearchBar`
+- Audit logs are fetched via hook; if hook supports server-side search, wire it up; otherwise click-to-search on client-side filtered data
+
+---
+
+### 3. Hook Updates Summary
+
+| Hook | Current | Change |
+|---|---|---|
+| `useStudents` | Server-side search/filter/pagination | No change needed |
+| `useCourses` | Server-side search + status | No change needed |
+| `useBatches` | Server-side search + status | No change needed |
+| `useEmployees` | Server-side everything | No change needed |
+| `useProducts` | Server-side search exists but page uses client-side | Wire page to use hook filters; add category filter to hook |
+| `useRevenues` | No search/filter params | Add search + source_id filter params |
+| `useExpenses` | No search/filter params | Add search + account_id filter params |
+
+---
+
+### 4. Technical Details
+
+**Files to create:**
+1. `src/components/shared/SearchBar.tsx` -- Reusable search input + button component
+
+**Files to modify:**
+1. `src/components/students/StudentFilters.tsx` -- Replace debounce with SearchBar + Apply button
+2. `src/pages/Courses.tsx` -- Use SearchBar
+3. `src/pages/Batches.tsx` -- Use SearchBar
+4. `src/pages/Employees.tsx` -- Use SearchBar
+5. `src/pages/Products.tsx` -- Use SearchBar, wire server-side filters
+6. `src/hooks/useProducts.ts` -- Add category server-side filter
+7. `src/pages/Revenue.tsx` -- Use SearchBar, remove client-side search
+8. `src/hooks/useRevenues.ts` -- Add search + source filter params
+9. `src/pages/Expenses.tsx` -- Use SearchBar, remove client-side search
+10. `src/hooks/useExpenses.ts` -- Add search + account filter params
+11. `src/pages/BatchDetail.tsx` -- Use SearchBar
+12. `src/pages/CategoryProducts.tsx` -- Use SearchBar
+13. `src/pages/AuditLog.tsx` -- Use SearchBar
+
+**No database changes required** -- all changes are frontend query parameter wiring.
+
+---
+
+### 5. SearchBar Component Design
+
+```text
++------------------------------------------+----------+
+| Search students, batches...       [X]    | [Search] |
++------------------------------------------+----------+
+```
+
+- Input field with placeholder text
+- X button appears when text is present (clears and triggers empty search)
+- Search button with Search icon triggers the search
+- Enter key in input also triggers search
+- Optional loading spinner on the Search button while query is fetching
+
