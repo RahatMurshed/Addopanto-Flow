@@ -108,7 +108,7 @@ async function generateEnrollmentPaymentSchedule(
     }
   }
 
-  if (scheduleRows.length === 0) return;
+  if (scheduleRows.length === 0) return null;
 
   const { error: insertError } = await supabase
     .from("student_payments")
@@ -116,7 +116,9 @@ async function generateEnrollmentPaymentSchedule(
 
   if (insertError) {
     console.error("Failed to generate payment schedule:", insertError);
+    return insertError;
   }
+  return null;
 }
 
 interface BatchEnrollDialogProps {
@@ -273,10 +275,19 @@ export default function BatchEnrollDialog({
 
         if (enrollError) throw enrollError;
 
-        // Generate payment schedule for the new enrollment
-        await generateEnrollmentPaymentSchedule(
+        // Generate payment schedule — rollback enrollment if this fails
+        const scheduleError = await generateEnrollmentPaymentSchedule(
           student.id, batchId, activeCompanyId, user.id, enrollment.id
         );
+
+        if (scheduleError) {
+          // Rollback: delete the enrollment we just created
+          await supabase
+            .from("batch_enrollments")
+            .delete()
+            .eq("id", enrollment.id);
+          throw new Error("Failed to generate payment schedule. Enrollment has been rolled back.");
+        }
       }
 
       // Only set batch_id if student has no primary batch

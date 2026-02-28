@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import type { Course, CourseInsert } from "@/hooks/useCourses";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const courseSchema = z.object({
   course_name: z.string().trim().min(1, "Name is required").max(200),
@@ -44,6 +46,7 @@ function generateCourseCode(name: string): string {
 
 export default function CourseDialog({ open, onOpenChange, course, onSave }: CourseDialogProps) {
   const [saving, setSaving] = useState(false);
+  const { activeCompanyId } = useCompany();
   const isEdit = !!course;
 
   const form = useForm<CourseFormData>({
@@ -82,6 +85,24 @@ export default function CourseDialog({ open, onOpenChange, course, onSave }: Cou
   const handleSubmit = async (data: CourseFormData) => {
     setSaving(true);
     try {
+      // Check for duplicate course name within company
+      if (activeCompanyId) {
+        const { data: existing } = await supabase
+          .from("courses")
+          .select("id")
+          .eq("company_id", activeCompanyId)
+          .eq("course_name", data.course_name.trim())
+          .maybeSingle();
+
+        if (existing && existing.id !== course?.id) {
+          form.setError("course_name", {
+            message: "A course with this name already exists in your company.",
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
       await onSave({
         course_name: data.course_name,
         course_code: data.course_code,
