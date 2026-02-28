@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import {
   useRevenues,
@@ -526,17 +527,39 @@ export default function Revenue() {
                             <TableCell>
                               <div className="flex gap-1">
                                 {(canEdit || canEditRevenue) && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => {
-                                      setEditingRevenue(rev);
-                                      setDialogOpen(true);
-                                    }}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
+                                  rev.is_system_generated ? (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-8 w-8 opacity-50 cursor-not-allowed"
+                                              disabled
+                                            >
+                                              <Pencil className="h-4 w-4" />
+                                            </Button>
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          This revenue entry was auto-generated from a student payment or product sale. Edit the original record instead.
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => {
+                                        setEditingRevenue(rev);
+                                        setDialogOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )
                                 )}
                                 {(canDelete || canDeleteRevenue) && (
                                   <Button

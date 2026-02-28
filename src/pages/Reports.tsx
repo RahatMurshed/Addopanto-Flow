@@ -17,6 +17,7 @@ import { useKhataTransfers } from "@/hooks/useKhataTransfers";
 import { useAccountBalances } from "@/hooks/useExpenses";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useRevenueSummaryRPC, useExpenseSummaryRPC } from "@/hooks/useReportSummaries";
 import TransferHistoryCard from "@/components/finance/TransferHistoryCard";
 import AdvancedDateFilter from "@/components/shared/AdvancedDateFilter";
 import ExportButtons from "@/components/shared/ExportButtons";
@@ -62,29 +63,28 @@ export default function Reports() {
 
   const activeCompanyId = activeCompany?.id ?? null;
 
-  const { data: reportData, isLoading } = useQuery({
-    queryKey: ["reports", user?.id, activeCompanyId],
+  // Use server-side RPC for aggregated summaries (no 1000-row limit)
+  const { data: revenueSummary = [], isLoading: revLoading } = useRevenueSummaryRPC(
+    dateRange?.start ?? null,
+    dateRange?.end ?? null
+  );
+  const { data: expenseSummary = [], isLoading: expLoading } = useExpenseSummaryRPC(
+    dateRange?.start ?? null,
+    dateRange?.end ?? null
+  );
+
+  // Fetch metadata only (sources & accounts for labels/colors) - small tables, no 1000-row issue
+  const { data: reportMeta, isLoading: metaLoading } = useQuery({
+    queryKey: ["reports_meta", activeCompanyId],
     queryFn: async () => {
       if (!user || !activeCompanyId) return null;
-
-      const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes] = await Promise.all([
-        supabase.from("revenues").select("*").eq("company_id", activeCompanyId),
-        supabase.from("expenses").select("*").eq("company_id", activeCompanyId),
-        supabase.from("allocations").select("*").eq("company_id", activeCompanyId),
+      const [accountsRes, sourcesRes] = await Promise.all([
         supabase.from("expense_accounts").select("*").eq("company_id", activeCompanyId),
         supabase.from("revenue_sources").select("*").eq("company_id", activeCompanyId),
       ]);
-
-      if (revenuesRes.error) throw revenuesRes.error;
-      if (expensesRes.error) throw expensesRes.error;
-      if (allocationsRes.error) throw allocationsRes.error;
       if (accountsRes.error) throw accountsRes.error;
       if (sourcesRes.error) throw sourcesRes.error;
-
       return {
-        revenues: revenuesRes.data || [],
-        expenses: expensesRes.data || [],
-        allocations: allocationsRes.data || [],
         accounts: accountsRes.data || [],
         sources: sourcesRes.data || [],
       };
@@ -92,280 +92,227 @@ export default function Reports() {
     enabled: !!user && !!activeCompanyId,
   });
 
-  // Get available years from data
-  const availableYears = useMemo(() => {
-    if (!reportData) return [new Date().getFullYear()];
-    
-    const years = new Set<number>();
-    reportData.revenues.forEach((r) => years.add(getYear(new Date(r.date))));
-    reportData.expenses.forEach((e) => years.add(getYear(new Date(e.date))));
-    
-    // Always include current year
-    years.add(new Date().getFullYear());
-    
-    return Array.from(years).sort((a, b) => b - a); // Descending order
-  }, [reportData]);
+  // For YoY we need full-year RPC calls
+  const currentYear = new Date().getFullYear();
+  const { data: revSummaryCurrentYear = [] } = useRevenueSummaryRPC(
+    `${currentYear}-01-01`, `${currentYear}-12-31`
+  );
+  const { data: revSummaryPrevYear = [] } = useRevenueSummaryRPC(
+    `${currentYear - 1}-01-01`, `${currentYear - 1}-12-31`
+  );
+  const { data: expSummaryCurrentYear = [] } = useExpenseSummaryRPC(
+    `${currentYear}-01-01`, `${currentYear}-12-31`
+  );
+  const { data: expSummaryPrevYear = [] } = useExpenseSummaryRPC(
+    `${currentYear - 1}-01-01`, `${currentYear - 1}-12-31`
+  );
 
-  // Filter data based on date range
-  const filteredData = useMemo(() => {
-    if (!reportData || !dateRange) return { revenues: [], expenses: [], allocations: [] };
+  const isLoading = revLoading || expLoading || metaLoading;
 
-    const filterByDate = (date: string) => {
-      return date >= dateRange.start && date <= dateRange.end;
-    };
-
-    return {
-      revenues: reportData.revenues.filter((r) => filterByDate(r.date)),
-      expenses: reportData.expenses.filter((e) => filterByDate(e.date)),
-      allocations: reportData.allocations,
-    };
-  }, [reportData, dateRange]);
-
-  // Calculate summaries
+  // Derive summaries from RPC data (server-side aggregated, no 1000-row limit)
   const summary = useMemo(() => {
-    const totalRevenue = filteredData.revenues.reduce((sum, r) => sum + Number(r.amount), 0);
-    const totalExpenses = filteredData.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalRevenue = revenueSummary.reduce((sum, r) => sum + Number(r.total_amount), 0);
+    const totalExpenses = expenseSummary.reduce((sum, e) => sum + Number(e.total_amount), 0);
+    const revenueEntryCount = revenueSummary.reduce((sum, r) => sum + Number(r.entry_count), 0);
+    const expenseEntryCount = expenseSummary.reduce((sum, e) => sum + Number(e.entry_count), 0);
     const netProfit = totalRevenue - totalExpenses;
-    const transactionCount = filteredData.revenues.length + filteredData.expenses.length;
+    const transactionCount = revenueEntryCount + expenseEntryCount;
+    return { totalRevenue, totalExpenses, netProfit, transactionCount, revenueEntryCount, expenseEntryCount };
+  }, [revenueSummary, expenseSummary]);
 
-    return { totalRevenue, totalExpenses, netProfit, transactionCount };
-  }, [filteredData]);
-
-  // Calculate KPIs
+  // KPIs
   const kpis = useMemo(() => {
-    const profitMargin = summary.totalRevenue > 0 
-      ? (summary.netProfit / summary.totalRevenue) * 100 
+    const profitMargin = summary.totalRevenue > 0
+      ? (summary.netProfit / summary.totalRevenue) * 100
       : 0;
-    
-    const avgRevenue = filteredData.revenues.length > 0 
-      ? summary.totalRevenue / filteredData.revenues.length 
+    const avgRevenue = summary.revenueEntryCount > 0
+      ? summary.totalRevenue / summary.revenueEntryCount
       : 0;
-    
-    const avgExpense = filteredData.expenses.length > 0 
-      ? summary.totalExpenses / filteredData.expenses.length 
+    const avgExpense = summary.expenseEntryCount > 0
+      ? summary.totalExpenses / summary.expenseEntryCount
       : 0;
-
     return { profitMargin, avgRevenue, avgExpense };
-  }, [summary, filteredData]);
+  }, [summary]);
 
-  // Dynamic breakdown based on date range
+  // Chart breakdown from RPC aggregated data
   const chartBreakdown = useMemo(() => {
-    if (!reportData || !dateRange) return [];
-    
+    if (!dateRange) return [];
+
     const start = parseISO(dateRange.start);
     const end = parseISO(dateRange.end);
     const daysDiff = differenceInDays(end, start);
 
-    // For ranges <= 31 days, show daily data points
+    // Build a revenue/expense lookup by month from RPC data
+    const revByMonth = new Map<string, number>();
+    revenueSummary.forEach((r) => {
+      revByMonth.set(r.month, (revByMonth.get(r.month) || 0) + Number(r.total_amount));
+    });
+    const expByMonth = new Map<string, number>();
+    expenseSummary.forEach((e) => {
+      expByMonth.set(e.month, (expByMonth.get(e.month) || 0) + Number(e.total_amount));
+    });
+
     if (daysDiff <= 31) {
-      const days = eachDayOfInterval({ start, end });
-      return days.map((day) => {
-        const dayStr = format(day, "yyyy-MM-dd");
-        const dayRevenue = filteredData.revenues
-          .filter((r) => r.date === dayStr)
-          .reduce((sum, r) => sum + Number(r.amount), 0);
-        const dayExpenses = filteredData.expenses
-          .filter((e) => e.date === dayStr)
-          .reduce((sum, e) => sum + Number(e.amount), 0);
+      // For short ranges, RPC gives monthly granularity; show monthly (daily not available from RPC)
+      // Use the single month bucket
+      const months = eachMonthOfInterval({ start, end });
+      return months.map((monthDate) => {
+        const key = format(monthDate, "yyyy-MM");
+        const revenue = revByMonth.get(key) || 0;
+        const expenses = expByMonth.get(key) || 0;
         return {
-          month: format(day, "MMM d"),
-          monthShort: format(day, "d"),
-          revenue: dayRevenue,
-          expenses: dayExpenses,
-          profit: dayRevenue - dayExpenses,
+          month: format(monthDate, "MMMM yyyy"),
+          monthShort: format(monthDate, "MMM"),
+          revenue,
+          expenses,
+          profit: revenue - expenses,
         };
       });
     }
 
-    // For longer ranges, aggregate by month
     const months = eachMonthOfInterval({ start, end });
     return months.map((monthDate) => {
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
-      const monthStartStr = format(monthStart, "yyyy-MM-dd");
-      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
-
-      const monthRevenue = filteredData.revenues
-        .filter((r) => r.date >= monthStartStr && r.date <= monthEndStr)
-        .reduce((sum, r) => sum + Number(r.amount), 0);
-      const monthExpenses = filteredData.expenses
-        .filter((e) => e.date >= monthStartStr && e.date <= monthEndStr)
-        .reduce((sum, e) => sum + Number(e.amount), 0);
-
+      const key = format(monthDate, "yyyy-MM");
+      const revenue = revByMonth.get(key) || 0;
+      const expenses = expByMonth.get(key) || 0;
       return {
         month: format(monthDate, "MMMM"),
         monthShort: format(monthDate, "MMM"),
-        revenue: monthRevenue,
-        expenses: monthExpenses,
-        profit: monthRevenue - monthExpenses,
+        revenue,
+        expenses,
+        profit: revenue - expenses,
       };
     });
-  }, [reportData, dateRange, filteredData]);
+  }, [dateRange, revenueSummary, expenseSummary]);
 
   // Pagination for chart breakdown
   const monthlyPagination = usePagination(chartBreakdown, { defaultItemsPerPage: 6 });
 
-  // Reset page when date range changes
   useEffect(() => {
     monthlyPagination.resetPage();
   }, [dateRange]);
 
-  // Year-over-Year comparison
+  // Year-over-Year comparison from RPC
   const yoyComparison = useMemo(() => {
-    if (!reportData) return null;
-
-    const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
+    const curRev = revSummaryCurrentYear.reduce((s, r) => s + Number(r.total_amount), 0);
+    const prevRev = revSummaryPrevYear.reduce((s, r) => s + Number(r.total_amount), 0);
+    const curExp = expSummaryCurrentYear.reduce((s, e) => s + Number(e.total_amount), 0);
+    const prevExp = expSummaryPrevYear.reduce((s, e) => s + Number(e.total_amount), 0);
 
-    const currentYearStart = `${currentYear}-01-01`;
-    const currentYearEnd = `${currentYear}-12-31`;
-    const previousYearStart = `${previousYear}-01-01`;
-    const previousYearEnd = `${previousYear}-12-31`;
-
-    const currentRevenue = reportData.revenues
-      .filter((r) => r.date >= currentYearStart && r.date <= currentYearEnd)
-      .reduce((sum, r) => sum + Number(r.amount), 0);
-
-    const previousRevenue = reportData.revenues
-      .filter((r) => r.date >= previousYearStart && r.date <= previousYearEnd)
-      .reduce((sum, r) => sum + Number(r.amount), 0);
-
-    const currentExpenses = reportData.expenses
-      .filter((e) => e.date >= currentYearStart && e.date <= currentYearEnd)
-      .reduce((sum, e) => sum + Number(e.amount), 0);
-
-    const previousExpenses = reportData.expenses
-      .filter((e) => e.date >= previousYearStart && e.date <= previousYearEnd)
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+    if (prevRev === 0 && prevExp === 0 && curRev === 0 && curExp === 0) return null;
 
     return {
       currentYear,
       previousYear,
-      currentRevenue,
-      previousRevenue,
-      currentExpenses,
-      previousExpenses,
-      currentProfit: currentRevenue - currentExpenses,
-      previousProfit: previousRevenue - previousExpenses,
+      currentRevenue: curRev,
+      previousRevenue: prevRev,
+      currentExpenses: curExp,
+      previousExpenses: prevExp,
+      currentProfit: curRev - curExp,
+      previousProfit: prevRev - prevExp,
     };
-  }, [reportData]);
+  }, [currentYear, revSummaryCurrentYear, revSummaryPrevYear, expSummaryCurrentYear, expSummaryPrevYear]);
 
-  // Expense breakdown by khata for pie chart
+  // Expense breakdown by khata from RPC data
   const expenseByKhata = useMemo(() => {
-    if (!reportData) return [];
+    const byAccount = new Map<string, { name: string; value: number; color: string }>();
+    expenseSummary.forEach((e) => {
+      const key = e.expense_account_id || "uncategorized";
+      const existing = byAccount.get(key);
+      if (existing) {
+        existing.value += Number(e.total_amount);
+      } else {
+        byAccount.set(key, { name: e.account_name, value: Number(e.total_amount), color: e.account_color });
+      }
+    });
+    return Array.from(byAccount.values()).filter((k) => k.value > 0);
+  }, [expenseSummary]);
 
-    const khataExpenses = reportData.accounts.map((account) => {
-      const total = filteredData.expenses
-        .filter((e) => e.expense_account_id === account.id)
-        .reduce((sum, e) => sum + Number(e.amount), 0);
-
-      return {
-        name: account.name,
-        value: total,
-        color: account.color,
-      };
-    }).filter((k) => k.value > 0);
-
-    return khataExpenses;
-  }, [reportData, filteredData]);
-
-  // Revenue breakdown by source for pie chart
+  // Revenue breakdown by source from RPC data
   const revenueBySource = useMemo(() => {
-    if (!reportData) return [];
+    const bySource = new Map<string, { name: string; value: number; color: string }>();
+    revenueSummary.forEach((r, index) => {
+      const key = r.source_id || "uncategorized";
+      const existing = bySource.get(key);
+      if (existing) {
+        existing.value += Number(r.total_amount);
+      } else {
+        const color = r.source_name === "Uncategorized"
+          ? "hsl(var(--muted-foreground))"
+          : CHART_COLORS[bySource.size % CHART_COLORS.length];
+        bySource.set(key, { name: r.source_name, value: Number(r.total_amount), color });
+      }
+    });
+    return Array.from(bySource.values()).filter((s) => s.value > 0);
+  }, [revenueSummary]);
 
-    const sourceRevenues = reportData.sources.map((source, index) => {
-      const total = filteredData.revenues
-        .filter((r) => r.source_id === source.id)
-        .reduce((sum, r) => sum + Number(r.amount), 0);
-
-      return {
-        name: source.name,
-        value: total,
-        color: CHART_COLORS[index % CHART_COLORS.length],
-      };
-    }).filter((s) => s.value > 0);
-
-    // Add uncategorized revenues
-    const uncategorizedRevenue = filteredData.revenues
-      .filter((r) => !r.source_id)
-      .reduce((sum, r) => sum + Number(r.amount), 0);
-
-    if (uncategorizedRevenue > 0) {
-      sourceRevenues.push({
-        name: "Uncategorized",
-        value: uncategorizedRevenue,
-        color: "hsl(var(--muted-foreground))",
-      });
-    }
-
-    return sourceRevenues;
-  }, [reportData, filteredData]);
-
-  // Account-wise breakdown
+  // Account breakdown uses account balances (already loaded) + expense RPC
   const accountBreakdown = useMemo(() => {
-    if (!reportData) return [];
+    if (!reportMeta) return [];
+    const expByAccount = new Map<string, number>();
+    expenseSummary.forEach((e) => {
+      if (e.expense_account_id) {
+        expByAccount.set(e.expense_account_id, (expByAccount.get(e.expense_account_id) || 0) + Number(e.total_amount));
+      }
+    });
 
-    return reportData.accounts.map((account) => {
-      const accountExpenses = filteredData.expenses
-        .filter((e) => e.expense_account_id === account.id)
-        .reduce((sum, e) => sum + Number(e.amount), 0);
-
-      const accountAllocations = reportData.allocations
-        .filter((a) => a.expense_account_id === account.id)
-        .reduce((sum, a) => sum + Number(a.amount), 0);
-
-      const balance = accountAllocations - accountExpenses;
+    return reportMeta.accounts.map((account) => {
+      const spent = expByAccount.get(account.id) || 0;
+      // Use account balances for allocation data
+      const accBalance = accounts.find((a) => a.id === account.id);
+      const allocated = accBalance?.total_allocated || 0;
 
       return {
         id: account.id,
         name: account.name,
         color: account.color,
-        allocated: accountAllocations,
-        spent: accountExpenses,
-        balance,
+        allocated,
+        spent,
+        balance: allocated - spent,
         percentage: account.allocation_percentage,
       };
     });
-  }, [reportData, filteredData]);
+  }, [reportMeta, expenseSummary, accounts]);
 
-  // Revenue source breakdown
+  // Revenue source breakdown from RPC
   const sourceBreakdown = useMemo(() => {
-    if (!reportData) return [];
-
-    return reportData.sources.map((source) => {
-      const sourceRevenue = filteredData.revenues
-        .filter((r) => r.source_id === source.id)
-        .reduce((sum, r) => sum + Number(r.amount), 0);
-
-      return {
-        id: source.id,
-        name: source.name,
-        amount: sourceRevenue,
-        count: filteredData.revenues.filter((r) => r.source_id === source.id).length,
-      };
+    if (!reportMeta) return [];
+    const bySource = new Map<string, { amount: number; count: number }>();
+    revenueSummary.forEach((r) => {
+      const key = r.source_id || "uncategorized";
+      const existing = bySource.get(key);
+      if (existing) {
+        existing.amount += Number(r.total_amount);
+        existing.count += Number(r.entry_count);
+      } else {
+        bySource.set(key, { amount: Number(r.total_amount), count: Number(r.entry_count) });
+      }
     });
-  }, [reportData, filteredData]);
+
+    return reportMeta.sources.map((source) => {
+      const data = bySource.get(source.id) || { amount: 0, count: 0 };
+      return { id: source.id, name: source.name, amount: data.amount, count: data.count };
+    });
+  }, [reportMeta, revenueSummary]);
 
   const formatCurrency = fcp;
 
-  // Export handlers
+  // Export handlers - use RPC summary data for CSV
   const handleExportCSV = () => {
-    if (!reportData || !dateRange) return;
-    
-    const revenues = filteredData.revenues.map((r) => ({
-      date: r.date,
-      amount: Number(r.amount),
-      sourceName: reportData.sources.find((s) => s.id === r.source_id)?.name || "Uncategorized",
-      description: r.description,
+    if (!dateRange) return;
+    const revenues = revenueSummary.map((r) => ({
+      date: r.month,
+      amount: Number(r.total_amount),
+      sourceName: r.source_name,
+      description: `${r.entry_count} entries`,
     }));
-
-    const expenses = filteredData.expenses.map((e) => ({
-      date: e.date,
-      amount: Number(e.amount),
-      accountName: reportData.accounts.find((a) => a.id === e.expense_account_id)?.name || "Uncategorized",
-      description: e.description,
+    const expenses = expenseSummary.map((e) => ({
+      date: e.month,
+      amount: Number(e.total_amount),
+      accountName: e.account_name,
+      description: `${e.entry_count} entries`,
     }));
-
     exportAllTransactionsCSV(revenues, expenses, dateRange.label);
   };
 
@@ -576,7 +523,7 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-success">{formatCurrency(kpis.avgRevenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{filteredData.revenues.length} revenue entries</p>
+            <p className="text-xs text-muted-foreground mt-1">{summary.revenueEntryCount} revenue entries</p>
           </CardContent>
         </Card>
         <Card>
@@ -586,7 +533,7 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-destructive">{formatCurrency(kpis.avgExpense)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{filteredData.expenses.length} expense entries</p>
+            <p className="text-xs text-muted-foreground mt-1">{summary.expenseEntryCount} expense entries</p>
           </CardContent>
         </Card>
       </div>

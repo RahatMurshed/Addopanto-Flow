@@ -2289,6 +2289,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          is_system_generated: boolean
           product_sale_id: string | null
           source_id: string | null
           student_payment_id: string | null
@@ -2302,6 +2303,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          is_system_generated?: boolean
           product_sale_id?: string | null
           source_id?: string | null
           student_payment_id?: string | null
@@ -2315,6 +2317,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          is_system_generated?: boolean
           product_sale_id?: string | null
           source_id?: string | null
           student_payment_id?: string | null
@@ -3597,6 +3600,27 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_expense_summary: {
+        Args: { _company_id: string; _end_date: string; _start_date: string }
+        Returns: {
+          account_color: string
+          account_name: string
+          entry_count: number
+          expense_account_id: string
+          month: string
+          total_amount: number
+        }[]
+      }
+      get_revenue_summary: {
+        Args: { _company_id: string; _end_date: string; _start_date: string }
+        Returns: {
+          entry_count: number
+          month: string
+          source_id: string
+          source_name: string
+          total_amount: number
+        }[]
       }
       get_user_role: {
         Args: { _user_id: string }
