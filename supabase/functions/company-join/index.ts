@@ -151,6 +151,18 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+    // Rate limiting: 5 requests per IP per minute
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rateLimitClient = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: allowed } = await rateLimitClient.rpc("check_rate_limit", {
+      _key: `company-join:${clientIp}`,
+      _max_requests: 5,
+      _window_seconds: 60,
+    });
+    if (allowed === false) {
+      return json(429, { error: "Too many requests. Please try again later." });
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json(401, { error: "Missing authorization" });
 

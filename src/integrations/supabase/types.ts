@@ -2158,6 +2158,27 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          id: string
+          key: string
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          request_count?: number
+          window_start?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          request_count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       registration_requests: {
         Row: {
           banned_until: string | null
@@ -3404,6 +3425,10 @@ export type Database = {
       can_edit_delete: { Args: { _user_id: string }; Returns: boolean }
       can_transfer: { Args: { _user_id: string }; Returns: boolean }
       can_view_user: { Args: { _target_user_id: string }; Returns: boolean }
+      check_rate_limit: {
+        Args: { _key: string; _max_requests: number; _window_seconds: number }
+        Returns: boolean
+      }
       check_student_duplicates_single: {
         Args: {
           _aadhar?: string
@@ -3419,6 +3444,7 @@ export type Database = {
           student_name: string
         }[]
       }
+      cleanup_rate_limits: { Args: never; Returns: undefined }
       company_can_add_batch: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
