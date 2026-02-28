@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import SearchBar from "@/components/shared/SearchBar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -231,10 +231,11 @@ export default function Employees() {
       <Card>
         <CardContent className="pt-4">
           <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search by name, ID, phone, email..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
-            </div>
+            <SearchBar
+              placeholder="Search by name, ID, phone, email..."
+              onSearch={(v) => { setSearch(v); setPage(1); }}
+              defaultValue={search}
+            />
             <Select value={department} onValueChange={v => { setDepartment(v); setPage(1); }}>
               <SelectTrigger className="w-[150px]"><SelectValue placeholder="Department" /></SelectTrigger>
               <SelectContent>

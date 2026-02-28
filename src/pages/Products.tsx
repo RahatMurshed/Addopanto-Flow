@@ -9,7 +9,7 @@ import { ProductDialog } from "@/components/dialogs/ProductDialog";
 import { ProductSaleDialog } from "@/components/dialogs/ProductSaleDialog";
 import { ProductCategoryDialog } from "@/components/dialogs/ProductCategoryDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import SearchBar from "@/components/shared/SearchBar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,7 +50,7 @@ export default function Products() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  const { data: allProducts = [], isLoading } = useProducts();
+  const { data: allProducts = [], isLoading } = useProducts({ search, status: statusFilter, category: categoryFilter });
   const { data: allSales = [] } = useProductSales();
   const { data: categories = [] } = useProductCategories();
   const deleteProduct = useDeleteProduct();
@@ -65,18 +65,8 @@ export default function Products() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
-  // Filter products in-memory
-  const products = useMemo(() => {
-    return allProducts.filter((p) => {
-      if (statusFilter !== "all" && p.status !== statusFilter) return false;
-      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
-      if (search) {
-        const s = search.toLowerCase();
-        if (!p.product_name.toLowerCase().includes(s) && !p.product_code.toLowerCase().includes(s)) return false;
-      }
-      return true;
-    });
-  }, [allProducts, search, statusFilter, categoryFilter]);
+  // Products are now filtered server-side via the hook
+  const products = allProducts;
 
   // Stats
   const stats = useMemo(() => ({
@@ -221,10 +211,11 @@ export default function Products() {
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
+        <SearchBar
+          placeholder="Search products..."
+          onSearch={setSearch}
+          defaultValue={search}
+        />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>

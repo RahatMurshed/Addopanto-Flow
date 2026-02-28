@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
+import SearchBar from "@/components/shared/SearchBar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -74,7 +74,6 @@ export default function Expenses() {
   
   // Search, filter, sort state
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [accountFilter, setAccountFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date-desc");
 
@@ -111,11 +110,7 @@ export default function Expenses() {
     }
   }, [isModerator, canAddExpense, canViewExpense, navigate]);
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  // No debounce needed — click-to-search
 
   const handleFilterChange = useCallback((range: DateRange, filterType: FilterType, filterValue: FilterValue) => {
     setDateRange(range);
@@ -132,8 +127,8 @@ export default function Expenses() {
   const searchedExpenses = useMemo(() => {
     let result = filteredExpenses;
 
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       result = result.filter((e) =>
         (e.description && e.description.toLowerCase().includes(q)) ||
         (e.expense_accounts?.name && e.expense_accounts.name.toLowerCase().includes(q))
@@ -155,7 +150,7 @@ export default function Expenses() {
     });
 
     return result;
-  }, [filteredExpenses, debouncedSearch, accountFilter, sortBy]);
+  }, [filteredExpenses, searchQuery, accountFilter, sortBy]);
 
   // Pagination for searched expenses
   const pagination = usePagination(searchedExpenses);
@@ -163,9 +158,9 @@ export default function Expenses() {
   // Reset page when filters change
   useEffect(() => {
     pagination.resetPage();
-  }, [dateRange, debouncedSearch, accountFilter, sortBy]);
+  }, [dateRange, searchQuery, accountFilter, sortBy]);
 
-  const activeFilterCount = (debouncedSearch ? 1 : 0) + (accountFilter !== "all" ? 1 : 0) + (sortBy !== "date-desc" ? 1 : 0);
+  const activeFilterCount = (searchQuery ? 1 : 0) + (accountFilter !== "all" ? 1 : 0) + (sortBy !== "date-desc" ? 1 : 0);
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -521,20 +516,11 @@ export default function Expenses() {
               </span>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-9"
-                />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              <SearchBar
+                placeholder="Search by description..."
+                onSearch={setSearchQuery}
+                defaultValue={searchQuery}
+              />
               {accounts.length > 0 && (
                 <Select value={accountFilter} onValueChange={setAccountFilter}>
                   <SelectTrigger className="w-[160px]"><SelectValue placeholder="Source" /></SelectTrigger>

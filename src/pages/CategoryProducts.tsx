@@ -8,7 +8,7 @@ import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { ProductDialog } from "@/components/dialogs/ProductDialog";
 import { ProductSaleDialog } from "@/components/dialogs/ProductSaleDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import SearchBar from "@/components/shared/SearchBar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -133,10 +133,11 @@ export default function CategoryProducts() {
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
+        <SearchBar
+          placeholder="Search products..."
+          onSearch={setSearch}
+          defaultValue={search}
+        />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>

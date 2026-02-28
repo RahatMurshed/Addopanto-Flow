@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 import { Switch } from "@/components/ui/switch";
 import { Search, X, SlidersHorizontal, ChevronDown, Filter, MapPin, Loader2 } from "lucide-react";
+import SearchBar from "@/components/shared/SearchBar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useBatches } from "@/hooks/useBatches";
 
@@ -59,78 +60,16 @@ interface Props {
 export { defaultFilters };
 
 export default function StudentFilters({ filters, onChange, totalResults, totalStudents }: Props) {
-  const [searchInput, setSearchInput] = useState(filters.search);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { data: batches = [] } = useBatches();
 
-  // Debounce search input (500ms, min 3 chars)
-  useEffect(() => {
-    if (searchInput.length > 0 && searchInput.length < 3) {
-      // Don't trigger search yet
-      return;
-    }
-    const timer = setTimeout(() => {
-      if (searchInput !== filters.search) {
-        onChange({ ...filters, search: searchInput });
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  // Sync external filter changes
-  useEffect(() => {
-    setSearchInput(filters.search);
-  }, [filters.search]);
-
-  // Debounced text filters for classGrade, addressCity, addressState, addressArea, addressPinZip, academicYear
+  // Local state for advanced text inputs (applied on button click)
   const [classInput, setClassInput] = useState(filters.classGrade);
   const [cityInput, setCityInput] = useState(filters.addressCity);
   const [stateInput, setStateInput] = useState(filters.addressState);
   const [areaInput, setAreaInput] = useState(filters.addressArea);
   const [pinInput, setPinInput] = useState(filters.addressPinZip);
   const [yearInput, setYearInput] = useState(filters.academicYear);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (classInput !== filters.classGrade) onChange({ ...filters, classGrade: classInput });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [classInput]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (cityInput !== filters.addressCity) onChange({ ...filters, addressCity: cityInput });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [cityInput]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (stateInput !== filters.addressState) onChange({ ...filters, addressState: stateInput });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [stateInput]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (areaInput !== filters.addressArea) onChange({ ...filters, addressArea: areaInput });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [areaInput]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (pinInput !== filters.addressPinZip) onChange({ ...filters, addressPinZip: pinInput });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [pinInput]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (yearInput !== filters.academicYear) onChange({ ...filters, academicYear: yearInput });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [yearInput]);
 
   // Sync external changes back
   useEffect(() => { setClassInput(filters.classGrade); }, [filters.classGrade]);
@@ -139,6 +78,18 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   useEffect(() => { setAreaInput(filters.addressArea); }, [filters.addressArea]);
   useEffect(() => { setPinInput(filters.addressPinZip); }, [filters.addressPinZip]);
   useEffect(() => { setYearInput(filters.academicYear); }, [filters.academicYear]);
+
+  const applyAdvancedTextFilters = () => {
+    onChange({
+      ...filters,
+      classGrade: classInput,
+      addressCity: cityInput,
+      addressState: stateInput,
+      addressArea: areaInput,
+      addressPinZip: pinInput,
+      academicYear: yearInput,
+    });
+  };
 
   const update = (partial: Partial<StudentFilterValues>) => {
     onChange({ ...filters, ...partial });
@@ -204,7 +155,6 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
   };
 
   const resetAll = () => {
-    setSearchInput("");
     setClassInput("");
     setCityInput("");
     setStateInput("");
@@ -218,30 +168,12 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
     <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search name, ID, father, phone... (min 3 chars)"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9 pr-9"
+        <div className="flex-1">
+          <SearchBar
+            placeholder="Search name, ID, father, phone..."
+            onSearch={(val) => update({ search: val })}
+            defaultValue={filters.search}
           />
-          {searchInput.length > 0 && searchInput.length < 3 && (
-            <span className="absolute right-10 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-              {3 - searchInput.length} more
-            </span>
-          )}
-          {searchInput.length >= 3 && searchInput !== filters.search && (
-            <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          )}
-          {searchInput && (
-            <button
-              onClick={() => { setSearchInput(""); update({ search: "" }); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
         </div>
 
         {/* Filter controls row */}
@@ -466,16 +398,22 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
               </div>
             </div>
 
-            {/* Search options */}
-            <div className="flex items-center gap-2">
-              <Switch
-                id="include-alt-contact"
-                checked={filters.includeAltContact}
-                onCheckedChange={(v) => onChange({ ...filters, includeAltContact: v })}
-              />
-              <label htmlFor="include-alt-contact" className="text-sm text-muted-foreground cursor-pointer">
-                Include alternate contact in search
-              </label>
+            {/* Apply button + search options */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="include-alt-contact"
+                  checked={filters.includeAltContact}
+                  onCheckedChange={(v) => onChange({ ...filters, includeAltContact: v })}
+                />
+                <label htmlFor="include-alt-contact" className="text-sm text-muted-foreground cursor-pointer">
+                  Include alternate contact in search
+                </label>
+              </div>
+              <Button size="sm" onClick={applyAdvancedTextFilters} className="gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                Apply Filters
+              </Button>
             </div>
           </div>
         </CollapsibleContent>
