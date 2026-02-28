@@ -12,6 +12,29 @@ export type ExpenseWithAccount = Expense & {
   expense_accounts: { name: string; color: string } | null;
 };
 
+const PAGE_SIZE = 100;
+
+async function fetchAllExpensePages(activeCompanyId: string): Promise<ExpenseWithAccount[]> {
+  const allData: ExpenseWithAccount[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("*, expense_accounts(name, color)")
+      .eq("company_id", activeCompanyId)
+      .order("date", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    allData.push(...(data as ExpenseWithAccount[]));
+    hasMore = data.length === PAGE_SIZE;
+    from += PAGE_SIZE;
+  }
+
+  return allData;
+}
+
 export function useExpenses() {
   const { user } = useAuth();
   const { activeCompanyId } = useCompany();
@@ -19,15 +42,8 @@ export function useExpenses() {
   return useQuery({
     queryKey: ["expenses", activeCompanyId],
     queryFn: async () => {
-      if (!user) return [];
-      if (!activeCompanyId) return [];
-      const { data, error } = await supabase
-        .from("expenses")
-        .select("*, expense_accounts(name, color)")
-        .eq("company_id", activeCompanyId)
-        .order("date", { ascending: false });
-      if (error) throw error;
-      return data as ExpenseWithAccount[];
+      if (!user || !activeCompanyId) return [];
+      return fetchAllExpensePages(activeCompanyId);
     },
     enabled: !!user && !!activeCompanyId,
   });
@@ -55,6 +71,7 @@ export function useCreateExpense() {
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-loans"] });
       queryClient.invalidateQueries({ queryKey: ["fund-utilization-summary"] });
@@ -82,6 +99,7 @@ export function useUpdateExpense() {
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-loans"] });
       queryClient.invalidateQueries({ queryKey: ["fund-utilization-summary"] });
@@ -103,6 +121,7 @@ export function useDeleteExpense() {
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-loans"] });
       queryClient.invalidateQueries({ queryKey: ["fund-utilization-summary"] });
@@ -130,9 +149,7 @@ export function useAccountBalances() {
   return useQuery({
     queryKey: ["account_balances", activeCompanyId],
     queryFn: async () => {
-      if (!user) return [];
-
-      if (!activeCompanyId) return [];
+      if (!user || !activeCompanyId) return [];
 
       const [accountsRes, allocationsRes, expensesRes, transfersRes] = await Promise.all([
         supabase.from("expense_accounts").select("*").eq("company_id", activeCompanyId),
@@ -201,11 +218,9 @@ export function useExpenseSummary() {
       const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
 
       if (!activeCompanyId) return { thisMonth: 0, thisYear: 0, total: 0 };
-      const { data, error } = await supabase
-        .from("expenses")
-        .select("amount, date")
-        .eq("company_id", activeCompanyId);
-      if (error) throw error;
+
+      // Use paginated fetch to avoid 1000-row limit
+      const data = await fetchAllExpensePages(activeCompanyId);
 
       const thisMonth = data
         .filter((e) => e.date >= startOfMonth)

@@ -12,6 +12,29 @@ export type RevenueWithSource = Revenue & {
   revenue_sources: { name: string } | null;
 };
 
+const PAGE_SIZE = 100;
+
+async function fetchAllRevenuePages(activeCompanyId: string): Promise<RevenueWithSource[]> {
+  const allData: RevenueWithSource[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("revenues")
+      .select("*, revenue_sources(name)")
+      .eq("company_id", activeCompanyId)
+      .order("date", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    allData.push(...(data as RevenueWithSource[]));
+    hasMore = data.length === PAGE_SIZE;
+    from += PAGE_SIZE;
+  }
+
+  return allData;
+}
+
 export function useRevenues() {
   const { user } = useAuth();
   const { activeCompanyId } = useCompany();
@@ -19,15 +42,8 @@ export function useRevenues() {
   return useQuery({
     queryKey: ["revenues", activeCompanyId],
     queryFn: async () => {
-      if (!user) return [];
-      if (!activeCompanyId) return [];
-      const { data, error } = await supabase
-        .from("revenues")
-        .select("*, revenue_sources(name)")
-        .eq("company_id", activeCompanyId)
-        .order("date", { ascending: false });
-      if (error) throw error;
-      return data as RevenueWithSource[];
+      if (!user || !activeCompanyId) return [];
+      return fetchAllRevenuePages(activeCompanyId);
     },
     enabled: !!user && !!activeCompanyId,
   });
@@ -43,7 +59,6 @@ export function useCreateRevenue() {
       if (!user) throw new Error("Not authenticated");
       if (!activeCompanyId) throw new Error("No active company");
 
-      // Insert revenue
       const { data: revenueData, error: revenueError } = await supabase
         .from("revenues")
         .insert({ ...revenue, user_id: user.id, company_id: activeCompanyId })
@@ -51,7 +66,6 @@ export function useCreateRevenue() {
         .single();
       if (revenueError) throw revenueError;
 
-      // Get active expense accounts for this company
       const { data: accounts, error: accountsError } = await supabase
         .from("expense_accounts")
         .select("id, allocation_percentage")
@@ -59,7 +73,6 @@ export function useCreateRevenue() {
         .eq("company_id", activeCompanyId);
       if (accountsError) throw accountsError;
 
-      // Create allocations for each active account
       if (accounts && accounts.length > 0) {
         const allocations = accounts
           .filter((acc) => acc.allocation_percentage > 0)
@@ -84,6 +97,7 @@ export function useCreateRevenue() {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
     },
   });
 }
@@ -95,7 +109,6 @@ export function useUpdateRevenue() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: RevenueUpdate & { id: string }) => {
-      // Get old revenue amount
       const { data: oldRevenue, error: fetchError } = await supabase
         .from("revenues")
         .select("amount")
@@ -103,7 +116,6 @@ export function useUpdateRevenue() {
         .single();
       if (fetchError) throw fetchError;
 
-      // Update revenue
       const { data, error } = await supabase
         .from("revenues")
         .update(updates)
@@ -112,9 +124,7 @@ export function useUpdateRevenue() {
         .single();
       if (error) throw error;
 
-      // If amount changed, update allocations proportionally
       if (updates.amount !== undefined && updates.amount !== oldRevenue.amount) {
-        // Get existing allocations for this revenue
         const { data: existingAllocations } = await supabase
           .from("allocations")
           .select("id, amount")
@@ -154,6 +164,7 @@ export function useUpdateRevenue() {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
     },
   });
 }
@@ -171,6 +182,7 @@ export function useDeleteRevenue() {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
     },
   });
 }
@@ -189,11 +201,9 @@ export function useRevenueSummary() {
       const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
 
       if (!activeCompanyId) return { thisMonth: 0, thisYear: 0, total: 0 };
-      const { data, error } = await supabase
-        .from("revenues")
-        .select("amount, date")
-        .eq("company_id", activeCompanyId);
-      if (error) throw error;
+
+      // Use paginated fetch to avoid 1000-row limit
+      const data = await fetchAllRevenuePages(activeCompanyId);
 
       const thisMonth = data
         .filter((r) => r.date >= startOfMonth)
