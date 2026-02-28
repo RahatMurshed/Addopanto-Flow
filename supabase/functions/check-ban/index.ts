@@ -35,6 +35,21 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Rate limiting: 10 requests per IP per minute
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: allowed } = await supabaseAdmin.rpc("check_rate_limit", {
+      _key: `check-ban:${clientIp}`,
+      _max_requests: 10,
+      _window_seconds: 60,
+    });
+    if (allowed === false) {
+      return jsonResponse(429, { error: "Too many requests. Please try again later." }, cors);
+    }
+
     const rawBody = await req.json().catch(() => null);
     const parsed = checkBanSchema.safeParse(rawBody);
 
@@ -43,12 +58,6 @@ Deno.serve(async (req) => {
     }
 
     const { email } = parsed.data;
-
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const normalizedEmail = email.toLowerCase().trim();
 
     const { data: banData, error: banError } = await supabaseAdmin
