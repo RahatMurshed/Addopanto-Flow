@@ -15,7 +15,7 @@ export interface Student {
   course_end_month: string | null;
   admission_fee_total: number;
   monthly_fee_amount: number;
-  status: "active" | "inactive" | "graduated" | "dropout" | "transferred";
+  status: "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
   notes: string | null;
   user_id: string;
   company_id: string;
@@ -82,7 +82,7 @@ export interface StudentInsert {
   course_end_month?: string | null;
   admission_fee_total?: number;
   monthly_fee_amount?: number;
-  status?: "active" | "inactive" | "graduated" | "dropout" | "transferred";
+  status?: "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
   notes?: string | null;
   batch_id?: string | null;
   // Extended fields
@@ -136,7 +136,7 @@ export interface StudentInsert {
 
 export interface StudentFilters {
   search?: string;
-  status?: "all" | "active" | "inactive" | "graduated" | "dropout" | "transferred";
+  status?: "all" | "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
   sortBy?: "name" | "enrollment_date" | "monthly_fee_amount" | "student_id_number" | "date_of_birth" | "class_grade" | "created_at";
   sortOrder?: "asc" | "desc";
   // Advanced filters
@@ -347,7 +347,7 @@ export function useCreateStudent() {
       };
       const { data, error } = await supabase
         .from("students")
-        .insert(sanitized)
+        .insert(sanitized as any)
         .select()
         .single();
       if (error) throw error;
@@ -382,7 +382,7 @@ export function useUpdateStudent() {
     mutationFn: async ({ id, ...updates }: Partial<StudentInsert> & { id: string }) => {
       const { data, error } = await supabase
         .from("students")
-        .update(updates)
+        .update(updates as any)
         .eq("id", id)
         .select()
         .single();
