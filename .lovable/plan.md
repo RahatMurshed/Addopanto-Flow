@@ -1,86 +1,119 @@
 
 
-## Minor Fixes and Unlinked Payments Section
+## Batch Duration in Months+Days and Payment Mode Selection
 
-### Overview
-Four targeted improvements based on audit recommendations: standardize financial calculations, add delete-payment warning, add inactive-student warning for product sales, and create a dedicated "Unlinked Payments" section in the Course Payments tab.
+### What Changes
 
----
+**Currently:** Batch duration is a single "months" integer. All batches assume monthly recurring payments.
 
-### Fix A: Standardize FinancialBreakdown vs Banner calculations
-
-**Problem:** The `FinancialSummaryTab` (inside `FinancialBreakdown`) calculates `totalCourseFee` by summing ALL payment row amounts (including unpaid schedule rows), while the `LifetimeValueBanner` uses batch defaults for its denominator. These can diverge.
-
-**Solution:** Standardize both to use **actual payment row amounts** as the source of truth:
-- In `FinancialBreakdown.tsx` (lines 227-254): The summary already uses payment rows -- this is correct. No change needed here.
-- In `LifetimeValueBanner.tsx` / `computeLifetimeMetrics`: Update the "Total Invoiced" display concept. The Banner's Payment Rate already uses `totalExpected` (passed from `StudentDetail` which comes from `computeStudentSummary`). To ensure consistency, pass `totalExpected` from the profile page using the same `computeStudentSummary` logic that `StudentDetail` uses. Currently `totalExpected` is already passed -- verify it matches.
-- **Action**: In `FinancialBreakdown.tsx`, fetch total expected from all enrollment payment rows (sum of `amount` column) and pass it as context so the Summary tab shows the same denominator the Banner uses. This means the Summary tab's "Total Invoiced" = sum of all payment row amounts (schedule + paid), which is already what it does. **No code change needed** -- both already use payment rows as source of truth. The Banner's Payment Rate uses batch defaults only as a fallback when `totalExpected` is not provided.
-
-**Verdict**: After review, both are already consistent when `totalExpected` is passed. Mark as verified/no-op.
+**After this change:**
+- Duration can be set as "X months Y days" (e.g., 1 month 15 days, or just 15 days, or 3 months 0 days)
+- Each batch has a **Payment Mode**: either "One-Time Payment" (single lump sum for the entire course) or "Monthly Payment" (recurring monthly fees as today)
 
 ---
 
-### Fix B: Sole payment deletion warning
+### 1. Database Migration
 
-**Problem:** When deleting the only payment for an enrollment, there's no special warning.
+Add two new columns to the `batches` table:
 
-**Changes:**
-- **`src/pages/StudentDetail.tsx`** (delete confirmation dialog, lines 803-817):
-  - When `deletePaymentId` is set, check if this is the only paid payment for its `batch_enrollment_id`
-  - If sole payment: show enhanced warning text: "This is the only payment recorded for this enrollment. Deleting it will mark the month as fully unpaid."
-  - Keep as a warning only (not a hard block)
+- `course_duration_days` (integer, nullable, default 0) -- the "days" part of the duration
+- `payment_mode` (text, not null, default `'monthly'`) -- values: `'one_time'` or `'monthly'`
 
----
-
-### Fix C: Product sales to inactive students warning
-
-**Problem:** Product sales can be recorded for inactive students without any warning.
-
-**Changes:**
-- **`src/components/dialogs/ProductSaleDialog.tsx`**:
-  - Add an `AlertDialog` confirmation (same pattern as Fix 4 in StudentPaymentDialog)
-  - When a student is selected and their status is not 'active', show warning: "This student is currently [status]. Continue recording sale?"
-  - Need to check the selected student's status from the `students` array
-  - Add `AlertDialog` imports and state management for the warning flow
+Existing batches will default to `payment_mode = 'monthly'` and `course_duration_days = 0`, preserving current behavior.
 
 ---
 
-### Fix D: Unlinked Payments section in Course Payments tab
+### 2. BatchDialog Form Updates
 
-**Problem:** 8 legacy payments have `batch_enrollment_id = null` and show as "Unlinked (pre-tracking)" mixed into the main table.
+**Duration section** -- Replace the single "Duration (months)" input with two side-by-side inputs:
+- "Duration Months" (number, min 0)
+- "Duration Days" (number, min 0, max 30)
+- Validation: at least one must be > 0
 
-**Changes:**
+**Payment Mode section** -- Add a toggle/radio group below the duration:
+- "Monthly Payment" (default) -- shows "Default Monthly Fee" and "Default Admission Fee" fields as today
+- "One-Time Payment" -- hides "Default Monthly Fee", renames "Default Admission Fee" to "Course Fee (One-Time)"
 
-1. **`src/components/students/profile/FinancialBreakdown.tsx`** (lines 183-206):
-   - Add `batch_enrollment_id` to the `CoursePaymentRow` interface and pass it through
-   - Track which payments are unlinked (`batch_enrollment_id === null` AND multi-enrollment student)
+**Fee fields adapt based on payment mode:**
+- Monthly mode: Admission Fee + Monthly Fee (current behavior)
+- One-time mode: Single "Course Fee" field (stored in `default_admission_fee` column)
 
-2. **`src/components/students/profile/CoursePaymentsTab.tsx`**:
-   - Add `batch_enrollment_id` to the `CoursePaymentRow` interface (optional, nullable)
-   - Split `payments` into two arrays: `linkedPayments` and `unlinkedPayments`
-   - Render the main table with `linkedPayments` only
-   - Below the main table, if `unlinkedPayments.length > 0`, render:
-     - A yellow warning banner with AlertTriangle icon: "The following payments were recorded before the enrollment tracking system was introduced. They are preserved as historical records and have not been automatically assigned to any batch."
-     - A separate, simpler table showing the unlinked payments with columns: Due Date, Amount, Status, Payment Date, Method, Recorded By
-   - Pagination applies only to the main linked table
+---
 
-3. **`src/components/students/profile/CoursePaymentsTab.tsx`** interface update:
-   ```
-   export interface CoursePaymentRow {
-     // ... existing fields
-     batch_enrollment_id?: string | null;  // new
-   }
-   ```
+### 3. TypeScript Types Update
+
+Update `Batch` and `BatchInsert` interfaces in `useBatches.ts`:
+- Add `course_duration_days: number | null`
+- Add `payment_mode: 'one_time' | 'monthly'`
+
+---
+
+### 4. Payment Schedule Generation
+
+**`enrollmentSync.ts` and `BatchEnrollDialog.tsx`** -- both have `generatePaymentSchedule` / `generateEnrollmentPaymentSchedule`:
+
+- If `payment_mode = 'one_time'`: generate only ONE schedule row with `payment_type = 'admission'` using `default_admission_fee` as the total course fee. No monthly rows.
+- If `payment_mode = 'monthly'`: current behavior (admission row + monthly rows based on `course_duration_months`)
+
+---
+
+### 5. Display Updates Across the App
+
+All locations that display "Duration: X months" need updating to show the combined format:
+
+| File | Change |
+|---|---|
+| `BatchDialog.tsx` | Form inputs (covered above) |
+| `StudentDialog.tsx` | Badge display "Duration: X months Y days" |
+| `AcademicStep.tsx` | Badge display |
+| `StudentDetail.tsx` | Duration display |
+| `StudentProfilePage.tsx` | Duration display |
+| `EnrollmentTimeline.tsx` | Duration display |
+| `BatchDetail.tsx` | Batch info cards |
+| `Batches.tsx` | Table column |
+| `CourseDetail.tsx` | Table column |
+
+A shared helper function `formatDuration(months: number | null, days: number | null): string` will be created in a utils file to standardize display (e.g., "1 month 15 days", "15 days", "3 months").
+
+---
+
+### 6. Computation Adjustments
+
+**`computeStudentSummary`** and **`computeLifetimeMetrics`**: These use `course_duration_months` to calculate billing ranges and total expected fees.
+
+- For **one-time payment** batches: the total expected = `default_admission_fee` only. No monthly billing range needed.
+- For **monthly payment** batches: behavior unchanged; `course_duration_days` is informational only (billing still operates on full-month boundaries).
+
+**End date auto-calculation**: When `course_duration_months` and `course_duration_days` are both set, `end_date` can be auto-suggested as `start_date + months + days`.
+
+---
+
+### 7. StudentPaymentDialog Adjustment
+
+When recording payments for a student in a **one-time payment** batch:
+- The "Payment Type" selector should default to and only show "Admission" (which represents the one-time course fee)
+- Hide the monthly payment option and month selector
 
 ---
 
 ### Technical Details
 
 **Files to modify:**
-1. `src/components/students/profile/CoursePaymentsTab.tsx` -- Add unlinked section, update interface
-2. `src/components/students/profile/FinancialBreakdown.tsx` -- Pass `batch_enrollment_id` through to CoursePaymentRow
-3. `src/pages/StudentDetail.tsx` -- Enhance delete confirmation with sole-payment warning
-4. `src/components/dialogs/ProductSaleDialog.tsx` -- Add inactive student warning dialog
-
-**No database changes required** -- all fixes are frontend-only.
+1. New migration SQL -- add `course_duration_days` and `payment_mode` columns to `batches`
+2. `src/hooks/useBatches.ts` -- update interfaces
+3. `src/components/dialogs/BatchDialog.tsx` -- form redesign with duration fields and payment mode toggle
+4. `src/utils/enrollmentSync.ts` -- adapt schedule generation for one-time mode
+5. `src/components/dialogs/BatchEnrollDialog.tsx` -- adapt schedule generation for one-time mode
+6. `src/components/dialogs/StudentDialog.tsx` -- display updates
+7. `src/components/StudentWizardSteps/AcademicStep.tsx` -- display updates
+8. `src/pages/StudentDetail.tsx` -- display updates
+9. `src/pages/StudentProfilePage.tsx` -- display updates
+10. `src/components/students/profile/EnrollmentTimeline.tsx` -- display updates
+11. `src/pages/BatchDetail.tsx` -- display updates
+12. `src/pages/Batches.tsx` -- display updates
+13. `src/pages/CourseDetail.tsx` -- display updates
+14. `src/components/dialogs/StudentPaymentDialog.tsx` -- restrict options for one-time batches
+15. `src/utils/studentMetrics.ts` -- adjust `computeLifetimeMetrics` for one-time mode
+16. `src/hooks/useStudentPayments.ts` -- adjust `computeStudentSummary` for one-time mode
+17. New `src/utils/durationFormat.ts` -- shared `formatDuration` helper
 
