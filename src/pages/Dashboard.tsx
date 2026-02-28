@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, BookOpen, Landmark, HandCoins } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { TrendingUp, TrendingDown, Wallet, DollarSign, PiggyBank, ArrowUpRight, ArrowDownRight, Receipt, Plus, ArrowLeftRight, GraduationCap, CreditCard, Layers, BookOpen, Landmark, HandCoins, ShieldAlert } from "lucide-react";
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -72,6 +74,7 @@ export default function Dashboard() {
   const [filterType, setFilterType] = useState<FilterType>("monthly");
   const [filterValue, setFilterValue] = useState<FilterValue>({});
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
+  const [allTimeView, setAllTimeView] = useState(false);
   
   const navigate = useNavigate();
 
@@ -407,6 +410,40 @@ export default function Dashboard() {
     return formatCurrencyFn(value, { compact: true });
   };
 
+  // Compute date-filtered top stat values (before conditional returns to satisfy hook rules)
+  const topCardValues = useMemo(() => {
+    if (allTimeView || !dateRange || !dashboardData) {
+      return {
+        totalRevenue: data.totalRevenue,
+        totalExpenses: data.totalExpenses,
+        allocatedProfit: data.allocatedProfit,
+        actualProfit: data.actualProfit,
+        totalBalance: data.totalBalance,
+        label: "All Time",
+      };
+    }
+    const fRevenue = filteredData.revenue;
+    const fExpenses = filteredData.expenses;
+    return {
+      totalRevenue: fRevenue,
+      totalExpenses: fExpenses,
+      allocatedProfit: fRevenue - fExpenses,
+      actualProfit: fRevenue - fExpenses,
+      totalBalance: fRevenue - fExpenses,
+      label: dateRange.label,
+    };
+  }, [allTimeView, dateRange, dashboardData, data, filteredData]);
+
+  const periodPill = topCardValues.label;
+
+  const metrics = [
+    { label: "Total Revenue", value: formatCurrency(topCardValues.totalRevenue), icon: TrendingUp, color: "text-success" },
+    { label: "Total Expenses", value: formatCurrency(topCardValues.totalExpenses), icon: TrendingDown, color: "text-destructive" },
+    { label: "Allocated Profit", value: formatCurrency(topCardValues.allocatedProfit), icon: PiggyBank, color: topCardValues.allocatedProfit >= 0 ? "text-success" : "text-destructive" },
+    { label: "Actual Profit", value: formatCurrency(topCardValues.actualProfit), icon: DollarSign, color: topCardValues.actualProfit >= 0 ? "text-success" : "text-destructive" },
+    { label: "Total Balance", value: formatCurrency(topCardValues.totalBalance), icon: Wallet, color: topCardValues.totalBalance >= 0 ? "text-success" : "text-destructive" },
+  ];
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -422,15 +459,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-
-  const metrics = [
-    { label: "Total Revenue", value: formatCurrency(data.totalRevenue), icon: TrendingUp, color: "text-success" },
-    { label: "Total Expenses", value: formatCurrency(data.totalExpenses), icon: TrendingDown, color: "text-destructive" },
-    { label: "Allocated Profit", value: formatCurrency(data.allocatedProfit), icon: PiggyBank, color: data.allocatedProfit >= 0 ? "text-success" : "text-destructive" },
-    { label: "Actual Profit", value: formatCurrency(data.actualProfit), icon: DollarSign, color: data.actualProfit >= 0 ? "text-success" : "text-destructive" },
-    { label: "Total Balance", value: formatCurrency(data.totalBalance), icon: Wallet, color: data.totalBalance >= 0 ? "text-success" : "text-destructive" },
-  ];
 
   const hasRevenueTrendData = filteredRevenueTrend.length > 0 && filteredRevenueTrend.some((d) => d.revenue > 0 || d.expenses > 0);
   const hasFilteredBreakdown = filteredData.expenseBreakdown.length > 0;
@@ -589,6 +617,57 @@ export default function Dashboard() {
     );
   }
 
+  // Fix 4: Traditional Moderator sees restricted dashboard
+  if (!canViewDashboardMetrics) {
+    return (
+      <div className="space-y-6" id="dashboard-content">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">Your workspace overview</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="mb-4 rounded-full bg-muted p-4">
+              <ShieldAlert className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="mb-2 text-lg font-semibold">Financial Metrics Restricted</h3>
+            <p className="max-w-sm text-muted-foreground">
+              Financial metrics are visible to Company Admins only. Contact your administrator for access.
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {canAddStudent && (
+                <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => setStudentDialogOpen(true)}>
+                  <GraduationCap className="h-4 w-4" /> Add Student
+                </Button>
+              )}
+              {canAddBatch && (
+                <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => setBatchDialogOpen(true)}>
+                  <Layers className="h-4 w-4" /> Create Batch
+                </Button>
+              )}
+              {canAddPayment && (
+                <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate("/students")}>
+                  <CreditCard className="h-4 w-4" /> Record Payment
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <StudentDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} onSave={async (d) => { await createStudent.mutateAsync(d); }} />
+        <BatchDialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen} onSave={async (d) => { await createBatch.mutateAsync(d); }} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" id="dashboard-content">
 
@@ -641,11 +720,24 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* All Time toggle for stat cards */}
+      <div className="flex items-center gap-2">
+        <Switch id="alltime-toggle" checked={allTimeView} onCheckedChange={setAllTimeView} />
+        <Label htmlFor="alltime-toggle" className="text-sm text-muted-foreground cursor-pointer">
+          All Time
+        </Label>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {metrics.map((m) => (
           <Card key={m.label} className="relative overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{m.label}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{m.label}</CardTitle>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal">
+                  {periodPill}
+                </Badge>
+              </div>
               <m.icon className={cn("h-4 w-4", m.color)} />
             </CardHeader>
             <CardContent>

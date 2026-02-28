@@ -77,7 +77,7 @@ export default function Revenue() {
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
   // Company-level permissions
-  const { canAddRevenue, canEdit, canDelete, isModerator, activeCompany, canEditRevenue, canDeleteRevenue, canViewRevenue } = useCompany();
+  const { canAddRevenue, canEdit, canDelete, isModerator, activeCompany, canEditRevenue, canDeleteRevenue, canViewRevenue, isDataEntryModerator } = useCompany();
   const { user } = useAuth();
   const showHistory = !isModerator || canViewRevenue;
   
@@ -306,7 +306,7 @@ export default function Revenue() {
               disabled={!dateRange}
             />
           )}
-          {canAddRevenue && (
+          {canAddRevenue && !isDataEntryModerator && (
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Revenue
@@ -432,7 +432,7 @@ export default function Revenue() {
                 ? "Try selecting a different date range or add new revenue."
                 : "Start tracking your income. Each entry will be automatically allocated to your active expense sources."}
             </p>
-            {canAddRevenue && <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>}
+            {canAddRevenue && !isDataEntryModerator && <Button onClick={() => setDialogOpen(true)}>Add Revenue</Button>}
           </CardContent>
         </Card>
       ) : (
