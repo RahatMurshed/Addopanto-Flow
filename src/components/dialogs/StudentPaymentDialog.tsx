@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -18,6 +19,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Loader2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -60,6 +62,9 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
   const [feeError, setFeeError] = useState<string | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [newSourceName, setNewSourceName] = useState("");
+  const [inactiveWarningOpen, setInactiveWarningOpen] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<PaymentFormData | null>(null);
+  const isInactiveStudent = student.status !== "active";
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string | null>(null);
   const { fc: formatCurrency } = useCompanyCurrency();
   const { data: revenueSources = [] } = useRevenueSources();
@@ -285,7 +290,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     setFeeError(null);
   };
 
-  const handleSubmit = async (data: PaymentFormData) => {
+  const executeSubmit = async (data: PaymentFormData) => {
     setFeeError(null);
 
     // Enrollment guard: require batch selection when enrollments exist
@@ -373,11 +378,37 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     return format(date, "MMM yyyy");
   };
 
+  const handleSubmit = async (data: PaymentFormData) => {
+    // Fix 4: Warn before recording payment for inactive students
+    if (isInactiveStudent && !pendingSubmitData) {
+      setPendingSubmitData(data);
+      setInactiveWarningOpen(true);
+      return;
+    }
+    setPendingSubmitData(null);
+    await executeSubmit(data);
+  };
+
   return (
+    <>
+    <AlertDialog open={inactiveWarningOpen} onOpenChange={setInactiveWarningOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Inactive Student</AlertDialogTitle>
+          <AlertDialogDescription>
+            This student is currently <span className="font-semibold">{student.status}</span>. Recording a payment will not reactivate them. Are you sure you want to continue?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => { setInactiveWarningOpen(false); setPendingSubmitData(null); }}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={async () => { setInactiveWarningOpen(false); if (pendingSubmitData) await executeSubmit(pendingSubmitData); }}>Confirm Payment</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <Dialog open={open} onOpenChange={(o) => { if (!o && saving) return; onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => { if (saving) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (saving) e.preventDefault(); }}>
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Payment" : "Record Payment"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Payment" : "Record Payment"}{isInactiveStudent && <Badge variant="outline" className="ml-2 text-amber-600 border-amber-500/30">{student.status}</Badge>}</DialogTitle>
           <DialogDescription>Payment for {student.name}</DialogDescription>
         </DialogHeader>
 
@@ -510,7 +541,7 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 bg-popover" align="start">
-                <Calendar mode="single" selected={selectedDate ? new Date(selectedDate) : undefined} onSelect={(date) => { if (date) { form.setValue("payment_date", format(date, "yyyy-MM-dd")); setCalendarOpen(false); } }} initialFocus />
+                <Calendar mode="single" selected={selectedDate ? new Date(selectedDate) : undefined} onSelect={(date) => { if (date) { form.setValue("payment_date", format(date, "yyyy-MM-dd")); setCalendarOpen(false); } }} toDate={new Date()} initialFocus />
               </PopoverContent>
             </Popover>
           </div>
@@ -586,5 +617,6 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

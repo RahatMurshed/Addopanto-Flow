@@ -159,6 +159,27 @@ export function LifetimeValueBanner({ studentId, student, totalExpected }: Lifet
   const { data: payments = [], isLoading: paymentsLoading } = useStudentPayments(studentId);
   const { data: batch } = useBatch(student.batch_id ?? undefined);
 
+  // Fix 5: Fetch ALL enrollments with batch fee info for multi-enrollment payment rate
+  const { data: allEnrollmentsRaw = [], isLoading: enrollmentsLoading } = useQuery({
+    queryKey: ["student-all-enrollments-fees", activeCompanyId, studentId],
+    queryFn: async () => {
+      if (!activeCompanyId) return [];
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("id, batches!batch_enrollments_batch_id_fkey(default_admission_fee, default_monthly_fee, course_duration_months)")
+        .eq("student_id", studentId)
+        .eq("company_id", activeCompanyId)
+        .in("status", ["active", "completed"]);
+      if (error) throw error;
+      return (data ?? []).map((e: any) => ({
+        admission_fee: Number(e.batches?.default_admission_fee ?? 0),
+        monthly_fee: Number(e.batches?.default_monthly_fee ?? 0),
+        duration_months: Number(e.batches?.course_duration_months ?? 0),
+      }));
+    },
+    enabled: !!activeCompanyId,
+  });
+
   const { data: productSales = [], isLoading: salesLoading, error: salesError, refetch: refetchSales } = useQuery({
     queryKey: ["student-product-sales", activeCompanyId, studentId],
     queryFn: async () => {
@@ -191,7 +212,7 @@ export function LifetimeValueBanner({ studentId, student, totalExpected }: Lifet
     enabled: !!activeCompanyId,
   });
 
-  const isLoading = paymentsLoading || salesLoading || unpaidLoading;
+  const isLoading = paymentsLoading || salesLoading || unpaidLoading || enrollmentsLoading;
   const hasError = !!salesError;
 
   const metrics = useMemo(() => {
@@ -202,9 +223,10 @@ export function LifetimeValueBanner({ studentId, student, totalExpected }: Lifet
       student,
       batch,
       futureUnpaidPayments,
-      totalExpected
+      totalExpected,
+      allEnrollmentsRaw.length > 0 ? allEnrollmentsRaw : undefined
     );
-  }, [payments, productSales, student, batch, isLoading, futureUnpaidPayments, totalExpected]);
+  }, [payments, productSales, student, batch, isLoading, futureUnpaidPayments, totalExpected, allEnrollmentsRaw]);
 
   // Count-up values
   const animatedLTV = useCountUp(metrics?.lifetimeValue ?? 0);
