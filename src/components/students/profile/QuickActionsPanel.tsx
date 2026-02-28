@@ -1,11 +1,18 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   MessageCircle, MessageSquarePlus, Pencil,
-  FileDown, Tag, Zap, X, Loader2,
+  FileDown, Tag, Zap, X, Loader2, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -27,7 +34,13 @@ interface QuickActionsPanelProps {
   isLoading?: boolean;
 }
 
-// Status options removed — status changes handled elsewhere
+const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
+  { value: "active", label: "Active", color: "text-green-600" },
+  { value: "inactive", label: "Inactive", color: "text-red-600" },
+  { value: "graduated", label: "Graduated", color: "text-blue-600" },
+  { value: "dropout", label: "Dropout", color: "text-orange-600" },
+  { value: "transferred", label: "Transferred", color: "text-purple-600" },
+];
 
 type ActionItem = {
   id: string;
@@ -43,11 +56,13 @@ type ActionItem = {
 };
 
 export function QuickActionsPanel({
-  student, companyId, userRole, userPermissions, onEdit, isLoading,
+  student, companyId, userRole, userPermissions, onStatusChange, onEdit, isLoading,
 }: QuickActionsPanelProps) {
   const { toast } = useToast();
-  const [saving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
 
   const isAdminOrCipher = userRole === "cipher" || userRole === "admin";
   const isModerator = userRole === "moderator";
@@ -64,7 +79,31 @@ export function QuickActionsPanel({
     setFabOpen(false);
   }, []);
 
-  // Status change logic removed
+  const handleStatusSelect = (newStatus: string) => {
+    if (newStatus === student.status) return;
+    setPendingStatus(newStatus);
+    setStatusDialogOpen(true);
+  };
+
+  const handleStatusConfirm = async () => {
+    if (!pendingStatus) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("students")
+        .update({ status: pendingStatus } as any)
+        .eq("id", student.id);
+      if (error) throw error;
+      onStatusChange?.(pendingStatus);
+      toast({ title: `Status changed to ${pendingStatus}` });
+    } catch (err: any) {
+      toast({ title: "Failed to change status", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+      setStatusDialogOpen(false);
+      setPendingStatus(null);
+    }
+  };
 
   const actions = useMemo<ActionItem[]>(() => {
     const items: ActionItem[] = [];
@@ -95,7 +134,6 @@ export function QuickActionsPanel({
       group: "actions",
     });
 
-
     // Edit Student
     if (isAdminOrCipher || (isModerator && userPermissions.includes("edit_students"))) {
       items.push({
@@ -109,8 +147,6 @@ export function QuickActionsPanel({
         group: "actions",
       });
     }
-
-    // Change Status removed
 
     // Export PDF
     if (isAdminOrCipher) {
@@ -192,6 +228,8 @@ export function QuickActionsPanel({
     return btn;
   };
 
+  const pendingLabel = STATUS_OPTIONS.find(s => s.value === pendingStatus)?.label ?? pendingStatus;
+
   return (
     <>
       {/* DESKTOP PANEL */}
@@ -209,6 +247,24 @@ export function QuickActionsPanel({
           {/* Actions group */}
           {groupedActions.actions.map(renderActionButton)}
 
+          {/* Change Status */}
+          {isAdminOrCipher && (
+            <div className="flex items-center gap-2 mt-1">
+              <RefreshCw className="h-4 w-4 text-muted-foreground shrink-0 ml-4" />
+              <Select value={student.status} onValueChange={handleStatusSelect} disabled={saving}>
+                <SelectTrigger className="h-9 flex-1 text-sm">
+                  <SelectValue placeholder="Change Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className={opt.color}>{opt.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Admin group */}
           {groupedActions.admin.length > 0 && (
@@ -267,24 +323,25 @@ export function QuickActionsPanel({
         </div>
       </div>
 
-
-
+      {/* Status Change Confirmation Dialog */}
+      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Student Status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to change <strong>{student.name}</strong>'s status to <strong>{pendingLabel}</strong>?
+              {pendingStatus === "inactive" && " Overdue alerts will stop and revenue projections will be excluded."}
+              {pendingStatus === "graduated" && " The student will be marked as an alumnus."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStatusConfirm} disabled={saving}>
+              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
-  );
-}
-
-export function QuickActionsSkeleton() {
-  return (
-    <div className="bg-card rounded-xl shadow-sm border border-border p-5">
-      <Skeleton className="w-24 h-3 mb-4" />
-      <div className="flex flex-col gap-2">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="w-full h-10 rounded-lg" />
-        ))}
-        <div className="border-t border-border my-3" />
-        <Skeleton className="w-full h-10 rounded-lg" />
-        <Skeleton className="w-full h-10 rounded-lg" />
-      </div>
-    </div>
   );
 }

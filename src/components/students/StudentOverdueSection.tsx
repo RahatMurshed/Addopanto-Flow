@@ -85,6 +85,8 @@ export default function StudentOverdueSection({ students, studentSummaries }: Pr
     const today = new Date();
 
     for (const s of students) {
+      // Only active students should show overdue alerts
+      if (s.status !== "active") continue;
       if (Number(s.monthly_fee_amount) === 0) continue;
       const sum = studentSummaries.get(s.id);
       if (!sum) continue;

@@ -35,7 +35,9 @@ interface ProfileHeaderProps {
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
   active: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400", label: "Active" },
   inactive: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400", label: "Inactive" },
-  graduated: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400", label: "Graduated" },
+  graduated: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400", label: "🎓 Alumni" },
+  dropout: { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-400", label: "Dropout" },
+  transferred: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-400", label: "Transferred" },
 };
 
 export function cleanPhone(phone: string): string {

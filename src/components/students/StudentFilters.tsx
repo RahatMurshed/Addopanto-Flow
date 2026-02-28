@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 import { Switch } from "@/components/ui/switch";
 import { Search, X, SlidersHorizontal, ChevronDown, Filter, MapPin, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useBatches } from "@/hooks/useBatches";
 
 export interface StudentFilterValues {
@@ -259,29 +260,47 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
             </SelectContent>
           </Select>
 
-          <Select value={filters.admissionStatus} onValueChange={(v) => update({ admissionStatus: v as any })}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Admission" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Admission</SelectItem>
-              <SelectItem value="paid">Admission Paid</SelectItem>
-              <SelectItem value="partial">Admission Partial</SelectItem>
-              <SelectItem value="pending">Admission Pending</SelectItem>
-            </SelectContent>
-          </Select>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Select value={filters.admissionStatus} onValueChange={(v) => update({ admissionStatus: v as any })}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Admission" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Admission</SelectItem>
+                    <SelectItem value="paid">Admission Paid</SelectItem>
+                    <SelectItem value="partial">Admission Partial</SelectItem>
+                    <SelectItem value="pending">Admission Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+              This filter applies to the current page only
+            </TooltipContent>
+          </Tooltip>
 
-          <Select value={filters.monthlyStatus} onValueChange={(v) => update({ monthlyStatus: v as any })}>
-            <SelectTrigger className="w-[155px]">
-              <SelectValue placeholder="Monthly" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Monthly</SelectItem>
-              <SelectItem value="paid">Monthly Paid</SelectItem>
-              <SelectItem value="pending">Monthly Pending</SelectItem>
-              <SelectItem value="overdue">Monthly Overdue</SelectItem>
-            </SelectContent>
-          </Select>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Select value={filters.monthlyStatus} onValueChange={(v) => update({ monthlyStatus: v as any })}>
+                  <SelectTrigger className="w-[155px]">
+                    <SelectValue placeholder="Monthly" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Monthly</SelectItem>
+                    <SelectItem value="paid">Monthly Paid</SelectItem>
+                    <SelectItem value="pending">Monthly Pending</SelectItem>
+                    <SelectItem value="overdue">Monthly Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+              This filter applies to the current page only
+            </TooltipContent>
+          </Tooltip>
 
           <Select
             value={`${filters.sortBy}-${filters.sortOrder}`}

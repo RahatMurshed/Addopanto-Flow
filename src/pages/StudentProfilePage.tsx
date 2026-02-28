@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useRole } from "@/contexts/RoleContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,21 +69,38 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Reads from the FinancialBreakdown query cache to avoid duplicate fetches */
+/** Fetches product purchases independently for this student */
 function ProductPurchaseHistoryWrapper({ studentId, companyId, fc }: { studentId: string; companyId: string; fc: (n: number) => string }) {
   const { data, isLoading } = useQuery({
-    queryKey: ["financial-breakdown", studentId, companyId],
-    queryFn: () => null, // never actually fetches — relies on cache from FinancialBreakdown
-    enabled: false,
-    staleTime: Infinity,
+    queryKey: ["product-purchases", studentId, companyId],
+    queryFn: async () => {
+      const { data: sales, error } = await supabase
+        .from("product_sales")
+        .select("id, quantity, unit_price, total_amount, sale_date, payment_method, user_id, product_id")
+        .eq("student_id", studentId)
+        .eq("company_id", companyId)
+        .order("sale_date", { ascending: false });
+      if (error) throw error;
+
+      const productIds = [...new Set((sales ?? []).map(s => s.product_id))];
+      const productMap = new Map<string, { name: string; category: string }>();
+      if (productIds.length > 0) {
+        const { data: products } = await supabase
+          .from("products")
+          .select("id, product_name, category")
+          .in("id", productIds);
+        products?.forEach(p => productMap.set(p.id, { name: p.product_name, category: p.category }));
+      }
+
+      return { sales: sales ?? [], productMap };
+    },
+    enabled: !!studentId && !!companyId,
   });
 
   const purchases: ProductPurchase[] = useMemo(() => {
     if (!data) return [];
-    const d = data as any;
-    return (d.sales ?? []).map((s: any) => {
-      const product = d.productMap?.get(s.product_id);
-      const recordedBy = d.userMap?.get(s.user_id);
+    return data.sales.map((s: any) => {
+      const product = data.productMap?.get(s.product_id);
       return {
         id: s.id,
         quantity: s.quantity,
@@ -94,7 +111,6 @@ function ProductPurchaseHistoryWrapper({ studentId, companyId, fc }: { studentId
         user_id: s.user_id,
         productName: product?.name ?? "Unknown Product",
         category: product?.category ?? "General",
-        recordedBy: recordedBy ?? undefined,
       };
     });
   }, [data]);
@@ -120,6 +136,7 @@ export default function StudentProfilePage() {
     activeCompanyId, isCompanyAdmin, membership,
   } = useCompany();
   const isAdmin = isCompanyAdmin || isCipher;
+  const queryClient = useQueryClient();
 
   // Derive role + permissions for QuickActionsPanel
   const quickActionRole = useMemo(() => {
@@ -480,9 +497,8 @@ export default function StudentProfilePage() {
                 companyId={activeCompanyId}
                 userRole={quickActionRole}
                 userPermissions={quickActionPermissions}
-                onStatusChange={(newStatus) => {
-                  // Optimistically update local student data by refetching
-                  // The status badge in header/sticky bar reads from `student.status`
+                onStatusChange={() => {
+                  queryClient.invalidateQueries({ queryKey: ["students", studentId] });
                 }}
                 onEdit={() => setEditOpen(true)}
               />

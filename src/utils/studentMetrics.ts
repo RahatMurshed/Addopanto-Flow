@@ -35,7 +35,7 @@ export function computeLifetimeMetrics(
   futureUnpaidPayments?: Array<{ amount: number; status: string; paid_amount?: number | null }>,
   totalExpected?: number
 ): LifetimeMetrics {
-  const isInactive = student.status === "inactive";
+  const isInactive = student.status !== "active";
 
   // 1. LIFETIME VALUE — total confirmed payments + product sales
   const totalCoursesPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
