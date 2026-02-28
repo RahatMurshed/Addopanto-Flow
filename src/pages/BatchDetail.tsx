@@ -13,6 +13,7 @@ import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import SearchBar from "@/components/shared/SearchBar";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -94,7 +95,6 @@ export default function BatchDetail() {
   const [inactiveStudentId, setInactiveStudentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
-  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
   const [studentStatusFilter, setStudentStatusFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [studentSort, setStudentSort] = useState("name-asc");
@@ -106,19 +106,7 @@ export default function BatchDetail() {
     }
   }, [companyLoading, isModerator, canEditBatch, navigate]);
 
-  // Debounce student search with 500ms
-  useEffect(() => {
-    if (studentSearch.length < 3 && studentSearch.length > 0) {
-      setDebouncedStudentSearch("");
-      return;
-    }
-    if (studentSearch.length === 0) {
-      setDebouncedStudentSearch("");
-      return;
-    }
-    const timer = setTimeout(() => setDebouncedStudentSearch(studentSearch), 500);
-    return () => clearTimeout(timer);
-  }, [studentSearch]);
+  // Click-to-search - no debounce needed
 
   const [filterValue, setFilterValue] = useState<BatchFilterValue>(getDefaultBatchFilter);
 
@@ -196,9 +184,9 @@ export default function BatchDetail() {
     if (!id) return [];
     let students = allBatchStudents;
 
-    // Name search (debounced)
-    if (debouncedStudentSearch.trim()) {
-      const q = debouncedStudentSearch.toLowerCase();
+    // Name search
+    if (studentSearch.trim()) {
+      const q = studentSearch.toLowerCase();
       students = students.filter((s) =>
         s.name.toLowerCase().includes(q) ||
         (s.student_id_number && s.student_id_number.toLowerCase().includes(q)) ||
@@ -229,7 +217,7 @@ export default function BatchDetail() {
     });
 
     return students;
-  }, [allBatchStudents, id, debouncedStudentSearch, studentStatusFilter, paymentStatusFilter, studentWorstStatuses, studentSort]);
+  }, [allBatchStudents, id, studentSearch, studentStatusFilter, paymentStatusFilter, studentWorstStatuses, studentSort]);
 
   const studentSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeStudentSummary>>();
@@ -334,13 +322,12 @@ export default function BatchDetail() {
 
   useEffect(() => {
     pagination.goToPage(1);
-  }, [debouncedStudentSearch, studentStatusFilter, paymentStatusFilter, studentSort]);
+  }, [studentSearch, studentStatusFilter, paymentStatusFilter, studentSort]);
 
   const activeFilterCount = (studentStatusFilter !== "all" ? 1 : 0) + (paymentStatusFilter !== "all" ? 1 : 0) + (studentSort !== "name-asc" ? 1 : 0);
 
   const resetStudentFilters = () => {
     setStudentSearch("");
-    setDebouncedStudentSearch("");
     setStudentStatusFilter("all");
     setPaymentStatusFilter("all");
     setStudentSort("name-asc");
@@ -642,28 +629,11 @@ export default function BatchDetail() {
             </span>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, ID, father name, phone... (min 3 chars)"
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                className="pl-9 pr-9"
-              />
-              {studentSearch.length > 0 && studentSearch.length < 3 && (
-                <span className="absolute right-10 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                  {3 - studentSearch.length} more
-                </span>
-              )}
-              {studentSearch.length >= 3 && debouncedStudentSearch !== studentSearch && (
-                <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-              )}
-              {studentSearch && (
-                <button onClick={() => { setStudentSearch(""); setDebouncedStudentSearch(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <SearchBar
+              placeholder="Search by name, ID, father name, phone..."
+              onSearch={setStudentSearch}
+              defaultValue={studentSearch}
+            />
             <Select value={studentStatusFilter} onValueChange={setStudentStatusFilter}>
               <SelectTrigger className="w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
