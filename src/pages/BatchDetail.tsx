@@ -415,7 +415,9 @@ export default function BatchDetail() {
       if (error) throw error;
 
       const studentName = allBatchStudents.find(s => s.id === deleteStudentId)?.name ?? "Student";
-      toast({ title: `${studentName} removed from ${batch?.batch_name}. Revenue updated.` });
+      const statusChanged = data && Array.isArray(data) && data[0]?.status_changed;
+      const statusMsg = statusChanged ? " Status set to Inquiry." : "";
+      toast({ title: `${studentName} removed from ${batch?.batch_name}. Revenue updated.${statusMsg}` });
       setDeleteStudentId(null);
       setRemoveConfirmText("");
     } catch (err: any) {
