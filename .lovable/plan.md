@@ -1,48 +1,86 @@
 
 
-## Auto-set "Inquiry" status when student is removed from a batch
+## Minor Fixes and Unlinked Payments Section
 
-### Problem
-When a student is removed from a batch, their status stays as-is (e.g., "active") even though they no longer have any active enrollment. The desired behavior is to automatically revert them to "inquiry" status -- but **only** if they have no other active enrollments in other batches/courses.
+### Overview
+Four targeted improvements based on audit recommendations: standardize financial calculations, add delete-payment warning, add inactive-student warning for product sales, and create a dedicated "Unlinked Payments" section in the Course Payments tab.
 
-### Logic
-- Student removed from Batch A, still enrolled in Batch B --> status stays unchanged
-- Student removed from Batch A, no other active enrollments --> status changes to "inquiry"
+---
 
-### Implementation
+### Fix A: Standardize FinancialBreakdown vs Banner calculations
 
-#### 1. Update the `remove_student_from_batch` database function
-Modify the existing RPC function to check for remaining active enrollments after deleting the current one. If none remain, set the student's status to `'inquiry'`.
+**Problem:** The `FinancialSummaryTab` (inside `FinancialBreakdown`) calculates `totalCourseFee` by summing ALL payment row amounts (including unpaid schedule rows), while the `LifetimeValueBanner` uses batch defaults for its denominator. These can diverge.
 
-**Changes to the function (new migration):**
-- After deleting the enrollment and clearing `batch_id`, add a check:
-  ```text
-  -- Count remaining active enrollments for this student
-  SELECT COUNT(*) INTO v_remaining
-  FROM batch_enrollments
-  WHERE student_id = p_student_id
-    AND company_id = p_company_id
-    AND status = 'active';
+**Solution:** Standardize both to use **actual payment row amounts** as the source of truth:
+- In `FinancialBreakdown.tsx` (lines 227-254): The summary already uses payment rows -- this is correct. No change needed here.
+- In `LifetimeValueBanner.tsx` / `computeLifetimeMetrics`: Update the "Total Invoiced" display concept. The Banner's Payment Rate already uses `totalExpected` (passed from `StudentDetail` which comes from `computeStudentSummary`). To ensure consistency, pass `totalExpected` from the profile page using the same `computeStudentSummary` logic that `StudentDetail` uses. Currently `totalExpected` is already passed -- verify it matches.
+- **Action**: In `FinancialBreakdown.tsx`, fetch total expected from all enrollment payment rows (sum of `amount` column) and pass it as context so the Summary tab shows the same denominator the Banner uses. This means the Summary tab's "Total Invoiced" = sum of all payment row amounts (schedule + paid), which is already what it does. **No code change needed** -- both already use payment rows as source of truth. The Banner's Payment Rate uses batch defaults only as a fallback when `totalExpected` is not provided.
 
-  -- If no active enrollments remain, set status to inquiry
-  IF v_remaining = 0 THEN
-    UPDATE students
-    SET status = 'inquiry'
-    WHERE id = p_student_id
-      AND company_id = p_company_id;
-  END IF;
-  ```
-- Include the status change in the audit log's `new_data` for traceability.
+**Verdict**: After review, both are already consistent when `totalExpected` is passed. Mark as verified/no-op.
 
-#### 2. Update the frontend toast message
-In `BatchDetail.tsx`, update the success toast after removal to mention the status change when applicable. The RPC return type will be extended to include a `status_changed` boolean so the frontend knows whether the student was moved to inquiry.
+---
 
-### Files to change
-- **New migration SQL**: Recreates `remove_student_from_batch` with the remaining-enrollment check
-- **`src/pages/BatchDetail.tsx`**: Update toast to conditionally mention "Status set to Inquiry"
+### Fix B: Sole payment deletion warning
 
-### Edge cases handled
-- Student with multiple active enrollments: only the removed enrollment is affected, status unchanged
-- Student with only one enrollment: status set to "inquiry" automatically
-- Student already in "inquiry" status: no-op on the status update (harmless)
-- Student in "inactive"/"graduated"/"dropout" status: will be overwritten to "inquiry" -- this is intentional since removal implies re-evaluation
+**Problem:** When deleting the only payment for an enrollment, there's no special warning.
+
+**Changes:**
+- **`src/pages/StudentDetail.tsx`** (delete confirmation dialog, lines 803-817):
+  - When `deletePaymentId` is set, check if this is the only paid payment for its `batch_enrollment_id`
+  - If sole payment: show enhanced warning text: "This is the only payment recorded for this enrollment. Deleting it will mark the month as fully unpaid."
+  - Keep as a warning only (not a hard block)
+
+---
+
+### Fix C: Product sales to inactive students warning
+
+**Problem:** Product sales can be recorded for inactive students without any warning.
+
+**Changes:**
+- **`src/components/dialogs/ProductSaleDialog.tsx`**:
+  - Add an `AlertDialog` confirmation (same pattern as Fix 4 in StudentPaymentDialog)
+  - When a student is selected and their status is not 'active', show warning: "This student is currently [status]. Continue recording sale?"
+  - Need to check the selected student's status from the `students` array
+  - Add `AlertDialog` imports and state management for the warning flow
+
+---
+
+### Fix D: Unlinked Payments section in Course Payments tab
+
+**Problem:** 8 legacy payments have `batch_enrollment_id = null` and show as "Unlinked (pre-tracking)" mixed into the main table.
+
+**Changes:**
+
+1. **`src/components/students/profile/FinancialBreakdown.tsx`** (lines 183-206):
+   - Add `batch_enrollment_id` to the `CoursePaymentRow` interface and pass it through
+   - Track which payments are unlinked (`batch_enrollment_id === null` AND multi-enrollment student)
+
+2. **`src/components/students/profile/CoursePaymentsTab.tsx`**:
+   - Add `batch_enrollment_id` to the `CoursePaymentRow` interface (optional, nullable)
+   - Split `payments` into two arrays: `linkedPayments` and `unlinkedPayments`
+   - Render the main table with `linkedPayments` only
+   - Below the main table, if `unlinkedPayments.length > 0`, render:
+     - A yellow warning banner with AlertTriangle icon: "The following payments were recorded before the enrollment tracking system was introduced. They are preserved as historical records and have not been automatically assigned to any batch."
+     - A separate, simpler table showing the unlinked payments with columns: Due Date, Amount, Status, Payment Date, Method, Recorded By
+   - Pagination applies only to the main linked table
+
+3. **`src/components/students/profile/CoursePaymentsTab.tsx`** interface update:
+   ```
+   export interface CoursePaymentRow {
+     // ... existing fields
+     batch_enrollment_id?: string | null;  // new
+   }
+   ```
+
+---
+
+### Technical Details
+
+**Files to modify:**
+1. `src/components/students/profile/CoursePaymentsTab.tsx` -- Add unlinked section, update interface
+2. `src/components/students/profile/FinancialBreakdown.tsx` -- Pass `batch_enrollment_id` through to CoursePaymentRow
+3. `src/pages/StudentDetail.tsx` -- Enhance delete confirmation with sole-payment warning
+4. `src/components/dialogs/ProductSaleDialog.tsx` -- Add inactive student warning dialog
+
+**No database changes required** -- all fixes are frontend-only.
+
