@@ -48,7 +48,7 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canAddRevenue, canEdit, isModerator, canEditBatch, isLoading: companyLoading, activeCompanyId } = useCompany();
+  const { canAddRevenue, canEdit, isModerator, canEditBatch, canAddBatch, isCompanyAdmin, isCipher, isLoading: companyLoading, activeCompanyId } = useCompany();
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
 
   const { data: batch, isLoading: batchLoading } = useBatch(id);
@@ -506,7 +506,7 @@ export default function BatchDetail() {
             maxYear={batch.end_date ? new Date(batch.end_date).getFullYear() : new Date().getFullYear() + 2}
           />
           {canEdit && <Button variant="outline" onClick={() => setEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>}
-          {canAddRevenue && (
+          {(isCompanyAdmin || isCipher || canAddBatch) && (
             <>
               <Button onClick={() => setStudentDialogOpen(true)}><UserPlus className="mr-2 h-4 w-4" />Enroll Student</Button>
               <Button variant="outline" onClick={() => navigate(`/students/new?batch=${id}`)}><Plus className="mr-2 h-4 w-4" />New Student</Button>
