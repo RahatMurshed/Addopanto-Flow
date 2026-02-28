@@ -183,12 +183,29 @@ export default function Courses() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    // Check if course has batches with students
+    const courseBatchIds = allBatches.filter((b: any) => b.course_id === deleteId).map((b: any) => b.id);
+    if (courseBatchIds.length > 0) {
+      let hasStudents = false;
+      for (const bid of courseBatchIds) {
+        const enrolled = enrollmentMap.get(bid);
+        if (enrolled && enrolled.size > 0) { hasStudents = true; break; }
+      }
+      if (hasStudents) {
+        toast({ title: "Cannot delete", description: "This course has batches with enrolled students. Remove all students first.", variant: "destructive" });
+        setDeleteId(null);
+        return;
+      }
+    }
     try {
       await deleteMutation.mutateAsync(deleteId);
       toast({ title: "Course deleted" });
       setDeleteId(null);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      const msg = err.message?.includes("violates foreign key")
+        ? "Cannot delete this course because it has linked payment records. Remove all student payments first."
+        : err.message;
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -200,9 +217,9 @@ export default function Courses() {
     }
   };
 
-  const effectiveCanAdd = canAddRevenue || canAddBatch;
-  const effectiveCanEdit = canEdit || canEditBatch;
-  const effectiveCanDelete = canDelete || canDeleteBatch;
+  const effectiveCanAdd = !isModerator && (canAddRevenue || canAddBatch);
+  const effectiveCanEdit = !isModerator && (canEdit || canEditBatch);
+  const effectiveCanDelete = !isModerator && (canDelete || canDeleteBatch);
 
   if (isLoading) {
     return (
