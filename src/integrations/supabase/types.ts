@@ -3425,6 +3425,10 @@ export type Database = {
       can_edit_delete: { Args: { _user_id: string }; Returns: boolean }
       can_transfer: { Args: { _user_id: string }; Returns: boolean }
       can_view_user: { Args: { _target_user_id: string }; Returns: boolean }
+      check_and_graduate_student: {
+        Args: { p_company_id: string; p_student_id: string }
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: { _key: string; _max_requests: number; _window_seconds: number }
         Returns: boolean
