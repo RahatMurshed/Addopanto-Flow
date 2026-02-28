@@ -2885,7 +2885,7 @@ export type Database = {
           admission_fee_total: number
           alt_contact_number: string | null
           batch_id: string | null
-          billing_start_month: string
+          billing_start_month: string | null
           blood_group: string | null
           board_university: string | null
           class_grade: string | null
@@ -2898,7 +2898,7 @@ export type Database = {
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_number: string | null
-          enrollment_date: string
+          enrollment_date: string | null
           extracurricular_interests: string | null
           father_annual_income: number | null
           father_contact: string | null
@@ -2951,7 +2951,7 @@ export type Database = {
           admission_fee_total?: number
           alt_contact_number?: string | null
           batch_id?: string | null
-          billing_start_month: string
+          billing_start_month?: string | null
           blood_group?: string | null
           board_university?: string | null
           class_grade?: string | null
@@ -2964,7 +2964,7 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_number?: string | null
-          enrollment_date: string
+          enrollment_date?: string | null
           extracurricular_interests?: string | null
           father_annual_income?: number | null
           father_contact?: string | null
@@ -3017,7 +3017,7 @@ export type Database = {
           admission_fee_total?: number
           alt_contact_number?: string | null
           batch_id?: string | null
-          billing_start_month?: string
+          billing_start_month?: string | null
           blood_group?: string | null
           board_university?: string | null
           class_grade?: string | null
@@ -3030,7 +3030,7 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_number?: string | null
-          enrollment_date?: string
+          enrollment_date?: string | null
           extracurricular_interests?: string | null
           father_annual_income?: number | null
           father_contact?: string | null

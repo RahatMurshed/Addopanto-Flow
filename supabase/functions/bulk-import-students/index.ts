@@ -53,11 +53,13 @@ function validateRow(row: Record<string, unknown>, rowIndex: number): { valid: b
   if (!row.name || String(row.name).trim() === "") errors.push("Name is required");
   else if (String(row.name).trim().length > 200) errors.push("Name must be less than 200 characters");
 
-  if (!row.enrollment_date || String(row.enrollment_date).trim() === "") errors.push("Enrollment date is required");
-  else { const d = new Date(String(row.enrollment_date)); if (isNaN(d.getTime())) errors.push("Invalid enrollment_date format"); }
+  if (row.enrollment_date && String(row.enrollment_date).trim() !== "") {
+    const d = new Date(String(row.enrollment_date)); if (isNaN(d.getTime())) errors.push("Invalid enrollment_date format");
+  }
 
-  if (!row.billing_start_month || String(row.billing_start_month).trim() === "") errors.push("Billing start month is required");
-  else if (!/^\d{4}-\d{2}$/.test(String(row.billing_start_month))) errors.push("billing_start_month must be YYYY-MM format");
+  if (row.billing_start_month && String(row.billing_start_month).trim() !== "") {
+    if (!/^\d{4}-\d{2}$/.test(String(row.billing_start_month))) errors.push("billing_start_month must be YYYY-MM format");
+  }
 
   if (row.status && !VALID_STATUSES.has(String(row.status))) errors.push(`Invalid status '${row.status}'`);
 
@@ -206,7 +208,7 @@ Deno.serve(async (req) => {
 
       if (inserted) {
         // Create monthly fee history entries
-        const feeHistoryEntries = inserted.filter((s: any) => (s.monthly_fee_amount || 0) > 0).map((s: any) => ({
+        const feeHistoryEntries = inserted.filter((s: any) => (s.monthly_fee_amount || 0) > 0 && s.billing_start_month).map((s: any) => ({
           student_id: s.id, monthly_amount: s.monthly_fee_amount, effective_from: s.billing_start_month, user_id: user.id, company_id,
         }));
         if (feeHistoryEntries.length > 0) await authClient.from("monthly_fee_history").insert(feeHistoryEntries);
