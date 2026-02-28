@@ -11,6 +11,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreateStudent, type StudentInsert } from "@/hooks/useStudents";
 import { useCreateStudentPayment } from "@/hooks/useStudentPayments";
+import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 import { useSaveSiblings } from "@/hooks/useStudentSiblings";
 import { useCheckSingleDuplicate } from "@/hooks/useDuplicateDetection";
 import type { InitialPaymentData } from "@/components/finance/InitialPaymentSection";
@@ -68,6 +69,7 @@ export default function AddStudent() {
   const presetBatchId = searchParams.get("batch");
   const { toast } = useToast();
   const { activeCompanyId } = useCompany();
+  const { user } = useAuth();
   const createMutation = useCreateStudent();
   const createPaymentMutation = useCreateStudentPayment();
   const saveSiblingsMutation = useSaveSiblings();
@@ -217,6 +219,16 @@ export default function AddStudent() {
       };
 
       const result = await createMutation.mutateAsync(insertData);
+
+      // Create batch enrollment if batch was selected
+      if (result && "id" in result && insertData.batch_id) {
+        setSavingStep("Creating enrollment...");
+        try {
+          await syncBatchEnrollment(result.id, null, insertData.batch_id, activeCompanyId!, user!.id);
+        } catch (e: any) {
+          console.error("Failed to create batch enrollment:", e);
+        }
+      }
 
       // Save siblings
       if (result && "id" in result && family.siblings.length > 0) {

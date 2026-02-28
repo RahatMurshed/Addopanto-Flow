@@ -298,11 +298,11 @@ export function useStudents(filters?: StudentFilters) {
 
 export function useStudent(id: string | undefined) {
   const { user } = useAuth();
-  const { canViewStudentPII } = useCompany();
+  const { canViewStudentPII, activeCompanyId } = useCompany();
   const table = canViewStudentPII ? "students" : "students_safe";
 
   return useQuery({
-    queryKey: ["students", id, table],
+    queryKey: ["students", id, table, activeCompanyId],
     queryFn: async () => {
       if (!user || !id) return null;
       const { data, error } = await supabase
