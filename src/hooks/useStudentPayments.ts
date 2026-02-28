@@ -43,17 +43,37 @@ export function useStudentPayments(studentId?: string) {
     queryFn: async () => {
       if (!user) return [];
       if (!activeCompanyId) return [];
-      let query = supabase
-        .from("student_payments")
-        .select("*")
-        .eq("company_id", activeCompanyId)
-        .order("payment_date", { ascending: false });
+
+      // When fetching for a specific student, no batching needed
       if (studentId) {
-        query = query.eq("student_id", studentId);
+        const { data, error } = await supabase
+          .from("student_payments")
+          .select("*")
+          .eq("company_id", activeCompanyId)
+          .eq("student_id", studentId)
+          .order("payment_date", { ascending: false });
+        if (error) throw error;
+        return data as StudentPayment[];
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as StudentPayment[];
+
+      // Fetch ALL payments in batches to bypass the 1000-row default limit
+      let allData: StudentPayment[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("student_payments")
+          .select("*")
+          .eq("company_id", activeCompanyId)
+          .order("payment_date", { ascending: false })
+          .range(from, from + batchSize - 1);
+        if (error) throw error;
+        allData = allData.concat(data as StudentPayment[]);
+        hasMore = data.length === batchSize;
+        from += batchSize;
+      }
+      return allData;
     },
     enabled: !!user && !!activeCompanyId,
   });

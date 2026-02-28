@@ -131,13 +131,19 @@ export default function Students() {
     return map;
   }, [students, allPayments]);
 
-  // Client-side payment status filters on current page
+  // Determine if client-side filtering mode is active (admission/monthly filters)
+  const isClientFilterActive = filters.admissionStatus !== "all" || filters.monthlyStatus !== "all";
+
+  // Client-side payment status filters - when active, filter ALL students, not just current page
   const filteredStudents = useMemo(() => {
-    let result = students;
+    // When client filters are active, filter from allStudents instead of current page
+    const sourceStudents = isClientFilterActive ? allStudents : students;
+    const sourceSummaries = isClientFilterActive ? allStudentSummaries : studentSummaries;
+    let result = sourceStudents;
 
     if (filters.admissionStatus !== "all") {
       result = result.filter((s) => {
-        const sum = studentSummaries.get(s.id);
+        const sum = sourceSummaries.get(s.id);
         if (!sum) return false;
         if (sum.admissionTotal === 0) return filters.admissionStatus === "paid";
         return sum.admissionStatus === filters.admissionStatus;
@@ -146,9 +152,15 @@ export default function Students() {
 
     if (filters.monthlyStatus !== "all") {
       result = result.filter((s) => {
-        const sum = studentSummaries.get(s.id);
+        const sum = sourceSummaries.get(s.id);
         if (!sum) return false;
-        if (Number(s.monthly_fee_amount) === 0) return filters.monthlyStatus === "paid";
+        const hasMonthlyFee = Number(s.monthly_fee_amount) > 0;
+        // Bug fix: Students with monthly fee but no billing_start_month should NOT be "paid"
+        if (!hasMonthlyFee) return filters.monthlyStatus === "paid";
+        if (hasMonthlyFee && !s.billing_start_month) {
+          // No billing start = pending, not paid
+          return filters.monthlyStatus === "pending";
+        }
         if (filters.monthlyStatus === "overdue") return sum.monthlyOverdueMonths.length > 0;
         if (filters.monthlyStatus === "pending") return (sum.monthlyPartialMonths.length + sum.monthlyPendingMonths.length + sum.monthlyOverdueMonths.length) > 0;
         if (filters.monthlyStatus === "paid") return sum.monthlyOverdueMonths.length === 0 && sum.monthlyPartialMonths.length === 0 && sum.monthlyPendingMonths.length === 0;
@@ -157,14 +169,28 @@ export default function Students() {
     }
 
     return result;
-  }, [students, studentSummaries, filters.admissionStatus, filters.monthlyStatus]);
+  }, [students, allStudents, studentSummaries, allStudentSummaries, filters.admissionStatus, filters.monthlyStatus, isClientFilterActive]);
+
+  // Client-side pagination for filtered results
+  const clientFilteredTotal = filteredStudents.length;
+  const clientTotalPages = Math.max(1, Math.ceil(clientFilteredTotal / pageSize));
+  const clientStartIndex = clientFilteredTotal === 0 ? 0 : (page - 1) * pageSize + 1;
+  const clientEndIndex = Math.min(page * pageSize, clientFilteredTotal);
+  const clientPaginatedStudents = useMemo(() => {
+    if (!isClientFilterActive) return filteredStudents;
+    const from = (page - 1) * pageSize;
+    return filteredStudents.slice(from, from + pageSize);
+  }, [filteredStudents, page, pageSize, isClientFilterActive]);
+
+  // Use client or server pagination values depending on mode
+  const displayStudents = isClientFilterActive ? clientPaginatedStudents : filteredStudents;
+  const displayTotalCount = isClientFilterActive ? clientFilteredTotal : serverTotalCount;
+  const displayTotalPages = isClientFilterActive ? clientTotalPages : Math.max(1, Math.ceil(serverTotalCount / pageSize));
+  const displayStartIndex = isClientFilterActive ? clientStartIndex : (serverTotalCount === 0 ? 0 : (page - 1) * pageSize + 1);
+  const displayEndIndex = isClientFilterActive ? clientEndIndex : Math.min(page * pageSize, serverTotalCount);
 
   // totalStudents used below for filters display
   const totalStudents = allStudents.length;
-  // Server-side pagination calculations
-  const totalPages = Math.max(1, Math.ceil(serverTotalCount / pageSize));
-  const startIndex = serverTotalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const endIndex = Math.min(page * pageSize, serverTotalCount);
 
   // Clear selection when page/filters change
   useEffect(() => {
@@ -172,7 +198,7 @@ export default function Students() {
   }, [page, pageSize, filters]);
 
   // Selection helpers
-  const currentPageIds = useMemo(() => filteredStudents.map(s => s.id), [filteredStudents]);
+  const currentPageIds = useMemo(() => displayStudents.map(s => s.id), [displayStudents]);
   const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
   const somePageSelected = currentPageIds.some(id => selectedIds.has(id));
 
@@ -202,14 +228,14 @@ export default function Students() {
   };
 
   const selectedStudentNames = useMemo(() => {
-    return filteredStudents.filter(s => selectedIds.has(s.id)).map(s => s.name);
-  }, [filteredStudents, selectedIds]);
+    return displayStudents.filter(s => selectedIds.has(s.id)).map(s => s.name);
+  }, [displayStudents, selectedIds]);
 
   const studentNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    filteredStudents.forEach(s => map.set(s.id, s.name));
+    displayStudents.forEach(s => map.set(s.id, s.name));
     return map;
-  }, [filteredStudents]);
+  }, [displayStudents]);
 
   // Batch name lookup
   const batchNameMap = useMemo(() => {
@@ -357,9 +383,9 @@ export default function Students() {
               <ScanSearch className="mr-2 h-4 w-4" /> Find Duplicates
             </Button>
           )}
-          {filteredStudents.length > 0 && (
-            <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
-              <Download className="mr-2 h-4 w-4" /> Export
+            {displayStudents.length > 0 && (
+              <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+                <Download className="mr-2 h-4 w-4" /> Export
             </Button>
           )}
           {effectiveCanAdd && (
@@ -403,12 +429,12 @@ export default function Students() {
           <CardHeader className="flex flex-col gap-4">
             <div className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">All Students</CardTitle>
-              <span className="text-sm text-muted-foreground">{serverTotalCount} students</span>
+              <span className="text-sm text-muted-foreground">{displayTotalCount} students</span>
             </div>
             <StudentFilters
               filters={filters}
               onChange={setFilters}
-              totalResults={filteredStudents.length}
+              totalResults={displayStudents.length}
               totalStudents={totalStudents}
             />
 
@@ -460,7 +486,7 @@ export default function Students() {
             )}
           </CardHeader>
           <CardContent>
-            {filteredStudents.length === 0 ? (
+            {displayStudents.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="mb-3 rounded-full bg-muted p-3">
                   <Search className="h-6 w-6 text-muted-foreground" />
@@ -498,7 +524,7 @@ export default function Students() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStudents.map((s) => {
+                    {displayStudents.map((s) => {
                       const isSelected = selectedIds.has(s.id);
                       const isEnrolled = s.batch_id != null;
                       const batchName = s.batch_id ? batchNameMap.get(s.batch_id) || "—" : "—";
@@ -609,15 +635,15 @@ export default function Students() {
               </div>
               <TablePagination
                 currentPage={page}
-                totalPages={totalPages}
-                totalItems={serverTotalCount}
-                startIndex={startIndex}
-                endIndex={endIndex}
+                totalPages={displayTotalPages}
+                totalItems={displayTotalCount}
+                startIndex={displayStartIndex}
+                endIndex={displayEndIndex}
                 itemsPerPage={pageSize}
                 onPageChange={setPage}
                 onItemsPerPageChange={(size) => { setPageSize(size); setPage(1); }}
                 itemsPerPageOptions={[25, 50, 100, 200]}
-                canGoNext={page < totalPages}
+                canGoNext={page < displayTotalPages}
                 canGoPrev={page > 1}
               />
             </>
@@ -633,10 +659,10 @@ export default function Students() {
       <StudentExportDialog
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
-        students={filteredStudents}
-        studentSummaries={studentSummaries}
+        students={displayStudents}
+        studentSummaries={isClientFilterActive ? allStudentSummaries : studentSummaries}
         filters={filters}
-        totalCount={serverTotalCount}
+        totalCount={displayTotalCount}
         activeCompanyId={activeCompanyId}
       />
 
