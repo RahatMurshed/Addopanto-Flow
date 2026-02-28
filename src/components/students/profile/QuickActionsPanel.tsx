@@ -39,7 +39,6 @@ const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: "inactive", label: "Inactive", color: "text-red-600" },
   { value: "graduated", label: "Graduated", color: "text-blue-600" },
   { value: "dropout", label: "Dropout", color: "text-orange-600" },
-  { value: "transferred", label: "Transferred", color: "text-purple-600" },
   { value: "inquiry", label: "Inquiry", color: "text-yellow-600" },
 ];
 

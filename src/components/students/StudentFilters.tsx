@@ -14,7 +14,7 @@ import { useBatches } from "@/hooks/useBatches";
 
 export interface StudentFilterValues {
   search: string;
-  status: "all" | "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
+  status: "all" | "active" | "inactive" | "graduated" | "dropout" | "inquiry";
   admissionStatus: "all" | "paid" | "partial" | "pending";
   monthlyStatus: "all" | "paid" | "pending" | "overdue";
   sortBy: "name" | "enrollment_date" | "monthly_fee_amount" | "student_id_number" | "date_of_birth" | "class_grade" | "created_at";
@@ -257,7 +257,6 @@ export default function StudentFilters({ filters, onChange, totalResults, totalS
               <SelectItem value="inquiry">Inquiry</SelectItem>
               <SelectItem value="graduated">Graduated</SelectItem>
               <SelectItem value="dropout">Dropout</SelectItem>
-              <SelectItem value="transferred">Transferred</SelectItem>
             </SelectContent>
           </Select>
 

@@ -15,7 +15,7 @@ export interface Student {
   course_end_month: string | null;
   admission_fee_total: number;
   monthly_fee_amount: number;
-  status: "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
+  status: "active" | "inactive" | "graduated" | "dropout" | "inquiry";
   notes: string | null;
   user_id: string;
   company_id: string;
@@ -82,7 +82,7 @@ export interface StudentInsert {
   course_end_month?: string | null;
   admission_fee_total?: number;
   monthly_fee_amount?: number;
-  status?: "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
+  status?: "active" | "inactive" | "graduated" | "dropout" | "inquiry";
   notes?: string | null;
   batch_id?: string | null;
   // Extended fields
@@ -136,7 +136,7 @@ export interface StudentInsert {
 
 export interface StudentFilters {
   search?: string;
-  status?: "all" | "active" | "inactive" | "graduated" | "dropout" | "transferred" | "inquiry";
+  status?: "all" | "active" | "inactive" | "graduated" | "dropout" | "inquiry";
   sortBy?: "name" | "enrollment_date" | "monthly_fee_amount" | "student_id_number" | "date_of_birth" | "class_grade" | "created_at";
   sortOrder?: "asc" | "desc";
   // Advanced filters
