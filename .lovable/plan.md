@@ -1,119 +1,67 @@
 
+## Fix Student Page Filters (Monthly Paid, Admission Status, and Others)
 
-## Batch Duration in Months+Days and Payment Mode Selection
+### Root Cause Analysis
 
-### What Changes
-
-**Currently:** Batch duration is a single "months" integer. All batches assume monthly recurring payments.
-
-**After this change:**
-- Duration can be set as "X months Y days" (e.g., 1 month 15 days, or just 15 days, or 3 months 0 days)
-- Each batch has a **Payment Mode**: either "One-Time Payment" (single lump sum for the entire course) or "Monthly Payment" (recurring monthly fees as today)
+There are **3 interconnected bugs** causing the filters to malfunction:
 
 ---
 
-### 1. Database Migration
+### Bug 1: Client-side filters don't work with server-side pagination (Critical)
 
-Add two new columns to the `batches` table:
+The `admissionStatus` and `monthlyStatus` filters are applied **client-side on the current page only** (lines 134-160 in `Students.tsx`). This fundamentally breaks with server-side pagination:
 
-- `course_duration_days` (integer, nullable, default 0) -- the "days" part of the duration
-- `payment_mode` (text, not null, default `'monthly'`) -- values: `'one_time'` or `'monthly'`
+- User selects "Monthly Paid" -- only students on page 1 are checked
+- Students matching "Monthly Paid" on pages 2-10 are never shown
+- The pagination count still says "200 students" but the table shows fewer rows
+- Changing pages doesn't help because each page is independently filtered
 
-Existing batches will default to `payment_mode = 'monthly'` and `course_duration_days = 0`, preserving current behavior.
+**Fix:** Move these filters to work across ALL students by filtering against `allStudents` + `allPayments` (which are already fetched), then paginate the filtered result client-side. This means:
+- Compute summaries for ALL students (already done at line 115-122)
+- Apply admission/monthly filters on the full `allStudents` list
+- Client-side paginate the filtered result
+- The server-side pagination continues to handle search, status, batch, and other DB-level filters
+- When admission/monthly filters are active, switch to client-side pagination mode
 
----
+### Bug 2: Students with no `billing_start_month` pass "Monthly Paid" filter incorrectly
 
-### 2. BatchDialog Form Updates
+In `computeStudentSummary`, if `billing_start_month` is null/empty, `allMonths` ends up empty. This makes all month arrays (overdue, pending, partial) empty. The "Monthly Paid" filter check (line 154) returns `true` for these students since there are no overdue/pending/partial months -- but they haven't actually paid anything.
 
-**Duration section** -- Replace the single "Duration (months)" input with two side-by-side inputs:
-- "Duration Months" (number, min 0)
-- "Duration Days" (number, min 0, max 30)
-- Validation: at least one must be > 0
+**Fix:** In the monthly filter logic, add a check: if a student has a monthly fee > 0 but no billing_start_month set, treat them as "pending" (not "paid").
 
-**Payment Mode section** -- Add a toggle/radio group below the duration:
-- "Monthly Payment" (default) -- shows "Default Monthly Fee" and "Default Admission Fee" fields as today
-- "One-Time Payment" -- hides "Default Monthly Fee", renames "Default Admission Fee" to "Course Fee (One-Time)"
+### Bug 3: `useStudentPayments()` hits 1000-row default limit
 
-**Fee fields adapt based on payment mode:**
-- Monthly mode: Admission Fee + Monthly Fee (current behavior)
-- One-time mode: Single "Course Fee" field (stored in `default_admission_fee` column)
+The `useStudentPayments()` hook (line 46-54) fetches ALL payments for the company without any `.limit()` or batched fetching. Supabase silently caps at 1000 rows. For companies with >1000 payment records, summaries become inaccurate and filters produce wrong results.
 
----
-
-### 3. TypeScript Types Update
-
-Update `Batch` and `BatchInsert` interfaces in `useBatches.ts`:
-- Add `course_duration_days: number | null`
-- Add `payment_mode: 'one_time' | 'monthly'`
+**Fix:** Add batched fetching (same pattern as `useAllStudents`) to `useStudentPayments` when fetching all payments (no `studentId` parameter).
 
 ---
 
-### 4. Payment Schedule Generation
+### Technical Changes
 
-**`enrollmentSync.ts` and `BatchEnrollDialog.tsx`** -- both have `generatePaymentSchedule` / `generateEnrollmentPaymentSchedule`:
+**File: `src/pages/Students.tsx`**
+- When `admissionStatus` or `monthlyStatus` filters are active, compute filtered students from `allStudents` + `allStudentSummaries` instead of just the current page
+- Implement client-side pagination for the filtered result
+- Update the pagination display to show correct counts
+- When these filters are "all", use existing server-side pagination as-is
 
-- If `payment_mode = 'one_time'`: generate only ONE schedule row with `payment_type = 'admission'` using `default_admission_fee` as the total course fee. No monthly rows.
-- If `payment_mode = 'monthly'`: current behavior (admission row + monthly rows based on `course_duration_months`)
+**File: `src/hooks/useStudentPayments.ts`**
+- In `useStudentPayments()`, when no `studentId` is provided (fetching all), use batched fetching with `.range()` to handle >1000 payments
+- Add the missing billing_start_month null check in the filter logic
 
----
-
-### 5. Display Updates Across the App
-
-All locations that display "Duration: X months" need updating to show the combined format:
-
-| File | Change |
-|---|---|
-| `BatchDialog.tsx` | Form inputs (covered above) |
-| `StudentDialog.tsx` | Badge display "Duration: X months Y days" |
-| `AcademicStep.tsx` | Badge display |
-| `StudentDetail.tsx` | Duration display |
-| `StudentProfilePage.tsx` | Duration display |
-| `EnrollmentTimeline.tsx` | Duration display |
-| `BatchDetail.tsx` | Batch info cards |
-| `Batches.tsx` | Table column |
-| `CourseDetail.tsx` | Table column |
-
-A shared helper function `formatDuration(months: number | null, days: number | null): string` will be created in a utils file to standardize display (e.g., "1 month 15 days", "15 days", "3 months").
+**File: `src/pages/Students.tsx` (filter logic)**
+- Fix the "Monthly Paid" filter: if student has `monthly_fee_amount > 0` but no `billing_start_month`, classify as "pending" not "paid"
+- Fix the "Monthly Pending" filter: same null-check to avoid false negatives
 
 ---
 
-### 6. Computation Adjustments
+### How it works after the fix
 
-**`computeStudentSummary`** and **`computeLifetimeMetrics`**: These use `course_duration_months` to calculate billing ranges and total expected fees.
+1. User selects "Monthly Paid" filter
+2. System iterates ALL students (from `allStudents` cache), computes each summary
+3. Filters to only students where all billed months are paid
+4. Paginates the filtered list client-side
+5. Shows correct count: "Showing 1-50 of 87 students"
+6. Page navigation works correctly within the filtered set
 
-- For **one-time payment** batches: the total expected = `default_admission_fee` only. No monthly billing range needed.
-- For **monthly payment** batches: behavior unchanged; `course_duration_days` is informational only (billing still operates on full-month boundaries).
-
-**End date auto-calculation**: When `course_duration_months` and `course_duration_days` are both set, `end_date` can be auto-suggested as `start_date + months + days`.
-
----
-
-### 7. StudentPaymentDialog Adjustment
-
-When recording payments for a student in a **one-time payment** batch:
-- The "Payment Type" selector should default to and only show "Admission" (which represents the one-time course fee)
-- Hide the monthly payment option and month selector
-
----
-
-### Technical Details
-
-**Files to modify:**
-1. New migration SQL -- add `course_duration_days` and `payment_mode` columns to `batches`
-2. `src/hooks/useBatches.ts` -- update interfaces
-3. `src/components/dialogs/BatchDialog.tsx` -- form redesign with duration fields and payment mode toggle
-4. `src/utils/enrollmentSync.ts` -- adapt schedule generation for one-time mode
-5. `src/components/dialogs/BatchEnrollDialog.tsx` -- adapt schedule generation for one-time mode
-6. `src/components/dialogs/StudentDialog.tsx` -- display updates
-7. `src/components/StudentWizardSteps/AcademicStep.tsx` -- display updates
-8. `src/pages/StudentDetail.tsx` -- display updates
-9. `src/pages/StudentProfilePage.tsx` -- display updates
-10. `src/components/students/profile/EnrollmentTimeline.tsx` -- display updates
-11. `src/pages/BatchDetail.tsx` -- display updates
-12. `src/pages/Batches.tsx` -- display updates
-13. `src/pages/CourseDetail.tsx` -- display updates
-14. `src/components/dialogs/StudentPaymentDialog.tsx` -- restrict options for one-time batches
-15. `src/utils/studentMetrics.ts` -- adjust `computeLifetimeMetrics` for one-time mode
-16. `src/hooks/useStudentPayments.ts` -- adjust `computeStudentSummary` for one-time mode
-17. New `src/utils/durationFormat.ts` -- shared `formatDuration` helper
-
+Server-side filters (search, status, batch, gender, class, address) continue to work as before. The admission/monthly filters overlay on top.
