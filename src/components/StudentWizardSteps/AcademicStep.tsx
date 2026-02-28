@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useBatches } from "@/hooks/useBatches";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Textarea } from "@/components/ui/textarea";
+import { formatDuration } from "@/utils/durationFormat";
 
 export interface AcademicData {
   student_id_number: string;
@@ -175,7 +176,8 @@ export default function AcademicStep({ data, onChange, errors, disabled, lockedB
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">Admission: {formatCurrency(Number(selectedBatch!.default_admission_fee), currency)}</Badge>
               <Badge variant="secondary">Monthly: {formatCurrency(Number(selectedBatch!.default_monthly_fee), currency)}</Badge>
-              {selectedBatch!.course_duration_months && <Badge variant="secondary">Duration: {selectedBatch!.course_duration_months} months</Badge>}
+              {(selectedBatch!.course_duration_months || (selectedBatch as any).course_duration_days) && <Badge variant="secondary">Duration: {formatDuration(selectedBatch!.course_duration_months, (selectedBatch as any).course_duration_days)}</Badge>}
+              <Badge variant="secondary">{(selectedBatch as any).payment_mode === "one_time" ? "One-Time" : "Monthly"}</Badge>
             </div>
           </div>
         )}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, addMonths, addDays } from "date-fns";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +28,9 @@ const batchSchema = z.object({
   description: z.string().max(500).nullable().optional(),
   start_date: z.string().min(1, "Start date is required"),
   end_date: z.string().nullable().optional().or(z.literal("")),
-  course_duration_months: z.number().min(1).nullable().optional(),
+  course_duration_months: z.number().min(0).nullable().optional(),
+  course_duration_days: z.number().min(0).max(30).nullable().optional(),
+  payment_mode: z.enum(["one_time", "monthly"]),
   default_admission_fee: z.number().min(0),
   default_monthly_fee: z.number().min(0),
   max_capacity: z.number().min(1).nullable().optional(),
@@ -37,7 +40,12 @@ const batchSchema = z.object({
     return false;
   }
   return true;
-}, { message: "End date must be after start date", path: ["end_date"] });
+}, { message: "End date must be after start date", path: ["end_date"] })
+.refine((data) => {
+  const m = data.course_duration_months || 0;
+  const d = data.course_duration_days || 0;
+  return m > 0 || d > 0;
+}, { message: "Duration must be at least 1 day or 1 month", path: ["course_duration_days"] });
 
 type BatchFormData = z.infer<typeof batchSchema>;
 
@@ -72,6 +80,8 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
       start_date: format(new Date(), "yyyy-MM-dd"),
       end_date: "",
       course_duration_months: null,
+      course_duration_days: null,
+      payment_mode: "monthly",
       default_admission_fee: 0,
       default_monthly_fee: 0,
       max_capacity: null,
@@ -88,6 +98,8 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
         start_date: batch?.start_date || format(new Date(), "yyyy-MM-dd"),
         end_date: batch?.end_date || "",
         course_duration_months: batch?.course_duration_months ?? courseDurationMonths ?? null,
+        course_duration_days: (batch as any)?.course_duration_days ?? null,
+        payment_mode: (batch as any)?.payment_mode || "monthly",
         default_admission_fee: batch ? Number(batch.default_admission_fee) : 0,
         default_monthly_fee: batch ? Number(batch.default_monthly_fee) : 0,
         max_capacity: batch?.max_capacity ?? null,
@@ -103,6 +115,29 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
       form.setValue("batch_code", generateBatchCode(watchedName));
     }
   }, [watchedName, isEdit, form]);
+
+  const paymentMode = form.watch("payment_mode");
+
+  // Auto-suggest end date when start date + duration changes
+  const watchedStartDate = form.watch("start_date");
+  const watchedDurationMonths = form.watch("course_duration_months");
+  const watchedDurationDays = form.watch("course_duration_days");
+
+  useEffect(() => {
+    if (!watchedStartDate) return;
+    const m = watchedDurationMonths || 0;
+    const d = watchedDurationDays || 0;
+    if (m === 0 && d === 0) return;
+    
+    let endDate = new Date(watchedStartDate);
+    if (m > 0) endDate = addMonths(endDate, m);
+    if (d > 0) endDate = addDays(endDate, d);
+    
+    // Only auto-set if user hasn't manually set an end date or in create mode
+    if (!isEdit || !form.getValues("end_date")) {
+      form.setValue("end_date", format(endDate, "yyyy-MM-dd"));
+    }
+  }, [watchedStartDate, watchedDurationMonths, watchedDurationDays]);
 
   const handleSubmit = async (data: BatchFormData) => {
     setSaving(true);
@@ -133,8 +168,10 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
         start_date: data.start_date,
         end_date: data.end_date || null,
         course_duration_months: data.course_duration_months ?? null,
+        course_duration_days: data.course_duration_days ?? null,
+        payment_mode: data.payment_mode,
         default_admission_fee: data.default_admission_fee,
-        default_monthly_fee: data.default_monthly_fee,
+        default_monthly_fee: data.payment_mode === "one_time" ? 0 : data.default_monthly_fee,
         max_capacity: data.max_capacity ?? null,
         status: data.status,
       });
@@ -203,10 +240,16 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Duration: Months + Days */}
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="course_duration_months">Duration (months)</Label>
-              <Input id="course_duration_months" type="number" min="1" disabled={saving} {...form.register("course_duration_months", { valueAsNumber: true, setValueAs: (v) => v === "" || v === undefined ? null : Number(v) })} />
+              <Label htmlFor="course_duration_months">Duration (Months)</Label>
+              <Input id="course_duration_months" type="number" min="0" placeholder="0" disabled={saving} {...form.register("course_duration_months", { valueAsNumber: true, setValueAs: (v) => v === "" || v === undefined ? null : Number(v) })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="course_duration_days">Duration (Days)</Label>
+              <Input id="course_duration_days" type="number" min="0" max="30" placeholder="0" disabled={saving} {...form.register("course_duration_days", { valueAsNumber: true, setValueAs: (v) => v === "" || v === undefined ? null : Number(v) })} />
+              {form.formState.errors.course_duration_days && <p className="text-sm text-destructive">{form.formState.errors.course_duration_days.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="max_capacity">Max Capacity</Label>
@@ -214,15 +257,40 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
             </div>
           </div>
 
+          {/* Payment Mode */}
+          <div className="space-y-3">
+            <Label>Payment Mode *</Label>
+            <RadioGroup
+              value={paymentMode}
+              onValueChange={(v) => form.setValue("payment_mode", v as "one_time" | "monthly")}
+              className="flex gap-4"
+              disabled={saving}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="monthly" id="pm_monthly" />
+                <Label htmlFor="pm_monthly" className="font-normal cursor-pointer">Monthly Payment</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="one_time" id="pm_onetime" />
+                <Label htmlFor="pm_onetime" className="font-normal cursor-pointer">One-Time Payment</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Fee Fields - adapt based on payment mode */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="default_admission_fee">Default Admission Fee</Label>
+              <Label htmlFor="default_admission_fee">
+                {paymentMode === "one_time" ? "Course Fee (One-Time)" : "Default Admission Fee"}
+              </Label>
               <Input id="default_admission_fee" type="number" step="0.01" min="0" disabled={saving} {...form.register("default_admission_fee", { valueAsNumber: true })} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="default_monthly_fee">Default Monthly Fee</Label>
-              <Input id="default_monthly_fee" type="number" step="0.01" min="0" disabled={saving} {...form.register("default_monthly_fee", { valueAsNumber: true })} />
-            </div>
+            {paymentMode === "monthly" && (
+              <div className="space-y-2">
+                <Label htmlFor="default_monthly_fee">Default Monthly Fee</Label>
+                <Input id="default_monthly_fee" type="number" step="0.01" min="0" disabled={saving} {...form.register("default_monthly_fee", { valueAsNumber: true })} />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

@@ -13,6 +13,8 @@ export interface Batch {
   start_date: string;
   end_date: string | null;
   course_duration_months: number | null;
+  course_duration_days: number | null;
+  payment_mode: "one_time" | "monthly";
   default_admission_fee: number;
   default_monthly_fee: number;
   max_capacity: number | null;
@@ -31,6 +33,8 @@ export interface BatchInsert {
   start_date: string;
   end_date?: string | null;
   course_duration_months?: number | null;
+  course_duration_days?: number | null;
+  payment_mode?: "one_time" | "monthly";
   default_admission_fee?: number;
   default_monthly_fee?: number;
   max_capacity?: number | null;

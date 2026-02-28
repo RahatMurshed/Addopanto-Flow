@@ -31,7 +31,7 @@ async function generateEnrollmentPaymentSchedule(
 ) {
   const { data: batch, error: batchError } = await supabase
     .from("batches")
-    .select("start_date, course_duration_months, default_admission_fee, default_monthly_fee")
+    .select("start_date, course_duration_months, default_admission_fee, default_monthly_fee, payment_mode")
     .eq("id", batchId)
     .single();
 
@@ -60,51 +60,71 @@ async function generateEnrollmentPaymentSchedule(
     }
   }
 
-  // Admission fee row
-  if (batch.default_admission_fee && Number(batch.default_admission_fee) > 0) {
-    scheduleRows.push({
-      student_id: studentId,
-      company_id: companyId,
-      user_id: userId,
-      batch_enrollment_id: enrollmentId,
-      payment_type: "admission",
-      amount: Number(batch.default_admission_fee),
-      status: "unpaid",
-      due_date: batch.start_date,
-      payment_date: batch.start_date,
-      payment_method: "cash",
-      months_covered: null,
-    });
-  }
-
-  // Monthly fee rows
-  const durationMonths = batch.course_duration_months;
-  const monthlyFee = Number(batch.default_monthly_fee);
-
-  if (durationMonths && durationMonths > 0 && monthlyFee > 0) {
-    // Calculate how many months from batch start the effective start is
-    const startOffset = (effectiveStart.getFullYear() - batchStartDate.getFullYear()) * 12
-      + (effectiveStart.getMonth() - batchStartDate.getMonth());
-    const actualOffset = Math.max(0, Math.min(startOffset, durationMonths));
-
-    for (let i = actualOffset; i < durationMonths; i++) {
-      const dueDate = addMonths(batchStartDate, i);
-      const dueDateStr = format(dueDate, "yyyy-MM-dd");
-      const monthStr = format(dueDate, "yyyy-MM");
-
+  // For one-time payment mode: only generate one admission/course fee row
+  if ((batch as any).payment_mode === "one_time") {
+    if (batch.default_admission_fee && Number(batch.default_admission_fee) > 0) {
       scheduleRows.push({
         student_id: studentId,
         company_id: companyId,
         user_id: userId,
         batch_enrollment_id: enrollmentId,
-        payment_type: "monthly",
-        amount: monthlyFee,
+        payment_type: "admission",
+        amount: Number(batch.default_admission_fee),
         status: "unpaid",
-        due_date: dueDateStr,
-        payment_date: dueDateStr,
+        due_date: batch.start_date,
+        payment_date: batch.start_date,
         payment_method: "cash",
-        months_covered: [monthStr],
+        months_covered: null,
       });
+    }
+  } else {
+    // Monthly mode: admission fee row + monthly rows
+    // Admission fee row
+    if (batch.default_admission_fee && Number(batch.default_admission_fee) > 0) {
+      scheduleRows.push({
+        student_id: studentId,
+        company_id: companyId,
+        user_id: userId,
+        batch_enrollment_id: enrollmentId,
+        payment_type: "admission",
+        amount: Number(batch.default_admission_fee),
+        status: "unpaid",
+        due_date: batch.start_date,
+        payment_date: batch.start_date,
+        payment_method: "cash",
+        months_covered: null,
+      });
+    }
+
+    // Monthly fee rows
+    const durationMonths = batch.course_duration_months;
+    const monthlyFee = Number(batch.default_monthly_fee);
+
+    if (durationMonths && durationMonths > 0 && monthlyFee > 0) {
+      // Calculate how many months from batch start the effective start is
+      const startOffset = (effectiveStart.getFullYear() - batchStartDate.getFullYear()) * 12
+        + (effectiveStart.getMonth() - batchStartDate.getMonth());
+      const actualOffset = Math.max(0, Math.min(startOffset, durationMonths));
+
+      for (let i = actualOffset; i < durationMonths; i++) {
+        const dueDate = addMonths(batchStartDate, i);
+        const dueDateStr = format(dueDate, "yyyy-MM-dd");
+        const monthStr = format(dueDate, "yyyy-MM");
+
+        scheduleRows.push({
+          student_id: studentId,
+          company_id: companyId,
+          user_id: userId,
+          batch_enrollment_id: enrollmentId,
+          payment_type: "monthly",
+          amount: monthlyFee,
+          status: "unpaid",
+          due_date: dueDateStr,
+          payment_date: dueDateStr,
+          payment_method: "cash",
+          months_covered: [monthStr],
+        });
+      }
     }
   }
 
