@@ -108,6 +108,7 @@ function ProductPurchaseHistoryWrapper({ studentId, companyId, fc }: { studentId
         total_amount: Number(s.total_amount),
         sale_date: s.sale_date,
         payment_method: s.payment_method,
+        payment_status: s.payment_status ?? "paid",
         user_id: s.user_id,
         productName: product?.name ?? "Unknown Product",
         category: product?.category ?? "General",

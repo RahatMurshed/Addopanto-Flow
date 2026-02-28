@@ -13,6 +13,7 @@ export interface ProductSale {
   customer_name: string | null;
   student_id: string | null;
   payment_method: string;
+  payment_status: string;
   sale_date: string;
   notes: string | null;
   source_id: string | null;
@@ -28,6 +29,7 @@ export interface ProductSaleInsert {
   customer_name?: string | null;
   student_id?: string | null;
   payment_method?: string;
+  payment_status?: string;
   sale_date?: string;
   notes?: string | null;
   source_id?: string | null;

@@ -1828,6 +1828,7 @@ export type Database = {
           id: string
           notes: string | null
           payment_method: string
+          payment_status: string
           product_id: string
           quantity: number
           sale_date: string
@@ -1844,6 +1845,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          payment_status?: string
           product_id: string
           quantity?: number
           sale_date?: string
@@ -1860,6 +1862,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          payment_status?: string
           product_id?: string
           quantity?: number
           sale_date?: string

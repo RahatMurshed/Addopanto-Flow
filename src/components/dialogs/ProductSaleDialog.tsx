@@ -33,6 +33,7 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending" | "partial">("paid");
   const [saleSuccess, setSaleSuccess] = useState(false);
 
   // Reset form when dialog opens or preselectedProduct changes
@@ -46,6 +47,7 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
       setPaymentMethod("cash");
       setSaleDate(new Date().toISOString().slice(0, 10));
       setNotes("");
+      setPaymentStatus("paid");
       setSaleSuccess(false);
     }
   }, [open, preselectedProduct]);
@@ -86,7 +88,8 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
         payment_method: paymentMethod,
         sale_date: saleDate,
         notes: notes || null,
-      });
+        payment_status: paymentStatus,
+      } as any);
       setSaleSuccess(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to record sale");
@@ -201,12 +204,25 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Sale Date</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Payment Status</Label>
+              <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as "paid" | "pending" | "partial")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="partial">Partial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Sale Date</Label>
             <Input type="date" value={saleDate} max={today} onChange={(e) => setSaleDate(e.target.value)} />
-            {isFutureDate && (
-              <p className="text-xs text-destructive">Sale date cannot be in the future</p>
-            )}
+              {isFutureDate && (
+                <p className="text-xs text-destructive">Sale date cannot be in the future</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
