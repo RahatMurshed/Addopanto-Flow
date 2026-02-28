@@ -61,6 +61,7 @@ const CategoryProducts = lazy(() => import("@/pages/CategoryProducts"));
 const Stakeholders = lazy(() => import("@/pages/Stakeholders"));
 const AddStakeholder = lazy(() => import("@/pages/AddStakeholder"));
 const StakeholderDetail = lazy(() => import("@/pages/StakeholderDetail"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -170,6 +171,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
                   <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   
                   <Route path="/companies" element={<ProtectedRoute><CompanySelection /></ProtectedRoute>} />
                   <Route path="/companies/join" element={<ProtectedRoute><JoinCompany /></ProtectedRoute>} />
@@ -192,8 +194,8 @@ const App = () => (
                   <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                   <Route path="/users" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><UserManagement /></RoleGuard></ProtectedRoute>} />
                   <Route path="/company/members" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoMembers]}><CompanyMembers /></AccessGuard></ProtectedRoute>} />
-                  <Route path="/company-requests" element={<ProtectedRoute><CompanyCreationRequests /></ProtectedRoute>} />
-                  <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
+                  <Route path="/company-requests" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><CompanyCreationRequests /></RoleGuard></ProtectedRoute>} />
+                  <Route path="/audit-log" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.moderatorDashboard]}><AuditLog /></AccessGuard></ProtectedRoute>} />
                   <Route path="/employees" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeesPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/employees/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoEmployees]}><EmployeeDetailPage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/products" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CriticalRouteErrorBoundary routeName="Products"><Products /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
