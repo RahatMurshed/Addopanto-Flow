@@ -2746,6 +2746,111 @@ export type Database = {
           },
         ]
       }
+      student_tag_assignments: {
+        Row: {
+          assigned_by: string
+          company_id: string
+          created_at: string
+          id: string
+          student_id: string
+          tag_id: string
+        }
+        Insert: {
+          assigned_by: string
+          company_id: string
+          created_at?: string
+          id?: string
+          student_id: string
+          tag_id: string
+        }
+        Update: {
+          assigned_by?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          student_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_tag_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_tag_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_tag_assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_tag_assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_tag_assignments_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "student_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_tags: {
+        Row: {
+          color_class: string
+          company_id: string
+          created_at: string
+          created_by: string
+          id: string
+          label: string
+        }
+        Insert: {
+          color_class?: string
+          company_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          label: string
+        }
+        Update: {
+          color_class?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_tags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_tags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           aadhar_id_number: string | null
