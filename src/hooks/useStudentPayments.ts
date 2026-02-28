@@ -73,11 +73,11 @@ export function useCreateStudentPayment() {
       if (paymentData.payment_type === "monthly" && paymentData.months_covered && paymentData.months_covered.length > 0) {
         const { data: existingRows } = await supabase
           .from("student_payments")
-          .select("id, months_covered")
+          .select("id, months_covered, amount, status")
           .eq("student_id", paymentData.student_id)
           .eq("company_id", activeCompanyId)
           .eq("payment_type", "monthly")
-          .eq("status", "unpaid");
+          .in("status", ["unpaid", "partial"]);
 
         // Find matching unpaid rows for the selected months
         const matchingRows = (existingRows || []).filter(row =>
@@ -85,13 +85,22 @@ export function useCreateStudentPayment() {
         );
 
         if (matchingRows.length > 0) {
-          // Update existing unpaid rows to paid
+          // Update existing unpaid/partial rows — determine partial vs paid
           for (const row of matchingRows) {
+            // Calculate the per-row payment amount based on months covered
+            const rowPayment = paymentData.amount / paymentData.months_covered!.length * (row.months_covered?.length || 1);
+            // Get the original scheduled amount (the amount on the unpaid row represents the expected due)
+            const originalDue = row.status === "unpaid" ? Number(row.amount) : 0;
+            // For partial rows, the original due is already partially paid, so we just add
+            const newStatus = (row.status === "unpaid" && rowPayment < originalDue && originalDue > 0)
+              ? "partial"
+              : "paid";
+
             await supabase
               .from("student_payments")
               .update({
-                status: "paid",
-                amount: paymentData.amount / paymentData.months_covered!.length * (row.months_covered?.length || 1),
+                status: newStatus,
+                amount: rowPayment,
                 payment_date: paymentData.payment_date,
                 payment_method: paymentData.payment_method,
                 receipt_number: paymentData.receipt_number || null,

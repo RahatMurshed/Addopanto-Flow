@@ -13,6 +13,7 @@ export interface ProductPurchaseRow {
   total_amount: number;
   sale_date: string;
   payment_method: string;
+  payment_status?: string;
   user_id: string;
   productName: string;
   category: string;
@@ -87,6 +88,7 @@ export function ProductPurchasesTab({ purchases, userMap, fc, isAdmin, isLoading
               <th className="text-right p-3 text-xs font-medium text-muted-foreground">Total</th>
               <th className="text-left p-3 text-xs font-medium text-muted-foreground">Date</th>
               <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Method</th>
+              <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Status</th>
               <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Recorded By</th>
             </tr>
           </thead>
@@ -104,6 +106,14 @@ export function ProductPurchasesTab({ purchases, userMap, fc, isAdmin, isLoading
                 <td className="p-3 text-right font-medium text-foreground">{fc(p.total_amount)}</td>
                 <td className="p-3 text-muted-foreground">{format(new Date(p.sale_date), "MMM d, yyyy")}</td>
                 <td className="p-3 text-muted-foreground capitalize hidden md:table-cell">{p.payment_method}</td>
+                <td className="p-3 hidden md:table-cell">
+                  <Badge
+                    variant={p.payment_status === "paid" ? "default" : p.payment_status === "partial" ? "secondary" : "outline"}
+                    className={cn("text-xs", p.payment_status === "paid" && "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-transparent")}
+                  >
+                    {p.payment_status || "paid"}
+                  </Badge>
+                </td>
                 <td className="p-3 text-muted-foreground hidden md:table-cell">{userMap.get(p.user_id) ?? "—"}</td>
               </tr>
             ))}
@@ -117,7 +127,7 @@ export function ProductPurchasesTab({ purchases, userMap, fc, isAdmin, isLoading
               <td className="p-3 text-right font-bold text-amber-600 dark:text-amber-400">
                 {fc(totalSpent)}
               </td>
-              <td colSpan={3} />
+              <td colSpan={4} />
             </tr>
           </tfoot>
         </table>
