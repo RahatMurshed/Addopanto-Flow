@@ -184,7 +184,7 @@ export default function BulkImportDialog({
           rows: parsed.rows,
           column_mapping: columnMapping,
           company_id: activeCompanyId,
-          batch_id: selectedBatchId || undefined,
+          batch_id: selectedBatchId && selectedBatchId !== "none" ? selectedBatchId : undefined,
         },
       });
 
@@ -385,7 +385,7 @@ export default function BulkImportDialog({
                     <SelectValue placeholder="No batch assignment" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {batches.map((b: any) => (
                       <SelectItem key={b.id} value={b.id}>
                         {b.batch_name} ({b.batch_code})
