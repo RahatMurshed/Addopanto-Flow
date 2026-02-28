@@ -805,7 +805,20 @@ export default function StudentDetail() {
         <AlertDialogContent onEscapeKeyDown={(e) => { if (deletePaymentMutation.isPending) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Payment</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete this payment record. The corresponding revenue entry will remain for audit purposes.</AlertDialogDescription>
+            <AlertDialogDescription>
+              {(() => {
+                if (!deletePaymentId) return "This will permanently delete this payment record. The corresponding revenue entry will remain for audit purposes.";
+                const targetPayment = payments.find(p => p.id === deletePaymentId);
+                const enrollmentId = targetPayment?.batch_enrollment_id;
+                if (enrollmentId) {
+                  const paidForEnrollment = payments.filter(p => p.batch_enrollment_id === enrollmentId && p.status === "paid");
+                  if (paidForEnrollment.length === 1 && paidForEnrollment[0].id === deletePaymentId) {
+                    return "⚠️ This is the only payment recorded for this enrollment. Deleting it will mark the month as fully unpaid. The corresponding revenue entry will remain for audit purposes.";
+                  }
+                }
+                return "This will permanently delete this payment record. The corresponding revenue entry will remain for audit purposes.";
+              })()}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletePaymentMutation.isPending}>Cancel</AlertDialogCancel>
