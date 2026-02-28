@@ -1,16 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://addopantoflow.lovable.app",
+  "https://id-preview--58aee540-d716-4564-805b-e26d9615ae54.lovable.app",
+];
 
-function jsonResponse(status: number, body: unknown) {
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  };
+}
+
+function jsonResponse(status: number, body: unknown, headers: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...headers, "Content-Type": "application/json" },
   });
 }
 
@@ -19,19 +28,18 @@ const checkBanSchema = z.object({
 });
 
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
   try {
-    // Note: check-ban is called pre-auth during login flow, so we don't require auth token.
-    // It only returns ban status for a given email - no sensitive data exposed.
-    // Rate limiting should be applied at the infrastructure level.
     const rawBody = await req.json().catch(() => null);
     const parsed = checkBanSchema.safeParse(rawBody);
 
     if (!parsed.success) {
-      return jsonResponse(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+      return jsonResponse(400, { error: parsed.error.issues[0]?.message || "Invalid input" }, cors);
     }
 
     const { email } = parsed.data;
@@ -43,7 +51,6 @@ Deno.serve(async (req) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check for active ban first
     const { data: banData, error: banError } = await supabaseAdmin
       .from("registration_requests")
       .select("banned_until, status")
@@ -53,7 +60,7 @@ Deno.serve(async (req) => {
 
     if (banError) {
       console.error("DB error:", banError);
-      return jsonResponse(500, { error: "Internal error" });
+      return jsonResponse(500, { error: "Internal error" }, cors);
     }
 
     if (banData) {
@@ -63,10 +70,9 @@ Deno.serve(async (req) => {
         ban_type: banData.status === "rejected" ? "rejected" : "deleted",
         rejected: false,
         rejection_reason: null,
-      });
+      }, cors);
     }
 
-    // No active ban — check if rejected (ban expired but still rejected status)
     const { data: rejectedData, error: rejError } = await supabaseAdmin
       .from("registration_requests")
       .select("status, rejection_reason")
@@ -76,28 +82,22 @@ Deno.serve(async (req) => {
 
     if (rejError) {
       console.error("DB error:", rejError);
-      return jsonResponse(500, { error: "Internal error" });
+      return jsonResponse(500, { error: "Internal error" }, cors);
     }
 
     if (rejectedData) {
       return jsonResponse(200, {
-        banned: false,
-        banned_until: null,
-        ban_type: null,
-        rejected: true,
-        rejection_reason: rejectedData.rejection_reason,
-      });
+        banned: false, banned_until: null, ban_type: null,
+        rejected: true, rejection_reason: rejectedData.rejection_reason,
+      }, cors);
     }
 
     return jsonResponse(200, {
-      banned: false,
-      banned_until: null,
-      ban_type: null,
-      rejected: false,
-      rejection_reason: null,
-    });
+      banned: false, banned_until: null, ban_type: null, rejected: false, rejection_reason: null,
+    }, cors);
   } catch (e) {
+    const cors = getCorsHeaders(req);
     console.error("Error:", e);
-    return jsonResponse(500, { error: "Internal error" });
+    return jsonResponse(500, { error: "Internal error" }, cors);
   }
 });

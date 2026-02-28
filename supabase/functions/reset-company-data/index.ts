@@ -1,16 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://addopantoflow.lovable.app",
+  "https://id-preview--58aee540-d716-4564-805b-e26d9615ae54.lovable.app",
+];
 
-const json = (status: number, body: unknown) =>
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  };
+}
+
+const json = (status: number, body: unknown, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...headers, "Content-Type": "application/json" },
   });
 
 const resetSchema = z.object({
@@ -19,8 +28,10 @@ const resetSchema = z.object({
 });
 
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
   try {
@@ -29,7 +40,7 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json(401, { error: "Missing authorization" });
+    if (!authHeader) return json(401, { error: "Missing authorization" }, cors);
 
     // Verify user identity
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -37,21 +48,21 @@ Deno.serve(async (req) => {
     });
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) return json(401, { error: "Unauthorized" });
+    if (userError || !user) return json(401, { error: "Unauthorized" }, cors);
 
     const rawBody = await req.json().catch(() => null);
     const parsed = resetSchema.safeParse(rawBody);
     if (!parsed.success) {
-      return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" });
+      return json(400, { error: parsed.error.issues[0]?.message || "Invalid input" }, cors);
     }
 
-    const { companyId, password } = parsed.data;
+    const { password } = parsed.data;
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify password by attempting sign-in
+    // Verify password by attempting sign-in with a separate client
     const tempClient = createClient(supabaseUrl, supabaseAnonKey);
     const { error: authError } = await tempClient.auth.signInWithPassword({
       email: user.email!,
@@ -59,7 +70,7 @@ Deno.serve(async (req) => {
     });
 
     if (authError) {
-      return json(403, { error: "Incorrect password" });
+      return json(403, { error: "Incorrect password" }, cors);
     }
 
     // CIPHER-ONLY: Only cipher users can reset data
@@ -71,7 +82,19 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!cipherCheck) {
-      return json(403, { error: "Only platform administrators can reset company data" });
+      return json(403, { error: "Only platform administrators can reset company data" }, cors);
+    }
+
+    // Derive company_id from user's active company — cipher can access any company
+    const { data: profile } = await adminClient
+      .from("user_profiles")
+      .select("active_company_id")
+      .eq("user_id", user.id)
+      .single();
+
+    const companyId = profile?.active_company_id;
+    if (!companyId) {
+      return json(400, { error: "No active company selected" }, cors);
     }
 
     // Delete data scoped to company (order matters for FK constraints)
@@ -103,7 +126,6 @@ Deno.serve(async (req) => {
 
       if (error) {
         console.error(`Error deleting from ${table}:`, error);
-        // Continue with other tables, some may not have company_id
       }
     }
 
@@ -118,9 +140,10 @@ Deno.serve(async (req) => {
       console.error("Error cleaning memberships:", membershipError);
     }
 
-    return json(200, { success: true });
+    return json(200, { success: true }, cors);
   } catch (err) {
+    const cors = getCorsHeaders(req);
     console.error("Error:", err);
-    return json(500, { error: "Internal error" });
+    return json(500, { error: "Internal error" }, cors);
   }
 });
