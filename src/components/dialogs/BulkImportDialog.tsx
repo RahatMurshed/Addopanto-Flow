@@ -151,11 +151,7 @@ export default function BulkImportDialog({
 
   const requiredFieldsMapped = useMemo(() => {
     const mapped = new Set(Object.values(columnMapping));
-    return (
-      mapped.has("name") &&
-      mapped.has("enrollment_date") &&
-      mapped.has("billing_start_month")
-    );
+    return mapped.has("name");
   }, [columnMapping]);
 
   // Preview data
@@ -296,11 +292,9 @@ export default function BulkImportDialog({
                 <p className="text-sm font-medium">Required columns:</p>
                 <div className="flex flex-wrap gap-2">
                   <Badge>name</Badge>
-                  <Badge>enrollment_date</Badge>
-                  <Badge>billing_start_month</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Dates should be in YYYY-MM-DD format. Billing months in YYYY-MM format. Max 5,000 rows per import.
+                  Only <strong>name</strong> is required. Enrollment date and billing start month are optional (useful for students not yet enrolled). Dates should be in YYYY-MM-DD format. Billing months in YYYY-MM format. Max 5,000 rows per import.
                 </p>
               </div>
             </div>
@@ -335,7 +329,7 @@ export default function BulkImportDialog({
               {mappedFieldCount > 0 && !requiredFieldsMapped && (
                 <div className="flex items-center gap-2 bg-destructive/10 text-destructive rounded-lg p-3 text-sm">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  Required fields (name, enrollment_date, billing_start_month) must be mapped.
+                  Required field (name) must be mapped.
                 </div>
               )}
 
