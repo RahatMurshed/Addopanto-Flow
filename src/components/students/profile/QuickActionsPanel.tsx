@@ -106,8 +106,39 @@ export function QuickActionsPanel({
           .eq("status", "active");
       }
 
+      // If reactivating, restore inactive enrollments whose batch is still active
+      let restoredCount = 0;
+      if (pendingStatus === "active" && ["inactive", "dropout"].includes(student.status)) {
+        const { data: inactiveEnrollments } = await supabase
+          .from("batch_enrollments")
+          .select("id, batch_id, updated_at, batches!inner(status)")
+          .eq("student_id", student.id)
+          .eq("company_id", companyId)
+          .eq("status", "inactive")
+          .order("updated_at", { ascending: false });
+
+        const restorableEnrollments = (inactiveEnrollments as any[])?.filter(
+          (e: any) => e.batches?.status === "active"
+        );
+
+        if (restorableEnrollments?.length) {
+          await supabase
+            .from("batch_enrollments")
+            .update({ status: "active" } as any)
+            .in("id", restorableEnrollments.map((e: any) => e.id));
+
+          await supabase
+            .from("students")
+            .update({ batch_id: restorableEnrollments[0].batch_id } as any)
+            .eq("id", student.id);
+
+          restoredCount = restorableEnrollments.length;
+        }
+      }
+
       onStatusChange?.(pendingStatus);
-      toast({ title: `Status changed to ${pendingStatus}` });
+      const restoredMsg = restoredCount > 0 ? ` — ${restoredCount} enrollment(s) restored` : "";
+      toast({ title: `Status changed to ${pendingStatus}${restoredMsg}` });
     } catch (err: any) {
       toast({ title: "Failed to change status", description: err.message, variant: "destructive" });
     } finally {
@@ -347,7 +378,8 @@ export function QuickActionsPanel({
             <AlertDialogTitle>Change Student Status</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to change <strong>{student.name}</strong>'s status to <strong>{pendingLabel}</strong>?
-              {pendingStatus === "inactive" && " Overdue alerts will stop and revenue projections will be excluded."}
+              {["inactive", "dropout"].includes(pendingStatus ?? "") && " This will deactivate their current enrollments. Overdue alerts will stop and revenue projections will be excluded."}
+              {pendingStatus === "active" && ["inactive", "dropout"].includes(student.status) && " This will restore any inactive enrollments whose batch is still active."}
               {pendingStatus === "graduated" && " The student will be marked as an alumnus."}
             </AlertDialogDescription>
           </AlertDialogHeader>
