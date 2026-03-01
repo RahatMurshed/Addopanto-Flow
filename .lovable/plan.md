@@ -1,68 +1,58 @@
 
 
-# Implement Export PDF Report and Manage Tags for Student Profile
+# Fix: Backfill Missing Expense Records for Old Salary Payments
 
-## Overview
-Both features are currently disabled placeholders in the QuickActionsPanel. The backend infrastructure exists for both -- we just need to wire up the frontend.
+## Root Cause
 
-## 1. Export PDF Report
+You have **12 salary payments** recorded, but only **6 have linked expense records** on the Expenses page. The missing 6 were created during a data restore (before the salary-to-expense sync feature existed). That's why you see the salary on the employee's page but NOT on the Expenses page.
 
-Generate a downloadable PDF of the student's profile including personal info, enrollment timeline, and financial summary.
+```text
++---+------------------+--------+----------+--------------+
+| # | Employee         | Month  | Amount   | Has Expense? |
++---+------------------+--------+----------+--------------+
+| 1 | Jahangir Alam    | 2026-04| 22,000   | YES          |
+| 2 | Jahangir Alam    | 2026-02| 22,000   | YES          |
+| 3 | Raju Miah        | 2026-03| 12,000   | YES          |
+| 4 | Mohammad Hasan   | 2026-03| 25,000   | YES          |
+| 5 | Jahangir Alam    | 2026-03| 22,000   | YES          |
+| 6 | Ayesha Siddiqua  | 2026-03| 18,000   | YES          |
+| 7 | Mohammad Hasan   | 2026-02| 25,000   | MISSING      |
+| 8 | Raju Miah        | 2026-02| 12,000   | MISSING      |
+| 9 | Jahangir Alam    | 2026-02| 22,000   | MISSING      |
+|10 | Ayesha Siddiqua  | 2026-03| 18,000   | MISSING      |
+|11 | Ayesha Siddiqua  | 2026-02| 18,000   | MISSING      |
+|12 | Mohammad Hasan   | 2026-03| 25,000   | MISSING      |
++---+------------------+--------+----------+--------------+
+```
 
-**Approach:**
-- Use the existing `html2canvas` + `jspdf` pattern already used elsewhere in the app
-- Capture the student profile's main content area (left column) as a canvas, then render to a multi-page A4 PDF
-- Follow the existing PDF export convention: light theme, business name in header, no interactive elements
-- Replace the disabled button with a working one that triggers the export
+All future salary recordings will work correctly (the fix is already in place). We just need to backfill the 6 old records.
 
-**Changes:**
-- `QuickActionsPanel.tsx`: Replace the disabled "Export PDF Report" action with a functional one that calls a new `handleExportPdf` function
-- Create `src/components/students/profile/StudentPdfExport.ts` utility with the export logic:
-  - Temporarily force light theme on the capture target
-  - Add a header with company name + student name + date
-  - Use A4-sized canvas slicing for multi-page support
-  - Download as `Student_Report_[Name]_[Date].pdf`
+## Fix Plan
 
-## 2. Manage Tags
+### Step 1: Backfill missing expense records via SQL migration
 
-Allow admins to assign/remove tags on a student. The DB tables `student_tags` and `student_tag_assignments` already exist.
+Write a one-time SQL migration that:
+- Finds all `employee_salary_payments` that have NO matching expense record (no `[SALARY:id]` in any expense description)
+- For each, creates an expense record with:
+  - `amount` = the salary's `net_amount`
+  - `date` = the salary's `payment_date`
+  - `description` = `Salary - [employee_name] - [month] [SALARY:salary_id]`
+  - `expense_account_id` = the company's first/default "Salary" expense account
+  - `company_id` and `user_id` from the salary record
 
-**Approach:**
-- Create a dialog/popover that shows all company tags with checkboxes
-- Allow assigning/unassigning tags to the current student
-- Include an inline "Create Tag" option for adding new tags on the fly
-- Only available to Admin/Cipher roles (already gated)
+### Step 2: Add a database trigger to prevent future gaps
 
-**Changes:**
-- Create `src/hooks/useStudentTags.ts`:
-  - `useCompanyTags(companyId)` -- fetch all tags for the company
-  - `useStudentTagAssignments(studentId)` -- fetch assigned tags for a student
-  - `useAssignTag` / `useUnassignTag` mutations
-  - `useCreateTag` mutation for creating new tags inline
-- Create `src/components/students/profile/ManageTagsDialog.tsx`:
-  - Dialog with a list of company tags as checkboxes
-  - Checked = assigned to student, unchecked = not assigned
-  - "Add new tag" input at the bottom for creating tags inline
-  - Tags shown as colored badges after assignment
-- `QuickActionsPanel.tsx`:
-  - Replace the disabled "Manage Tags" action with a functional one
-  - Add state for dialog open/close
-  - Pass student ID and company ID to the dialog
+Create a Postgres trigger on `employee_salary_payments` INSERT that automatically creates the linked expense record at the database level. This ensures the expense is ALWAYS created even if the frontend code fails or is bypassed (e.g., during data restores).
 
-## 3. Display Assigned Tags on Profile Header
-
-- `ProfileHeader.tsx`: Show assigned tags as small badges below the student name so they're visible at a glance
+This makes the system bulletproof -- no more missing expenses regardless of how salary records are created.
 
 ## Technical Details
 
-**Files to create:**
-- `src/hooks/useStudentTags.ts` -- hooks for tag CRUD
-- `src/components/students/profile/ManageTagsDialog.tsx` -- tag management UI
-- `src/components/students/profile/StudentPdfExport.ts` -- PDF generation utility
+**Database migration (single SQL script):**
+1. Backfill query joins `employee_salary_payments` with `employees` to get names, LEFT JOINs with `expenses` to find gaps, and INSERTs missing expense records
+2. The trigger function `fn_auto_create_salary_expense()` fires AFTER INSERT on `employee_salary_payments` and creates the linked expense automatically
+3. The `useCreateSalaryPayment` hook's manual expense insertion will be made idempotent (check if trigger already created it) to avoid duplicates during the transition
 
-**Files to modify:**
-- `src/components/students/profile/QuickActionsPanel.tsx` -- enable both buttons, wire up handlers
-- `src/components/students/profile/ProfileHeader.tsx` -- display assigned tags
-
-**No database migrations needed** -- the `student_tags` and `student_tag_assignments` tables already exist with RLS policies.
+**Frontend change:**
+- Update `useCreateSalaryPayment` in `useEmployees.ts` to skip manual expense creation if a trigger-created expense already exists (prevents duplicates)
 
