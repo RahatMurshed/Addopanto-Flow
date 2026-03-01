@@ -100,7 +100,7 @@ export function QuickActionsPanel({
       if (["inactive", "dropout"].includes(pendingStatus)) {
         await supabase
           .from("batch_enrollments")
-          .update({ status: "completed" } as any)
+          .update({ status: "inactive" } as any)
           .eq("student_id", student.id)
           .eq("company_id", companyId)
           .eq("status", "active");
