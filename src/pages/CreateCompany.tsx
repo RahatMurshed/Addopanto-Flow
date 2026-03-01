@@ -14,6 +14,7 @@ import { ArrowLeft, Loader2, Building2, Link2, FileText, KeyRound, ImageIcon, Us
 import { Navigate } from "react-router-dom";
 import gaLogo from "@/assets/GA-LOGO.png";
 import { ImageUpload } from "@/components/shared/ImageUpload";
+import { formatBDPhone, stripPhoneFormat } from "@/utils/phoneFormat";
 
 export default function CreateCompany() {
   const { user } = useAuth();
@@ -247,7 +248,7 @@ export default function CreateCompany() {
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Contact Phone</Label>
-                        <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+1234567890" />
+                        <Input type="tel" inputMode="numeric" value={formatBDPhone(contactPhone)} onChange={(e) => setContactPhone(stripPhoneFormat(e.target.value))} placeholder="01XXX-XXXXXX" />
                       </div>
                     </div>
                     <div className="space-y-2">

@@ -29,6 +29,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { syncBatchEnrollment } from "@/utils/enrollmentSync";
 import { formatDuration } from "@/utils/durationFormat";
+import { formatBDPhone, stripPhoneFormat } from "@/utils/phoneFormat";
 
 
 const yyyyMmRegex = /^\d{4}-\d{2}$/;
@@ -348,7 +349,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" disabled={saving} {...form.register("phone")} />
+              <Input id="phone" type="tel" inputMode="numeric" disabled={saving} value={formatBDPhone(form.watch("phone") || "")} onChange={(e) => form.setValue("phone", stripPhoneFormat(e.target.value))} />
             </div>
           </div>
 
