@@ -8,7 +8,7 @@
 
 const UNCATEGORIZED_STYLE = {
   light: { bg: "transparent", text: "hsl(220, 25%, 45%)", border: "hsla(220, 30%, 50%, 0.25)" },
-  dark: { bg: "hsl(220, 12%, 16%)", text: "hsl(220, 10%, 62%)", border: "hsl(220, 12%, 28%)" },
+  dark: { bg: "transparent", text: "hsl(220, 60%, 70%)", border: "hsla(220, 60%, 65%, 0.50)" },
 };
 
 function hashString(str: string): number {
@@ -31,11 +31,11 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
   }
   const hue = hashString(name) % 360;
   if (isDark) {
-    // Dark: subtle filled with moderate contrast
+    // Dark: neon outlined – vivid text on transparent bg
     return {
-      bg: `hsl(${hue}, 30%, 15%)`,
-      text: `hsl(${hue}, 50%, 68%)`,
-      border: `hsl(${hue}, 40%, 35%)`,
+      bg: "transparent",
+      text: `hsl(${hue}, 90%, 65%)`,
+      border: `hsla(${hue}, 90%, 60%, 0.50)`,
     };
   }
   // Light: neon text with no background, vivid per-source hue
