@@ -35,7 +35,7 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
     return {
       bg: `hsl(${hue}, 30%, 15%)`,
       text: `hsl(${hue}, 50%, 68%)`,
-      border: `hsl(${hue}, 35%, 28%)`,
+      border: `hsl(${hue}, 40%, 35%)`,
     };
   }
   // Light: neon text with no background, vivid per-source hue
