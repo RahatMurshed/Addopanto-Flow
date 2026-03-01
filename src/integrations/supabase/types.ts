@@ -471,7 +471,6 @@ export type Database = {
           company_id: string
           data_entry_mode: boolean
           deo_batches: boolean
-          deo_courses: boolean
           deo_finance: boolean
           deo_payments: boolean
           deo_students: boolean
@@ -480,9 +479,6 @@ export type Database = {
           mod_batches_add: boolean
           mod_batches_delete: boolean
           mod_batches_edit: boolean
-          mod_courses_add: boolean
-          mod_courses_delete: boolean
-          mod_courses_edit: boolean
           mod_expenses_add: boolean
           mod_expenses_delete: boolean
           mod_expenses_edit: boolean
@@ -511,7 +507,6 @@ export type Database = {
           company_id: string
           data_entry_mode?: boolean
           deo_batches?: boolean
-          deo_courses?: boolean
           deo_finance?: boolean
           deo_payments?: boolean
           deo_students?: boolean
@@ -520,9 +515,6 @@ export type Database = {
           mod_batches_add?: boolean
           mod_batches_delete?: boolean
           mod_batches_edit?: boolean
-          mod_courses_add?: boolean
-          mod_courses_delete?: boolean
-          mod_courses_edit?: boolean
           mod_expenses_add?: boolean
           mod_expenses_delete?: boolean
           mod_expenses_edit?: boolean
@@ -551,7 +543,6 @@ export type Database = {
           company_id?: string
           data_entry_mode?: boolean
           deo_batches?: boolean
-          deo_courses?: boolean
           deo_finance?: boolean
           deo_payments?: boolean
           deo_students?: boolean
@@ -560,9 +551,6 @@ export type Database = {
           mod_batches_add?: boolean
           mod_batches_delete?: boolean
           mod_batches_edit?: boolean
-          mod_courses_add?: boolean
-          mod_courses_delete?: boolean
-          mod_courses_edit?: boolean
           mod_expenses_add?: boolean
           mod_expenses_delete?: boolean
           mod_expenses_edit?: boolean
@@ -3453,7 +3441,6 @@ export type Database = {
           company_id: string
           data_entry_mode: boolean
           deo_batches: boolean
-          deo_courses: boolean
           deo_finance: boolean
           deo_payments: boolean
           deo_students: boolean
@@ -3462,9 +3449,6 @@ export type Database = {
           mod_batches_add: boolean
           mod_batches_delete: boolean
           mod_batches_edit: boolean
-          mod_courses_add: boolean
-          mod_courses_delete: boolean
-          mod_courses_edit: boolean
           mod_expenses_add: boolean
           mod_expenses_delete: boolean
           mod_expenses_edit: boolean

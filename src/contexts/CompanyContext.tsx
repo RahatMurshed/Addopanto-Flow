@@ -38,7 +38,6 @@ export interface CompanyMembership {
   deo_payments: boolean;
   deo_batches: boolean;
   deo_finance: boolean;
-  deo_courses: boolean;
   // Granular mod_* permissions (for traditional moderator)
   mod_students_add: boolean;
   mod_students_edit: boolean;
@@ -55,9 +54,6 @@ export interface CompanyMembership {
   mod_expenses_add: boolean;
   mod_expenses_edit: boolean;
   mod_expenses_delete: boolean;
-  mod_courses_add: boolean;
-  mod_courses_edit: boolean;
-  mod_courses_delete: boolean;
   status: string;
   joined_at: string;
   approved_by: string | null;
@@ -103,8 +99,6 @@ interface CompanyContextType {
   deoPayments: boolean;
   deoBatches: boolean;
   deoFinance: boolean;
-  deoCourses: boolean;
-
   // Derived granular permissions
   canAddStudent: boolean;
   canEditStudent: boolean;
@@ -255,7 +249,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const deoPayments = membership?.deo_payments ?? false;
   const deoBatches = membership?.deo_batches ?? false;
   const deoFinance = membership?.deo_finance ?? false;
-  const deoCourses = membership?.deo_courses ?? false;
+  
 
   // Derived granular permissions
   // Admin = full access
@@ -275,9 +269,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const canEditBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_edit ?? false)) || (isDataEntryModerator && deoBatches);
   const canDeleteBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_delete ?? false)) || (isDataEntryModerator && deoBatches);
 
-  const canAddCourse = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_courses_add ?? false)) || (isDataEntryModerator && deoCourses);
-  const canEditCourse = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_courses_edit ?? false)) || (isDataEntryModerator && deoCourses);
-  const canDeleteCourse = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_courses_delete ?? false)) || (isDataEntryModerator && deoCourses);
+  // Courses are Admin/Cipher only (no RLS backing for moderators)
+  const canAddCourse = isCompanyAdmin;
+  const canEditCourse = isCompanyAdmin;
+  const canDeleteCourse = isCompanyAdmin;
 
   const canAddRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_add ?? false)) || (isDataEntryModerator && deoFinance);
   const canEditRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_edit ?? false)) || (isDataEntryModerator && deoFinance);
@@ -365,7 +360,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       deoPayments,
       deoBatches,
       deoFinance,
-      deoCourses,
+      
       canAddStudent,
       canEditStudent,
       canDeleteStudent,

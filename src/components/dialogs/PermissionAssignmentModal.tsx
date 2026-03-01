@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GraduationCap, CreditCard, Layers, TrendingUp, Receipt, BookOpen, Database, Shield } from "lucide-react";
+import { GraduationCap, CreditCard, Layers, TrendingUp, Receipt, Database, Shield } from "lucide-react";
 import type { CompanyMembership } from "@/contexts/CompanyContext";
 
 interface PermissionAssignmentModalProps {
@@ -49,15 +49,6 @@ const MOD_CATEGORIES = [
       { key: "mod_batches_add", label: "Add" },
       { key: "mod_batches_edit", label: "Edit" },
       { key: "mod_batches_delete", label: "Delete" },
-    ],
-  },
-  {
-    label: "Courses",
-    icon: BookOpen,
-    permissions: [
-      { key: "mod_courses_add", label: "Add" },
-      { key: "mod_courses_edit", label: "Edit" },
-      { key: "mod_courses_delete", label: "Delete" },
     ],
   },
   {

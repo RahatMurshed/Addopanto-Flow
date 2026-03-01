@@ -59,9 +59,6 @@ interface ApproveData {
   modBatchesAdd: boolean;
   modBatchesEdit: boolean;
   modBatchesDelete: boolean;
-  modCoursesAdd: boolean;
-  modCoursesEdit: boolean;
-  modCoursesDelete: boolean;
   modRevenueAdd: boolean;
   modRevenueEdit: boolean;
   modRevenueDelete: boolean;
@@ -155,9 +152,6 @@ export default function CompanyJoinRequests() {
       mod_batches_add: data.modBatchesAdd,
       mod_batches_edit: data.modBatchesEdit,
       mod_batches_delete: data.modBatchesDelete,
-      mod_courses_add: data.modCoursesAdd,
-      mod_courses_edit: data.modCoursesEdit,
-      mod_courses_delete: data.modCoursesDelete,
       mod_revenue_add: data.modRevenueAdd,
       mod_revenue_edit: data.modRevenueEdit,
       mod_revenue_delete: data.modRevenueDelete,
@@ -184,7 +178,7 @@ export default function CompanyJoinRequests() {
       if (data.modStudentsAdd || data.modStudentsEdit || data.modStudentsDelete) enabled.push("Students");
       if (data.modPaymentsAdd || data.modPaymentsEdit || data.modPaymentsDelete) enabled.push("Payments");
       if (data.modBatchesAdd || data.modBatchesEdit || data.modBatchesDelete) enabled.push("Batches");
-      if (data.modCoursesAdd || data.modCoursesEdit || data.modCoursesDelete) enabled.push("Courses");
+      
       if (data.modRevenueAdd || data.modRevenueEdit || data.modRevenueDelete) enabled.push("Revenue");
       if (data.modExpensesAdd || data.modExpensesEdit || data.modExpensesDelete) enabled.push("Expenses");
       if (data.canViewReports) enabled.push("Reports");
@@ -278,7 +272,7 @@ export default function CompanyJoinRequests() {
     modStudentsAdd: false, modStudentsEdit: false, modStudentsDelete: false,
     modPaymentsAdd: false, modPaymentsEdit: false, modPaymentsDelete: false,
     modBatchesAdd: false, modBatchesEdit: false, modBatchesDelete: false,
-    modCoursesAdd: false, modCoursesEdit: false, modCoursesDelete: false,
+    
     modRevenueAdd: false, modRevenueEdit: false, modRevenueDelete: false,
     modExpensesAdd: false, modExpensesEdit: false, modExpensesDelete: false,
     canViewReports: false,
@@ -402,7 +396,7 @@ export default function CompanyJoinRequests() {
               { title: "Students", keys: ["modStudentsAdd", "modStudentsEdit", "modStudentsDelete"] },
               { title: "Payments", keys: ["modPaymentsAdd", "modPaymentsEdit", "modPaymentsDelete"] },
               { title: "Batches", keys: ["modBatchesAdd", "modBatchesEdit", "modBatchesDelete"] },
-              { title: "Courses", keys: ["modCoursesAdd", "modCoursesEdit", "modCoursesDelete"] },
+              
               { title: "Revenue", keys: ["modRevenueAdd", "modRevenueEdit", "modRevenueDelete"] },
               { title: "Expenses", keys: ["modExpensesAdd", "modExpensesEdit", "modExpensesDelete"] },
             ] as const).map(({ title, keys }) => (
