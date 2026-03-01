@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { getSourceBadgeStyle, cleanSalaryTag } from "@/utils/sourceColors";
 import {
@@ -72,10 +72,33 @@ export default function Expenses() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [previousRange, setPreviousRange] = useState<DateRange | null>(null);
   
-  // Search, filter, sort state
+  // Search state (local)
   const [searchQuery, setSearchQuery] = useState("");
-  const [accountFilter, setAccountFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date-desc");
+  
+  // Sort & account filter from URL search params (prevents race condition with date filter)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sortBy = searchParams.get("sortBy") || "date-desc";
+  const accountFilter = searchParams.get("account") || "all";
+  
+  const setSortBy = useCallback((value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("sortBy", value);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  
+  const setAccountFilter = useCallback((value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === "all") {
+        next.delete("account");
+      } else {
+        next.set("account", value);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
   
@@ -155,7 +178,7 @@ export default function Expenses() {
   // Pagination for searched expenses
   const pagination = usePagination(searchedExpenses);
 
-  // Reset page when filters change
+  // Reset page when filters change (sortBy/accountFilter are now URL-derived, so stable across re-renders)
   useEffect(() => {
     pagination.resetPage();
   }, [dateRange, searchQuery, accountFilter, sortBy]);
@@ -164,8 +187,13 @@ export default function Expenses() {
 
   const resetFilters = () => {
     setSearchQuery("");
-    setAccountFilter("all");
-    setSortBy("date-desc");
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("sortBy");
+      next.delete("account");
+      return next;
+    }, { replace: true });
+    pagination.resetPage();
   };
 
   const filteredTotal = useMemo(() => {
