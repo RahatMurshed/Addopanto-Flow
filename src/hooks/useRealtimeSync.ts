@@ -36,7 +36,7 @@ const TABLE_INVALIDATION_MAP: Record<string, string[]> = {
   product_stock_movements: ["product-stock-movements", "products"],
   product_categories: ["product_categories", "products"],
   batch_enrollments: ["batch_enrollments", "students", "batches", "student_payments", "revenues", "dashboard", "reports"],
-  
+  employee_salary_payments: ["employee-salary", "employees", "expenses", "account_balances", "dashboard", "dashboard-totals", "reports", "expense_summary_rpc"],
 };
 
 const TABLE_LABELS: Record<string, string> = {
@@ -55,7 +55,7 @@ const TABLE_LABELS: Record<string, string> = {
   product_stock_movements: "Stock movements",
   product_categories: "Categories",
   batch_enrollments: "Enrollments",
-  
+  employee_salary_payments: "Salary payments",
 };
 
 export function useRealtimeSync() {
@@ -115,7 +115,7 @@ export function useRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "product_stock_movements" }, (p) => handleChange("product_stock_movements", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, (p) => handleChange("product_categories", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "batch_enrollments" }, (p) => handleChange("batch_enrollments", p))
-      
+      .on("postgres_changes", { event: "*", schema: "public", table: "employee_salary_payments" }, (p) => handleChange("employee_salary_payments", p))
       .subscribe();
 
     return () => {

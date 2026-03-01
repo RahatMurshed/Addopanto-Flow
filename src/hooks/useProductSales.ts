@@ -85,6 +85,13 @@ export function useCreateProductSale() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
       queryClient.invalidateQueries({ queryKey: ["product-stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary"] });
     },
   });
 }
@@ -102,6 +109,13 @@ export function useDeleteProductSale() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
       queryClient.invalidateQueries({ queryKey: ["product-stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary"] });
     },
   });
 }

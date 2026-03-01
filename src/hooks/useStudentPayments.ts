@@ -203,8 +203,10 @@ export function useCreateStudentPayment() {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary"] });
     },
   });
@@ -231,8 +233,10 @@ export function useUpdateStudentPayment() {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary"] });
     },
   });
@@ -253,8 +257,10 @@ export function useDeleteStudentPayment() {
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary"] });
     },
   });

@@ -316,12 +316,14 @@ export function useCreateSalaryPayment() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-salary", vars.employee_id] });
       qc.invalidateQueries({ queryKey: ["employees"] });
-      // Invalidate all financial queries
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["expense_accounts"] });
       qc.invalidateQueries({ queryKey: ["account_balances"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-totals"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
+      qc.invalidateQueries({ queryKey: ["expense_summary"] });
+      qc.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
     },
   });
 }
@@ -356,12 +358,14 @@ export function useDeleteSalaryPayment() {
     onSuccess: (employeeId) => {
       qc.invalidateQueries({ queryKey: ["employee-salary", employeeId] });
       qc.invalidateQueries({ queryKey: ["employees"] });
-      // Invalidate all financial queries
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["expense_accounts"] });
       qc.invalidateQueries({ queryKey: ["account_balances"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-totals"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
+      qc.invalidateQueries({ queryKey: ["expense_summary"] });
+      qc.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
     },
   });
 }
