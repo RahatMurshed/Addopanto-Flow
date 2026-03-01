@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { getSourceBadgeStyle } from "@/utils/sourceColors";
+import { getSourceBadgeStyle, cleanSalaryTag } from "@/utils/sourceColors";
 import {
   useExpenses,
   useCreateExpense,
@@ -592,7 +592,7 @@ export default function Expenses() {
                             )}
                           </TableCell>
                           <TableCell className="hidden max-w-xs truncate md:table-cell">
-                            {exp.description || <span className="text-muted-foreground">—</span>}
+                            {cleanSalaryTag(exp.description) || <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && (
                             <TableCell>

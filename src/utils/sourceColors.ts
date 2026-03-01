@@ -42,8 +42,13 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
   return {
     bg: "transparent",
     text: `hsl(${hue}, 85%, 40%)`,
-    border: `hsla(${hue}, 85%, 45%, 0.30)`,
+    border: `hsla(${hue}, 85%, 45%, 0.50)`,
   };
+}
+
+export function cleanSalaryTag(desc: string | null | undefined): string {
+  if (!desc) return "";
+  return desc.replace(/\s*\[SALARY:[^\]]+\]/g, "").trim();
 }
 
 export function getSourceBadgeStyle(name: string | null | undefined, isDark?: boolean): React.CSSProperties {

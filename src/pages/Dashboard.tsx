@@ -14,7 +14,7 @@ import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { getSourceBadgeStyle } from "@/utils/sourceColors";
+import { getSourceBadgeStyle, cleanSalaryTag } from "@/utils/sourceColors";
 import {
   AreaChart,
   Area,
@@ -193,7 +193,7 @@ export default function Dashboard() {
           type: "expense" as const,
           amount: Number(e.amount),
           date: e.date,
-          description: e.description || accounts.find((a) => a.id === e.expense_account_id)?.name || "Expense",
+          description: cleanSalaryTag(e.description) || accounts.find((a) => a.id === e.expense_account_id)?.name || "Expense",
           category: accounts.find((a) => a.id === e.expense_account_id)?.name || "",
           color: accounts.find((a) => a.id === e.expense_account_id)?.color || "#6B7280",
           createdAt: e.created_at,
@@ -1027,7 +1027,7 @@ export default function Dashboard() {
                               <ArrowDownRight className="h-3.5 w-3.5" />
                             )}
                           </div>
-                          <span className="font-medium">{tx.description}</span>
+                          <span className="font-medium">{cleanSalaryTag(tx.description)}</span>
                         </div>
                       </TableCell>
                       <TableCell>
