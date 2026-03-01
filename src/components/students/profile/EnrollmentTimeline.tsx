@@ -266,7 +266,7 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
                     {group.enrollments.map((enrollment) => {
                       const batch = enrollment.batches as any;
                       const rawStatus = enrollment.status as string;
-                      const status: EnrollmentStatus = rawStatus === "completed" ? "completed" : "active";
+                      const status: EnrollmentStatus = (rawStatus === "completed" || rawStatus === "inactive") ? rawStatus : "active";
                       const totalFee = Number(enrollment.total_fee) || 0;
                       const paymentSummary = paymentsByEnrollment.get(enrollment.id);
                       const paidAmount = paymentSummary?.paid ?? 0;
