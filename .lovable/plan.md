@@ -1,44 +1,48 @@
 
 
-# Fix: Data Not Updating After Changes (Missing Query Invalidation)
+# Fix: Student Shows "Not Enrolled" Despite Active Enrollment
 
 ## Problem
-After performing actions like removing a student from a batch, the UI doesn't update until a manual page reload. This regression was introduced because several operations call the database directly (via `supabase.rpc()`) without invalidating the React Query cache afterward.
+Nusrat Jahan shows "Not Enrolled" in the UI, but the Enrollment History section correctly shows her enrolled in "English Evening" batch. This happens because:
 
-## Root Cause
-The `handleRemoveFromBatch` function in `BatchDetail.tsx` calls `supabase.rpc("remove_student_from_batch")` directly, but never calls `queryClient.invalidateQueries()` after success. The same pattern likely affects other direct RPC/mutation calls across the app.
+1. **Data inconsistency**: The seed script inserted a `batch_enrollments` record but didn't update `students.batch_id`
+2. **UI relies on `batch_id`**: The "Enrolled"/"Not Enrolled" badge in both the Students list and profile dialog checks `student.batch_id` directly, ignoring the `batch_enrollments` table
 
-Additionally, the `useRealtimeSync` hook doesn't subscribe to the `batch_enrollments` table, so even realtime changes won't trigger a cache refresh for enrollment data.
+## Fix (2 parts)
 
-## Fix Strategy
+### 1. Fix the data (SQL update)
+Update Nusrat Jahan's `batch_id` to match her active enrollment:
 
-### 1. Add query invalidation to `handleRemoveFromBatch` in BatchDetail.tsx
-After the RPC call succeeds, invalidate the relevant query keys:
-- `batch_enrollments`
-- `students`
-- `student_payments`
-- `revenues`
-- `batches`
-- `dashboard`
-- `reports`
+```sql
+UPDATE students 
+SET batch_id = '67fbc8af-3097-4c75-9b20-4a2fa8066269' 
+WHERE id = '8ee7096d-b189-4d44-833b-7426501bfe5b';
+```
 
-This requires getting `queryClient` via `useQueryClient()`.
+### 2. Make UI resilient (code changes)
+The `batch_id` field on the `students` table is a legacy shorthand. The real source of truth is `batch_enrollments`. Update two files to check enrollments when `batch_id` is null:
 
-### 2. Add `batch_enrollments` to the realtime sync hook
-Update `useRealtimeSync.ts` to subscribe to `batch_enrollments` changes and invalidate `batch_enrollments`, `students`, `batches`, and `dashboard` queries.
+**`StudentProfileDialog.tsx` (line 69-73)**: Instead of only checking `s.batch_id`, also accept an optional `isEnrolled` prop or check the batch name prop that's already passed in.
 
-### 3. Audit other direct RPC calls for missing invalidation
-Check `handleSetInactive` and any other direct database calls in the codebase to ensure they also invalidate caches properly.
+Since `batchName` is already a prop on this dialog, we can use it as a secondary signal:
+- Show "Enrolled" if `s.batch_id` OR `batchName` is truthy
+
+**`Students.tsx` (line 608-609)**: The Students list page already fetches `batch_enrollments` data. Use the enrollment map to determine enrollment status instead of relying solely on `student.batch_id`.
 
 ## Technical Details
 
-**BatchDetail.tsx changes:**
-- Add `const queryClient = useQueryClient()` at the top of the component
-- After successful `handleRemoveFromBatch`, add invalidation calls for all affected query keys
-- Same for `handleSetInactive` (though it uses `updateStudentMutation` which should already invalidate, we should verify)
+### StudentProfileDialog.tsx
+Change the enrollment badge logic from:
+```tsx
+{s.batch_id ? (...Enrolled...) : (...Not Enrolled...)}
+```
+to:
+```tsx
+{(s.batch_id || batchName) ? (...Enrolled...) : (...Not Enrolled...)}
+```
 
-**useRealtimeSync.ts changes:**
-- Add `batch_enrollments` to `TABLE_INVALIDATION_MAP` with keys: `["batch_enrollments", "students", "batches", "dashboard"]`
-- Add `batch_enrollments` to `TABLE_LABELS` as `"Enrollments"`
-- Add `.on("postgres_changes", ...)` subscription for `batch_enrollments`
+### Students.tsx
+The page already has an `enrollmentMap` (from `batch_enrollments` query). Update the badge condition to also check if the student has any active enrollment in the map, not just `batch_id`.
 
+### Data fix
+Run a single SQL UPDATE to sync the student's `batch_id` with their active enrollment.
