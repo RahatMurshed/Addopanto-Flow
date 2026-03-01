@@ -501,7 +501,10 @@ export default function StudentProfilePage() {
                 userRole={quickActionRole}
                 userPermissions={quickActionPermissions}
                 onStatusChange={() => {
-                  queryClient.invalidateQueries({ queryKey: ["students", studentId] });
+                  queryClient.invalidateQueries({ queryKey: ["students"] });
+                  queryClient.invalidateQueries({ queryKey: ["batch_enrollments"] });
+                  queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                  queryClient.invalidateQueries({ queryKey: ["reports"] });
                 }}
                 onEdit={() => setEditOpen(true)}
               />
