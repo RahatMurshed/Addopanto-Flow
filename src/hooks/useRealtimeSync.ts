@@ -35,6 +35,7 @@ const TABLE_INVALIDATION_MAP: Record<string, string[]> = {
   product_sales: ["product-sales", "products", "revenues", "dashboard", "reports"],
   product_stock_movements: ["product-stock-movements", "products"],
   product_categories: ["product_categories", "products"],
+  batch_enrollments: ["batch_enrollments", "students", "batches", "student_payments", "revenues", "dashboard", "reports"],
   
 };
 
@@ -53,6 +54,7 @@ const TABLE_LABELS: Record<string, string> = {
   product_sales: "Product sales",
   product_stock_movements: "Stock movements",
   product_categories: "Categories",
+  batch_enrollments: "Enrollments",
   
 };
 
@@ -112,6 +114,7 @@ export function useRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "product_sales" }, (p) => handleChange("product_sales", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "product_stock_movements" }, (p) => handleChange("product_stock_movements", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, (p) => handleChange("product_categories", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "batch_enrollments" }, (p) => handleChange("batch_enrollments", p))
       
       .subscribe();
 

@@ -6,7 +6,7 @@ import { useBatch, useUpdateBatch, type BatchInsert } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
 import { useAllStudents } from "@/hooks/useStudents";
 import { useStudentPayments, computeStudentSummary } from "@/hooks/useStudentPayments";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -389,6 +389,8 @@ export default function BatchDetail() {
       });
   }, [deleteStudentId, id, activeCompanyId, batchEnrollments]);
 
+  const queryClient = useQueryClient();
+
   const handleRemoveFromBatch = async () => {
     if (!deleteStudentId || !id || !activeCompanyId || !user) return;
     setDeleting(true);
@@ -401,6 +403,17 @@ export default function BatchDetail() {
         p_user_email: user.email ?? null,
       });
       if (error) throw error;
+
+      // Invalidate all affected caches
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["batch_enrollments"] }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+        queryClient.invalidateQueries({ queryKey: ["student_payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["revenues"] }),
+        queryClient.invalidateQueries({ queryKey: ["batches"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+      ]);
 
       const studentName = allBatchStudents.find(s => s.id === deleteStudentId)?.name ?? "Student";
       const statusChanged = data && Array.isArray(data) && data[0]?.status_changed;
