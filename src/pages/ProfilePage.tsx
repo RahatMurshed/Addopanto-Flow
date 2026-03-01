@@ -13,6 +13,7 @@ import { ImageUpload } from "@/components/shared/ImageUpload";
 import { Loader2, Save, User, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatBDPhone, stripPhoneFormat } from "@/utils/phoneFormat";
 
 interface ProfileFormData {
   full_name: string;
@@ -202,18 +203,22 @@ export default function ProfilePage() {
               <Label htmlFor="phone">Phone Number</Label>
               <Input
                 id="phone"
-                value={form.phone}
-                onChange={(e) => handleChange("phone", e.target.value)}
-                placeholder="+1 234 567 8900"
+                type="tel"
+                inputMode="numeric"
+                value={formatBDPhone(form.phone)}
+                onChange={(e) => handleChange("phone", stripPhoneFormat(e.target.value))}
+                placeholder="01XXX-XXXXXX"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="alt_phone">Alternative Phone</Label>
               <Input
                 id="alt_phone"
-                value={form.alt_phone}
-                onChange={(e) => handleChange("alt_phone", e.target.value)}
-                placeholder="Alternative number"
+                type="tel"
+                inputMode="numeric"
+                value={formatBDPhone(form.alt_phone)}
+                onChange={(e) => handleChange("alt_phone", stripPhoneFormat(e.target.value))}
+                placeholder="01XXX-XXXXXX"
               />
             </div>
           </div>

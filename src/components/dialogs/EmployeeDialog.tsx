@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateEmployee, useUpdateEmployee, useNextEmployeeId, type Employee, type EmployeeInsert } from "@/hooks/useEmployees";
 import { toast } from "sonner";
+import { formatBDPhone, stripPhoneFormat } from "@/utils/phoneFormat";
 
 const DESIGNATIONS = ["Teacher", "Manager", "Accountant", "Receptionist", "IT Staff"];
 const DEPARTMENTS = ["Academic", "Administration", "Finance", "Operations"];
@@ -177,11 +178,11 @@ export function EmployeeDialog({ open, onOpenChange, employee }: Props) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Contact Number *</Label>
-                  <Input value={form.contact_number || ""} onChange={e => set("contact_number", e.target.value)} />
+                  <Input type="tel" inputMode="numeric" value={formatBDPhone(form.contact_number || "")} onChange={e => set("contact_number", stripPhoneFormat(e.target.value))} />
                 </div>
                 <div className="space-y-2">
                   <Label>WhatsApp Number</Label>
-                  <Input value={form.whatsapp_number || ""} onChange={e => set("whatsapp_number", e.target.value)} />
+                  <Input type="tel" inputMode="numeric" value={formatBDPhone(form.whatsapp_number || "")} onChange={e => set("whatsapp_number", stripPhoneFormat(e.target.value))} />
                 </div>
               </div>
               <div className="space-y-2">

@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatBDPhone, stripPhoneFormat } from "@/utils/phoneFormat";
 
 export interface ContactData {
   phone: string;
@@ -37,16 +38,16 @@ export default function ContactStep({ data, onChange, errors, disabled }: Props)
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="w-phone">Mobile Number <span className="text-destructive">*</span></Label>
-          <Input id="w-phone" value={data.phone} onChange={(e) => update({ phone: e.target.value })} disabled={disabled} />
+          <Input id="w-phone" type="tel" inputMode="numeric" value={formatBDPhone(data.phone)} onChange={(e) => update({ phone: stripPhoneFormat(e.target.value) })} disabled={disabled} />
           {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="w-whatsapp">WhatsApp Number</Label>
-          <Input id="w-whatsapp" value={data.whatsapp_number} onChange={(e) => update({ whatsapp_number: e.target.value })} disabled={disabled} />
+          <Input id="w-whatsapp" type="tel" inputMode="numeric" value={formatBDPhone(data.whatsapp_number)} onChange={(e) => update({ whatsapp_number: stripPhoneFormat(e.target.value) })} disabled={disabled} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="w-alt">Alt Contact</Label>
-          <Input id="w-alt" value={data.alt_contact_number} onChange={(e) => update({ alt_contact_number: e.target.value })} disabled={disabled} />
+          <Input id="w-alt" type="tel" inputMode="numeric" value={formatBDPhone(data.alt_contact_number)} onChange={(e) => update({ alt_contact_number: stripPhoneFormat(e.target.value) })} disabled={disabled} />
         </div>
       </div>
 
