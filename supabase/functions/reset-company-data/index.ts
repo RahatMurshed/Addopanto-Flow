@@ -118,8 +118,6 @@ Deno.serve(async (req) => {
       "investments",
       "stakeholders",
       // Employees
-      "employee_attendance",
-      "employee_leaves",
       "employee_salary_payments",
       "employees",
       // Suppliers

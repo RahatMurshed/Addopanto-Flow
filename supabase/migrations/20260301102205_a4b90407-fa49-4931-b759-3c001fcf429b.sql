@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS employee_attendance CASCADE;
+DROP TABLE IF EXISTS employee_leaves CASCADE;

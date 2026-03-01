@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
-import { endOfMonth, format as fnsFormat } from "date-fns";
+
 
 export interface Employee {
   id: string;
@@ -81,30 +81,6 @@ export interface SalaryPayment {
   deductions: number;
   net_amount: number;
   description: string | null;
-  user_id: string;
-  created_at: string;
-}
-
-export interface EmployeeAttendance {
-  id: string;
-  company_id: string;
-  employee_id: string;
-  date: string;
-  status: string;
-  marked_by: string;
-  created_at: string;
-}
-
-export interface EmployeeLeave {
-  id: string;
-  company_id: string;
-  employee_id: string;
-  leave_type: string;
-  start_date: string;
-  end_date: string;
-  reason: string | null;
-  approval_status: string;
-  approved_by: string | null;
   user_id: string;
   created_at: string;
 }
@@ -359,87 +335,3 @@ export function useDeleteSalaryPayment() {
   });
 }
 
-// Attendance
-export function useEmployeeAttendance(employeeId: string | undefined, month?: string) {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["employee-attendance", employeeId, month],
-    queryFn: async () => {
-      if (!user || !employeeId) return [];
-      let query = supabase.from("employee_attendance" as any).select("*").eq("employee_id", employeeId);
-      if (month) {
-        const lastDay = fnsFormat(endOfMonth(new Date(`${month}-01`)), "yyyy-MM-dd");
-        query = query.gte("date", `${month}-01`).lte("date", lastDay);
-      }
-      const { data, error } = await query.order("date", { ascending: true });
-      if (error) throw error;
-      return (data as unknown) as EmployeeAttendance[];
-    },
-    enabled: !!user && !!employeeId,
-  });
-}
-
-export function useMarkAttendance() {
-  const { user } = useAuth();
-  const { activeCompanyId } = useCompany();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (record: { employee_id: string; date: string; status: string }) => {
-      if (!user) throw new Error("Not authenticated");
-      if (!activeCompanyId) throw new Error("No active company");
-      const { data, error } = await supabase.from("employee_attendance" as any).upsert({ ...record, company_id: activeCompanyId, marked_by: user.id }, { onConflict: "company_id,employee_id,date" }).select().single();
-      if (error) throw error;
-      return data as unknown as EmployeeAttendance;
-    },
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ["employee-attendance", vars.employee_id] });
-    },
-  });
-}
-
-// Leaves
-export function useEmployeeLeaves(employeeId: string | undefined) {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["employee-leaves", employeeId],
-    queryFn: async () => {
-      if (!user || !employeeId) return [];
-      const { data, error } = await supabase.from("employee_leaves" as any).select("*").eq("employee_id", employeeId).order("start_date", { ascending: false });
-      if (error) throw error;
-      return (data as unknown) as EmployeeLeave[];
-    },
-    enabled: !!user && !!employeeId,
-  });
-}
-
-export function useCreateLeave() {
-  const { user } = useAuth();
-  const { activeCompanyId } = useCompany();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (leave: { employee_id: string; leave_type: string; start_date: string; end_date: string; reason?: string }) => {
-      if (!user) throw new Error("Not authenticated");
-      if (!activeCompanyId) throw new Error("No active company");
-      const { data, error } = await supabase.from("employee_leaves" as any).insert({ ...leave, company_id: activeCompanyId, user_id: user.id, approved_by: user.id, approval_status: "approved" }).select().single();
-      if (error) throw error;
-      return data as unknown as EmployeeLeave;
-    },
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ["employee-leaves", vars.employee_id] });
-    },
-  });
-}
-
-export function useDeleteLeave() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, employeeId }: { id: string; employeeId: string }) => {
-      const { error } = await supabase.from("employee_leaves" as any).delete().eq("id", id);
-      if (error) throw error;
-      return employeeId;
-    },
-    onSuccess: (employeeId) => {
-      qc.invalidateQueries({ queryKey: ["employee-leaves", employeeId] });
-    },
-  });
-}
