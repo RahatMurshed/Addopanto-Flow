@@ -1,7 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useRevenues,
   useCreateRevenue,
@@ -52,6 +54,7 @@ import {
   Search,
   X,
   SlidersHorizontal,
+  Eye,
 } from "lucide-react";
 import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,6 +66,7 @@ import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRan
 import { exportRevenuesToCSV, exportToPDF } from "@/utils/exportUtils";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/shared/TablePagination";
+import RecordDetailDialog from "@/components/dialogs/RecordDetailDialog";
 
 export default function Revenue() {
   const navigate = useNavigate();
@@ -99,6 +103,7 @@ export default function Revenue() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRevenue, setEditingRevenue] = useState<RevenueWithSource | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewingRevenue, setViewingRevenue] = useState<RevenueWithSource | null>(null);
 
   const activeAccounts = accounts.filter((a) => a.is_active);
   const totalAllocationPercent = activeAccounts.reduce((sum, a) => sum + Number(a.allocation_percentage), 0);
@@ -113,10 +118,13 @@ export default function Revenue() {
     setPreviousRange(getPreviousPeriodRange(filterType, filterValue));
   }, []);
 
-  // Filter revenues by selected date range
+  // Filter revenues by entry date (created_at)
   const filteredRevenues = useMemo(() => {
     if (!dateRange) return [];
-    return revenues.filter((r) => r.date >= dateRange.start && r.date <= dateRange.end);
+    return revenues.filter((r) => {
+      const entryDate = (r.created_at ?? "").slice(0, 10);
+      return entryDate >= dateRange.start && entryDate <= dateRange.end;
+    });
   }, [revenues, dateRange]);
 
   // Apply search, source filter, and sort on top of date-filtered revenues
@@ -140,11 +148,11 @@ export default function Revenue() {
     // Sort
     result = [...result].sort((a, b) => {
       switch (sortBy) {
-        case "date-asc": return a.date.localeCompare(b.date);
-        case "date-desc": return b.date.localeCompare(a.date);
+        case "date-asc": return (a.created_at ?? "").localeCompare(b.created_at ?? "");
+        case "date-desc": return (b.created_at ?? "").localeCompare(a.created_at ?? "");
         case "amount-desc": return Number(b.amount) - Number(a.amount);
         case "amount-asc": return Number(a.amount) - Number(b.amount);
-        default: return b.date.localeCompare(a.date);
+        default: return (b.created_at ?? "").localeCompare(a.created_at ?? "");
       }
     });
 
@@ -165,6 +173,22 @@ export default function Revenue() {
     setSearchQuery("");
     setSourceFilter("all");
     setSortBy("date-desc");
+  };
+
+  // Fetch recorder profiles
+  const userIds = useMemo(() => [...new Set(filteredRevenues.map(r => r.user_id))], [filteredRevenues]);
+  const { data: userProfiles = [] } = useQuery({
+    queryKey: ["revenue-user-profiles", userIds],
+    queryFn: async () => {
+      if (userIds.length === 0) return [];
+      const { data } = await supabase.from("user_profiles").select("user_id, full_name, email").in("user_id", userIds);
+      return data ?? [];
+    },
+    enabled: userIds.length > 0,
+  });
+  const getRecorderName = (userId: string) => {
+    const p = userProfiles.find(p => p.user_id === userId);
+    return p?.full_name || p?.email || "Unknown";
   };
 
   const filteredTotal = useMemo(() => {
@@ -497,18 +521,18 @@ export default function Revenue() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Entry Date</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Source</TableHead>
                         <TableHead className="hidden md:table-cell">Description</TableHead>
-                        {((canEdit || canEditRevenue) || (canDelete || canDeleteRevenue)) && <TableHead className="w-24">Actions</TableHead>}
+                        {((canEdit || canEditRevenue) || (canDelete || canDeleteRevenue)) && <TableHead className="w-32">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pagination.paginatedItems.map((rev) => (
                         <TableRow key={rev.id}>
                           <TableCell className="font-medium">
-                            {format(new Date(rev.date), "MMM d, yyyy")}
+                            {rev.created_at ? format(new Date(rev.created_at), "MMM d, yyyy h:mm a") : "—"}
                           </TableCell>
                           <TableCell className="font-semibold text-primary">
                             {formatCurrency(Number(rev.amount), currency)}
@@ -526,6 +550,14 @@ export default function Revenue() {
                           {((canEdit || canEditRevenue) || (canDelete || canDeleteRevenue)) && (
                             <TableCell>
                               <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => setViewingRevenue(rev)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                                 {(canEdit || canEditRevenue) && (
                                   rev.is_system_generated ? (
                                     <TooltipProvider>
@@ -634,6 +666,22 @@ export default function Revenue() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Detail Dialog */}
+      <RecordDetailDialog
+        open={!!viewingRevenue}
+        onOpenChange={(open) => { if (!open) setViewingRevenue(null); }}
+        title="Revenue Details"
+        fields={viewingRevenue ? [
+          { label: "Entry Date", value: viewingRevenue.created_at ? format(new Date(viewingRevenue.created_at), "MMM d, yyyy h:mm a") : "—" },
+          { label: "Transaction Date", value: format(new Date(viewingRevenue.date), "MMM d, yyyy") },
+          { label: "Amount", value: formatCurrency(Number(viewingRevenue.amount), currency) },
+          { label: "Source", value: viewingRevenue.revenue_sources?.name || "Uncategorized" },
+          { label: "Description", value: viewingRevenue.description || "—" },
+          { label: "Recorded By", value: getRecorderName(viewingRevenue.user_id) },
+          { label: "System Generated", value: viewingRevenue.is_system_generated ? "Yes" : "No" },
+        ] : []}
+      />
     </div>
   );
 }
