@@ -96,8 +96,10 @@ export function useCreateRevenue() {
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
     },
   });
 }
@@ -163,8 +165,10 @@ export function useUpdateRevenue() {
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
     },
   });
 }
@@ -181,8 +185,10 @@ export function useDeleteRevenue() {
       queryClient.invalidateQueries({ queryKey: ["revenues"] });
       queryClient.invalidateQueries({ queryKey: ["allocations"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["revenue_summary_rpc"] });
+      queryClient.invalidateQueries({ queryKey: ["account_balances"] });
     },
   });
 }

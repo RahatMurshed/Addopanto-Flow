@@ -70,6 +70,7 @@ export function useCreateExpense() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
@@ -98,6 +99,7 @@ export function useUpdateExpense() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
@@ -120,6 +122,7 @@ export function useDeleteExpense() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["account_balances"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-totals"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["expense_summary_rpc"] });
       queryClient.invalidateQueries({ queryKey: ["fundable-investments"] });
