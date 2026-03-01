@@ -133,6 +133,12 @@ export function QuickActionsPanel({
             .eq("id", student.id);
 
           restoredCount = restorableEnrollments.length;
+
+          // Store restored IDs for visual indicator in EnrollmentTimeline
+          sessionStorage.setItem(
+            `restored-enrollments-${student.id}`,
+            JSON.stringify(restorableEnrollments.map((e: any) => e.id))
+          );
         }
       }
 

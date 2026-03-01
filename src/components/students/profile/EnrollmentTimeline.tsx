@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { formatDuration } from "@/utils/durationFormat";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { BookOpen, CalendarDays, Clock, GraduationCap } from "lucide-react";
+import { BookOpen, CalendarDays, Clock, GraduationCap, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -137,6 +137,25 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
   const { user } = useAuth();
   const navigate = useNavigate();
   const isAdmin = isCompanyAdmin || isCipher;
+
+  // Track recently restored enrollment IDs
+  const [restoredIds, setRestoredIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const key = `restored-enrollments-${studentId}`;
+    const stored = sessionStorage.getItem(key);
+    if (stored) {
+      try {
+        setRestoredIds(new Set(JSON.parse(stored)));
+      } catch { /* ignore */ }
+      // Clear after 30 seconds so the indicator is temporary
+      const timer = setTimeout(() => {
+        sessionStorage.removeItem(key);
+        setRestoredIds(new Set());
+      }, 30000);
+      return () => clearTimeout(timer);
+    }
+  }, [studentId, enrollments]);
 
   // Filter for DEO
   const visibleEnrollments = useMemo(() => {
@@ -272,6 +291,7 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
                       const paidAmount = paymentSummary?.paid ?? 0;
                       const dueAmount = totalFee - paidAmount;
                       const paidPercent = totalFee > 0 ? Math.min(100, (paidAmount / totalFee) * 100) : 0;
+                      const isRestored = restoredIds.has(enrollment.id);
 
                       const canViewPayments = !isDataEntryModerator;
 
@@ -283,15 +303,28 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
                             STATUS_DOT[status]
                           )} />
 
-                          <div className="ml-0 rounded-lg border bg-muted/30 p-4">
+                          <div className={cn(
+                            "ml-0 rounded-lg border p-4",
+                            isRestored
+                              ? "bg-green-50/60 border-green-300 dark:bg-green-950/20 dark:border-green-800 animate-in fade-in duration-500"
+                              : "bg-muted/30"
+                          )}>
                             {/* Row 1: Batch name + status */}
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-sm font-semibold text-foreground">
                                 {batch?.batch_name ?? "Unknown Batch"}
                               </span>
-                              <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_BADGE[status])}>
-                                {STATUS_LABEL[status]}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {isRestored && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 animate-in slide-in-from-right-2 duration-300">
+                                    <RotateCcw className="w-3 h-3" />
+                                    Restored
+                                  </span>
+                                )}
+                                <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_BADGE[status])}>
+                                  {STATUS_LABEL[status]}
+                                </span>
+                              </div>
                             </div>
 
                             {/* Row 2: Dates */}
