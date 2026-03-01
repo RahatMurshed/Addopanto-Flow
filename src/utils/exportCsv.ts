@@ -3,7 +3,13 @@
  * Reusable across Course Payments, Product Purchases, and future PDF export.
  */
 export function downloadCsv(filename: string, headers: string[], rows: string[][]) {
-  const escape = (cell: string) => `"${String(cell ?? "").replace(/"/g, '""')}"`;
+  const sanitize = (val: string): string => {
+    const s = String(val ?? "");
+    // Prevent CSV formula injection: prefix dangerous leading chars with a single quote
+    if (/^[=+\-@\t\r]/.test(s)) return `'${s}`;
+    return s;
+  };
+  const escape = (cell: string) => `"${sanitize(cell).replace(/"/g, '""')}"`;
   const csvContent = [
     headers.map(escape).join(","),
     ...rows.map((row) => row.map(escape).join(",")),

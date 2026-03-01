@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { cleanPhone } from "@/utils/phoneFormat";
 
 export interface StudentData {
   id: string;
@@ -42,12 +43,8 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }>
   inquiry: { bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-400", label: "🔍 Inquiry" },
 };
 
-export function cleanPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("880")) return `+${digits}`;
-  if (digits.startsWith("0")) return `+880${digits.slice(1)}`;
-  return `+880${digits}`;
-}
+/** @deprecated Import from @/utils/phoneFormat instead */
+export { cleanPhone };
 
 function getInitials(name: string): string {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);

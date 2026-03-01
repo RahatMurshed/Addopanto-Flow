@@ -18,3 +18,14 @@ export function formatBDPhone(raw: string | null | undefined): string {
 export function stripPhoneFormat(formatted: string): string {
   return formatted.replace(/-/g, "");
 }
+
+/**
+ * Clean a phone number to international format (+880...).
+ * Previously defined in ProfileHeader — moved here for reuse.
+ */
+export function cleanPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("880")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+880${digits.slice(1)}`;
+  return `+880${digits}`;
+}
