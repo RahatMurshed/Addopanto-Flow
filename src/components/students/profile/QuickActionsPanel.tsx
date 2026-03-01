@@ -89,11 +89,23 @@ export function QuickActionsPanel({
     if (!pendingStatus) return;
     setSaving(true);
     try {
+      // Update student status
       const { error } = await supabase
         .from("students")
-        .update({ status: pendingStatus } as any)
+        .update({ status: pendingStatus, ...(["inactive", "dropout"].includes(pendingStatus) ? { batch_id: null } : {}) } as any)
         .eq("id", student.id);
       if (error) throw error;
+
+      // If setting inactive/dropout, also deactivate active enrollments
+      if (["inactive", "dropout"].includes(pendingStatus)) {
+        await supabase
+          .from("batch_enrollments")
+          .update({ status: "completed" } as any)
+          .eq("student_id", student.id)
+          .eq("company_id", companyId)
+          .eq("status", "active");
+      }
+
       onStatusChange?.(pendingStatus);
       toast({ title: `Status changed to ${pendingStatus}` });
     } catch (err: any) {
