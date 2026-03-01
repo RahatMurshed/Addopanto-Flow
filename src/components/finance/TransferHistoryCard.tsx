@@ -2,7 +2,7 @@ import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowLeftRight, Trash2, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowLeftRight, Trash2, Loader2, Eye } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,12 +14,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import type { KhataTransfer } from "@/hooks/useKhataTransfers";
 import type { AccountBalance } from "@/hooks/useExpenses";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/shared/TablePagination";
 import AdvancedDateFilter from "@/components/shared/AdvancedDateFilter";
 import type { DateRange, FilterType, FilterValue } from "@/utils/dateRangeUtils";
+import RecordDetailDialog from "@/components/dialogs/RecordDetailDialog";
 
 interface TransferHistoryCardProps {
   transfers: KhataTransfer[];
@@ -42,6 +45,7 @@ export default function TransferHistoryCard({
 }: TransferHistoryCardProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterDateRange, setFilterDateRange] = useState<DateRange | null>(null);
+  const [viewingTransfer, setViewingTransfer] = useState<KhataTransfer | null>(null);
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name || "Unknown";
   const getAccountColor = (id: string) => accounts.find((a) => a.id === id)?.color || "#888";
@@ -60,6 +64,22 @@ export default function TransferHistoryCard({
       return isWithinInterval(transferDate, { start, end });
     });
   }, [transfers, filterDateRange]);
+
+  // Fetch recorder profiles
+  const userIds = useMemo(() => [...new Set(filteredTransfers.map(t => t.user_id))], [filteredTransfers]);
+  const { data: userProfiles = [] } = useQuery({
+    queryKey: ["transfer-user-profiles", userIds],
+    queryFn: async () => {
+      if (userIds.length === 0) return [];
+      const { data } = await supabase.from("user_profiles").select("user_id, full_name, email").in("user_id", userIds);
+      return data ?? [];
+    },
+    enabled: userIds.length > 0,
+  });
+  const getRecorderName = (userId: string) => {
+    const p = userProfiles.find(p => p.user_id === userId);
+    return p?.full_name || p?.email || "Unknown";
+  };
 
   // Pagination for filtered transfers
   const pagination = usePagination(filteredTransfers);
@@ -140,7 +160,7 @@ export default function TransferHistoryCard({
                       <TableHead>To</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead className="hidden md:table-cell">Note</TableHead>
-                      {showDelete && onDelete && <TableHead className="w-12"></TableHead>}
+                      <TableHead className="w-20"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -176,18 +196,28 @@ export default function TransferHistoryCard({
                         <TableCell className="hidden max-w-xs truncate md:table-cell">
                           {transfer.description || <span className="text-muted-foreground">—</span>}
                         </TableCell>
-                        {showDelete && onDelete && (
-                          <TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteId(transfer.id)}
+                              className="h-8 w-8"
+                              onClick={() => setViewingTransfer(transfer)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          </TableCell>
-                        )}
+                            {showDelete && onDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(transfer.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -247,6 +277,21 @@ export default function TransferHistoryCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Detail Dialog */}
+      <RecordDetailDialog
+        open={!!viewingTransfer}
+        onOpenChange={(open) => { if (!open) setViewingTransfer(null); }}
+        title="Transfer Details"
+        fields={viewingTransfer ? [
+          { label: "Entry Date", value: format(new Date(viewingTransfer.created_at), "MMM d, yyyy h:mm a") },
+          { label: "From", value: getAccountName(viewingTransfer.from_account_id) },
+          { label: "To", value: getAccountName(viewingTransfer.to_account_id) },
+          { label: "Amount", value: `৳${Number(viewingTransfer.amount).toLocaleString()}` },
+          { label: "Description", value: viewingTransfer.description || "—" },
+          { label: "Recorded By", value: getRecorderName(viewingTransfer.user_id) },
+        ] : []}
+      />
     </>
   );
 }

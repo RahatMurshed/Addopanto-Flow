@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { getSourceBadgeStyle, cleanSalaryTag } from "@/utils/sourceColors";
 import {
   useExpenses,
@@ -53,6 +55,7 @@ import {
   Search,
   X,
   SlidersHorizontal,
+  Eye,
 } from "lucide-react";
 import { SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,6 +69,7 @@ import { type DateRange, type FilterType, type FilterValue, getPreviousPeriodRan
 import { exportExpensesToCSV, exportToPDF } from "@/utils/exportUtils";
 import { usePagination } from "@/hooks/usePagination";
 import TablePagination from "@/components/shared/TablePagination";
+import RecordDetailDialog from "@/components/dialogs/RecordDetailDialog";
 
 export default function Expenses() {
   const navigate = useNavigate();
@@ -125,6 +129,7 @@ export default function Expenses() {
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseWithAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewingExpense, setViewingExpense] = useState<ExpenseWithAccount | null>(null);
 
   // DEO route guard: redirect if no expense permissions
   useEffect(() => {
@@ -140,10 +145,13 @@ export default function Expenses() {
     setPreviousRange(getPreviousPeriodRange(filterType, filterValue));
   }, []);
 
-  // Filter expenses by selected date range
+  // Filter expenses by entry date (created_at)
   const filteredExpenses = useMemo(() => {
     if (!dateRange) return [];
-    return expenses.filter((e) => e.date >= dateRange.start && e.date <= dateRange.end);
+    return expenses.filter((e) => {
+      const entryDate = (e.created_at ?? "").slice(0, 10);
+      return entryDate >= dateRange.start && entryDate <= dateRange.end;
+    });
   }, [expenses, dateRange]);
 
   // Apply search, account filter, and sort
@@ -165,13 +173,13 @@ export default function Expenses() {
     result = [...result].sort((a, b) => {
       switch (sortBy) {
         case "date-asc":
-          return a.date.localeCompare(b.date) || (a.created_at ?? "").localeCompare(b.created_at ?? "");
+          return (a.created_at ?? "").localeCompare(b.created_at ?? "");
         case "date-desc":
-          return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+          return (b.created_at ?? "").localeCompare(a.created_at ?? "");
         case "amount-desc": return Number(b.amount) - Number(a.amount);
         case "amount-asc": return Number(a.amount) - Number(b.amount);
         default:
-          return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+          return (b.created_at ?? "").localeCompare(a.created_at ?? "");
       }
     });
 
@@ -187,6 +195,22 @@ export default function Expenses() {
   }, [dateRange, searchQuery, accountFilter, sortBy]);
 
   const activeFilterCount = (searchQuery ? 1 : 0) + (accountFilter !== "all" ? 1 : 0) + (sortBy !== "date-desc" ? 1 : 0);
+
+  // Fetch recorder profiles
+  const userIds = useMemo(() => [...new Set(filteredExpenses.map(e => e.user_id))], [filteredExpenses]);
+  const { data: userProfiles = [] } = useQuery({
+    queryKey: ["expense-user-profiles", userIds],
+    queryFn: async () => {
+      if (userIds.length === 0) return [];
+      const { data } = await supabase.from("user_profiles").select("user_id, full_name, email").in("user_id", userIds);
+      return data ?? [];
+    },
+    enabled: userIds.length > 0,
+  });
+  const getRecorderName = (userId: string) => {
+    const p = userProfiles.find(p => p.user_id === userId);
+    return p?.full_name || p?.email || "Unknown";
+  };
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -597,18 +621,18 @@ export default function Expenses() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Entry Date</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Expense Source</TableHead>
                         <TableHead className="hidden md:table-cell">Description</TableHead>
-                        {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && <TableHead className="w-24">Actions</TableHead>}
+                        {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && <TableHead className="w-32">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pagination.paginatedItems.map((exp) => (
                         <TableRow key={exp.id}>
                           <TableCell className="font-medium">
-                            {format(new Date(exp.date), "MMM d, yyyy")}
+                            {exp.created_at ? format(new Date(exp.created_at), "MMM d, yyyy h:mm a") : "—"}
                           </TableCell>
                           <TableCell className="font-semibold text-destructive">
                             {formatCurrency(Number(exp.amount), currency)}
@@ -628,6 +652,14 @@ export default function Expenses() {
                           {((canEdit || canEditExpense) || (canDelete || canDeleteExpense)) && (
                             <TableCell>
                               <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => setViewingExpense(exp)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                                 {(canEdit || canEditExpense) && (
                                   <Button
                                     variant="ghost"
@@ -744,6 +776,23 @@ export default function Expenses() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Detail Dialog */}
+      <RecordDetailDialog
+        open={!!viewingExpense}
+        onOpenChange={(open) => { if (!open) setViewingExpense(null); }}
+        title="Expense Details"
+        fields={viewingExpense ? [
+          { label: "Entry Date", value: viewingExpense.created_at ? format(new Date(viewingExpense.created_at), "MMM d, yyyy h:mm a") : "—" },
+          { label: "Payment Date", value: format(new Date(viewingExpense.date), "MMM d, yyyy") },
+          { label: "Amount", value: formatCurrency(Number(viewingExpense.amount), currency) },
+          { label: "Expense Source", value: viewingExpense.expense_accounts?.name || "Uncategorized" },
+          { label: "Description", value: cleanSalaryTag(viewingExpense.description) || "—" },
+          { label: "Recorded By", value: getRecorderName(viewingExpense.user_id) },
+          ...(viewingExpense.vendor_name ? [{ label: "Vendor", value: viewingExpense.vendor_name }] : []),
+          ...(viewingExpense.invoice_number ? [{ label: "Invoice #", value: viewingExpense.invoice_number }] : []),
+        ] : []}
+      />
     </div>
   );
 }
