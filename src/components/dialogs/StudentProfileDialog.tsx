@@ -66,7 +66,7 @@ export default function StudentProfileDialog({ student, open, onOpenChange, onEd
           </div>
           <div className="flex flex-wrap gap-2 mt-1">
             <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">{s.status}</Badge>
-            {s.batch_id ? (
+            {(s.batch_id || (batchName && batchName !== "—")) ? (
               <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Enrolled</Badge>
             ) : (
               <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30">Not Enrolled</Badge>
