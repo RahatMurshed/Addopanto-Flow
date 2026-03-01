@@ -277,32 +277,91 @@ export function useCreateSalaryPayment() {
   const { activeCompanyId } = useCompany();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payment: { employee_id: string; amount: number; month: string; payment_date: string; payment_method: string; deductions?: number; net_amount: number; description?: string }) => {
+    mutationFn: async (payment: {
+      employee_id: string; amount: number; month: string; payment_date: string;
+      payment_method: string; deductions?: number; net_amount: number; description?: string;
+      expense_account_id: string; employee_name: string;
+    }) => {
       if (!user) throw new Error("Not authenticated");
       if (!activeCompanyId) throw new Error("No active company");
-      const { data, error } = await supabase.from("employee_salary_payments" as any).insert({ ...payment, company_id: activeCompanyId, user_id: user.id }).select().single();
-      if (error) throw error;
-      return data as unknown as SalaryPayment;
+
+      const { expense_account_id, employee_name, ...salaryData } = payment;
+
+      // 1. Create salary payment
+      const { data: salaryRecord, error: salaryError } = await supabase
+        .from("employee_salary_payments" as any)
+        .insert({ ...salaryData, company_id: activeCompanyId, user_id: user.id })
+        .select()
+        .single();
+      if (salaryError) throw salaryError;
+
+      const salaryId = (salaryRecord as any).id;
+
+      // 2. Create linked expense record
+      const expenseDescription = `Salary - ${employee_name} - ${payment.month} [SALARY:${salaryId}]`;
+      const { error: expenseError } = await supabase
+        .from("expenses")
+        .insert({
+          company_id: activeCompanyId,
+          user_id: user.id,
+          expense_account_id,
+          amount: payment.net_amount,
+          date: payment.payment_date,
+          description: expenseDescription,
+        });
+      if (expenseError) throw expenseError;
+
+      return salaryRecord as unknown as SalaryPayment;
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-salary", vars.employee_id] });
-      qc.invalidateQueries({ queryKey: ["employee-perf-salary", vars.employee_id] });
       qc.invalidateQueries({ queryKey: ["employees"] });
+      // Invalidate all financial queries
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["expense_accounts"] });
+      qc.invalidateQueries({ queryKey: ["account_balances"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
 
 export function useDeleteSalaryPayment() {
+  const { user } = useAuth();
+  const { activeCompanyId } = useCompany();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, employeeId }: { id: string; employeeId: string }) => {
+      // 1. Find and delete linked expense by description pattern [SALARY:<id>]
+      if (activeCompanyId) {
+        const { data: expenses } = await supabase
+          .from("expenses")
+          .select("id, description")
+          .eq("company_id", activeCompanyId)
+          .ilike("description", `%[SALARY:${id}]%`);
+
+        if (expenses && expenses.length > 0) {
+          await supabase
+            .from("expenses")
+            .delete()
+            .in("id", expenses.map(e => e.id));
+        }
+      }
+
+      // 2. Delete salary payment
       const { error } = await supabase.from("employee_salary_payments" as any).delete().eq("id", id);
       if (error) throw error;
       return employeeId;
     },
     onSuccess: (employeeId) => {
       qc.invalidateQueries({ queryKey: ["employee-salary", employeeId] });
-      qc.invalidateQueries({ queryKey: ["employee-perf-salary", employeeId] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
+      // Invalidate all financial queries
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["expense_accounts"] });
+      qc.invalidateQueries({ queryKey: ["account_balances"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
     },
   });
 }
@@ -341,7 +400,6 @@ export function useMarkAttendance() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-attendance", vars.employee_id] });
-      qc.invalidateQueries({ queryKey: ["employee-perf-attendance", vars.employee_id] });
     },
   });
 }
@@ -375,7 +433,6 @@ export function useCreateLeave() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["employee-leaves", vars.employee_id] });
-      qc.invalidateQueries({ queryKey: ["employee-perf-attendance", vars.employee_id] });
     },
   });
 }
@@ -390,7 +447,6 @@ export function useDeleteLeave() {
     },
     onSuccess: (employeeId) => {
       qc.invalidateQueries({ queryKey: ["employee-leaves", employeeId] });
-      qc.invalidateQueries({ queryKey: ["employee-perf-attendance", employeeId] });
     },
   });
 }

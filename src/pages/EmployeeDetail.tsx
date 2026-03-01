@@ -16,18 +16,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmployeeDialog } from "@/components/dialogs/EmployeeDialog";
 import {
   useEmployee, useEmployeeSalaryPayments, useCreateSalaryPayment, useDeleteSalaryPayment,
-  useEmployeeAttendance, useMarkAttendance,
-  useEmployeeLeaves, useCreateLeave, useDeleteLeave,
 } from "@/hooks/useEmployees";
-import { useEmployeePerformance } from "@/hooks/useEmployeePerformance";
+import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
 import { useCompany } from "@/contexts/CompanyContext";
-import { exportToPDF } from "@/utils/exportUtils";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-import { ArrowLeft, Pencil, Calendar, DollarSign, Clock, FileText, Trash2, Download, Eye, EyeOff, TrendingUp, Users, CheckCircle, AlertTriangle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ComposedChart, Line, Cell, Tooltip as RechartsTooltip, Legend, Area, ReferenceLine } from "recharts";
+import { ArrowLeft, Pencil, DollarSign, FileText, Trash2, Download } from "lucide-react";
 import jsPDF from "jspdf";
-import { format, getDaysInMonth, startOfMonth, addMonths, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { toast } from "sonner";
 
 const STATUS_BADGES: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -37,66 +32,34 @@ const STATUS_BADGES: Record<string, { label: string; variant: "default" | "secon
 };
 
 const TYPE_LABELS: Record<string, string> = { full_time: "Full-time", part_time: "Part-time", contract: "Contract" };
-const ATTENDANCE_COLORS: Record<string, string> = { present: "bg-success/20 text-success", absent: "bg-destructive/20 text-destructive", half_day: "bg-warning/20 text-warning", leave: "bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400" };
-
-function getScoreColor(score: number) {
-  if (score >= 80) return "hsl(var(--success))";
-  if (score >= 50) return "hsl(var(--warning))";
-  return "hsl(var(--destructive))";
-}
-
-function getScoreLabel(score: number) {
-  if (score >= 80) return "Excellent";
-  if (score >= 50) return "Good";
-  return "Needs Improvement";
-}
-
-function getBarColor(pct: number) {
-  if (pct >= 80) return "hsl(var(--success))";
-  if (pct >= 50) return "hsl(var(--warning))";
-  return "hsl(var(--destructive))";
-}
 
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { canManageEmployees, isCipher, activeCompany } = useCompany();
+  const { canManageEmployees, isCipher } = useCompany();
   const { fc: formatAmount } = useCompanyCurrency();
   const canManage = canManageEmployees;
 
   const { data: employee, isLoading } = useEmployee(id);
   const [editOpen, setEditOpen] = useState(false);
-  const [showSalary, setShowSalary] = useState(isCipher);
   const [activeTab, setActiveTab] = useState("profile");
-  const salaryVisible = isCipher || showSalary;
 
   // Salary
   const { data: salaryPayments = [] } = useEmployeeSalaryPayments(id);
   const createSalary = useCreateSalaryPayment();
   const deleteSalary = useDeleteSalaryPayment();
   const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
-  const [salaryForm, setSalaryForm] = useState({ month: format(new Date(), "yyyy-MM"), payment_date: format(new Date(), "yyyy-MM-dd"), payment_method: "cash", deductions: 0, description: "" });
+  const [salaryForm, setSalaryForm] = useState({ month: format(new Date(), "yyyy-MM"), payment_date: format(new Date(), "yyyy-MM-dd"), payment_method: "cash", deductions: 0, description: "", expense_account_id: "" });
 
-  // Attendance
-  const [attendanceMonth, setAttendanceMonth] = useState(format(new Date(), "yyyy-MM"));
-  const { data: attendance = [] } = useEmployeeAttendance(id, attendanceMonth);
-  const markAttendance = useMarkAttendance();
-
-  // Leaves
-  const { data: leaves = [] } = useEmployeeLeaves(id);
-  const createLeave = useCreateLeave();
-  const deleteLeave = useDeleteLeave();
-  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
-  const [leaveForm, setLeaveForm] = useState({ leave_type: "casual", start_date: "", end_date: "", reason: "" });
-
-  // Performance
-  const perf = useEmployeePerformance(id, 6, salaryVisible);
-
-  // Tab count for grid
-  const tabCount = salaryVisible ? 5 : 4;
+  // Expense accounts for salary deduction
+  const { data: expenseAccounts = [] } = useExpenseAccounts();
 
   const handlePaySalary = async () => {
     if (!id || !employee) return;
+    if (!salaryForm.expense_account_id) {
+      toast.error("Please select an expense source");
+      return;
+    }
     const amount = employee.monthly_salary;
     const deductions = salaryForm.deductions || 0;
     try {
@@ -104,27 +67,12 @@ export default function EmployeeDetail() {
         employee_id: id, amount, month: salaryForm.month,
         payment_date: salaryForm.payment_date, payment_method: salaryForm.payment_method,
         deductions, net_amount: amount - deductions, description: salaryForm.description || undefined,
+        expense_account_id: salaryForm.expense_account_id,
+        employee_name: employee.full_name,
       });
-      toast.success("Salary payment recorded");
+      toast.success("Salary payment recorded & expense created");
       setSalaryDialogOpen(false);
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  const handleMarkAttendance = async (date: string, status: string) => {
-    if (!id) return;
-    try {
-      await markAttendance.mutateAsync({ employee_id: id, date, status });
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  const handleAddLeave = async () => {
-    if (!id) return;
-    if (!leaveForm.start_date || !leaveForm.end_date) { toast.error("Start and end dates required"); return; }
-    try {
-      await createLeave.mutateAsync({ employee_id: id, ...leaveForm });
-      toast.success("Leave recorded");
-      setLeaveDialogOpen(false);
-      setLeaveForm({ leave_type: "casual", start_date: "", end_date: "", reason: "" });
+      setSalaryForm(f => ({ ...f, expense_account_id: "" }));
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -183,25 +131,7 @@ export default function EmployeeDetail() {
     toast.success("Salary slip downloaded");
   };
 
-  // Attendance calendar data
-  const daysInMonth = getDaysInMonth(new Date(attendanceMonth + "-01"));
-  const attendanceMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    attendance.forEach(a => { map[a.date] = a.status; });
-    return map;
-  }, [attendance]);
-
-  const attendanceStats = useMemo(() => {
-    const present = attendance.filter(a => a.status === "present").length;
-    const absent = attendance.filter(a => a.status === "absent").length;
-    const halfDay = attendance.filter(a => a.status === "half_day").length;
-    const leave = attendance.filter(a => a.status === "leave").length;
-    const total = present + absent + halfDay + leave;
-    return { present, absent, halfDay, leave, percentage: total > 0 ? Math.round(((present + halfDay * 0.5) / total) * 100) : 0 };
-  }, [attendance]);
-
   // Salary summary
-  const paidMonths = useMemo(() => new Set(salaryPayments.map(s => s.month)), [salaryPayments]);
   const totalPaid = useMemo(() => salaryPayments.reduce((s, p) => s + p.net_amount, 0), [salaryPayments]);
 
   if (isLoading) {
@@ -214,13 +144,6 @@ export default function EmployeeDetail() {
 
   const initials = employee.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
   const badge = STATUS_BADGES[employee.employment_status] || STATUS_BADGES.active;
-
-  // Performance chart data
-  const scoreColor = getScoreColor(perf.overallScore);
-  const scoreLabel = getScoreLabel(perf.overallScore);
-  const scorePercent = perf.overallScore / 100;
-  const circumference = 2 * Math.PI * 45;
-  const strokeDashoffset = circumference * (1 - scorePercent);
 
   return (
     <div className="space-y-6">
@@ -244,49 +167,7 @@ export default function EmployeeDetail() {
               <p className="text-muted-foreground">{employee.employee_id_number} • {employee.designation || "No designation"} • {employee.department || "No department"}</p>
               <p className="text-sm text-muted-foreground mt-1">{TYPE_LABELS[employee.employment_type] || employee.employment_type} • Joined {format(new Date(employee.join_date), "dd MMM yyyy")}</p>
             </div>
-            {/* Performance Score KPI */}
-            <button
-              onClick={() => setActiveTab("performance")}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-              title="View Performance Details"
-            >
-              {perf.isLoading ? (
-                <Skeleton className="h-10 w-10 rounded-full" />
-              ) : (
-                <svg width="40" height="40" viewBox="0 0 100 100" className="shrink-0">
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
-                  <circle
-                    cx="50" cy="50" r="45" fill="none"
-                    stroke={scoreColor} strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    transform="rotate(-90 50 50)"
-                    className="transition-all duration-700"
-                  />
-                  <text x="50" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" fill={scoreColor}>
-                    {perf.overallScore}
-                  </text>
-                </svg>
-              )}
-              <div className="text-left hidden sm:block">
-                <p className="text-xs font-semibold" style={{ color: scoreColor }}>{scoreLabel}</p>
-                <p className="text-[10px] text-muted-foreground">Performance</p>
-              </div>
-            </button>
             <div className="flex items-center gap-2">
-              {canManage && !isCipher && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" onClick={() => setShowSalary(s => !s)}>
-                        {showSalary ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{showSalary ? "Hide Salary" : "Show Salary"}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
               {canManage && (
                 <Button onClick={() => setEditOpen(true)} variant="outline" className="gap-2">
                   <Pencil className="h-4 w-4" /> Edit
@@ -298,12 +179,9 @@ export default function EmployeeDetail() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full ${salaryVisible ? "grid-cols-5" : "grid-cols-4"}`}>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="profile" className="gap-1"><FileText className="h-3 w-3 hidden sm:inline" /> Profile</TabsTrigger>
-          {salaryVisible && <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>}
-          <TabsTrigger value="attendance" className="gap-1"><Calendar className="h-3 w-3 hidden sm:inline" /> Attendance</TabsTrigger>
-          <TabsTrigger value="performance" className="gap-1"><TrendingUp className="h-3 w-3 hidden sm:inline" /> Performance</TabsTrigger>
-          <TabsTrigger value="leaves" className="gap-1"><Clock className="h-3 w-3 hidden sm:inline" /> Leaves</TabsTrigger>
+          <TabsTrigger value="salary" className="gap-1"><DollarSign className="h-3 w-3 hidden sm:inline" /> Salary</TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}
@@ -334,17 +212,15 @@ export default function EmployeeDetail() {
                 <InfoRow label="Permanent" value={employee.permanent_address_same ? "Same as current" : employee.permanent_address} />
               </CardContent>
             </Card>
-            {salaryVisible && (
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Financial Information</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <InfoRow label="Monthly Salary" value={formatAmount(employee.monthly_salary)} />
-                  <InfoRow label="Bank Account" value={employee.bank_account_number} />
-                  <InfoRow label="Bank Name" value={employee.bank_name} />
-                  <InfoRow label="Branch" value={employee.bank_branch} />
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Financial Information</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <InfoRow label="Monthly Salary" value={formatAmount(employee.monthly_salary)} />
+                <InfoRow label="Bank Account" value={employee.bank_account_number} />
+                <InfoRow label="Bank Name" value={employee.bank_name} />
+                <InfoRow label="Branch" value={employee.bank_branch} />
+              </CardContent>
+            </Card>
             <Card className="md:col-span-2">
               <CardHeader><CardTitle className="text-sm">Additional Details</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -357,42 +233,42 @@ export default function EmployeeDetail() {
         </TabsContent>
 
         {/* Salary Tab */}
-        {salaryVisible && (
-          <TabsContent value="salary" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Paid: <span className="font-bold text-foreground">{formatAmount(totalPaid)}</span></p>
-              </div>
-              <Button onClick={() => setSalaryDialogOpen(true)} className="gap-2"><DollarSign className="h-4 w-4" /> Record Payment</Button>
+        <TabsContent value="salary" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Paid: <span className="font-bold text-foreground">{formatAmount(totalPaid)}</span></p>
             </div>
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Deductions</TableHead>
-                      <TableHead>Net Amount</TableHead>
-                      <TableHead>Payment Date</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {salaryPayments.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">No salary payments recorded</TableCell></TableRow>
-                    ) : salaryPayments.map(sp => (
-                      <TableRow key={sp.id}>
-                        <TableCell className="font-medium">{sp.month}</TableCell>
-                        <TableCell>{formatAmount(sp.amount)}</TableCell>
-                        <TableCell>{formatAmount(sp.deductions)}</TableCell>
-                        <TableCell className="font-medium">{formatAmount(sp.net_amount)}</TableCell>
-                        <TableCell>{format(new Date(sp.payment_date), "dd MMM yyyy")}</TableCell>
-                        <TableCell className="capitalize">{sp.payment_method}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleDownloadSalarySlip(sp)} title="Download Salary Slip"><Download className="h-4 w-4" /></Button>
+            {canManage && <Button onClick={() => setSalaryDialogOpen(true)} className="gap-2"><DollarSign className="h-4 w-4" /> Record Payment</Button>}
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Deductions</TableHead>
+                    <TableHead>Net Amount</TableHead>
+                    <TableHead>Payment Date</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {salaryPayments.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">No salary payments recorded</TableCell></TableRow>
+                  ) : salaryPayments.map(sp => (
+                    <TableRow key={sp.id}>
+                      <TableCell className="font-medium">{sp.month}</TableCell>
+                      <TableCell>{formatAmount(sp.amount)}</TableCell>
+                      <TableCell>{formatAmount(sp.deductions)}</TableCell>
+                      <TableCell className="font-medium">{formatAmount(sp.net_amount)}</TableCell>
+                      <TableCell>{format(new Date(sp.payment_date), "dd MMM yyyy")}</TableCell>
+                      <TableCell className="capitalize">{sp.payment_method}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleDownloadSalarySlip(sp)} title="Download Salary Slip"><Download className="h-4 w-4" /></Button>
+                        {canManage && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -400,7 +276,7 @@ export default function EmployeeDetail() {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Payment?</AlertDialogTitle>
-                                <AlertDialogDescription>Remove this salary payment record?</AlertDialogDescription>
+                                <AlertDialogDescription>This will remove both the salary record and its linked expense.</AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -408,416 +284,9 @@ export default function EmployeeDetail() {
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            {/* Salary Dialog */}
-            <Dialog open={salaryDialogOpen} onOpenChange={setSalaryDialogOpen}>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Record Salary Payment</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Month</Label>
-                      <Input type="month" value={salaryForm.month} onChange={e => setSalaryForm(f => ({ ...f, month: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Amount</Label>
-                      <Input value={formatAmount(employee.monthly_salary)} disabled />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Payment Date</Label>
-                      <Input type="date" value={salaryForm.payment_date} onChange={e => setSalaryForm(f => ({ ...f, payment_date: e.target.value }))} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Payment Method</Label>
-                      <Select value={salaryForm.payment_method} onValueChange={v => setSalaryForm(f => ({ ...f, payment_method: v }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                          <SelectItem value="cheque">Cheque</SelectItem>
-                          <SelectItem value="upi">UPI</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Deductions</Label>
-                    <Input type="number" min={0} value={salaryForm.deductions} onChange={e => setSalaryForm(f => ({ ...f, deductions: parseFloat(e.target.value) || 0 }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description (optional)</Label>
-                    <Textarea value={salaryForm.description} onChange={e => setSalaryForm(f => ({ ...f, description: e.target.value }))} rows={2} />
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted text-sm">
-                    Net Payable: <span className="font-bold text-primary">{formatAmount(employee.monthly_salary - (salaryForm.deductions || 0))}</span>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setSalaryDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handlePaySalary} disabled={createSalary.isPending}>{createSalary.isPending ? "Saving..." : "Record Payment"}</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
-        )}
-
-        {/* Attendance Tab */}
-        <TabsContent value="attendance" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setAttendanceMonth(format(subMonths(new Date(attendanceMonth + "-01"), 1), "yyyy-MM"))}>←</Button>
-              <span className="font-medium">{format(new Date(attendanceMonth + "-01"), "MMMM yyyy")}</span>
-              <Button variant="outline" size="sm" onClick={() => setAttendanceMonth(format(addMonths(new Date(attendanceMonth + "-01"), 1), "yyyy-MM"))}>→</Button>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Attendance: <span className="font-bold text-foreground">{attendanceStats.percentage}%</span>
-              <span className="ml-3">P:{attendanceStats.present} A:{attendanceStats.absent} H:{attendanceStats.halfDay} L:{attendanceStats.leave}</span>
-            </div>
-          </div>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="grid grid-cols-7 gap-1">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
-                  <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>
-                ))}
-                {(() => {
-                  const firstDay = new Date(attendanceMonth + "-01").getDay();
-                  const blanks = Array.from({ length: firstDay }, (_, i) => <div key={`b-${i}`} />);
-                  const days = Array.from({ length: daysInMonth }, (_, i) => {
-                    const day = i + 1;
-                    const dateStr = `${attendanceMonth}-${String(day).padStart(2, "0")}`;
-                    const status = attendanceMap[dateStr];
-                    const colorClass = status ? ATTENDANCE_COLORS[status] || "" : "";
-
-                    return (
-                      <div key={day} className="relative">
-                        {canManage ? (
-                          <Select value={status || ""} onValueChange={v => handleMarkAttendance(dateStr, v)}>
-                            <SelectTrigger className={`h-10 text-xs justify-center border-0 ${colorClass}`}>
-                              <span>{day}</span>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="present">Present</SelectItem>
-                              <SelectItem value="absent">Absent</SelectItem>
-                              <SelectItem value="half_day">Half Day</SelectItem>
-                              <SelectItem value="leave">Leave</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className={`h-10 flex items-center justify-center text-xs rounded ${colorClass}`}>{day}</div>
                         )}
-                      </div>
-                    );
-                  });
-                  return [...blanks, ...days];
-                })()}
-              </div>
-              <div className="flex gap-4 mt-4 text-xs">
-                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-success/20" /> Present</span>
-                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-destructive/20" /> Absent</span>
-                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-warning/20" /> Half Day</span>
-                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-sky-100 dark:bg-sky-900/30" /> Leave</span>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Performance Tab */}
-        <TabsContent value="performance" className="space-y-6 mt-4">
-          {perf.isLoading ? (
-            <div className="space-y-4"><Skeleton className="h-40 w-full" /><Skeleton className="h-64 w-full" /></div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between" data-pdf-hide>
-                <p className="text-sm text-muted-foreground">Performance overview for the last 6 months</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={async () => {
-                    toast.info("Generating PDF...");
-                    try {
-                      await exportToPDF(
-                        "employee-performance-report",
-                        `${employee.full_name.replace(/\s+/g, "_")}_Performance`,
-                        `${employee.full_name} — Performance Report`,
-                        "Last 6 Months",
-                        activeCompany?.name
-                      );
-                      toast.success("PDF downloaded");
-                    } catch { toast.error("PDF generation failed"); }
-                  }}
-                >
-                  <Download className="h-4 w-4" /> Download PDF
-                </Button>
-              </div>
-              <div id="employee-performance-report">
-              {/* Score + KPIs Row */}
-              <div className="grid md:grid-cols-5 gap-4">
-                {/* Radial Score */}
-                <Card className="md:col-span-1 flex flex-col items-center justify-center py-6">
-                  <div className="relative w-28 h-28">
-                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="45" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
-                      <circle
-                        cx="50" cy="50" r="45" fill="none"
-                        stroke={scoreColor}
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        className="transition-all duration-700"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold" style={{ color: scoreColor }}>{perf.overallScore}</span>
-                      <span className="text-[10px] text-muted-foreground">/ 100</span>
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium mt-2" style={{ color: scoreColor }}>{scoreLabel}</p>
-                  <p className="text-xs text-muted-foreground">Performance Score</p>
-                </Card>
-
-                {/* KPI Cards */}
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <TrendingUp className="h-5 w-5 mx-auto text-primary mb-2" />
-                    <p className="text-2xl font-bold">{perf.avgAttendance}%</p>
-                    <p className="text-xs text-muted-foreground">Avg Attendance</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <Users className="h-5 w-5 mx-auto text-success mb-2" />
-                    <p className="text-2xl font-bold">{perf.totalPresent}</p>
-                    <p className="text-xs text-muted-foreground">Days Present</p>
-                  </CardContent>
-                </Card>
-                {salaryVisible ? (
-                  <Card>
-                    <CardContent className="pt-6 text-center">
-                      <CheckCircle className="h-5 w-5 mx-auto text-primary mb-2" />
-                      <p className="text-2xl font-bold">{perf.monthsPaidOnTime}/{perf.totalMonths}</p>
-                      <p className="text-xs text-muted-foreground">Salary Months Paid</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className="pt-6 text-center">
-                      <AlertTriangle className="h-5 w-5 mx-auto text-warning mb-2" />
-                      <p className="text-2xl font-bold">{perf.months.reduce((s, m) => s + m.daysAbsent, 0)}</p>
-                      <p className="text-xs text-muted-foreground">Days Absent</p>
-                    </CardContent>
-                  </Card>
-                )}
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <Clock className="h-5 w-5 mx-auto text-warning mb-2" />
-                    <p className="text-2xl font-bold">{perf.totalLeaves}</p>
-                    <p className="text-xs text-muted-foreground">Total Leaves</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Attendance Breakdown Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Attendance Breakdown (Last 6 Months)</CardTitle>
-                  <p className="text-xs text-muted-foreground">Daily attendance distribution by category per month</p>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                      <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                      <RechartsTooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
-                        formatter={(value: number, name: string) => [value, name]}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar dataKey="daysPresent" name="Present" stackId="a" fill="hsl(var(--success))" radius={[0, 0, 0, 0]} />
-                      <Bar dataKey="halfDays" name="Half Day" stackId="a" fill="hsl(var(--warning))" />
-                      <Bar dataKey="leaveDays" name="Leave" stackId="a" fill="hsl(var(--primary))" />
-                      <Bar dataKey="daysAbsent" name="Absent" stackId="a" fill="hsl(var(--destructive))" />
-                      <Bar dataKey="unmarkedDays" name="Unmarked" stackId="a" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Attendance % Trend with Reference Line */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Attendance Trend</CardTitle>
-                  <p className="text-xs text-muted-foreground">Monthly attendance percentage with 80% target line</p>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <ComposedChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                      <RechartsTooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
-                        formatter={(value: number) => [`${value}%`, "Attendance"]}
-                      />
-                      <ReferenceLine y={80} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" label={{ value: "Target 80%", position: "right", fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                      <Area type="monotone" dataKey="attendancePercent" fill="hsl(var(--primary) / 0.15)" stroke="none" />
-                      <Bar dataKey="attendancePercent" name="Attendance %" radius={[4, 4, 0, 0]}>
-                        {perf.months.map((m, i) => (
-                          <Cell key={i} fill={getBarColor(m.attendancePercent)} />
-                        ))}
-                      </Bar>
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Payroll vs Attendance Correlation (salary visible only) */}
-              {salaryVisible && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Payroll vs Attendance Correlation</CardTitle>
-                    <p className="text-xs text-muted-foreground">Gross salary, deductions, and net pay mapped against attendance rate</p>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <ComposedChart data={perf.months} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                        <YAxis yAxisId="left" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} unit="%" />
-                        <RechartsTooltip
-                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
-                          formatter={(value: number, name: string) => {
-                            if (name === "Attendance %") return [`${value}%`, name];
-                            return [formatAmount(value), name];
-                          }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar yAxisId="left" dataKey="salaryGross" name="Gross Salary" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.3} />
-                        <Bar yAxisId="left" dataKey="salaryAmount" name="Net Paid" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} opacity={0.8} />
-                        <Line yAxisId="right" dataKey="attendancePercent" name="Attendance %" stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--warning))", strokeWidth: 2, stroke: "hsl(var(--card))" }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Monthly Breakdown Table */}
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Monthly Breakdown</CardTitle></CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Month</TableHead>
-                        <TableHead>Working</TableHead>
-                        <TableHead>Present</TableHead>
-                        <TableHead>Absent</TableHead>
-                        <TableHead>Half Days</TableHead>
-                        <TableHead>Leaves</TableHead>
-                        <TableHead>Effective</TableHead>
-                        <TableHead>Attendance %</TableHead>
-                        {salaryVisible && <TableHead>Net Paid</TableHead>}
-                        {salaryVisible && <TableHead>Status</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...perf.months].reverse().map(m => (
-                        <TableRow key={m.month}>
-                          <TableCell className="font-medium">{m.label}</TableCell>
-                          <TableCell className="text-muted-foreground">{m.workingDays}</TableCell>
-                          <TableCell>{m.daysPresent}</TableCell>
-                          <TableCell>{m.daysAbsent}</TableCell>
-                          <TableCell>{m.halfDays}</TableCell>
-                          <TableCell>{m.leaveDays}</TableCell>
-                          <TableCell className="font-medium">{m.effectiveDays}</TableCell>
-                          <TableCell>
-                            <span className="font-medium" style={{ color: getBarColor(m.attendancePercent) }}>
-                              {m.attendancePercent}%
-                            </span>
-                          </TableCell>
-                          {salaryVisible && (
-                            <TableCell className="font-medium">{m.salaryPaid ? formatAmount(m.salaryAmount) : "—"}</TableCell>
-                          )}
-                          {salaryVisible && (
-                            <TableCell>
-                              <Badge variant={m.salaryPaid ? "default" : "secondary"}>
-                                {m.salaryPaid ? "Paid" : "Pending"}
-                              </Badge>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* Leaves Tab */}
-        <TabsContent value="leaves" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total leaves: <span className="font-bold text-foreground">{leaves.length}</span></p>
-            {canManage && <Button onClick={() => setLeaveDialogOpen(true)} className="gap-2"><Clock className="h-4 w-4" /> Add Leave</Button>}
-          </div>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    {canManage && <TableHead className="text-right">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leaves.length === 0 ? (
-                    <TableRow><TableCell colSpan={canManage ? 6 : 5} className="text-center py-6 text-muted-foreground">No leave records</TableCell></TableRow>
-                  ) : leaves.map(l => (
-                    <TableRow key={l.id}>
-                      <TableCell className="capitalize">{l.leave_type}</TableCell>
-                      <TableCell>{format(new Date(l.start_date), "dd MMM yyyy")}</TableCell>
-                      <TableCell>{format(new Date(l.end_date), "dd MMM yyyy")}</TableCell>
-                      <TableCell>{l.reason || "—"}</TableCell>
-                      <TableCell><Badge variant={l.approval_status === "approved" ? "default" : "secondary"} className="capitalize">{l.approval_status}</Badge></TableCell>
-                      {canManage && (
-                        <TableCell className="text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Leave Record</AlertDialogTitle>
-                                <AlertDialogDescription>This will permanently delete this leave record. This action cannot be undone.</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteLeave.mutate({ id: l.id, employeeId: id! })}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -825,39 +294,70 @@ export default function EmployeeDetail() {
             </CardContent>
           </Card>
 
-          {/* Leave Dialog */}
-          <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+          {/* Salary Dialog */}
+          <Dialog open={salaryDialogOpen} onOpenChange={setSalaryDialogOpen}>
             <DialogContent>
-              <DialogHeader><DialogTitle>Add Leave</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Record Salary Payment</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Leave Type</Label>
-                  <Select value={leaveForm.leave_type} onValueChange={v => setLeaveForm(f => ({ ...f, leave_type: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sick">Sick Leave</SelectItem>
-                      <SelectItem value="casual">Casual Leave</SelectItem>
-                      <SelectItem value="annual">Annual Leave</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Month</Label>
+                    <Input type="month" value={salaryForm.month} onChange={e => setSalaryForm(f => ({ ...f, month: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Amount</Label>
+                    <Input value={formatAmount(employee.monthly_salary)} disabled />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Start Date</Label>
-                    <Input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm(f => ({ ...f, start_date: e.target.value }))} />
+                    <Label>Payment Date</Label>
+                    <Input type="date" value={salaryForm.payment_date} onChange={e => setSalaryForm(f => ({ ...f, payment_date: e.target.value }))} />
                   </div>
                   <div className="space-y-2">
-                    <Label>End Date</Label>
-                    <Input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm(f => ({ ...f, end_date: e.target.value }))} />
+                    <Label>Payment Method</Label>
+                    <Select value={salaryForm.payment_method} onValueChange={v => setSalaryForm(f => ({ ...f, payment_method: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="cheque">Cheque</SelectItem>
+                        <SelectItem value="upi">UPI</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reason</Label>
-                  <Textarea value={leaveForm.reason} onChange={e => setLeaveForm(f => ({ ...f, reason: e.target.value }))} rows={2} />
+                  <Label>Expense Source <span className="text-destructive">*</span></Label>
+                  <Select value={salaryForm.expense_account_id} onValueChange={v => setSalaryForm(f => ({ ...f, expense_account_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select expense account" /></SelectTrigger>
+                    <SelectContent>
+                      {expenseAccounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                            {acc.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Salary will be recorded as an expense in this account</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Deductions</Label>
+                  <Input type="number" min={0} value={salaryForm.deductions} onChange={e => setSalaryForm(f => ({ ...f, deductions: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description (optional)</Label>
+                  <Textarea value={salaryForm.description} onChange={e => setSalaryForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+                </div>
+                <div className="p-3 rounded-lg bg-muted text-sm">
+                  Net Payable: <span className="font-bold text-primary">{formatAmount(employee.monthly_salary - (salaryForm.deductions || 0))}</span>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setLeaveDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleAddLeave} disabled={createLeave.isPending}>{createLeave.isPending ? "Saving..." : "Add Leave"}</Button>
+                  <Button variant="outline" onClick={() => setSalaryDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handlePaySalary} disabled={createSalary.isPending}>{createSalary.isPending ? "Saving..." : "Record Payment"}</Button>
                 </div>
               </div>
             </DialogContent>
