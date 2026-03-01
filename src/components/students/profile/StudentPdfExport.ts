@@ -1,5 +1,3 @@
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { format } from "date-fns";
 
 interface PdfExportOptions {
@@ -25,6 +23,7 @@ export async function exportStudentPdf({
   interactiveEls.forEach((el) => (el.style.visibility = "hidden"));
 
   try {
+    const { default: html2canvas } = await import("html2canvas");
     const canvas = await html2canvas(contentElement, {
       scale: 2,
       useCORS: true,
@@ -36,6 +35,7 @@ export async function exportStudentPdf({
     const pageHeight = 277; // A4 height minus margins (297 - 20)
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF("p", "mm", "a4");
     const dateStr = format(new Date(), "dd MMM yyyy");
 

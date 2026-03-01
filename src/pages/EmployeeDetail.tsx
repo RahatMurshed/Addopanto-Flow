@@ -21,7 +21,7 @@ import { useExpenseAccounts } from "@/hooks/useExpenseAccounts";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { ArrowLeft, Pencil, DollarSign, FileText, Trash2, Download } from "lucide-react";
-import jsPDF from "jspdf";
+
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -76,8 +76,9 @@ export default function EmployeeDetail() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleDownloadSalarySlip = (sp: { month: string; amount: number; deductions: number; net_amount: number; payment_date: string; payment_method: string }) => {
+  const handleDownloadSalarySlip = async (sp: { month: string; amount: number; deductions: number; net_amount: number; payment_date: string; payment_method: string }) => {
     if (!employee) return;
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
     const w = 210;
     let y = 20;

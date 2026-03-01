@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { logger } from "@/utils/logger";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -34,7 +35,7 @@ export class SectionErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("SectionErrorBoundary caught:", error, errorInfo);
+    logger.error("SectionErrorBoundary caught:", error, errorInfo);
 
     toast({
       variant: "destructive",

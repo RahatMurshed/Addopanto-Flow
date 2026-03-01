@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { logger } from "@/utils/logger";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -226,7 +227,7 @@ export default function AddStudent() {
         try {
           await syncBatchEnrollment(result.id, null, insertData.batch_id, activeCompanyId!, user!.id);
         } catch (e: any) {
-          console.error("Failed to create batch enrollment:", e);
+          logger.error("Failed to create batch enrollment:", e);
         }
       }
 

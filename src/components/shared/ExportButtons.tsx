@@ -1,4 +1,5 @@
 import { useState, memo } from "react";
+import { logger } from "@/utils/logger";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +31,7 @@ const ExportButtons = memo(function ExportButtons({
     try {
       await onExportPDF();
     } catch (error) {
-      console.error("PDF export failed:", error);
+      logger.error("PDF export failed:", error);
     } finally {
       setIsExportingPDF(false);
     }

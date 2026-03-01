@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { logger } from "@/utils/logger";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -99,7 +100,7 @@ export default function Auth() {
             await supabase.from("user_profiles").update({ avatar_url: urlData.publicUrl }).eq("user_id", signUpData.user.id);
           }
         } catch (avatarErr) {
-          console.error("Avatar upload failed:", avatarErr);
+          logger.error("Avatar upload failed:", avatarErr);
         }
       }
       // User is now logged in immediately — navigate to companies

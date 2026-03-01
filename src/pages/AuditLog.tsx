@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { logger } from "@/utils/logger";
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -746,7 +747,7 @@ export default function AuditLog() {
 
       toast.success(`Exported ${allLogs.length} audit entries`);
     } catch (err) {
-      console.error("Export failed:", err);
+      logger.error("Export failed:", err);
       toast.error("Failed to export audit logs");
     } finally {
       setIsExporting(false);
@@ -773,7 +774,7 @@ export default function AuditLog() {
       setDeleteConfirmText("");
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
     } catch (err) {
-      console.error("Delete failed:", err);
+      logger.error("Delete failed:", err);
       toast.error("Failed to delete audit logs. Only platform admins can perform this action.");
     } finally {
       setIsDeleting(false);

@@ -1,8 +1,5 @@
 project_id = "zrmhhnepzbwbihdshwcm"
 
-[functions.check-ban]
-verify_jwt = false
-
 [functions.admin-users]
 verify_jwt = false
 

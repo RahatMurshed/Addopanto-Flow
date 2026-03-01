@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { logger } from "@/utils/logger";
 import { format } from "date-fns";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -331,7 +332,7 @@ export default function StudentWizardDialog({ open, onOpenChange, onSave, defaul
             );
           }
         } catch (e: any) {
-          console.error("Failed to sync batch enrollment:", e);
+          logger.error("Failed to sync batch enrollment:", e);
         }
       }
 

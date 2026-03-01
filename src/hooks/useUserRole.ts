@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/utils/logger";
 
 export type AppRole = "cipher" | "user";
 
@@ -29,7 +30,7 @@ export function useUserRole() {
         .maybeSingle();
 
       if (error) {
-        console.error("Error fetching user role:", error);
+        logger.error("Error fetching user role:", error);
         return null;
       }
 

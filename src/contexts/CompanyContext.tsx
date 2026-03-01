@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, setForcedLogoutInProgress } from "@/contexts/AuthContext";
+import { logger } from "@/utils/logger";
 
 export interface Company {
   id: string;
@@ -311,7 +312,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
     const isMember = memberships.some(m => m.company_id === companyId && m.status === "active");
     if (!isMember && !isCipher) {
-      console.error("Cannot switch to company: not a member");
+      logger.error("Cannot switch to company: not a member");
       return;
     }
     const { error } = await supabase
@@ -319,7 +320,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       .update({ active_company_id: companyId })
       .eq("user_id", user.id);
     if (error) {
-      console.error("Failed to switch company:", error.message);
+      logger.error("Failed to switch company:", error.message);
       return;
     }
     queryClient.invalidateQueries({ queryKey: ["user-profile-company"] });
