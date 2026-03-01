@@ -227,7 +227,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 space-y-1 p-3 overflow-y-auto sidebar-nav-scroll">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.href;
+            const isActive = location.pathname === item.href || (item.href !== "/dashboard" && location.pathname.startsWith(item.href + "/"));
             return (
               <Link
                 key={item.href}
@@ -288,7 +288,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <Button variant="ghost" size="icon" className="text-primary" onClick={() => setMobileOpen(!mobileOpen)}>
+            <Button variant="ghost" size="icon" className="text-primary" aria-label="Open navigation menu" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
@@ -306,7 +306,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               )}
               <div className="flex-1 space-y-1 overflow-y-auto sidebar-nav-scroll">
                 {navItems.map((item) => {
-                  const isActive = location.pathname === item.href;
+                  const isActive = location.pathname === item.href || (item.href !== "/dashboard" && location.pathname.startsWith(item.href + "/"));
                   return (
                     <Link
                       key={item.href}
