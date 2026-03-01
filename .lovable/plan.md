@@ -1,50 +1,49 @@
 
 
-# Clean Up Unused Employee Attendance, Leaves, and Performance Code & Tables
+# Fix: Expense Sort Order Tiebreaker
 
-## What's being removed
+## Problem
 
-The attendance, leaves, and performance features were removed from the UI but their code hooks and database tables remain. None of these hooks are imported by any component -- they are dead code.
+When sorting by "Date Newest" or "Date Oldest", expenses with the same date appear in random/unstable order because the sort only compares the `date` field (a date-only string like "2026-03-03"). Many expenses share the same date, so without a secondary sort key, the browser's sort algorithm produces inconsistent ordering that can appear reversed.
 
-## Code Changes
+## Solution
 
-### 1. Remove `src/hooks/useEmployeePerformance.ts` (entire file)
-This file is never imported anywhere. Delete it completely.
+Add `created_at` as a tiebreaker in the sort logic in `src/pages/Expenses.tsx`. When two expenses have the same date, the one created more recently should appear first for "Date Newest" and last for "Date Oldest".
 
-### 2. Clean up `src/hooks/useEmployees.ts`
-Remove the following dead code:
-- `EmployeeAttendance` interface (lines 88-96)
-- `EmployeeLeave` interface (lines 98-110)
-- `useEmployeeAttendance` function (lines 362-380)
-- `useMarkAttendance` function (lines 382-398)
-- `useEmployeeLeaves` function (lines 400-413)
-- `useCreateLeave` function (lines 415-431)
-- `useDeleteLeave` function (lines 433-445)
+### Change in `src/pages/Expenses.tsx` (lines 165-172)
 
-Also remove the `endOfMonth` and `format as fnsFormat` imports if they become unused after this cleanup.
-
-### 3. Update `supabase/functions/reset-company-data/index.ts`
-Remove `"employee_attendance"` and `"employee_leaves"` from the tables list (lines 121-122), since these tables will be dropped.
-
-## Database Migration
-
-### 4. Drop unused tables
-Run a migration to drop the two tables:
-
-```sql
-DROP TABLE IF EXISTS employee_attendance CASCADE;
-DROP TABLE IF EXISTS employee_leaves CASCADE;
+**Current:**
+```typescript
+result = [...result].sort((a, b) => {
+  switch (sortBy) {
+    case "date-asc": return a.date.localeCompare(b.date);
+    case "date-desc": return b.date.localeCompare(a.date);
+    case "amount-desc": return Number(b.amount) - Number(a.amount);
+    case "amount-asc": return Number(a.amount) - Number(b.amount);
+    default: return b.date.localeCompare(a.date);
+  }
+});
 ```
 
-This removes:
-- `employee_attendance` table (with its RLS policies and foreign keys)
-- `employee_leaves` table (with its RLS policies and foreign keys)
+**Updated:**
+```typescript
+result = [...result].sort((a, b) => {
+  switch (sortBy) {
+    case "date-asc":
+      return a.date.localeCompare(b.date) || (a.created_at ?? "").localeCompare(b.created_at ?? "");
+    case "date-desc":
+      return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+    case "amount-desc":
+      return Number(b.amount) - Number(a.amount);
+    case "amount-asc":
+      return Number(a.amount) - Number(b.amount);
+    default:
+      return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  }
+});
+```
 
-The `types.ts` file will auto-regenerate after the migration.
+This ensures a stable, deterministic sort order by using `created_at` (a full timestamp) as a tiebreaker when expenses share the same date.
 
-## Summary of files affected
-- **Delete:** `src/hooks/useEmployeePerformance.ts`
-- **Edit:** `src/hooks/useEmployees.ts` -- remove ~90 lines of dead code
-- **Edit:** `supabase/functions/reset-company-data/index.ts` -- remove 2 table references
-- **Migration:** Drop `employee_attendance` and `employee_leaves` tables
-
+## Files affected
+- `src/pages/Expenses.tsx` -- update sort comparator (~8 lines changed)
