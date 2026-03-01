@@ -14,8 +14,8 @@ const UNCATEGORIZED_STYLE = {
 /** Named overrides for specific source badges */
 const NAMED_OVERRIDES: Record<string, { light: { bg: string; text: string; border: string }; dark: { bg: string; text: string; border: string } }> = {
   "Student Fees": {
-    light: { bg: "hsl(142, 55%, 95%)", text: "hsl(142, 65%, 28%)", border: "hsla(142, 55%, 40%, 0.50)" },
-    dark: { bg: "hsla(142, 50%, 20%, 0.20)", text: "hsl(142, 80%, 65%)", border: "hsla(142, 70%, 55%, 0.55)" },
+    light: { bg: "transparent", text: "hsl(270, 70%, 35%)", border: "hsla(270, 65%, 45%, 0.45)" },
+    dark: { bg: "transparent", text: "hsl(270, 90%, 65%)", border: "hsla(270, 90%, 60%, 0.50)" },
   },
 };
 
