@@ -1,0 +1,2 @@
+ALTER TABLE public.batch_enrollments DROP CONSTRAINT batch_enrollments_status_check;
+ALTER TABLE public.batch_enrollments ADD CONSTRAINT batch_enrollments_status_check CHECK (status IN ('active', 'completed', 'inactive'));
