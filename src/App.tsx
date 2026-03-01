@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect } from "react";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { SectionErrorBoundary } from "@/components/layout/SectionErrorBoundary";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -162,7 +161,6 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <OfflineBanner />
-        <Toaster />
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
