@@ -38,11 +38,11 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
       border: `hsla(${hue}, 90%, 60%, 0.50)`,
     };
   }
-  // Light: neon text with no background, vivid per-source hue
+  // Light: vivid but readable text, no background
   return {
     bg: "transparent",
-    text: `hsl(${hue}, 85%, 40%)`,
-    border: `hsla(${hue}, 85%, 45%, 0.50)`,
+    text: `hsl(${hue}, 70%, 35%)`,
+    border: `hsla(${hue}, 65%, 45%, 0.45)`,
   };
 }
 
