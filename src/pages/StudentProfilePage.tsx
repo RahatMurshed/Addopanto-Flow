@@ -7,6 +7,7 @@ import { useStudentPayments, computeStudentSummary, useMonthlyFeeHistory } from 
 import { useBatch, useBatches } from "@/hooks/useBatches";
 import { useCourse } from "@/hooks/useCourses";
 import { useStudentSalesNotes, useCreateSalesNote, useUpdateSalesNote, useDeleteSalesNote, NOTE_CATEGORIES, getCategoryInfo, useCustomNoteCategories, useCreateCustomCategory, useDeleteCustomCategory, COLOR_PRESETS } from "@/hooks/useStudentSalesNotes";
+import { useCompanyTags, useStudentTagAssignments } from "@/hooks/useStudentTags";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
@@ -135,9 +136,10 @@ export default function StudentProfilePage() {
   const { isCipher } = useRole();
   const {
     canEdit, canEditStudent, isDataEntryModerator, canViewStudentPII,
-    activeCompanyId, isCompanyAdmin, membership,
+    activeCompanyId, activeCompany, isCompanyAdmin, membership,
   } = useCompany();
   const isAdmin = isCompanyAdmin || isCipher;
+  const profileContentRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   // Derive role + permissions for QuickActionsPanel
@@ -169,6 +171,14 @@ export default function StudentProfilePage() {
   const { data: batch } = useBatch(batchId ?? undefined);
   const courseId = (batch as any)?.course_id;
   const { data: course } = useCourse(courseId);
+
+  // ── tags ──
+  const { data: companyTags = [] } = useCompanyTags(activeCompanyId);
+  const { data: tagAssignments = [] } = useStudentTagAssignments(isValidUUID ? studentId! : null, activeCompanyId);
+  const studentTags = useMemo(() => {
+    const assignedIds = new Set(tagAssignments.map(a => a.tag_id));
+    return companyTags.filter(t => assignedIds.has(t.id));
+  }, [companyTags, tagAssignments]);
 
   // ── notes ──
   const { data: notes = [], isLoading: notesLoading } = useStudentSalesNotes(isValidUUID ? studentId : undefined);
@@ -393,6 +403,7 @@ export default function StudentProfilePage() {
           student={student}
           canEdit={effectiveCanEdit}
           onEdit={() => setEditOpen(true)}
+          tags={studentTags}
         />
 
         {/* Lifetime Value Hero Banner */}
@@ -401,7 +412,7 @@ export default function StudentProfilePage() {
         {/* 2-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           {/* LEFT COLUMN */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-7 space-y-6" ref={profileContentRef}>
             {/* Personal Information */}
             <Card className="rounded-xl shadow-sm">
               <CardContent className="pt-6">
@@ -498,6 +509,7 @@ export default function StudentProfilePage() {
               <QuickActionsPanel
                 student={student}
                 companyId={activeCompanyId}
+                companyName={activeCompany?.name}
                 userRole={quickActionRole}
                 userPermissions={quickActionPermissions}
                 onStatusChange={() => {
@@ -507,6 +519,7 @@ export default function StudentProfilePage() {
                   queryClient.invalidateQueries({ queryKey: ["reports"] });
                 }}
                 onEdit={() => setEditOpen(true)}
+                profileContentRef={profileContentRef}
               />
             )}
             {/* Future: Financial Mini, Tags, Recent Activity */}
