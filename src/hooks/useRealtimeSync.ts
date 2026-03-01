@@ -37,6 +37,7 @@ const TABLE_INVALIDATION_MAP: Record<string, string[]> = {
   product_categories: ["product_categories", "products"],
   batch_enrollments: ["batch_enrollments", "students", "batches", "student_payments", "revenues", "dashboard", "reports"],
   employee_salary_payments: ["employee-salary", "employees", "expenses", "account_balances", "dashboard", "dashboard-totals", "reports", "expense_summary_rpc"],
+  company_memberships: ["company-memberships", "company-members", "user-companies"],
 };
 
 const TABLE_LABELS: Record<string, string> = {
@@ -56,6 +57,7 @@ const TABLE_LABELS: Record<string, string> = {
   product_categories: "Categories",
   batch_enrollments: "Enrollments",
   employee_salary_payments: "Salary payments",
+  company_memberships: "Permissions",
 };
 
 export function useRealtimeSync() {
@@ -88,6 +90,19 @@ export function useRealtimeSync() {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
 
+      // Special handling for company_memberships: notify the affected moderator
+      if (table === "company_memberships") {
+        const affectedUserId = payload?.new?.user_id ?? payload?.old?.user_id;
+        if (affectedUserId === user?.id && payload?.eventType !== "DELETE") {
+          toast({
+            title: "Permissions updated",
+            description: "Your permissions have been updated by an admin.",
+            duration: 5000,
+          });
+        }
+        return; // Skip generic toast for membership changes
+      }
+
       // Only show toast for changes made by OTHER users
       const recordUserId = payload?.new?.user_id ?? payload?.old?.user_id;
       if (recordUserId && recordUserId === user?.id) return;
@@ -116,6 +131,7 @@ export function useRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, (p) => handleChange("product_categories", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "batch_enrollments" }, (p) => handleChange("batch_enrollments", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "employee_salary_payments" }, (p) => handleChange("employee_salary_payments", p))
+      .on("postgres_changes", { event: "*", schema: "public", table: "company_memberships" }, (p) => handleChange("company_memberships", p))
       .subscribe();
 
     return () => {
