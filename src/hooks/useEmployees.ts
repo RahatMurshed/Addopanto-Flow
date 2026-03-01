@@ -297,19 +297,8 @@ export function useCreateSalaryPayment() {
 
       const salaryId = (salaryRecord as any).id;
 
-      // 2. Create linked expense record
-      const expenseDescription = `Salary - ${employee_name} - ${payment.month} [SALARY:${salaryId}]`;
-      const { error: expenseError } = await supabase
-        .from("expenses")
-        .insert({
-          company_id: activeCompanyId,
-          user_id: user.id,
-          expense_account_id,
-          amount: payment.net_amount,
-          date: payment.payment_date,
-          description: expenseDescription,
-        });
-      if (expenseError) throw expenseError;
+      // 2. Expense record is now auto-created by database trigger (trg_auto_create_salary_expense)
+      // No manual expense insertion needed — the trigger handles it idempotently
 
       return salaryRecord as unknown as SalaryPayment;
     },
