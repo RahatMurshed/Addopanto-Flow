@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { logger } from "@/utils/logger";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,7 +76,7 @@ export default function CreateCompany() {
             await supabase.from("companies").update({ logo_url: logoUrl }).eq("id", data.company.id);
           }
         } catch (logoErr) {
-          console.error("Logo upload failed:", logoErr);
+          logger.error("Logo upload failed:", logoErr);
         }
       }
 

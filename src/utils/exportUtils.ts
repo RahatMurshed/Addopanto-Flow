@@ -1,5 +1,4 @@
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import { logger } from "@/utils/logger";
 
 export interface TransactionRecord {
   date: string;
@@ -145,7 +144,7 @@ export async function exportToPDF(
 ): Promise<void> {
   const element = document.getElementById(elementId);
   if (!element) {
-    console.error(`Element with id "${elementId}" not found`);
+    logger.error(`Element with id "${elementId}" not found`);
     return;
   }
 
@@ -179,6 +178,7 @@ export async function exportToPDF(
     }
 
     // Capture with higher scale for better quality
+    const { default: html2canvas } = await import("html2canvas");
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
@@ -192,6 +192,7 @@ export async function exportToPDF(
     const margin = 10;
     const contentWidth = A4_WIDTH - margin * 2;
 
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -277,7 +278,7 @@ export async function exportToPDF(
 
     pdf.save(`${filename}_${dateRangeLabel.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
   } catch (error) {
-    console.error("Error generating PDF:", error);
+    logger.error("Error generating PDF:", error);
     throw error;
   } finally {
     // Restore hidden elements

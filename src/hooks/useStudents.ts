@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -335,7 +336,7 @@ export function useCreateStudent() {
           .eq("id", validBatchId)
           .maybeSingle();
         if (!batchExists) {
-          console.warn(`Batch ${validBatchId} not found, setting batch_id to null`);
+          logger.warn(`Batch ${validBatchId} not found, setting batch_id to null`);
           validBatchId = null;
         }
       }

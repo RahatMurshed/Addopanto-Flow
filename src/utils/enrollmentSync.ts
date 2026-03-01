@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 import { addMonths, format } from "date-fns";
 
 /**
@@ -48,7 +49,7 @@ export async function syncBatchEnrollment(
       .single();
 
     if (enrollError) {
-      console.error("Failed to create enrollment:", enrollError);
+      logger.error("Failed to create enrollment:", enrollError);
       return;
     }
 
@@ -82,7 +83,7 @@ async function generatePaymentSchedule(
     .single();
 
   if (batchError || !batch) {
-    console.error("Failed to fetch batch for schedule generation:", batchError);
+    logger.error("Failed to fetch batch for schedule generation:", batchError);
     return;
   }
 
@@ -180,6 +181,6 @@ async function generatePaymentSchedule(
     .insert(scheduleRows);
 
   if (insertError) {
-    console.error("Failed to generate payment schedule:", insertError);
+    logger.error("Failed to generate payment schedule:", insertError);
   }
 }

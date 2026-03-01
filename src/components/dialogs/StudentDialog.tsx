@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { logger } from "@/utils/logger";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -210,7 +211,7 @@ export default function StudentDialog({ open, onOpenChange, student, onSave, def
             );
           }
         } catch (e: any) {
-          console.error("Failed to sync batch enrollment:", e);
+          logger.error("Failed to sync batch enrollment:", e);
         }
       }
 

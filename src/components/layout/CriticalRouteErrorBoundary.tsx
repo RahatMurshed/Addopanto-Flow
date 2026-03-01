@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { logger } from "@/utils/logger";
 import { AlertTriangle, RefreshCw, Shield, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,7 +40,7 @@ export class CriticalRouteErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`CriticalRouteErrorBoundary [${this.props.routeName}]:`, error, errorInfo);
+    logger.error(`CriticalRouteErrorBoundary [${this.props.routeName}]:`, error, errorInfo);
 
     toast({
       variant: "destructive",
