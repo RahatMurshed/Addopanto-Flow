@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // Find all active batches past their end_date
+    // ── 1. Auto-complete expired batches ──
     const { data: expiredBatches, error: fetchError } = await supabase
       .from("batches")
       .select("id, batch_name, company_id")
@@ -28,42 +28,62 @@ Deno.serve(async (req) => {
 
     if (fetchError) throw fetchError;
 
-    if (!expiredBatches || expiredBatches.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No batches to complete", count: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const completedIds: string[] = [];
 
-    for (const batch of expiredBatches) {
-      // Update batch status to completed
-      const { error: updateError } = await supabase
-        .from("batches")
-        .update({ status: "completed", updated_at: new Date().toISOString() })
-        .eq("id", batch.id);
+    if (expiredBatches && expiredBatches.length > 0) {
+      for (const batch of expiredBatches) {
+        const { error: updateError } = await supabase
+          .from("batches")
+          .update({ status: "completed", updated_at: new Date().toISOString() })
+          .eq("id", batch.id);
 
-      if (updateError) {
-        console.error(`Failed to complete batch ${batch.id}:`, updateError);
-        continue;
+        if (updateError) {
+          console.error(`Failed to complete batch ${batch.id}:`, updateError);
+          continue;
+        }
+
+        await supabase.from("audit_logs").insert({
+          company_id: batch.company_id,
+          user_id: "00000000-0000-0000-0000-000000000000",
+          record_id: batch.id,
+          table_name: "batches",
+          action: "auto_complete",
+          new_data: { status: "completed", batch_name: batch.batch_name },
+          user_email: "system@auto-complete",
+        });
+
+        completedIds.push(batch.id);
       }
+    }
 
-      // The DB trigger sync_enrollments_on_batch_completion will
-      // automatically update batch_enrollments.status to 'completed'
+    // ── 2. Financial consistency check for all companies ──
+    const { data: companies, error: compError } = await supabase
+      .from("companies")
+      .select("id");
 
-      // Log to audit_logs
-      await supabase.from("audit_logs").insert({
-        company_id: batch.company_id,
-        user_id: "00000000-0000-0000-0000-000000000000", // system action
-        record_id: batch.id,
-        table_name: "batches",
-        action: "auto_complete",
-        new_data: { status: "completed", batch_name: batch.batch_name },
-        user_email: "system@auto-complete",
-      });
+    if (compError) {
+      console.error("Failed to fetch companies for consistency check:", compError);
+    }
 
-      completedIds.push(batch.id);
+    const consistencyResults: Record<string, unknown> = {};
+
+    if (companies && companies.length > 0) {
+      for (const company of companies) {
+        try {
+          const { data, error } = await supabase.rpc("verify_financial_consistency", {
+            _company_id: company.id,
+          });
+          if (error) {
+            console.error(`Consistency check failed for ${company.id}:`, error);
+            consistencyResults[company.id] = { error: error.message };
+          } else {
+            consistencyResults[company.id] = data;
+          }
+        } catch (e) {
+          console.error(`Consistency check exception for ${company.id}:`, e);
+          consistencyResults[company.id] = { error: String(e) };
+        }
+      }
     }
 
     return new Response(
@@ -71,6 +91,7 @@ Deno.serve(async (req) => {
         message: `Auto-completed ${completedIds.length} batch(es)`,
         count: completedIds.length,
         batch_ids: completedIds,
+        consistency_check: consistencyResults,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

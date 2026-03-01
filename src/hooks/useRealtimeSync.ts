@@ -11,8 +11,8 @@ import { toast } from "@/hooks/use-toast";
  */
 
 const TABLE_INVALIDATION_MAP: Record<string, string[]> = {
-  revenues: ["revenues", "dashboard", "reports", "revenue_summary"],
-  expenses: ["expenses", "account_balances", "dashboard", "reports", "expense_summary"],
+  revenues: ["revenues", "dashboard", "reports", "revenue_summary", "revenue_summary_rpc"],
+  expenses: ["expenses", "account_balances", "dashboard", "reports", "expense_summary", "expense_summary_rpc"],
   students: ["students", "dashboard", "reports"],
   student_payments: [
     "student_payments",
