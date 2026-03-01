@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useStudents, useAllStudents, useCreateStudent, useDeleteStudent, useBulkDeleteStudents, type StudentInsert, type Student } from "@/hooks/useStudents";
@@ -42,6 +43,7 @@ import { useProductSales } from "@/hooks/useProductSales";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import PiiRestrictionBanner from "@/components/shared/PiiRestrictionBanner";
+import { supabase } from "@/integrations/supabase/client";
 export default function Students() {
   const [filters, setFilters] = useState<StudentFilterValues>(defaultFilters);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -84,6 +86,22 @@ export default function Students() {
   const { data: allPayments = [] } = useStudentPayments();
   const { data: batchesData = [] } = useBatches({ status: "all" });
   const { canAddRevenue, canEdit, canDelete, isModerator, isDataEntryModerator, canAddStudent, canEditStudent, canDeleteStudent, canAddPayment, canViewStudentPII, activeCompanyId } = useCompany();
+
+  // Fetch active batch enrollments to determine enrollment status (source of truth)
+  const { data: activeEnrollmentStudentIds = new Set<string>() } = useQuery({
+    queryKey: ["batch_enrollments", "active_student_ids", activeCompanyId],
+    queryFn: async () => {
+      if (!activeCompanyId) return new Set<string>();
+      const { data, error } = await supabase
+        .from("batch_enrollments")
+        .select("student_id")
+        .eq("company_id", activeCompanyId)
+        .eq("status", "active");
+      if (error) throw error;
+      return new Set((data || []).map((e: any) => e.student_id));
+    },
+    enabled: !!activeCompanyId,
+  });
   const { user } = useAuth();
   
   const { fc: formatCurrency, currencyCode: currency } = useCompanyCurrency();
@@ -526,7 +544,7 @@ export default function Students() {
                   <TableBody>
                     {displayStudents.map((s) => {
                       const isSelected = selectedIds.has(s.id);
-                      const isEnrolled = s.batch_id != null;
+                      const isEnrolled = s.batch_id != null || activeEnrollmentStudentIds.has(s.id);
                       const batchName = s.batch_id ? batchNameMap.get(s.batch_id) || "—" : "—";
                       return (
                         <TableRow
