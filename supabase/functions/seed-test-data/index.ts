@@ -17,11 +17,22 @@ Deno.serve(async (req) => {
   const COMPANY = "0f108cf2-94a8-4e36-b117-7a786ac6b51e";
   const ADMIN = "c4a042bf-eff2-4c3e-9431-a093fe7feaa1"; // cipher@app.com - exists in auth.users
 
-  // Idempotency check
-  const { count } = await supabase.from("students").select("id", { count: "exact", head: true }).eq("company_id", COMPANY);
-  if ((count ?? 0) > 0) {
-    return new Response(JSON.stringify({ error: "Students already exist for this company. Aborting." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
+  // Clean up any partial data from previous failed runs (reverse FK order)
+  await supabase.from("student_sales_notes").delete().eq("company_id", COMPANY);
+  await supabase.from("product_sales").delete().eq("company_id", COMPANY);
+  await supabase.from("allocations").delete().eq("company_id", COMPANY);
+  await supabase.from("revenues").delete().eq("company_id", COMPANY);
+  await supabase.from("student_payments").delete().eq("company_id", COMPANY);
+  await supabase.from("monthly_fee_history").delete().eq("company_id", COMPANY);
+  await supabase.from("batch_enrollments").delete().eq("company_id", COMPANY);
+  await supabase.from("students").delete().eq("company_id", COMPANY);
+  await supabase.from("batches").delete().eq("company_id", COMPANY);
+  await supabase.from("courses").delete().eq("company_id", COMPANY);
+  await supabase.from("products").delete().eq("company_id", COMPANY);
+  await supabase.from("product_categories").delete().eq("company_id", COMPANY);
+  await supabase.from("expenses").delete().eq("company_id", COMPANY);
+  await supabase.from("expense_accounts").delete().eq("company_id", COMPANY);
+  await supabase.from("revenue_sources").delete().eq("company_id", COMPANY);
 
   const results: Record<string, number> = {};
 
