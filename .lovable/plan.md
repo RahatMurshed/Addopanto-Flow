@@ -1,66 +1,51 @@
 
 
-# Reactivate Inactive Student and Restore Enrollment
+# Simplify Employee Detail Page and Sync Salary with Expense System
 
-## Problem
-When a student is set back to "Active" from "Inactive", their batch enrollments remain in "inactive" status and their `batch_id` stays null. The student appears active but has no active enrollments.
-
-## Solution
-When changing a student's status to "active", automatically restore their most recent inactive enrollment(s) back to "active" and reassign their `batch_id`.
+## Overview
+Remove the Attendance, Performance, and Leaves tabs from the Employee Detail page. Keep only Profile and Salary. When recording a salary payment, automatically create an expense record in the selected expense source account so the payment flows through the entire financial system (Dashboard, Revenue, Expenses, Reports, Expense Source balances).
 
 ## Changes
 
-### 1. QuickActionsPanel.tsx - Add reactivation logic
-In the `handleStatusConfirm` function, add a new branch: when the new status is "active", query for the student's most recent "inactive" enrollment(s), update them back to "active", and set the student's `batch_id` to the most recent one.
+### 1. Simplify EmployeeDetail.tsx - Remove unused tabs and features
+- Remove the Attendance, Performance, and Leaves tab content and all related state/hooks
+- Remove the performance score KPI widget from the header
+- Remove imports for `useEmployeePerformance`, attendance/leave hooks, chart components
+- Keep only **Profile** and **Salary** tabs (2-column tab layout)
+- Remove the salary visibility toggle -- salary tab is always visible for users who can manage employees
 
-Logic:
-- Query `batch_enrollments` where `student_id` matches, `status = 'inactive'`, ordered by `updated_at DESC`
-- Only restore enrollments whose associated batch is still "active" (don't restore enrollments for completed/archived batches)
-- Update matching enrollment(s) to `status = 'active'`
-- Set the student's `batch_id` to the batch from the most recent restored enrollment
-- Show a toast indicating how many enrollments were restored
+### 2. Add expense source selector to salary payment dialog
+- Fetch expense accounts using `useExpenseAccounts()` hook
+- Add a **Select** dropdown in the salary recording dialog labeled "Expense Source" (required field)
+- This lets users choose which expense account (khata) the salary should be deducted from
 
-### 2. Status confirmation dialog - Add context
-Update the confirmation dialog text when reactivating to inform the user that inactive enrollments will be restored automatically.
+### 3. Auto-create expense record when salary is recorded
+- In `handlePaySalary`, after inserting the salary payment, also call `useCreateExpense` to insert an expense record with:
+  - `expense_account_id`: the selected expense source
+  - `amount`: the net salary amount
+  - `date`: the payment date
+  - `description`: auto-generated like "Salary - [Employee Name] - [Month]"
+- This ensures the salary payment:
+  - Appears in the Expenses page
+  - Deducts from the selected expense account balance
+  - Reflects in Dashboard totals (revenue vs expenses)
+  - Shows in Reports page charts and summaries
+
+### 4. Handle salary deletion (reverse the expense)
+- When deleting a salary payment, also delete the corresponding expense record
+- To link them, store the salary payment ID in the expense description or add a reference
+- Approach: use a convention in the description field (e.g., `[SALARY:payment_id]`) to find and delete the linked expense when a salary record is deleted
+
+### 5. Invalidate financial queries on salary operations
+- After creating/deleting salary+expense, invalidate:
+  - `expenses`, `account_balances`, `dashboard`, `reports`, `expense_summary_rpc`
+  - This ensures all pages stay in sync
 
 ## Technical Details
 
-File: `src/components/students/profile/QuickActionsPanel.tsx`
+**Files modified:**
+- `src/pages/EmployeeDetail.tsx` -- Major simplification (remove ~400 lines of attendance/performance/leaves UI), add expense source selector to salary dialog, integrate expense creation
+- `src/hooks/useEmployees.ts` -- Update `useCreateSalaryPayment` and `useDeleteSalaryPayment` to also create/delete linked expense records and invalidate financial queries
 
-In `handleStatusConfirm`, after the student status update succeeds, add:
+**No database migrations needed** -- we use the existing `expenses` table with existing columns.
 
-```typescript
-if (pendingStatus === "active") {
-  // Find inactive enrollments with still-active batches
-  const { data: inactiveEnrollments } = await supabase
-    .from("batch_enrollments")
-    .select("id, batch_id, batches!inner(status)")
-    .eq("student_id", student.id)
-    .eq("company_id", companyId)
-    .eq("status", "inactive");
-
-  const restorableEnrollments = inactiveEnrollments?.filter(
-    (e) => e.batches?.status === "active"
-  );
-
-  if (restorableEnrollments?.length) {
-    // Restore enrollments
-    await supabase
-      .from("batch_enrollments")
-      .update({ status: "active" })
-      .in("id", restorableEnrollments.map(e => e.id));
-
-    // Set batch_id to most recent
-    await supabase
-      .from("students")
-      .update({ batch_id: restorableEnrollments[0].batch_id })
-      .eq("id", student.id);
-  }
-}
-```
-
-Also update the confirmation dialog message (around line 343-361) to show contextual text:
-- For inactive/dropout: "This will deactivate their current enrollments."
-- For active (from inactive): "This will restore any inactive enrollments whose batch is still active."
-
-No database migrations needed -- the "active" status is already allowed in the constraint.
