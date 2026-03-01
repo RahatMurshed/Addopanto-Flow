@@ -148,33 +148,8 @@ export function QuickActionsPanel({
       });
     }
 
-    // Export PDF
-    if (isAdminOrCipher) {
-      items.push({
-        id: "export-pdf",
-        icon: FileDown,
-        label: "Export PDF Report",
-        iconColor: "#1E3A8A",
-        className: "bg-muted/50 text-foreground border border-border hover:bg-muted",
-        fabColor: "#64748b",
-        onClick: () => toast({ title: "PDF export coming soon" }),
-        group: "admin",
-      });
-    }
-
-    // Manage Tags
-    if (isAdminOrCipher) {
-      items.push({
-        id: "manage-tags",
-        icon: Tag,
-        label: "Manage Tags",
-        iconColor: "#1E3A8A",
-        className: "bg-muted/50 text-foreground border border-border hover:bg-muted",
-        fabColor: "#64748b",
-        onClick: () => toast({ title: "Tag management coming soon" }),
-        group: "admin",
-      });
-    }
+    // Export PDF — planned feature, hidden until implemented
+    // Manage Tags — planned feature, hidden until implemented
 
     return items;
   }, [student.phone, isAdminOrCipher, isModerator, userPermissions, handleWhatsApp, handleScrollToNotes, onEdit, toast]);

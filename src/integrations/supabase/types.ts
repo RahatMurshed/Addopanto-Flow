@@ -3604,6 +3604,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_dashboard_totals: {
+        Args: { _company_id: string }
+        Returns: {
+          total_allocations: number
+          total_expenses: number
+          total_revenue: number
+        }[]
+      }
       get_expense_summary: {
         Args: { _company_id: string; _end_date: string; _start_date: string }
         Returns: {

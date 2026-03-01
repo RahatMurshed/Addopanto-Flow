@@ -137,42 +137,47 @@ export default function Dashboard() {
     enabled: !!user && !!activeCompanyId && isCipher,
   });
 
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["dashboard", user?.id, activeCompanyId],
+  // All-time totals via RPC (no 1000-row limit)
+  const { data: totalsData, isLoading: totalsLoading } = useQuery({
+    queryKey: ["dashboard-totals", activeCompanyId],
     queryFn: async () => {
-      if (!user) return null;
+      const { data, error } = await supabase.rpc("get_dashboard_totals", {
+        _company_id: activeCompanyId!,
+      });
+      if (error) throw error;
+      const row = data?.[0] || { total_revenue: 0, total_expenses: 0, total_allocations: 0 };
+      return {
+        totalRevenue: Number(row.total_revenue),
+        totalExpenses: Number(row.total_expenses),
+        totalAllocations: Number(row.total_allocations),
+      };
+    },
+    enabled: !!user && !!activeCompanyId,
+  });
 
-      const now = new Date();
+  // Metadata + recent transactions (bounded queries)
+  const { data: dashboardMeta, isLoading: metaLoading } = useQuery({
+    queryKey: ["dashboard-meta", activeCompanyId],
+    queryFn: async () => {
+      if (!user || !activeCompanyId) return null;
 
-      if (!activeCompanyId) return null;
-
-      const [revenuesRes, expensesRes, allocationsRes, accountsRes, sourcesRes, recentRevenuesRes, recentExpensesRes] = await Promise.all([
-        supabase.from("revenues").select("amount, date").eq("company_id", activeCompanyId),
-        supabase.from("expenses").select("amount, date, expense_account_id").eq("company_id", activeCompanyId),
-        supabase.from("allocations").select("amount").eq("company_id", activeCompanyId),
+      const [accountsRes, sourcesRes, recentRevenuesRes, recentExpensesRes] = await Promise.all([
         supabase.from("expense_accounts").select("id, name, color, allocation_percentage, is_active").eq("company_id", activeCompanyId),
         supabase.from("revenue_sources").select("id, name").eq("company_id", activeCompanyId),
         supabase.from("revenues").select("id, amount, date, description, source_id, created_at").eq("company_id", activeCompanyId).order("created_at", { ascending: false }).limit(50),
         supabase.from("expenses").select("id, amount, date, description, expense_account_id, created_at").eq("company_id", activeCompanyId).order("created_at", { ascending: false }).limit(50),
       ]);
 
-      if (revenuesRes.error) throw revenuesRes.error;
-      if (expensesRes.error) throw expensesRes.error;
-      if (allocationsRes.error) throw allocationsRes.error;
       if (accountsRes.error) throw accountsRes.error;
       if (sourcesRes.error) throw sourcesRes.error;
       if (recentRevenuesRes.error) throw recentRevenuesRes.error;
       if (recentExpensesRes.error) throw recentExpensesRes.error;
 
-      const revenues = revenuesRes.data || [];
-      const expenses = expensesRes.data || [];
-      const allocations = allocationsRes.data || [];
       const accounts = accountsRes.data || [];
       const sources = sourcesRes.data || [];
       const recentRevenues = recentRevenuesRes.data || [];
       const recentExpenses = recentExpensesRes.data || [];
 
-      // Build recent transactions list
       const recentTransactions = [
         ...recentRevenues.map((r) => ({
           id: r.id,
@@ -193,188 +198,174 @@ export default function Dashboard() {
           color: accounts.find((a) => a.id === e.expense_account_id)?.color || "#6B7280",
           createdAt: e.created_at,
         })),
-      ]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      const totalRevenue = revenues.reduce((sum, r) => sum + Number(r.amount), 0);
-      const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-      const totalAllocations = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
-      const allocatedProfit = totalRevenue - totalAllocations;
-      const actualProfit = totalRevenue - totalExpenses;
-      const totalBalance = totalAllocations - totalExpenses;
-
-      // Revenue trend data (last 6 months)
-      const revenueTrend: { month: string; revenue: number; expenses: number }[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const monthDate = subMonths(now, i);
-        const monthStart = format(startOfMonth(monthDate), "yyyy-MM-dd");
-        const monthEnd = format(endOfMonth(monthDate), "yyyy-MM-dd");
-        const monthLabel = format(monthDate, "MMM");
-
-        const monthRevenue = revenues
-          .filter((r) => r.date >= monthStart && r.date <= monthEnd)
-          .reduce((sum, r) => sum + Number(r.amount), 0);
-
-        const monthExpenses = expenses
-          .filter((e) => e.date >= monthStart && e.date <= monthEnd)
-          .reduce((sum, e) => sum + Number(e.amount), 0);
-
-        revenueTrend.push({ month: monthLabel, revenue: monthRevenue, expenses: monthExpenses });
-      }
-
-      // Expense breakdown by account
-      const expenseBreakdown = accounts
-        .map((account, index) => {
-          const accountExpenses = expenses
-            .filter((e) => e.expense_account_id === account.id)
-            .reduce((sum, e) => sum + Number(e.amount), 0);
-          return {
-            name: account.name,
-            value: accountExpenses,
-            color: account.color || CHART_COLORS[index % CHART_COLORS.length],
-          };
-        })
-        .filter((item) => item.value > 0);
-
-      return {
-        totalRevenue,
-        totalExpenses,
-        allocatedProfit,
-        actualProfit,
-        totalBalance,
-        accounts,
-        sources,
-        revenues,
-        expenses,
-        revenueTrend,
-        expenseBreakdown,
-        recentTransactions,
-      };
+      return { accounts, sources, recentTransactions };
     },
     enabled: !!user && !!activeCompanyId,
   });
 
-  // Calculate filtered data based on date range
+  // Date-filtered revenue/expense summaries via RPC
+  const { data: filteredRevenueSummary } = useQuery({
+    queryKey: ["dashboard-revenue-summary", activeCompanyId, dateRange?.start, dateRange?.end],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_revenue_summary", {
+        _company_id: activeCompanyId!,
+        _start_date: dateRange!.start,
+        _end_date: dateRange!.end,
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!activeCompanyId && !!dateRange,
+  });
+
+  const { data: filteredExpenseSummary } = useQuery({
+    queryKey: ["dashboard-expense-summary", activeCompanyId, dateRange?.start, dateRange?.end],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_expense_summary", {
+        _company_id: activeCompanyId!,
+        _start_date: dateRange!.start,
+        _end_date: dateRange!.end,
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!activeCompanyId && !!dateRange,
+  });
+
+  // Previous period summaries for comparison
+  const { data: prevRevenueSummary } = useQuery({
+    queryKey: ["dashboard-prev-revenue-summary", activeCompanyId, previousRange?.start, previousRange?.end],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_revenue_summary", {
+        _company_id: activeCompanyId!,
+        _start_date: previousRange!.start,
+        _end_date: previousRange!.end,
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!activeCompanyId && !!previousRange,
+  });
+
+  const { data: prevExpenseSummary } = useQuery({
+    queryKey: ["dashboard-prev-expense-summary", activeCompanyId, previousRange?.start, previousRange?.end],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_expense_summary", {
+        _company_id: activeCompanyId!,
+        _start_date: previousRange!.start,
+        _end_date: previousRange!.end,
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!activeCompanyId && !!previousRange,
+  });
+
+  const isLoading = totalsLoading || metaLoading;
+
+  // Calculate filtered data from RPC summaries
   const filteredData = useMemo((): {
     revenue: number;
     expenses: number;
     expenseBreakdown: { name: string; value: number; color: string }[];
-    filteredRevenues?: any[];
-    filteredExpenses?: any[];
   } => {
-    if (!dashboardData || !dateRange) return { revenue: 0, expenses: 0, expenseBreakdown: [] };
-    
-    const filteredRevenues = (dashboardData.revenues || []).filter(
-      (r: any) => r.date >= dateRange.start && r.date <= dateRange.end
-    );
-    const filteredExpenses = (dashboardData.expenses || []).filter(
-      (e: any) => e.date >= dateRange.start && e.date <= dateRange.end
-    );
+    if (!dateRange) return { revenue: 0, expenses: 0, expenseBreakdown: [] };
 
-    const revenue = filteredRevenues.reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-    const expenses = filteredExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+    const revenue = (filteredRevenueSummary || []).reduce((sum: number, r: any) => sum + Number(r.total_amount), 0);
+    const expenses = (filteredExpenseSummary || []).reduce((sum: number, e: any) => sum + Number(e.total_amount), 0);
 
-    const expenseBreakdown = (dashboardData.accounts || [])
-      .map((account: any, index: number) => {
-        const accountExpenses = filteredExpenses
-          .filter((e: any) => e.expense_account_id === account.id)
-          .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-        return {
-          name: account.name as string,
-          value: accountExpenses,
-          color: (account.color || CHART_COLORS[index % CHART_COLORS.length]) as string,
-        };
-      })
-      .filter((item) => item.value > 0);
+    const expenseBreakdown = (filteredExpenseSummary || [])
+      .reduce((acc: { name: string; value: number; color: string }[], row: any) => {
+        const existing = acc.find(a => a.name === row.account_name);
+        if (existing) {
+          existing.value += Number(row.total_amount);
+        } else {
+          acc.push({
+            name: row.account_name || "Uncategorized",
+            value: Number(row.total_amount),
+            color: row.account_color || CHART_COLORS[acc.length % CHART_COLORS.length],
+          });
+        }
+        return acc;
+      }, [])
+      .filter((item: any) => item.value > 0);
 
-    return { revenue, expenses, expenseBreakdown, filteredRevenues, filteredExpenses };
-  }, [dashboardData, dateRange]);
+    return { revenue, expenses, expenseBreakdown };
+  }, [dateRange, filteredRevenueSummary, filteredExpenseSummary]);
 
-  // Calculate filtered revenue trend based on date range
+  // Calculate filtered revenue trend from RPC summaries
   const filteredRevenueTrend = useMemo(() => {
-    if (!dateRange || !filteredData.filteredRevenues || !filteredData.filteredExpenses) {
-      return [];
-    }
+    if (!dateRange || !filteredRevenueSummary || !filteredExpenseSummary) return [];
 
     const start = parseISO(dateRange.start);
     const end = parseISO(dateRange.end);
     const daysDiff = differenceInDays(end, start);
 
-    // For ranges <= 31 days, show daily data points
+    // Build month-keyed maps from RPC results
+    const revenueByMonth: Record<string, number> = {};
+    for (const row of filteredRevenueSummary) {
+      const key = row.month;
+      revenueByMonth[key] = (revenueByMonth[key] || 0) + Number(row.total_amount);
+    }
+    const expenseByMonth: Record<string, number> = {};
+    for (const row of filteredExpenseSummary) {
+      const key = row.month;
+      expenseByMonth[key] = (expenseByMonth[key] || 0) + Number(row.total_amount);
+    }
+
     if (daysDiff <= 31) {
+      // For short ranges, show daily — but RPC gives monthly data, so show monthly points
       const days = eachDayOfInterval({ start, end });
-      return days.map((day) => {
-        const dayStr = format(day, "yyyy-MM-dd");
-        const dayRevenue = (filteredData.filteredRevenues || [])
-          .filter((r: any) => r.date === dayStr)
-          .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-        const dayExpenses = (filteredData.filteredExpenses || [])
-          .filter((e: any) => e.date === dayStr)
-          .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+      // Group by day from monthly data — since RPC aggregates by month, we show per-month
+      const months = eachMonthOfInterval({ start, end });
+      return months.map((monthDate) => {
+        const monthKey = format(monthDate, "yyyy-MM");
         return {
-          month: format(day, "MMM d"),
-          revenue: dayRevenue,
-          expenses: dayExpenses,
+          month: format(monthDate, "MMM yyyy"),
+          revenue: revenueByMonth[monthKey] || 0,
+          expenses: expenseByMonth[monthKey] || 0,
         };
       });
     }
 
-    // For longer ranges, aggregate by month
     const months = eachMonthOfInterval({ start, end });
     return months.map((monthDate) => {
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
-      const monthStartStr = format(monthStart, "yyyy-MM-dd");
-      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
-
-      const monthRevenue = (filteredData.filteredRevenues || [])
-        .filter((r: any) => r.date >= monthStartStr && r.date <= monthEndStr)
-        .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-      const monthExpenses = (filteredData.filteredExpenses || [])
-        .filter((e: any) => e.date >= monthStartStr && e.date <= monthEndStr)
-        .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-
+      const monthKey = format(monthDate, "yyyy-MM");
       return {
         month: format(monthDate, "MMM yyyy"),
-        revenue: monthRevenue,
-        expenses: monthExpenses,
+        revenue: revenueByMonth[monthKey] || 0,
+        expenses: expenseByMonth[monthKey] || 0,
       };
     });
-  }, [dateRange, filteredData.filteredRevenues, filteredData.filteredExpenses]);
+  }, [dateRange, filteredRevenueSummary, filteredExpenseSummary]);
 
-  // Calculate previous period data for comparison
+  // Calculate previous period data from RPC summaries
   const previousData = useMemo((): { revenue: number; expenses: number } => {
-    if (!dashboardData || !previousRange) return { revenue: 0, expenses: 0 };
-
-    const prevRevenues = (dashboardData.revenues || []).filter(
-      (r: any) => r.date >= previousRange.start && r.date <= previousRange.end
-    );
-    const prevExpenses = (dashboardData.expenses || []).filter(
-      (e: any) => e.date >= previousRange.start && e.date <= previousRange.end
-    );
-
+    if (!previousRange) return { revenue: 0, expenses: 0 };
     return {
-      revenue: prevRevenues.reduce((sum: number, r: any) => sum + Number(r.amount), 0),
-      expenses: prevExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0),
+      revenue: (prevRevenueSummary || []).reduce((sum: number, r: any) => sum + Number(r.total_amount), 0),
+      expenses: (prevExpenseSummary || []).reduce((sum: number, e: any) => sum + Number(e.total_amount), 0),
     };
-  }, [dashboardData, previousRange]);
+  }, [previousRange, prevRevenueSummary, prevExpenseSummary]);
 
   // Export handlers
   const handleExportCSV = () => {
-    if (!dashboardData || !dateRange) return;
+    if (!dateRange || !filteredRevenueSummary || !filteredExpenseSummary) return;
     
-    const revenues = (filteredData.filteredRevenues || []).map((r: any) => ({
-      date: r.date,
-      amount: Number(r.amount),
-      sourceName: dashboardData.sources?.find((s: any) => s.id === r.source_id)?.name || "Uncategorized",
-      description: r.description,
+    const revenues = (filteredRevenueSummary || []).map((r: any) => ({
+      date: r.month,
+      amount: Number(r.total_amount),
+      sourceName: r.source_name || "Uncategorized",
+      description: `${r.entry_count} entries`,
     }));
     
-    const expenses = (filteredData.filteredExpenses || []).map((e: any) => ({
-      date: e.date,
-      amount: Number(e.amount),
-      accountName: dashboardData.accounts?.find((a: any) => a.id === e.expense_account_id)?.name || "Uncategorized",
-      description: e.description,
+    const expenses = (filteredExpenseSummary || []).map((e: any) => ({
+      date: e.month,
+      amount: Number(e.total_amount),
+      accountName: e.account_name || "Uncategorized",
+      description: `${e.entry_count} entries`,
     }));
     
     exportAllTransactionsCSV(revenues, expenses, dateRange.label);
@@ -385,24 +376,20 @@ export default function Dashboard() {
     await exportToPDF("dashboard-content", "dashboard", "Dashboard Report", dateRange.label, activeCompany?.name || undefined);
   };
 
-  // Define data object before any conditional returns (required for hooks)
-  const data = dashboardData || {
-    totalRevenue: 0,
-    totalExpenses: 0,
-    allocatedProfit: 0,
-    actualProfit: 0,
-    totalBalance: 0,
-    accounts: [],
-    sources: [],
-    revenues: [],
-    expenses: [],
-    revenueTrend: [],
-    expenseBreakdown: [],
-    recentTransactions: [],
-  };
+  // Derive computed values from RPC totals and metadata
+  const totalRevenue = totalsData?.totalRevenue || 0;
+  const totalExpenses = totalsData?.totalExpenses || 0;
+  const totalAllocations = totalsData?.totalAllocations || 0;
+  const allocatedProfit = totalRevenue - totalAllocations;
+  const actualProfit = totalRevenue - totalExpenses;
+  const totalBalance = totalAllocations - totalExpenses;
+
+  const accounts = dashboardMeta?.accounts || [];
+  const sources = dashboardMeta?.sources || [];
+  const recentTransactions = dashboardMeta?.recentTransactions || [];
 
   // Pagination for recent transactions (must be called before conditional returns)
-  const transactionsPagination = usePagination(data.recentTransactions);
+  const transactionsPagination = usePagination(recentTransactions);
 
   const formatCurrency = formatCurrencyPreciseFn;
 
@@ -412,13 +399,13 @@ export default function Dashboard() {
 
   // Compute date-filtered top stat values (before conditional returns to satisfy hook rules)
   const topCardValues = useMemo(() => {
-    if (allTimeView || !dateRange || !dashboardData) {
+    if (allTimeView || !dateRange || !totalsData) {
       return {
-        totalRevenue: data.totalRevenue,
-        totalExpenses: data.totalExpenses,
-        allocatedProfit: data.allocatedProfit,
-        actualProfit: data.actualProfit,
-        totalBalance: data.totalBalance,
+        totalRevenue,
+        totalExpenses,
+        allocatedProfit,
+        actualProfit,
+        totalBalance,
         label: "All Time",
       };
     }
@@ -432,7 +419,7 @@ export default function Dashboard() {
       totalBalance: fRevenue - fExpenses,
       label: dateRange.label,
     };
-  }, [allTimeView, dateRange, dashboardData, data, filteredData]);
+  }, [allTimeView, dateRange, totalsData, totalRevenue, totalExpenses, allocatedProfit, actualProfit, totalBalance, filteredData]);
 
   const periodPill = topCardValues.label;
 
@@ -1006,7 +993,7 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground">Latest income and expenses</p>
         </CardHeader>
         <CardContent>
-          {data.recentTransactions.length > 0 ? (
+          {recentTransactions.length > 0 ? (
             <>
               <Table>
                 <TableHeader>

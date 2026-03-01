@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { SectionErrorBoundary } from "@/components/layout/SectionErrorBoundary";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
@@ -16,6 +16,7 @@ import { RoleGuard } from "@/components/auth/RoleGuard";
 import { AccessGuard, ACCESS_RULES } from "@/components/auth/AccessGuard";
 import AppLayout from "@/components/layout/AppLayout";
 import { CriticalRouteErrorBoundary } from "@/components/layout/CriticalRouteErrorBoundary";
+import { friendlyErrorMessage } from "@/utils/errorMessages";
 
 function AccessDenied() {
   return (
@@ -69,8 +70,7 @@ const queryClient = new QueryClient({
     mutations: {
       retry: 0,
       onError: (error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Something went wrong";
+        const message = friendlyErrorMessage(error);
         // Use sonner toast for global mutation errors
         import("sonner").then(({ toast }) => {
           toast.error(message, { duration: 5000 });
