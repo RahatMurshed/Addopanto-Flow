@@ -1,58 +1,52 @@
 
 
-# Fix: Backfill Missing Expense Records for Old Salary Payments
+# Clean Up Salary Descriptions + Outlined Badges in Light Mode
 
-## Root Cause
+## 1. Strip `[SALARY:uuid]` from displayed descriptions
 
-You have **12 salary payments** recorded, but only **6 have linked expense records** on the Expenses page. The missing 6 were created during a data restore (before the salary-to-expense sync feature existed). That's why you see the salary on the employee's page but NOT on the Expenses page.
+The internal tracking tag `[SALARY:cb284cc9-...]` is visible in the UI on both the Dashboard and Expenses pages. We'll create a small utility function to clean descriptions for display, stripping the `[SALARY:...]` suffix while keeping it in the database for tracking.
 
-```text
-+---+------------------+--------+----------+--------------+
-| # | Employee         | Month  | Amount   | Has Expense? |
-+---+------------------+--------+----------+--------------+
-| 1 | Jahangir Alam    | 2026-04| 22,000   | YES          |
-| 2 | Jahangir Alam    | 2026-02| 22,000   | YES          |
-| 3 | Raju Miah        | 2026-03| 12,000   | YES          |
-| 4 | Mohammad Hasan   | 2026-03| 25,000   | YES          |
-| 5 | Jahangir Alam    | 2026-03| 22,000   | YES          |
-| 6 | Ayesha Siddiqua  | 2026-03| 18,000   | YES          |
-| 7 | Mohammad Hasan   | 2026-02| 25,000   | MISSING      |
-| 8 | Raju Miah        | 2026-02| 12,000   | MISSING      |
-| 9 | Jahangir Alam    | 2026-02| 22,000   | MISSING      |
-|10 | Ayesha Siddiqua  | 2026-03| 18,000   | MISSING      |
-|11 | Ayesha Siddiqua  | 2026-02| 18,000   | MISSING      |
-|12 | Mohammad Hasan   | 2026-03| 25,000   | MISSING      |
-+---+------------------+--------+----------+--------------+
+**Approach:**
+- Create a utility function `cleanDescription(desc: string)` that removes `[SALARY:uuid]` patterns using a regex
+- Apply it in the two places descriptions are shown:
+  - `Dashboard.tsx` (line ~196 where expense descriptions are built, and line ~1030 where `tx.description` is rendered)
+  - `Expenses.tsx` (line ~595 where `exp.description` is rendered)
+
+**The regex:** `/\s*\[SALARY:[^\]]+\]/g` -- removes the tag and any leading whitespace before it.
+
+## 2. Outlined badges in light mode (no background, just border)
+
+The user wants all source badges across the app to have no background color in light mode -- just a border and colored text. This is controlled by `getSourceColor()` in `src/utils/sourceColors.ts`.
+
+**Current light mode style:**
+```
+bg: "transparent", text: hsl(hue, 85%, 40%), border: hsla(hue, 85%, 45%, 0.30)
 ```
 
-All future salary recordings will work correctly (the fix is already in place). We just need to backfill the 6 old records.
+This is already transparent background. However, the `Badge` component (`badge.tsx`) has a `default` variant that applies `bg-primary` styles and dark mode uses `dark:bg-primary`. The issue is likely that in some places badges use the `default` variant instead of `outline`.
 
-## Fix Plan
+**Changes:**
+- Verify and update `sourceColors.ts` -- light mode already uses `transparent` bg, which is correct
+- Update the `Badge` component's `default` variant to use an outlined style in light mode (border + no bg), keeping filled style only for dark mode -- this is actually already done based on the code
+- Make the border more visible in light mode by increasing border opacity from 0.30 to 0.45 for better visibility
 
-### Step 1: Backfill missing expense records via SQL migration
+## Files to modify
 
-Write a one-time SQL migration that:
-- Finds all `employee_salary_payments` that have NO matching expense record (no `[SALARY:id]` in any expense description)
-- For each, creates an expense record with:
-  - `amount` = the salary's `net_amount`
-  - `date` = the salary's `payment_date`
-  - `description` = `Salary - [employee_name] - [month] [SALARY:salary_id]`
-  - `expense_account_id` = the company's first/default "Salary" expense account
-  - `company_id` and `user_id` from the salary record
-
-### Step 2: Add a database trigger to prevent future gaps
-
-Create a Postgres trigger on `employee_salary_payments` INSERT that automatically creates the linked expense record at the database level. This ensures the expense is ALWAYS created even if the frontend code fails or is bypassed (e.g., during data restores).
-
-This makes the system bulletproof -- no more missing expenses regardless of how salary records are created.
+1. **New utility:** Add `cleanSalaryTag()` to `src/utils/sourceColors.ts` (or a new small util)
+2. **`src/pages/Dashboard.tsx`** -- Clean description display at line ~196 and ~1030
+3. **`src/pages/Expenses.tsx`** -- Clean description display at line ~595
+4. **`src/utils/sourceColors.ts`** -- Increase border opacity for light mode badges
 
 ## Technical Details
 
-**Database migration (single SQL script):**
-1. Backfill query joins `employee_salary_payments` with `employees` to get names, LEFT JOINs with `expenses` to find gaps, and INSERTs missing expense records
-2. The trigger function `fn_auto_create_salary_expense()` fires AFTER INSERT on `employee_salary_payments` and creates the linked expense automatically
-3. The `useCreateSalaryPayment` hook's manual expense insertion will be made idempotent (check if trigger already created it) to avoid duplicates during the transition
+The `cleanSalaryTag` function:
+```typescript
+export function cleanSalaryTag(desc: string | null | undefined): string {
+  if (!desc) return "";
+  return desc.replace(/\s*\[SALARY:[^\]]+\]/g, "").trim();
+}
+```
 
-**Frontend change:**
-- Update `useCreateSalaryPayment` in `useEmployees.ts` to skip manual expense creation if a trigger-created expense already exists (prevents duplicates)
+Applied in Dashboard.tsx where expense transactions build their description (line ~196) and in the render (line ~1030), and in Expenses.tsx where `exp.description` is displayed (line ~595).
 
+For badges, increase the border opacity in `getSourceColor()` light mode from `0.30` to `0.50` so the outline is more prominent and the badge looks clearly "outlined."
