@@ -164,11 +164,14 @@ export default function Expenses() {
 
     result = [...result].sort((a, b) => {
       switch (sortBy) {
-        case "date-asc": return a.date.localeCompare(b.date);
-        case "date-desc": return b.date.localeCompare(a.date);
+        case "date-asc":
+          return a.date.localeCompare(b.date) || (a.created_at ?? "").localeCompare(b.created_at ?? "");
+        case "date-desc":
+          return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
         case "amount-desc": return Number(b.amount) - Number(a.amount);
         case "amount-asc": return Number(a.amount) - Number(b.amount);
-        default: return b.date.localeCompare(a.date);
+        default:
+          return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
       }
     });
 
