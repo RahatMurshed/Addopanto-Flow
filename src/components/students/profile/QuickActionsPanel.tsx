@@ -1,8 +1,10 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import {
   MessageCircle, MessageSquarePlus, Pencil,
   FileDown, Tag, Zap, X, Loader2, RefreshCw,
 } from "lucide-react";
+import { exportStudentPdf } from "./StudentPdfExport";
+import { ManageTagsDialog } from "./ManageTagsDialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,11 +29,13 @@ interface QuickActionsPanelProps {
     [key: string]: any;
   };
   companyId: string;
+  companyName?: string;
   userRole: string;
   userPermissions: string[];
   onStatusChange?: (newStatus: string) => void;
   onEdit: () => void;
   isLoading?: boolean;
+  profileContentRef?: React.RefObject<HTMLElement>;
 }
 
 const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
@@ -56,13 +60,15 @@ type ActionItem = {
 };
 
 export function QuickActionsPanel({
-  student, companyId, userRole, userPermissions, onStatusChange, onEdit, isLoading,
+  student, companyId, companyName, userRole, userPermissions, onStatusChange, onEdit, isLoading, profileContentRef,
 }: QuickActionsPanelProps) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [tagsDialogOpen, setTagsDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const isAdminOrCipher = userRole === "cipher" || userRole === "admin";
   const isModerator = userRole === "moderator";
@@ -197,36 +203,54 @@ export function QuickActionsPanel({
       });
     }
 
-    // Planned features — visible as disabled badges
+    // Export PDF
     if (isAdminOrCipher) {
       items.push({
         id: "export-pdf",
         icon: FileDown,
-        label: "Export PDF Report",
-        iconColor: "#9CA3AF",
-        className: "bg-muted/30 text-muted-foreground border border-border/50 cursor-not-allowed opacity-60",
-        fabColor: "#9CA3AF",
-        onClick: () => {},
-        disabled: true,
-        disabledTooltip: "Coming soon — PDF export will be available in a future update",
+        label: exporting ? "Exporting..." : "Export PDF Report",
+        iconColor: "#6366F1",
+        className: "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-800 dark:hover:bg-indigo-950/50",
+        fabColor: "#6366F1",
+        onClick: async () => {
+          if (!profileContentRef?.current) {
+            toast({ title: "Cannot export", description: "Profile content not found", variant: "destructive" });
+            return;
+          }
+          setExporting(true);
+          try {
+            await exportStudentPdf({
+              studentName: student.name,
+              companyName: companyName || "Report",
+              contentElement: profileContentRef.current,
+            });
+            toast({ title: "PDF exported successfully" });
+          } catch (err: any) {
+            toast({ title: "PDF export failed", description: err.message, variant: "destructive" });
+          } finally {
+            setExporting(false);
+            setFabOpen(false);
+          }
+        },
+        disabled: exporting,
         group: "admin",
       });
+
+      // Manage Tags
       items.push({
         id: "manage-tags",
         icon: Tag,
         label: "Manage Tags",
-        iconColor: "#9CA3AF",
-        className: "bg-muted/30 text-muted-foreground border border-border/50 cursor-not-allowed opacity-60",
-        fabColor: "#9CA3AF",
-        onClick: () => {},
-        disabled: true,
-        disabledTooltip: "Coming soon — Tag management will be available in a future update",
+        iconColor: "#8B5CF6",
+        className: "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-950/30 dark:border-purple-800 dark:hover:bg-purple-950/50",
+        fabColor: "#8B5CF6",
+        onClick: () => { setTagsDialogOpen(true); setFabOpen(false); },
         group: "admin",
       });
     }
 
     return items;
-  }, [student.phone, isAdminOrCipher, isModerator, userPermissions, handleWhatsApp, handleScrollToNotes, onEdit, toast]);
+  }, [student.phone, student.name, isAdminOrCipher, isModerator, userPermissions, handleWhatsApp, handleScrollToNotes, onEdit, toast, exporting, profileContentRef, companyName]);
 
   const groupedActions = useMemo(() => {
     const communication = actions.filter(a => a.group === "communication");
@@ -263,11 +287,6 @@ export function QuickActionsPanel({
       >
         <action.icon className="h-4 w-4 mr-3 shrink-0" style={{ color: action.disabled ? undefined : action.iconColor }} />
         {action.label}
-        {(action.id === "export-pdf" || action.id === "manage-tags") && (
-          <span className="ml-auto text-[10px] font-semibold bg-muted text-muted-foreground rounded-full px-2 py-0.5">
-            Soon
-          </span>
-        )}
       </Button>
     );
 
@@ -397,6 +416,14 @@ export function QuickActionsPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Tags Dialog */}
+      <ManageTagsDialog
+        open={tagsDialogOpen}
+        onOpenChange={setTagsDialogOpen}
+        studentId={student.id}
+        companyId={companyId}
+      />
     </>
   );
 }

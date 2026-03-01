@@ -30,6 +30,7 @@ interface ProfileHeaderProps {
   student: StudentData;
   canEdit: boolean;
   onEdit: () => void;
+  tags?: { id: string; label: string; color_class: string }[];
 }
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
@@ -53,7 +54,7 @@ function getInitials(name: string): string {
 }
 
 export const ProfileHeader = forwardRef<HTMLDivElement, ProfileHeaderProps>(
-  ({ student, canEdit, onEdit }, ref) => {
+  ({ student, canEdit, onEdit, tags }, ref) => {
     const status = STATUS_CONFIG[student.status] || STATUS_CONFIG.inactive;
     const initials = getInitials(student.name);
     const address = [student.address_house, student.address_street, student.address_area, student.address_city, student.address_state].filter(Boolean).join(", ");
@@ -109,8 +110,16 @@ export const ProfileHeader = forwardRef<HTMLDivElement, ProfileHeaderProps>(
               )}
             </div>
 
-            {/* Row 3 — Tags placeholder */}
-            {/* Student tags render here — added in Prompt 9 */}
+            {/* Row 3 — Tags */}
+            {tags && tags.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap justify-center sm:justify-start">
+                {tags.map(tag => (
+                  <Badge key={tag.id} variant="secondary" className={cn("text-xs", tag.color_class)}>
+                    {tag.label}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Status + Edit */}
