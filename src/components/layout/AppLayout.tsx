@@ -131,11 +131,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
     } else {
       // Admin/Cipher: full navigation
+      items.push({ label: "Courses", href: "/courses", icon: BookOpen });
       items.push({ label: "Products", href: "/products", icon: Package });
       items.push({ label: "Students", href: "/students", icon: GraduationCap });
       items.push({ label: "Employees", href: "/employees", icon: Briefcase });
       
-      items.push({ label: "Courses", href: "/courses", icon: BookOpen });
       items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
       items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
       items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
