@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight, Percent, Calculator, Calendar, BarChart3 } from "lucide-react";
+import { Download, Loader2, TrendingUp, TrendingDown, Wallet, FileText, ArrowLeftRight, Percent, Calculator, Calendar, BarChart3, Info } from "lucide-react";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SkeletonCards, SkeletonChart, SkeletonTable } from "@/components/shared/SkeletonLoaders";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, endOfMonth, getYear, parseISO, startOfMonth, differenceInDays, eachDayOfInterval, eachMonthOfInterval } from "date-fns";
@@ -846,7 +847,19 @@ export default function Reports() {
         <TabsContent value="accounts" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Khata Breakdown{dateRange ? ` - ${dateRange.label}` : ""}</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Khata Breakdown{dateRange ? ` - ${dateRange.label}` : ""}
+                <TooltipProvider>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-sm">Balances shown are cumulative all-time totals and are not affected by the date filter.</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
+              </CardTitle>
               <Button variant="outline" size="sm" onClick={exportAccountBreakdown}>
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV

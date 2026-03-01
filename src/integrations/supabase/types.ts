@@ -308,6 +308,7 @@ export type Database = {
           logo_url: string | null
           name: string
           slug: string
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -324,6 +325,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           slug: string
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -340,6 +342,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           slug?: string
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3663,6 +3666,10 @@ export type Database = {
           deleted_payment_total: number
           status_changed: boolean
         }[]
+      }
+      verify_financial_consistency: {
+        Args: { _company_id: string }
+        Returns: Json
       }
     }
     Enums: {
