@@ -148,8 +148,33 @@ export function QuickActionsPanel({
       });
     }
 
-    // Export PDF — planned feature, hidden until implemented
-    // Manage Tags — planned feature, hidden until implemented
+    // Planned features — visible as disabled badges
+    if (isAdminOrCipher) {
+      items.push({
+        id: "export-pdf",
+        icon: FileDown,
+        label: "Export PDF Report",
+        iconColor: "#9CA3AF",
+        className: "bg-muted/30 text-muted-foreground border border-border/50 cursor-not-allowed opacity-60",
+        fabColor: "#9CA3AF",
+        onClick: () => {},
+        disabled: true,
+        disabledTooltip: "Coming soon — PDF export will be available in a future update",
+        group: "admin",
+      });
+      items.push({
+        id: "manage-tags",
+        icon: Tag,
+        label: "Manage Tags",
+        iconColor: "#9CA3AF",
+        className: "bg-muted/30 text-muted-foreground border border-border/50 cursor-not-allowed opacity-60",
+        fabColor: "#9CA3AF",
+        onClick: () => {},
+        disabled: true,
+        disabledTooltip: "Coming soon — Tag management will be available in a future update",
+        group: "admin",
+      });
+    }
 
     return items;
   }, [student.phone, isAdminOrCipher, isModerator, userPermissions, handleWhatsApp, handleScrollToNotes, onEdit, toast]);
@@ -189,6 +214,11 @@ export function QuickActionsPanel({
       >
         <action.icon className="h-4 w-4 mr-3 shrink-0" style={{ color: action.disabled ? undefined : action.iconColor }} />
         {action.label}
+        {(action.id === "export-pdf" || action.id === "manage-tags") && (
+          <span className="ml-auto text-[10px] font-semibold bg-muted text-muted-foreground rounded-full px-2 py-0.5">
+            Soon
+          </span>
+        )}
       </Button>
     );
 
