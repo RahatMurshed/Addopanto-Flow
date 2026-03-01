@@ -11,6 +11,14 @@ const UNCATEGORIZED_STYLE = {
   dark: { bg: "transparent", text: "hsl(220, 60%, 70%)", border: "hsla(220, 60%, 65%, 0.50)" },
 };
 
+/** Named overrides for specific source badges */
+const NAMED_OVERRIDES: Record<string, { light: { bg: string; text: string; border: string }; dark: { bg: string; text: string; border: string } }> = {
+  "Student Fees": {
+    light: { bg: "hsl(142, 55%, 95%)", text: "hsl(142, 65%, 28%)", border: "hsla(142, 55%, 40%, 0.50)" },
+    dark: { bg: "hsla(142, 50%, 20%, 0.20)", text: "hsl(142, 80%, 65%)", border: "hsla(142, 70%, 55%, 0.55)" },
+  },
+};
+
 function hashString(str: string): number {
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {
@@ -28,6 +36,9 @@ export function getSourceColor(name: string | null | undefined, isDark?: boolean
   }
   if (!name || name === "Uncategorized") {
     return isDark ? UNCATEGORIZED_STYLE.dark : UNCATEGORIZED_STYLE.light;
+  }
+  if (name in NAMED_OVERRIDES) {
+    return isDark ? NAMED_OVERRIDES[name].dark : NAMED_OVERRIDES[name].light;
   }
   const hue = hashString(name) % 360;
   if (isDark) {
@@ -59,5 +70,6 @@ export function getSourceBadgeStyle(name: string | null | undefined, isDark?: bo
     borderColor: c.border,
     borderWidth: "1px",
     borderStyle: "solid",
+    fontWeight: 700,
   };
 }
