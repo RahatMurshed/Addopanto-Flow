@@ -1,68 +1,21 @@
 
 
-# Sentry Error Tracking Integration
+# Fix Student Fees Badge Visibility
 
-## Overview
-Install `@sentry/react`, initialize it in `main.tsx`, integrate with existing error boundaries, and add PII scrubbing to protect sensitive student data.
+## Problem
+The "Student Fees" named override uses custom saturation/lightness values (85%/45% in light mode) that differ from the standard badge formula (70%/35%). This makes violet text less readable in light mode compared to other badges.
 
-## Changes
+## Solution
+Use the exact same HSL formula that all other dynamically-generated badges use, but locked to hue 270 (violet):
 
-### 1. Install dependency
-- Add `@sentry/react` to `package.json`
+| Mode | Property | Current (broken) | Fixed (matches others) |
+|------|----------|-------------------|----------------------|
+| Light | text | hsl(270, 85%, 45%) | hsl(270, 70%, 35%) |
+| Light | border | hsla(270, 80%, 50%, 0.50) | hsla(270, 65%, 45%, 0.45) |
+| Dark | text | hsl(270, 90%, 72%) | hsl(270, 90%, 65%) |
+| Dark | border | hsla(270, 90%, 65%, 0.55) | hsla(270, 90%, 60%, 0.50) |
 
-### 2. Create Sentry configuration module
-**New file: `src/lib/sentry.ts`**
-- Initialize Sentry with `Sentry.init()` reading DSN from `import.meta.env.VITE_SENTRY_DSN`
-- Only initialize when DSN is present (skip in dev when left empty)
-- Set `tracesSampleRate: 0.1` (10% of transactions)
-- Configure `beforeSend` callback to scrub PII fields:
-  - Strip `phone`, `email`, `address`, `guardian_name`, `guardian_phone`, `name`, `student_name` from event `extra`, `contexts`, and breadcrumb data
-  - Replace matched values with `[REDACTED]`
-- Export a `captureException` wrapper for use across the app
+## File changed
+- `src/utils/sourceColors.ts` — update the `Student Fees` entry in `NAMED_OVERRIDES` to match the standard dynamic formula at hue 270.
 
-### 3. Update `src/main.tsx`
-- Import `src/lib/sentry.ts` at the top (side-effect import triggers init)
-- Replace `console.warn` in unhandled rejection handler with `Sentry.captureException`
-
-### 4. Update `src/components/layout/ErrorBoundary.tsx`
-- Add `Sentry.captureException(error, { contexts: { react: { componentStack } } })` inside `componentDidCatch`
-- This sends every caught error to Sentry alongside the existing logger + toast
-
-### 5. Update `src/components/layout/CriticalRouteErrorBoundary.tsx`
-- Same pattern: add `Sentry.captureException(error)` in `componentDidCatch`
-
-### 6. Update `src/components/layout/SectionErrorBoundary.tsx`
-- Same pattern: add `Sentry.captureException(error)` in `componentDidCatch`
-
-### 7. Environment variable
-- Add `VITE_SENTRY_DSN=""` to `.env.example` as documentation
-- In production, set the real DSN value. When empty, Sentry silently does nothing.
-
-## Technical Details
-
-**PII scrubbing (`beforeSend`):**
-```text
-const PII_KEYS = new Set([
-  "phone", "email", "address", "name", "student_name",
-  "guardian_name", "guardian_phone", "guardian_email",
-  "date_of_birth"
-]);
-
-function scrubPii(obj) {
-  // recursively walk obj keys, replace any PII_KEYS values with "[REDACTED]"
-}
-```
-
-**No Sentry.ErrorBoundary wrapper needed** -- the existing custom `ErrorBoundary` already catches all errors. Adding `Sentry.captureException` inside `componentDidCatch` achieves the same result without replacing the custom UI.
-
-### Files modified
-| File | Action |
-|---|---|
-| `package.json` | Add `@sentry/react` dependency |
-| `src/lib/sentry.ts` | New -- init + PII scrubbing config |
-| `src/main.tsx` | Import sentry init, capture unhandled rejections |
-| `src/components/layout/ErrorBoundary.tsx` | Add captureException |
-| `src/components/layout/CriticalRouteErrorBoundary.tsx` | Add captureException |
-| `src/components/layout/SectionErrorBoundary.tsx` | Add captureException |
-| `.env.example` | Add VITE_SENTRY_DSN |
-
+This ensures the violet badge has identical contrast and weight to every other source badge.
