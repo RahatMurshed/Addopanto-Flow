@@ -1,31 +1,50 @@
 
 
-# Fix: Expense Sort Dropdown State Issue
+# Clean Up Unused Employee Attendance, Leaves, and Performance Code & Tables
 
-## Problem
+## What's being removed
 
-The sort dropdown on the Expenses page behaves erratically -- selecting "Date Oldest" can revert back to a previous value (like "Amount High"), and the default "Date Newest" may appear to show data in the wrong order. The session replay confirms the dropdown selection reverts within ~120ms of the user's click.
+The attendance, leaves, and performance features were removed from the UI but their code hooks and database tables remain. None of these hooks are imported by any component -- they are dead code.
 
-## Root Cause
+## Code Changes
 
-The `sortBy` state is stored as local React state (`useState`). When the `AdvancedDateFilter` component updates URL search params (via `useSearchParams`), it can trigger a re-render cascade in the Expenses component. Combined with the `useEffect` that calls `pagination.resetPage()` on every `sortBy` change, this creates a race condition where the state update from the Select dropdown gets lost during the re-render.
+### 1. Remove `src/hooks/useEmployeePerformance.ts` (entire file)
+This file is never imported anywhere. Delete it completely.
 
-## Fix
+### 2. Clean up `src/hooks/useEmployees.ts`
+Remove the following dead code:
+- `EmployeeAttendance` interface (lines 88-96)
+- `EmployeeLeave` interface (lines 98-110)
+- `useEmployeeAttendance` function (lines 362-380)
+- `useMarkAttendance` function (lines 382-398)
+- `useEmployeeLeaves` function (lines 400-413)
+- `useCreateLeave` function (lines 415-431)
+- `useDeleteLeave` function (lines 433-445)
 
-**Persist `sortBy` and `accountFilter` in URL search params** instead of local state. This makes them survive re-renders caused by the date filter's search param updates and keeps filter state bookmarkable.
+Also remove the `endOfMonth` and `format as fnsFormat` imports if they become unused after this cleanup.
 
-### Changes in `src/pages/Expenses.tsx`:
+### 3. Update `supabase/functions/reset-company-data/index.ts`
+Remove `"employee_attendance"` and `"employee_leaves"` from the tables list (lines 121-122), since these tables will be dropped.
 
-1. Read `sortBy` and `accountFilter` from URL search params (via `useSearchParams`) instead of `useState`
-2. Write updates back to the URL using `setSearchParams` with `replace: true`
-3. Remove the `useEffect` that resets pagination on sort/filter change -- instead, reset page inline when the user changes filters
-4. This eliminates the re-render race condition since the sort value lives in the URL (the single source of truth), not in ephemeral React state
+## Database Migration
 
-### Detailed approach:
+### 4. Drop unused tables
+Run a migration to drop the two tables:
 
-- Extract `sortBy` from `searchParams.get("sortBy") || "date-desc"` 
-- Extract `accountFilter` from `searchParams.get("account") || "all"`
-- Create setter functions that update search params: `setSortBy` updates the `sortBy` param and resets page to 1
-- Remove the `useEffect` for `pagination.resetPage()` -- handle page reset inside the setter callbacks
-- Keep the existing sort logic (`localeCompare` for dates, numeric comparison for amounts) unchanged since it is correct
+```sql
+DROP TABLE IF EXISTS employee_attendance CASCADE;
+DROP TABLE IF EXISTS employee_leaves CASCADE;
+```
+
+This removes:
+- `employee_attendance` table (with its RLS policies and foreign keys)
+- `employee_leaves` table (with its RLS policies and foreign keys)
+
+The `types.ts` file will auto-regenerate after the migration.
+
+## Summary of files affected
+- **Delete:** `src/hooks/useEmployeePerformance.ts`
+- **Edit:** `src/hooks/useEmployees.ts` -- remove ~90 lines of dead code
+- **Edit:** `supabase/functions/reset-company-data/index.ts` -- remove 2 table references
+- **Migration:** Drop `employee_attendance` and `employee_leaves` tables
 
