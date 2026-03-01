@@ -2,11 +2,12 @@ import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface PermissionDeniedProps {
   title?: string;
   message?: string;
-  /** If set, auto-redirects to /dashboard after this many seconds */
+  /** If set, auto-redirects after this many seconds */
   autoRedirectSeconds?: number;
 }
 
@@ -16,17 +17,22 @@ export function PermissionDenied({
   autoRedirectSeconds,
 }: PermissionDeniedProps) {
   const navigate = useNavigate();
+  const { isModerator } = useCompany();
   const [countdown, setCountdown] = useState(autoRedirectSeconds ?? 0);
+
+  // Moderators can't access dashboard, so redirect to students instead
+  const fallbackRoute = isModerator ? "/students" : "/dashboard";
+  const fallbackLabel = isModerator ? "Go Back" : "Go to Dashboard";
 
   useEffect(() => {
     if (!autoRedirectSeconds) return;
     if (countdown <= 0) {
-      navigate("/dashboard", { replace: true });
+      navigate(fallbackRoute, { replace: true });
       return;
     }
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
-  }, [countdown, autoRedirectSeconds, navigate]);
+  }, [countdown, autoRedirectSeconds, navigate, fallbackRoute]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
@@ -37,11 +43,11 @@ export function PermissionDenied({
       <p className="text-muted-foreground max-w-md">{message}</p>
       {autoRedirectSeconds ? (
         <p className="text-sm text-muted-foreground">
-          Redirecting to dashboard in {countdown}s…
+          Redirecting in {countdown}s…
         </p>
       ) : null}
-      <Button variant="outline" onClick={() => navigate("/dashboard")}>
-        Go to Dashboard
+      <Button variant="outline" onClick={() => navigate(fallbackRoute)}>
+        {fallbackLabel}
       </Button>
     </div>
   );
