@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Sentry } from "@/lib/sentry";
 import { logger } from "@/utils/logger";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export class SectionErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logger.error("SectionErrorBoundary caught:", error, errorInfo);
+    Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } });
 
     toast({
       variant: "destructive",
