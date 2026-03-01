@@ -63,12 +63,18 @@ export function parseCSV(text: string): ParsedCSV {
     return result;
   };
 
+  // Sanitize a cell value to prevent formula injection
+  const sanitizeCell = (val: string): string => {
+    if (/^[=+\-@\t\r]/.test(val)) return val.slice(1).trim();
+    return val;
+  };
+
   const headers = splitLine(lines[0]);
   const rows = lines.slice(1).map((line) => {
     const values = splitLine(line);
     const obj: Record<string, string> = {};
     headers.forEach((h, i) => {
-      obj[h] = values[i] || "";
+      obj[h] = sanitizeCell(values[i] || "");
     });
     return obj;
   });

@@ -65,7 +65,18 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 2, staleTime: 30_000, refetchOnWindowFocus: true },
+    queries: {
+      retry: (failureCount, error: unknown) => {
+        // Don't retry on client errors (4xx)
+        if (error && typeof error === "object" && "status" in error) {
+          const status = (error as { status: number }).status;
+          if (status >= 400 && status < 500) return false;
+        }
+        return failureCount < 2;
+      },
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
+    },
     mutations: {
       retry: 0,
       onError: (error: unknown) => {
