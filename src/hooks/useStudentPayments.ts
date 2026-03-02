@@ -379,7 +379,7 @@ export function computeStudentSummary(
     // Fix 6: Cap billing range at batch end date for completed batches
     let courseEnd = student.course_end_month || currentMonth;
     // If a batchEndDate is provided and the batch is completed or past end date, cap there
-    const endBound = courseEnd < currentMonth ? courseEnd : currentMonth;
+    const endBound = courseEnd;
     let cursor = billingStart;
     while (cursor <= endBound) {
       allMonths.push(cursor);
