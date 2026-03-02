@@ -1,89 +1,43 @@
 
 
-# Fix: Database Trigger "v_batch is not assigned yet"
+## Fix: Students Incorrectly Showing as "Paid" After Enrollment
 
-## Root Cause
+### Root Cause
+The `computeStudentSummary` function in `src/hooks/useStudentPayments.ts` filters out only `cancelled` payments (line 345), but treats everything else -- including `unpaid` schedule rows -- as actual paid money. This means the auto-generated payment schedule (admission + monthly rows with `status: "unpaid"`) gets summed into `admissionPaid`, `totalPaid`, and `monthPaymentTotals`, making every newly enrolled student appear fully paid.
 
-The `validate_student_payment_amount` trigger on `student_payments` declares a `v_batch RECORD` variable but only assigns it when `v_student.batch_id IS NOT NULL`. When a student has no primary `batch_id`, the variable remains unassigned. Later, the trigger references `v_batch.default_admission_fee` and `v_batch.default_monthly_fee` unconditionally, causing the Postgres error:
+### Fix (single file change)
 
-```
-record "v_batch" is not assigned yet
-```
+**File: `src/hooks/useStudentPayments.ts`**
 
-This happens during enrollment because the payment schedule rows are inserted for a student who may not have a primary `batch_id` set yet (the dialog only sets `batch_id` after the payment schedule succeeds).
+Update `computeStudentSummary` to only count payments with `status = 'paid'` or `status = 'partial'` as actual money received:
 
-## Fix
+1. **Line 345** - Keep filtering out cancelled, but also distinguish "paid/partial" from "unpaid" payments:
+   - `activePayments` stays as non-cancelled (for determining which months exist)
+   - Add a new `paidPayments` filter: payments where `status === 'paid' || status === 'partial'`
 
-Run a database migration to replace the trigger function. The fix initializes `v_batch` fields to safe defaults before the conditional assignment:
+2. **Line 347** - `admissionPaid`: sum only from `paidPayments` (not all active)
 
-```sql
-CREATE OR REPLACE FUNCTION validate_student_payment_amount()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_student RECORD;
-  v_total_paid NUMERIC;
-  v_max_allowed NUMERIC;
-  v_month TEXT;
-  v_month_paid NUMERIC;
-  v_batch_admission_fee NUMERIC := 0;
-  v_batch_monthly_fee NUMERIC := 0;
-  v_effective_fee NUMERIC;
-BEGIN
-  SELECT admission_fee_total, monthly_fee_amount, batch_id
-    INTO v_student FROM public.students WHERE id = NEW.student_id;
+3. **Lines 393-399** - `monthPaymentTotals`: only sum amounts from payments that are actually paid/partial
 
-  IF v_student.batch_id IS NOT NULL THEN
-    SELECT COALESCE(default_admission_fee, 0), COALESCE(default_monthly_fee, 0)
-      INTO v_batch_admission_fee, v_batch_monthly_fee
-      FROM public.batches WHERE id = v_student.batch_id;
-  END IF;
+4. **Line 435** - `totalPaid`: sum only from `paidPayments`
 
-  IF NEW.payment_type = 'admission' THEN
-    v_max_allowed := GREATEST(COALESCE(v_student.admission_fee_total, 0), v_batch_admission_fee);
-    IF v_max_allowed > 0 THEN
-      SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
-        FROM public.student_payments
-        WHERE student_id = NEW.student_id
-          AND payment_type = 'admission'
-          AND status != 'cancelled'
-          AND id IS DISTINCT FROM NEW.id;
-      IF v_total_paid + NEW.amount > v_max_allowed THEN
-        RAISE EXCEPTION 'Overpayment: admission fee exceeded. Maximum allowed: %. Already paid: %.',
-          (v_max_allowed - v_total_paid), v_total_paid;
-      END IF;
-    END IF;
-  END IF;
+5. **Line 436** - `monthlyPaidTotal`: sum only from paid/partial monthly payments
 
-  IF NEW.payment_type = 'monthly' AND NEW.months_covered IS NOT NULL AND array_length(NEW.months_covered, 1) > 0 THEN
-    v_effective_fee := GREATEST(COALESCE(v_student.monthly_fee_amount, 0), v_batch_monthly_fee);
-    IF v_effective_fee > 0 THEN
-      FOREACH v_month IN ARRAY NEW.months_covered LOOP
-        SELECT COALESCE(SUM(sp.amount / GREATEST(array_length(sp.months_covered, 1), 1)), 0)
-          INTO v_month_paid
-          FROM public.student_payments sp
-          WHERE sp.student_id = NEW.student_id
-            AND sp.payment_type = 'monthly'
-            AND sp.status != 'cancelled'
-            AND sp.months_covered IS NOT NULL
-            AND v_month = ANY(sp.months_covered)
-            AND sp.id IS DISTINCT FROM NEW.id;
-        IF v_month_paid + (NEW.amount / array_length(NEW.months_covered, 1)) > v_effective_fee THEN
-          RAISE EXCEPTION 'Overpayment: monthly fee for % exceeded. Maximum allowed: %. Already paid: %.',
-            v_month, (v_effective_fee - v_month_paid), v_month_paid;
-        END IF;
-      END LOOP;
-    END IF;
-  END IF;
+### Technical Details
 
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+```text
+Before (broken):
+  activePayments = payments.filter(p => p.status !== "cancelled")
+  admissionPaid = admissionPayments.reduce(sum amounts)  // includes unpaid!
+  totalPaid = activePayments.reduce(sum amounts)          // includes unpaid!
+
+After (fixed):
+  activePayments = payments.filter(p => p.status !== "cancelled")
+  paidPayments = activePayments.filter(p => p.status === "paid" || p.status === "partial")
+  admissionPaid = paidAdmissionPayments.reduce(sum amounts)  // only real payments
+  totalPaid = paidPayments.reduce(sum amounts)               // only real payments
+  monthPaymentTotals uses only paid/partial monthly payments
 ```
 
-### Changes from original:
-1. Replace `v_batch RECORD` with two scalar variables `v_batch_admission_fee` and `v_batch_monthly_fee`, both defaulting to `0`. This eliminates the "not assigned yet" error entirely.
-2. Add `AND status != 'cancelled'` to the overpayment check queries so cancelled payments don't count toward the total (consistent with the cancelled payment filtering from Phase 2).
-
-### No frontend changes needed
-The frontend code is correct. The error originates entirely from the database trigger.
+This is a single-file fix with no database changes needed. The payment schedule rows will correctly remain as "unpaid/pending" in the UI until an actual payment is recorded.
 
