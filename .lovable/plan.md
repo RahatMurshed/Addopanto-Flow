@@ -1,43 +1,64 @@
 
 
-## Fix: Students Incorrectly Showing as "Paid" After Enrollment
+# Fix: Enrollment Fails Due to Cross-Batch Payment Validation
 
-### Root Cause
-The `computeStudentSummary` function in `src/hooks/useStudentPayments.ts` filters out only `cancelled` payments (line 345), but treats everything else -- including `unpaid` schedule rows -- as actual paid money. This means the auto-generated payment schedule (admission + monthly rows with `status: "unpaid"`) gets summed into `admissionPaid`, `totalPaid`, and `monthPaymentTotals`, making every newly enrolled student appear fully paid.
+## Problem
 
-### Fix (single file change)
+The `validate_student_payment_amount` database trigger blocks payment schedule generation when enrolling a student into a second batch. The trigger checks admission/monthly overpayment across **all** batches globally, so existing payments from Batch-1 cause "Overpayment: admission fee exceeded" when creating unpaid schedule rows for Batch-2.
 
-**File: `src/hooks/useStudentPayments.ts`**
+DB error: `Overpayment: admission fee exceeded. Maximum allowed: 0. Already paid: 2500.`
 
-Update `computeStudentSummary` to only count payments with `status = 'paid'` or `status = 'partial'` as actual money received:
+## Root Cause
 
-1. **Line 345** - Keep filtering out cancelled, but also distinguish "paid/partial" from "unpaid" payments:
-   - `activePayments` stays as non-cancelled (for determining which months exist)
-   - Add a new `paidPayments` filter: payments where `status === 'paid' || status === 'partial'`
+The trigger (`validate_student_payment_amount`) has two issues:
+1. It validates **unpaid schedule rows** -- these are just placeholders and should be skipped
+2. It sums admission payments across **all** batch enrollments instead of scoping to the current enrollment
 
-2. **Line 347** - `admissionPaid`: sum only from `paidPayments` (not all active)
+## Solution
 
-3. **Lines 393-399** - `monthPaymentTotals`: only sum amounts from payments that are actually paid/partial
+Modify the `validate_student_payment_amount` trigger to **skip validation entirely when the payment status is 'unpaid'**. Schedule rows (status = 'unpaid') are auto-generated placeholders, not actual payments. Validation should only apply when a payment is being recorded (status = 'paid' or 'partial').
 
-4. **Line 435** - `totalPaid`: sum only from `paidPayments`
+## Changes
 
-5. **Line 436** - `monthlyPaidTotal`: sum only from paid/partial monthly payments
+### 1. Database migration -- Update `validate_student_payment_amount` function
 
-### Technical Details
+Add an early return at the top of the function:
 
-```text
-Before (broken):
-  activePayments = payments.filter(p => p.status !== "cancelled")
-  admissionPaid = admissionPayments.reduce(sum amounts)  // includes unpaid!
-  totalPaid = activePayments.reduce(sum amounts)          // includes unpaid!
-
-After (fixed):
-  activePayments = payments.filter(p => p.status !== "cancelled")
-  paidPayments = activePayments.filter(p => p.status === "paid" || p.status === "partial")
-  admissionPaid = paidAdmissionPayments.reduce(sum amounts)  // only real payments
-  totalPaid = paidPayments.reduce(sum amounts)               // only real payments
-  monthPaymentTotals uses only paid/partial monthly payments
+```sql
+-- Skip validation for unpaid schedule rows (auto-generated placeholders)
+IF NEW.status = 'unpaid' THEN
+  RETURN NEW;
+END IF;
 ```
 
-This is a single-file fix with no database changes needed. The payment schedule rows will correctly remain as "unpaid/pending" in the UI until an actual payment is recorded.
+Additionally, scope the admission overpayment check to the same `batch_enrollment_id` (when present), so payments from one batch don't interfere with another batch's limits:
 
+```sql
+-- When checking admission totals, scope to the same enrollment
+AND (NEW.batch_enrollment_id IS NULL 
+     OR batch_enrollment_id = NEW.batch_enrollment_id)
+```
+
+Same scoping for the monthly fee check.
+
+## Technical Details
+
+- **Security**: No RLS changes needed. The trigger remains SECURITY DEFINER.
+- **Edge cases**: If `batch_enrollment_id` is NULL (legacy payments without enrollment), validation falls back to global scope -- preserving backward compatibility.
+- **No code changes**: Only a single database migration is needed.
+
+## Testing Checklist
+
+| # | Test | Expected Result | Pass |
+|---|------|----------------|------|
+| 1 | Enroll student (with existing Batch-1 payments) into Batch-2 | Enrollment succeeds, schedule rows created | -- |
+| 2 | Record an actual overpayment on a batch | Trigger still blocks the overpayment | -- |
+| 3 | Enroll a fresh student into a batch | Schedule generated normally | -- |
+
+## Files Modified
+
+- New migration SQL file (database trigger update only)
+
+## Rollback Notes
+
+Revert the migration by restoring the original `validate_student_payment_amount` function body (remove the `IF NEW.status = 'unpaid'` early return and the `batch_enrollment_id` scoping).
