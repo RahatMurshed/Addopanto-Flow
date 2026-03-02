@@ -3425,6 +3425,20 @@ export type Database = {
           student_id: string
         }[]
       }
+      get_account_balances: {
+        Args: { p_company_id: string }
+        Returns: {
+          allocation_percentage: number
+          balance: number
+          color: string
+          expected_monthly_expense: number
+          id: string
+          is_active: boolean
+          name: string
+          total_allocated: number
+          total_spent: number
+        }[]
+      }
       get_active_company_id: { Args: { _user_id: string }; Returns: string }
       get_cipher_user_ids: { Args: never; Returns: string[] }
       get_company_members_filtered: {
