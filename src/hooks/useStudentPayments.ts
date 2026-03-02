@@ -338,7 +338,8 @@ export interface StudentSummary {
 export function computeStudentSummary(
   student: { admission_fee_total: number; monthly_fee_amount: number; billing_start_month: string; status: string; course_start_month?: string | null; course_end_month?: string | null },
   payments: StudentPayment[],
-  feeHistory: MonthlyFeeHistory[] = []
+  feeHistory: MonthlyFeeHistory[] = [],
+  companyTimezone?: string | null
 ): StudentSummary {
   // Exclude cancelled payments from all calculations
   const activePayments = payments.filter((p) => p.status !== "cancelled");
@@ -354,8 +355,20 @@ export function computeStudentSummary(
       ? "pending"
       : "paid";
 
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  // Issue 3.4: Use company timezone for current month if available
+  let currentMonth: string;
+  if (companyTimezone) {
+    try {
+      const tzNow = new Date(new Date().toLocaleString("en-US", { timeZone: companyTimezone }));
+      currentMonth = `${tzNow.getFullYear()}-${String(tzNow.getMonth() + 1).padStart(2, "0")}`;
+    } catch {
+      const now = new Date();
+      currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    }
+  } else {
+    const now = new Date();
+    currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
   const billingStart = student.billing_start_month;
 
   const allMonths: string[] = [];
