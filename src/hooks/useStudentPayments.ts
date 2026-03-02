@@ -343,8 +343,10 @@ export function computeStudentSummary(
 ): StudentSummary {
   // Exclude cancelled payments from all calculations
   const activePayments = payments.filter((p) => p.status !== "cancelled");
+  const paidPayments = activePayments.filter((p) => p.status === "paid" || p.status === "partial");
   const admissionPayments = activePayments.filter((p) => p.payment_type === "admission");
-  const admissionPaid = admissionPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const paidAdmissionPayments = paidPayments.filter((p) => p.payment_type === "admission");
+  const admissionPaid = paidAdmissionPayments.reduce((s, p) => s + Number(p.amount), 0);
   const admissionTotal = Number(student.admission_fee_total);
   const admissionStatus: "paid" | "partial" | "pending" =
     admissionPaid >= admissionTotal && admissionTotal > 0
@@ -388,10 +390,11 @@ export function computeStudentSummary(
   }
 
   const monthlyPayments = activePayments.filter((p) => p.payment_type === "monthly");
+  const paidMonthlyPayments = paidPayments.filter((p) => p.payment_type === "monthly");
   const paidMonthsSet = new Set<string>();
   
   const monthPaymentTotals = new Map<string, number>();
-  for (const p of monthlyPayments) {
+  for (const p of paidMonthlyPayments) {
     if (p.months_covered) {
       for (const m of p.months_covered) {
         monthPaymentTotals.set(m, (monthPaymentTotals.get(m) || 0) + Number(p.amount) / p.months_covered.length);
@@ -432,8 +435,8 @@ export function computeStudentSummary(
     }
   }
 
-  const totalPaid = activePayments.reduce((s, p) => s + Number(p.amount), 0);
-  const monthlyPaidTotal = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaid = paidPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const monthlyPaidTotal = paidMonthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
   let monthlyPendingTotal = 0;
   for (const m of [...monthlyPartialMonths, ...monthlyOverdueMonths, ...monthlyPendingMonths]) {
     const fee = getFeeForMonth(m);
