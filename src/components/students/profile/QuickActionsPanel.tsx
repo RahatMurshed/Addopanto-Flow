@@ -139,8 +139,19 @@ export function QuickActionsPanel({
       }
 
       // If reactivating, restore inactive enrollments whose batch is still active
+      // and reverse cancelled payments
       let restoredCount = 0;
       if (pendingStatus === "active" && ["inactive", "dropout"].includes(student.status)) {
+        // Reverse cancellation: restore future cancelled payments back to unpaid
+        const today = new Date().toISOString().split("T")[0];
+        await supabase
+          .from("student_payments")
+          .update({ status: "unpaid" } as any)
+          .eq("student_id", student.id)
+          .eq("company_id", companyId)
+          .eq("status", "cancelled")
+          .gt("due_date", today);
+
         const { data: inactiveEnrollments } = await supabase
           .from("batch_enrollments")
           .select("id, batch_id, updated_at, batches!inner(status)")

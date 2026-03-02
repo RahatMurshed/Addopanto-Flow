@@ -226,8 +226,10 @@ export function FinancialBreakdown({ studentId, companyId, initialTab }: Financi
   }, [data]);
 
   const summaryData = useMemo(() => {
-    const totalCourseFee = coursePayments.reduce((sum, p) => sum + p.amount, 0);
-    const totalCoursePaid = coursePayments
+    // Exclude cancelled payments from financial totals
+    const activeCoursePayments = coursePayments.filter((p) => p.status !== "cancelled");
+    const totalCourseFee = activeCoursePayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalCoursePaid = activeCoursePayments
       .filter((p) => p.status === "paid")
       .reduce((sum, p) => sum + p.amount, 0);
     const totalCourseOutstanding = Math.max(0, totalCourseFee - totalCoursePaid);
@@ -236,7 +238,7 @@ export function FinancialBreakdown({ studentId, companyId, initialTab }: Financi
     const totalPaid = totalCoursePaid + totalProductsSpent;
     const totalOutstanding = totalCourseOutstanding;
 
-    const lastPaid = coursePayments
+    const lastPaid = activeCoursePayments
       .filter((p) => p.status === "paid")
       .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0];
 

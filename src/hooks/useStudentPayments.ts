@@ -340,7 +340,9 @@ export function computeStudentSummary(
   payments: StudentPayment[],
   feeHistory: MonthlyFeeHistory[] = []
 ): StudentSummary {
-  const admissionPayments = payments.filter((p) => p.payment_type === "admission");
+  // Exclude cancelled payments from all calculations
+  const activePayments = payments.filter((p) => p.status !== "cancelled");
+  const admissionPayments = activePayments.filter((p) => p.payment_type === "admission");
   const admissionPaid = admissionPayments.reduce((s, p) => s + Number(p.amount), 0);
   const admissionTotal = Number(student.admission_fee_total);
   const admissionStatus: "paid" | "partial" | "pending" =
@@ -372,7 +374,7 @@ export function computeStudentSummary(
     }
   }
 
-  const monthlyPayments = payments.filter((p) => p.payment_type === "monthly");
+  const monthlyPayments = activePayments.filter((p) => p.payment_type === "monthly");
   const paidMonthsSet = new Set<string>();
   
   const monthPaymentTotals = new Map<string, number>();
@@ -417,7 +419,7 @@ export function computeStudentSummary(
     }
   }
 
-  const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaid = activePayments.reduce((s, p) => s + Number(p.amount), 0);
   const monthlyPaidTotal = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
   let monthlyPendingTotal = 0;
   for (const m of [...monthlyPartialMonths, ...monthlyOverdueMonths, ...monthlyPendingMonths]) {
