@@ -397,7 +397,9 @@ export default function Expenses() {
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Create expense sources first before recording expenses.
+            {isModerator
+              ? "No expense sources have been configured yet. Ask your admin to set up expense sources before you can record expenses."
+              : "Create expense sources first before recording expenses."}
           </AlertDescription>
         </Alert>
       )}
