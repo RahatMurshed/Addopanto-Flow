@@ -1,38 +1,30 @@
 
 
-# Fix: Payment History Date Column Should Show `created_at` Instead of `payment_date`
+## Fix: DEO Can't Add Expenses — No Expense Sources in Company
 
-## Problem
+### What's Happening
 
-The Payment History table's Date column currently displays `payment_date` (which is the due date set during schedule generation). The user wants it to show `created_at` -- the actual timestamp when the payment record was created/recorded.
+The Data Entry Operator (DEO) has the correct "Add Expenses" permission (`deo_finance = true`). The problem is **the company has no expense sources (accounts) configured**. Without at least one expense source, the "Add Expense" button is disabled for everyone — including admins.
 
-## Current State
+The current alert says "Create expense sources first before recording expenses" but the DEO has no ability to create expense sources (that's admin-only). This creates a confusing experience.
 
-- `src/pages/StudentDetail.tsx` line 656: displays `p.payment_date`
-- Lines 145-152: sorting also uses `payment_date`
+### What Needs to Happen
 
-## Changes
+**Step 1 (Admin action needed):** An admin must go to the **Expense Sources** page (`/khatas`) and create at least one expense account/source. This is required before anyone can record expenses.
 
-### 1. `src/pages/StudentDetail.tsx` -- Display and sort by `created_at`
+**Step 2 (Code fix):** Improve the empty-state message on the Expenses page so DEO moderators see a more helpful message instead of being told to create something they can't.
 
-- **Line 656**: Change `p.payment_date` to `p.created_at` for the Date column display
-- **Lines 147-151**: Update all sorting references from `payment_date` to `created_at`
-- **Line 715**: Update the payment notes timeline sorting from `payment_date` to `created_at`
+### Code Change
 
-## Technical Details
+**File: `src/pages/Expenses.tsx`** — Update the "no accounts" alert to show a different message for moderators:
 
-- The `student_payments` table has a `created_at` column (timestamp with time zone, default `now()`)
-- The `StudentPayment` interface in `useStudentPayments.ts` already includes `created_at: string`
-- No database changes needed
+- Current: "Create expense sources first before recording expenses."
+- For moderators: "No expense sources have been configured yet. Ask your admin to set up expense sources before you can record expenses."
+- For admins: Keep the current message with a link/suggestion to go to Expense Sources.
 
-## Testing Checklist
+### Summary
 
-| # | Test | Expected Result | Pass |
-|---|------|----------------|------|
-| 1 | View Payment History on a student detail page | Date column shows the record creation date, not the due date | -- |
-| 2 | Sort by Date Newest / Date Oldest | Payments sort by `created_at` | -- |
-
-## Files Modified
-
-- `src/pages/StudentDetail.tsx`
-
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| "Add Expense" button disabled | Company has 0 expense accounts | Admin must create expense accounts first |
+| Confusing alert for DEO | Same message shown to all roles | Show role-appropriate message |
