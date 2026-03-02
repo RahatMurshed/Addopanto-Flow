@@ -22,15 +22,38 @@ export async function syncBatchEnrollment(
   // No change
   if (oldId === newId) return;
 
-  // Archive old enrollment as "transferred" instead of deleting (Issue 1.3)
+  // Cancel future unpaid payments then delete old enrollment (Issue 1.3)
   if (oldId) {
-    await supabase
+    // Get enrollment IDs before deleting, to cancel linked future payments
+    const { data: oldEnrollments } = await supabase
       .from("batch_enrollments")
-      .update({ status: "transferred" } as any)
+      .select("id")
       .eq("student_id", studentId)
       .eq("batch_id", oldId)
       .eq("company_id", companyId)
       .eq("status", "active");
+
+    if (oldEnrollments && oldEnrollments.length > 0) {
+      const enrollmentIds = oldEnrollments.map(e => e.id);
+      const today = format(new Date(), "yyyy-MM-dd");
+
+      // Cancel future unpaid payment rows before deleting enrollment
+      await supabase
+        .from("student_payments")
+        .update({ status: "cancelled" } as any)
+        .in("batch_enrollment_id", enrollmentIds)
+        .eq("status", "unpaid")
+        .gt("due_date", today);
+
+      // Delete the old enrollment (original behavior)
+      await supabase
+        .from("batch_enrollments")
+        .delete()
+        .eq("student_id", studentId)
+        .eq("batch_id", oldId)
+        .eq("company_id", companyId)
+        .eq("status", "active");
+    }
   }
 
   // Create new active enrollment (check batch status first - Issue 2.2)

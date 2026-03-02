@@ -36,6 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
   paid: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   partial: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   unpaid: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  cancelled: "bg-muted text-muted-foreground",
 };
 
 const PAGE_SIZE = 10;
@@ -166,35 +167,38 @@ export function CoursePaymentsTab({ payments, userMap, fc, isAdmin, isLoading }:
           </thead>
           <tbody>
             {pageData.map((p) => {
-              const isOverdue = p.status !== "paid" && isBefore(new Date(p.due_date), today);
-              const rowBg = p.status === "paid"
-                ? "bg-green-50/30 dark:bg-green-900/10"
-                : isOverdue
-                  ? "bg-red-50/30 dark:bg-red-900/10"
-                  : p.status === "partial"
-                    ? "bg-yellow-50/30 dark:bg-yellow-900/10"
-                    : "";
+              const isCancelled = p.status === "cancelled";
+              const isOverdue = !isCancelled && p.status !== "paid" && isBefore(new Date(p.due_date), today);
+              const rowBg = isCancelled
+                ? "bg-muted/30"
+                : p.status === "paid"
+                  ? "bg-green-50/30 dark:bg-green-900/10"
+                  : isOverdue
+                    ? "bg-red-50/30 dark:bg-red-900/10"
+                    : p.status === "partial"
+                      ? "bg-yellow-50/30 dark:bg-yellow-900/10"
+                      : "";
 
               return (
                 <tr key={p.id} className={cn("border-b border-border last:border-0", rowBg)}>
                   <td className="p-3">
-                    <div className="font-medium text-foreground">{p.courseName}</div>
-                    <div className="text-xs text-muted-foreground">{p.batchName}</div>
+                    <div className={cn("font-medium text-foreground", isCancelled && "line-through text-muted-foreground")}>{p.courseName}</div>
+                    <div className={cn("text-xs text-muted-foreground", isCancelled && "line-through")}>{p.batchName}</div>
                   </td>
-                  <td className={cn("p-3 text-sm", isOverdue && "text-red-600 dark:text-red-400 font-medium")}>
+                  <td className={cn("p-3 text-sm", isCancelled && "line-through text-muted-foreground", isOverdue && "text-red-600 dark:text-red-400 font-medium")}>
                     {format(new Date(p.due_date), "MMM d, yyyy")}
                   </td>
-                  <td className="p-3 text-right font-medium text-foreground">{fc(p.amount)}</td>
+                  <td className={cn("p-3 text-right font-medium text-foreground", isCancelled && "line-through text-muted-foreground")}>{fc(p.amount)}</td>
                   <td className="p-3 text-center">
                     <Badge className={cn("text-xs rounded-full border-0 capitalize", STATUS_STYLES[p.status] ?? STATUS_STYLES.unpaid)}>
-                      {p.status}
+                      {isCancelled ? "Cancelled" : p.status}
                     </Badge>
                   </td>
                   <td className="p-3 text-sm text-muted-foreground">
-                    {p.status !== "unpaid" ? format(new Date(p.payment_date), "MMM d, yyyy") : "—"}
+                    {!isCancelled && p.status !== "unpaid" ? format(new Date(p.payment_date), "MMM d, yyyy") : "—"}
                   </td>
                   <td className="p-3 text-sm text-muted-foreground capitalize">
-                    {p.status !== "unpaid" ? p.payment_method : "—"}
+                    {!isCancelled && p.status !== "unpaid" ? p.payment_method : "—"}
                   </td>
                   <td className="p-3 text-sm text-muted-foreground hidden md:table-cell">
                     {userMap.get(p.user_id) ?? "—"}
