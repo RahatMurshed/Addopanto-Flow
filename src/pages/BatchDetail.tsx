@@ -334,9 +334,52 @@ export default function BatchDetail() {
 
   const handleUpdate = async (data: BatchInsert) => {
     if (!batch) return;
+    const oldMonthlyFee = Number(batch.default_monthly_fee) || 0;
+    const newMonthlyFee = Number(data.default_monthly_fee) || 0;
     try {
       await updateMutation.mutateAsync({ id: batch.id, ...data });
-      toast({ title: "Batch updated" });
+      // Issue 3.2: If monthly fee changed, offer to propagate to unpaid rows
+      if (oldMonthlyFee !== newMonthlyFee && newMonthlyFee > 0) {
+        toast({
+          title: "Batch updated",
+          description: `Monthly fee changed from ${formatCurrency(oldMonthlyFee)} to ${formatCurrency(newMonthlyFee)}. Update unpaid payment rows?`,
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  // Get all active enrollment IDs for this batch
+                  const { data: enrollments } = await supabase
+                    .from("batch_enrollments")
+                    .select("id")
+                    .eq("batch_id", batch.id)
+                    .eq("status", "active");
+                  if (enrollments && enrollments.length > 0) {
+                    const enrollmentIds = enrollments.map(e => e.id);
+                    const { error } = await supabase
+                      .from("student_payments")
+                      .update({ amount: newMonthlyFee })
+                      .in("batch_enrollment_id", enrollmentIds)
+                      .eq("status", "unpaid")
+                      .eq("payment_type", "monthly");
+                    if (error) throw error;
+                    queryClient.invalidateQueries({ queryKey: ["student_payments"] });
+                    toast({ title: "Unpaid payment rows updated to new fee" });
+                  }
+                } catch (err: any) {
+                  toast({ title: "Error updating payments", description: err.message, variant: "destructive" });
+                }
+              }}
+            >
+              Update
+            </Button>
+          ),
+          duration: 15000,
+        });
+      } else {
+        toast({ title: "Batch updated" });
+      }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;

@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Loader2, Info } from "lucide-react";
+import { CalendarIcon, Loader2, Info, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useRevenueSources, useCreateRevenueSource } from "@/hooks/useRevenueSources";
@@ -388,6 +388,9 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
     return format(date, "MMM yyyy");
   };
 
+  // Issue 3.1: Warn if payment date is before enrollment date
+  const isBeforeEnrollment = selectedDate && student.enrollment_date ? selectedDate < student.enrollment_date : false;
+
   const handleSubmit = async (data: PaymentFormData) => {
     // Fix 4: Warn before recording payment for inactive students
     if (isInactiveStudent && !pendingSubmitData) {
@@ -429,6 +432,15 @@ export default function StudentPaymentDialog({ open, onOpenChange, student, summ
         )}
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          {/* Issue 3.1: Pre-enrollment payment warning */}
+          {isBeforeEnrollment && (
+            <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+              <span className="text-yellow-700 dark:text-yellow-300">
+                Payment date ({selectedDate}) is before enrollment date ({student.enrollment_date}). This is unusual — please verify.
+              </span>
+            </div>
+          )}
           {/* Batch Enrollment Selector */}
           {enrollments.length >= 1 && (
             <div className="space-y-2">
