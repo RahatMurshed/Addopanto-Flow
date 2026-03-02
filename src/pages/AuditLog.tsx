@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { useAuditLogs } from "@/hooks/useAuditLogs";
 import { format } from "date-fns";
 import { UserAvatar } from "@/components/auth/UserAvatar";
@@ -184,13 +185,14 @@ function getEntityLink(log: AuditLogType): string | null {
   }
 }
 
-function getDescription(log: AuditLogType): string {
+function getDescription(log: AuditLogType, fc?: (amount: number) => string): string {
   const d = log.new_data || log.old_data;
   if (!d) return "";
+  const fmtAmt = (v: unknown) => fc && typeof v === "number" ? fc(v) : typeof v === "number" ? String(v) : String(v);
   if (log.table_name === "student_payments") {
     const parts: string[] = [];
     if (d.payment_type) parts.push(`Type: ${d.payment_type === "admission" ? "Admission Fee" : "Monthly Fee"}`);
-    if (d.amount) parts.push(`Amount: ${d.amount}`);
+    if (d.amount) parts.push(`Amount: ${fmtAmt(d.amount)}`);
     if (d.months_covered && Array.isArray(d.months_covered) && (d.months_covered as string[]).length > 0) {
       parts.push(`Months: ${(d.months_covered as string[]).join(", ")}`);
     }
@@ -204,10 +206,10 @@ function getDescription(log: AuditLogType): string {
     return parts.join(" · ");
   }
   if (log.table_name === "expenses" && d.amount) {
-    return `Amount: ${d.amount}${d.description ? ` — ${d.description}` : ""}`;
+    return `Amount: ${fmtAmt(d.amount)}${d.description ? ` — ${d.description}` : ""}`;
   }
   if (log.table_name === "khata_transfers" && d.amount) {
-    return `Amount: ${d.amount}${d.description ? ` — ${d.description}` : ""}`;
+    return `Amount: ${fmtAmt(d.amount)}${d.description ? ` — ${d.description}` : ""}`;
   }
   if (log.table_name === "company_memberships") {
     const parts: string[] = [];
@@ -354,13 +356,23 @@ function getDescription(log: AuditLogType): string {
   return "";
 }
 
-function formatValue(val: unknown): string {
+function formatValue(val: unknown, key?: string, fc?: (amount: number) => string): string {
   if (val === null || val === undefined) return "—";
+  if (key && fc && MONETARY_FIELDS.has(key) && typeof val === "number") return fc(val);
   if (typeof val === "object") return JSON.stringify(val);
   return String(val);
 }
 
 const HIDDEN_FIELDS = new Set(["id", "user_id", "company_id", "created_at", "updated_at"]);
+
+const MONETARY_FIELDS = new Set([
+  "amount", "monthly_fee", "admission_fee", "total_paid", "balance",
+  "expected_monthly_expense", "price", "purchase_price", "sale_price",
+  "total_amount", "unit_price", "monthly_salary", "net_amount",
+  "loan_amount", "remaining_balance", "total_repayable", "interest_amount",
+  "investment_amount", "cost_price", "default_admission_fee", "default_monthly_fee",
+  "total_fee", "monthly_amount", "amount_paid", "deductions",
+]);
 
 /* ── Diff View ── */
 
@@ -393,11 +405,12 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
 
 const BOOLEAN_FIELD_TABLES = new Set(["company_memberships", "moderator_permissions"]);
 
-function formatFieldValue(val: unknown, key: string, tableName?: string): string {
+function formatFieldValue(val: unknown, key: string, tableName?: string, fc?: (amount: number) => string): string {
   if (val === null || val === undefined) return "—";
   if (tableName && BOOLEAN_FIELD_TABLES.has(tableName) && typeof val === "boolean") {
     return val ? "✅ Enabled" : "❌ Disabled";
   }
+  if (fc && MONETARY_FIELDS.has(key) && typeof val === "number") return fc(val);
   if (typeof val === "object") return JSON.stringify(val);
   return String(val);
 }
@@ -407,7 +420,7 @@ function getFieldLabel(key: string, tableName?: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function DiffView({ oldData, newData, tableName }: { oldData: Record<string, unknown>; newData: Record<string, unknown>; tableName?: string }) {
+function DiffView({ oldData, newData, tableName, fc }: { oldData: Record<string, unknown>; newData: Record<string, unknown>; tableName?: string; fc?: (amount: number) => string }) {
   const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)]));
   const changed: { key: string; old: unknown; new: unknown }[] = [];
 
@@ -465,11 +478,11 @@ function DiffView({ oldData, newData, tableName }: { oldData: Record<string, unk
                   <div className="flex flex-col gap-1">
                     <div className="flex items-start gap-2 text-xs rounded px-2 py-1 bg-destructive/10">
                       <Minus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
-                      <span className="break-all">{formatFieldValue(oldVal, key, tableName)}</span>
+                      <span className="break-all">{formatFieldValue(oldVal, key, tableName, fc)}</span>
                     </div>
                     <div className="flex items-start gap-2 text-xs rounded px-2 py-1 bg-emerald-500/10">
                       <Plus className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-500" />
-                      <span className="break-all">{formatFieldValue(newVal, key, tableName)}</span>
+                      <span className="break-all">{formatFieldValue(newVal, key, tableName, fc)}</span>
                     </div>
                   </div>
                 </div>
@@ -488,7 +501,7 @@ function DiffView({ oldData, newData, tableName }: { oldData: Record<string, unk
                 <div key={key} className={`flex gap-2 text-xs py-0.5 px-1 rounded ${isChanged ? "bg-accent" : ""}`}>
                   {isChanged && <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />}
                   <span className={`font-mono min-w-[140px] ${isChanged ? "text-primary font-medium" : "text-muted-foreground"}`}>{getFieldLabel(key, tableName)}:</span>
-                  <span className="text-foreground break-all">{formatFieldValue(val, key, tableName)}</span>
+                  <span className="text-foreground break-all">{formatFieldValue(val, key, tableName, fc)}</span>
                 </div>
               );
             })}
@@ -501,7 +514,7 @@ function DiffView({ oldData, newData, tableName }: { oldData: Record<string, unk
 
 /* ── Data View (INSERT / DELETE) ── */
 
-function DataView({ data, variant }: { data: Record<string, unknown>; variant: "added" | "removed" }) {
+function DataView({ data, variant, fc }: { data: Record<string, unknown>; variant: "added" | "removed"; fc?: (amount: number) => string }) {
   const Icon = variant === "added" ? Plus : Minus;
   const iconColor = variant === "added" ? "text-emerald-500" : "text-destructive";
   const entries = Object.entries(data).filter(([k]) => !HIDDEN_FIELDS.has(k));
@@ -513,7 +526,7 @@ function DataView({ data, variant }: { data: Record<string, unknown>; variant: "
           <div key={key} className="flex gap-2 text-xs py-0.5">
             <Icon className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${iconColor}`} />
             <span className="font-mono text-muted-foreground min-w-[140px]">{key}:</span>
-            <span className="text-foreground break-all">{formatValue(val)}</span>
+            <span className="text-foreground break-all">{formatValue(val, key, fc)}</span>
           </div>
         ))}
       </div>
@@ -527,6 +540,7 @@ export default function AuditLog() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isCompanyAdmin, isCipher, isLoading: companyLoading, activeCompanyId } = useCompany();
+  const { fc } = useCompanyCurrency();
 
   const [tableFilter, setTableFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
@@ -899,7 +913,7 @@ export default function AuditLog() {
                       const { label: actionLabel, color: actionColor } = getActionLabel(log.table_name, log.action, log);
                       const entityName = getEntityName(log, studentNameMap);
                       const entityLink = getEntityLink(log);
-                      const desc = getDescription(log);
+                      const desc = getDescription(log, fc);
 
                       return (
                         <TableRow key={log.id} className={`group ${selectedIds.has(log.id) ? "bg-destructive/5" : ""}`}>
@@ -1011,10 +1025,10 @@ export default function AuditLog() {
               </div>
 
               {/* Description */}
-              {getDescription(detail) && (
+              {getDescription(detail, fc) && (
                 <div className="rounded-md border bg-primary/5 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Summary</p>
-                  <p className="text-sm">{getDescription(detail)}</p>
+                  <p className="text-sm">{getDescription(detail, fc)}</p>
                 </div>
               )}
 
@@ -1022,17 +1036,17 @@ export default function AuditLog() {
               {detail.action === "UPDATE" && detail.old_data && detail.new_data ? (
                 <div>
                   <p className="font-medium mb-2">Before → After</p>
-                  <DiffView oldData={detail.old_data} newData={detail.new_data} tableName={detail.table_name} />
+                  <DiffView oldData={detail.old_data} newData={detail.new_data} tableName={detail.table_name} fc={fc} />
                 </div>
               ) : detail.action === "INSERT" && detail.new_data ? (
                 <div>
                   <p className="font-medium mb-2">Created Data</p>
-                  <DataView data={detail.new_data} variant="added" />
+                  <DataView data={detail.new_data} variant="added" fc={fc} />
                 </div>
               ) : detail.action === "DELETE" && detail.old_data ? (
                 <div>
                   <p className="font-medium mb-2">Deleted Data</p>
-                  <DataView data={detail.old_data} variant="removed" />
+                  <DataView data={detail.old_data} variant="removed" fc={fc} />
                 </div>
               ) : null}
             </div>
