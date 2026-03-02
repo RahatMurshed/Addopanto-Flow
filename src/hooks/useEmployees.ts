@@ -263,6 +263,19 @@ export function useCreateSalaryPayment() {
 
       const { expense_account_id, employee_name, ...salaryData } = payment;
 
+      // Issue 1.6: Block duplicate month salary
+      const { data: existingSalary } = await supabase
+        .from("employee_salary_payments" as any)
+        .select("id")
+        .eq("employee_id", payment.employee_id)
+        .eq("month", payment.month)
+        .eq("company_id", activeCompanyId)
+        .limit(1);
+
+      if (existingSalary && existingSalary.length > 0) {
+        throw new Error(`Salary for ${payment.month} has already been recorded for this employee.`);
+      }
+
       // 1. Create salary payment
       const { data: salaryRecord, error: salaryError } = await supabase
         .from("employee_salary_payments" as any)

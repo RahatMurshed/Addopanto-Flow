@@ -15,10 +15,10 @@ import { Button } from "@/components/ui/button";
 import SearchBar from "@/components/shared/SearchBar";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, Search, ClipboardList, Plus, Minus, ArrowRight, Download, Trash2, AlertTriangle } from "lucide-react";
+
+import { Eye, Search, ClipboardList, Plus, Minus, ArrowRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import TablePagination from "@/components/shared/TablePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -550,32 +550,7 @@ export default function AuditLog() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [detail, setDetail] = useState<AuditLogType | null>(null);
 
-  // Bulk selection (Cipher only)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleSelectAll = useCallback((logs: AuditLogType[]) => {
-    setSelectedIds(prev => {
-      const allOnPage = logs.map(l => l.id);
-      const allSelected = allOnPage.every(id => prev.has(id));
-      if (allSelected) {
-        const next = new Set(prev);
-        allOnPage.forEach(id => next.delete(id));
-        return next;
-      }
-      return new Set([...prev, ...allOnPage]);
-    });
-  }, []);
+  // Audit logs are now immutable — bulk delete removed (Issue 1.8)
 
   useEffect(() => {
     if (!companyLoading && !isCompanyAdmin && !isCipher) {
@@ -768,32 +743,7 @@ export default function AuditLog() {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (deleteConfirmText !== "DELETE" || selectedIds.size === 0) return;
-    setIsDeleting(true);
-    try {
-      const idsToDelete = [...selectedIds];
-      // Delete in batches of 100
-      for (let i = 0; i < idsToDelete.length; i += 100) {
-        const batch = idsToDelete.slice(i, i + 100);
-        const { error } = await supabase
-          .from("audit_logs" as any)
-          .delete()
-          .in("id", batch);
-        if (error) throw error;
-      }
-      toast.success(`Deleted ${idsToDelete.length} audit ${idsToDelete.length === 1 ? "entry" : "entries"}`);
-      setSelectedIds(new Set());
-      setShowDeleteDialog(false);
-      setDeleteConfirmText("");
-      queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-    } catch (err) {
-      logger.error("Delete failed:", err);
-      toast.error("Failed to delete audit logs. Only platform admins can perform this action.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  // Audit log deletion removed — logs are now immutable (Issue 1.8)
 
   return (
     <div className="space-y-6">
@@ -806,17 +756,6 @@ export default function AuditLog() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isCipher && selectedIds.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete ({selectedIds.size})
-            </Button>
-          )}
           <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCSV} disabled={isExporting || totalCount === 0}>
             <Download className="h-4 w-4" />
             {isExporting ? "Exporting..." : "Export CSV"}
@@ -890,15 +829,6 @@ export default function AuditLog() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {isCipher && (
-                        <TableHead className="w-[40px]">
-                          <Checkbox
-                            checked={logs.length > 0 && logs.every(l => selectedIds.has(l.id))}
-                            onCheckedChange={() => toggleSelectAll(logs)}
-                            aria-label="Select all"
-                          />
-                        </TableHead>
-                      )}
                       <TableHead className="w-[150px]">Timestamp</TableHead>
                       <TableHead>Performed By</TableHead>
                       <TableHead>Action</TableHead>
@@ -916,16 +846,7 @@ export default function AuditLog() {
                       const desc = getDescription(log, fc);
 
                       return (
-                        <TableRow key={log.id} className={`group ${selectedIds.has(log.id) ? "bg-destructive/5" : ""}`}>
-                          {isCipher && (
-                            <TableCell>
-                              <Checkbox
-                                checked={selectedIds.has(log.id)}
-                                onCheckedChange={() => toggleSelect(log.id)}
-                                aria-label={`Select audit entry ${log.id}`}
-                              />
-                            </TableCell>
-                          )}
+                        <TableRow key={log.id} className="group">
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                             {format(new Date(log.created_at), "MMM dd, yyyy")}
                             <br />
@@ -1054,52 +975,6 @@ export default function AuditLog() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={(o) => { if (!o) { setShowDeleteDialog(false); setDeleteConfirmText(""); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Delete Audit Entries
-            </DialogTitle>
-            <DialogDescription>
-              You are about to permanently delete <strong>{selectedIds.size}</strong> audit {selectedIds.size === 1 ? "entry" : "entries"}. This action cannot be undone and will remove the historical record of these business actions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-              <p className="text-sm font-medium text-destructive mb-1">⚠️ Irreversible Action</p>
-              <p className="text-xs text-muted-foreground">
-                Deleted audit entries cannot be recovered. Ensure you have exported a backup if needed.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm:
-              </label>
-              <Input
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder="Type DELETE to confirm"
-                className="font-mono"
-                autoComplete="off"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setDeleteConfirmText(""); }} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleBulkDelete}
-              disabled={deleteConfirmText !== "DELETE" || isDeleting}
-            >
-              {isDeleting ? "Deleting..." : `Delete ${selectedIds.size} ${selectedIds.size === 1 ? "Entry" : "Entries"}`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

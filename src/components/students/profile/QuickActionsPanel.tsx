@@ -102,7 +102,7 @@ export function QuickActionsPanel({
         .eq("id", student.id);
       if (error) throw error;
 
-      // If setting inactive/dropout, also deactivate active enrollments
+      // If setting inactive/dropout, deactivate active enrollments & cancel future unpaid payments
       if (["inactive", "dropout"].includes(pendingStatus)) {
         await supabase
           .from("batch_enrollments")
@@ -110,6 +110,32 @@ export function QuickActionsPanel({
           .eq("student_id", student.id)
           .eq("company_id", companyId)
           .eq("status", "active");
+
+        // Cancel future unpaid payment rows (Issue 1.1 / 2.1)
+        const today = new Date().toISOString().split("T")[0];
+        await supabase
+          .from("student_payments")
+          .update({ status: "cancelled" } as any)
+          .eq("student_id", student.id)
+          .eq("company_id", companyId)
+          .eq("status", "unpaid")
+          .gt("due_date", today);
+      }
+
+      // If graduated, complete active enrollments (Issue 1.2)
+      if (pendingStatus === "graduated") {
+        await supabase
+          .from("batch_enrollments")
+          .update({ status: "completed" } as any)
+          .eq("student_id", student.id)
+          .eq("company_id", companyId)
+          .eq("status", "active");
+
+        // Clear batch_id on the student record
+        await supabase
+          .from("students")
+          .update({ batch_id: null } as any)
+          .eq("id", student.id);
       }
 
       // If reactivating, restore inactive enrollments whose batch is still active

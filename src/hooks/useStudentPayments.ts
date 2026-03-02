@@ -90,11 +90,26 @@ export function useCreateStudentPayment() {
       if (!activeCompanyId) throw new Error("No active company");
       const { studentName, source_id, due_date, batch_enrollment_id, ...paymentData } = payment;
 
-      // If monthly payment with months_covered, check for existing unpaid schedule rows
+      // If monthly payment with months_covered, check for existing rows
       if (paymentData.payment_type === "monthly" && paymentData.months_covered && paymentData.months_covered.length > 0) {
+        // Issue 1.2: Block double payment for already-paid months
+        const { data: paidRows } = await supabase
+          .from("student_payments")
+          .select("id, months_covered")
+          .eq("student_id", paymentData.student_id)
+          .eq("company_id", activeCompanyId)
+          .eq("payment_type", "monthly")
+          .eq("status", "paid");
+
+        const alreadyPaidMonths = (paidRows || []).flatMap(r => r.months_covered || []);
+        const duplicateMonths = paymentData.months_covered.filter(m => alreadyPaidMonths.includes(m));
+        if (duplicateMonths.length > 0) {
+          throw new Error(`Payment already recorded for ${duplicateMonths.join(", ")}. Cannot record duplicate payment.`);
+        }
+
         const { data: existingRows } = await supabase
           .from("student_payments")
-          .select("id, months_covered, amount, status")
+          .select("id, months_covered, amount, status, due_date")
           .eq("student_id", paymentData.student_id)
           .eq("company_id", activeCompanyId)
           .eq("payment_type", "monthly")
@@ -106,22 +121,23 @@ export function useCreateStudentPayment() {
         );
 
         if (matchingRows.length > 0) {
-          // Update existing unpaid/partial rows — determine partial vs paid
-          for (const row of matchingRows) {
-            // Calculate the per-row payment amount based on months covered
-            const rowPayment = paymentData.amount / paymentData.months_covered!.length * (row.months_covered?.length || 1);
-            // Get the original scheduled amount (the amount on the unpaid row represents the expected due)
+          // Issue 2.5: Waterfall distribution — sort by due_date, fill earliest first
+          const sorted = [...matchingRows].sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""));
+          let remaining = paymentData.amount;
+
+          for (const row of sorted) {
+            if (remaining <= 0) break;
             const originalDue = row.status === "unpaid" ? Number(row.amount) : 0;
-            // For partial rows, the original due is already partially paid, so we just add
-            const newStatus = (row.status === "unpaid" && rowPayment < originalDue && originalDue > 0)
-              ? "partial"
-              : "paid";
+            const applied = Math.min(remaining, originalDue > 0 ? originalDue : remaining);
+            remaining -= applied;
+
+            const newStatus = (originalDue > 0 && applied < originalDue) ? "partial" : "paid";
 
             await supabase
               .from("student_payments")
               .update({
                 status: newStatus,
-                amount: rowPayment,
+                amount: applied,
                 payment_date: paymentData.payment_date,
                 payment_method: paymentData.payment_method,
                 receipt_number: paymentData.receipt_number || null,
@@ -136,7 +152,7 @@ export function useCreateStudentPayment() {
           const { data: updated } = await supabase
             .from("student_payments")
             .select("*")
-            .eq("id", matchingRows[0].id)
+            .eq("id", sorted[0].id)
             .single();
           return updated as StudentPayment;
         }
