@@ -1,64 +1,42 @@
 
 
-# Fix: Enrollment Fails Due to Cross-Batch Payment Validation
+## Fix: Monthly Fee Breakdown Only Shows Current Month Instead of Full Duration
 
-## Problem
+### Root Cause
 
-The `validate_student_payment_amount` database trigger blocks payment schedule generation when enrolling a student into a second batch. The trigger checks admission/monthly overpayment across **all** batches globally, so existing payments from Batch-1 cause "Overpayment: admission fee exceeded" when creating unpaid schedule rows for Batch-2.
+In `computeStudentSummary` (line 382 of `src/hooks/useStudentPayments.ts`):
 
-DB error: `Overpayment: admission fee exceeded. Maximum allowed: 0. Already paid: 2500.`
-
-## Root Cause
-
-The trigger (`validate_student_payment_amount`) has two issues:
-1. It validates **unpaid schedule rows** -- these are just placeholders and should be skipped
-2. It sums admission payments across **all** batch enrollments instead of scoping to the current enrollment
-
-## Solution
-
-Modify the `validate_student_payment_amount` trigger to **skip validation entirely when the payment status is 'unpaid'**. Schedule rows (status = 'unpaid') are auto-generated placeholders, not actual payments. Validation should only apply when a payment is being recorded (status = 'paid' or 'partial').
-
-## Changes
-
-### 1. Database migration -- Update `validate_student_payment_amount` function
-
-Add an early return at the top of the function:
-
-```sql
--- Skip validation for unpaid schedule rows (auto-generated placeholders)
-IF NEW.status = 'unpaid' THEN
-  RETURN NEW;
-END IF;
+```javascript
+const endBound = courseEnd < currentMonth ? courseEnd : currentMonth;
 ```
 
-Additionally, scope the admission overpayment check to the same `batch_enrollment_id` (when present), so payments from one batch don't interfere with another batch's limits:
+This caps `allMonths` at the current month (2026-03), so future months (2026-04, 2026-05, 2026-06) are never added to the array. The student has a 4-month course, but only March is generated.
 
-```sql
--- When checking admission totals, scope to the same enrollment
-AND (NEW.batch_enrollment_id IS NULL 
-     OR batch_enrollment_id = NEW.batch_enrollment_id)
+The cap is unnecessary because the month classification loop (lines 422-436) already correctly categorizes future months as "pending" (`else` branch at line 434).
+
+### Fix
+
+**File: `src/hooks/useStudentPayments.ts`** -- Line 382
+
+Change:
+```javascript
+const endBound = courseEnd < currentMonth ? courseEnd : currentMonth;
 ```
 
-Same scoping for the monthly fee check.
+To:
+```javascript
+const endBound = courseEnd;
+```
 
-## Technical Details
+This allows all months from `billingStart` through `courseEnd` (or `currentMonth` if no end date) to be generated. The existing classification logic will correctly mark:
+- Past unpaid months as "overdue"
+- Current month as "pending" 
+- Future months as "pending"
 
-- **Security**: No RLS changes needed. The trigger remains SECURITY DEFINER.
-- **Edge cases**: If `batch_enrollment_id` is NULL (legacy payments without enrollment), validation falls back to global scope -- preserving backward compatibility.
-- **No code changes**: Only a single database migration is needed.
+### Impact
 
-## Testing Checklist
+- Monthly Fee Breakdown grid will show all 4 months
+- Monthly Tuition card will show "Pending (4 mo)" instead of "Pending (1 mo)"
+- Overall Total will reflect the full pending amount
+- No database changes needed
 
-| # | Test | Expected Result | Pass |
-|---|------|----------------|------|
-| 1 | Enroll student (with existing Batch-1 payments) into Batch-2 | Enrollment succeeds, schedule rows created | -- |
-| 2 | Record an actual overpayment on a batch | Trigger still blocks the overpayment | -- |
-| 3 | Enroll a fresh student into a batch | Schedule generated normally | -- |
-
-## Files Modified
-
-- New migration SQL file (database trigger update only)
-
-## Rollback Notes
-
-Revert the migration by restoring the original `validate_student_payment_amount` function body (remove the `IF NEW.status = 'unpaid'` early return and the `batch_enrollment_id` scoping).
