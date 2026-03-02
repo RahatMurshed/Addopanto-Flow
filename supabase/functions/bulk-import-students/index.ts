@@ -1,19 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-function isAllowedOrigin(origin: string): boolean {
-  if (origin === "https://addopantoflow.lovable.app") return true;
-  if (origin === "https://58aee540-d716-4564-805b-e26d9615ae54.lovableproject.com") return true;
-  if (/^https:\/\/[a-z0-9-]+--58aee540-d716-4564-805b-e26d9615ae54\.lovable\.app$/.test(origin)) return true;
-  return false;
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
 
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("Origin") || "";
-  return {
-    "Access-Control-Allow-Origin": isAllowedOrigin(origin) ? origin : "https://addopantoflow.lovable.app",
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  };
+function getCorsHeaders(_req: Request) {
+  return corsHeaders;
 }
 
 interface ImportRow {
