@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, setForcedLogoutInProgress } from "@/contexts/AuthContext";
@@ -173,13 +173,24 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     refetchInterval: 10 * 1000,
   });
 
-  // Fallback: if user has no role at all, they were deleted — force logout
+  // Fallback: if user has no role at all after multiple checks, they were deleted — force logout
+  const noRoleCountRef = useRef(0);
   useEffect(() => {
-    if (userRoleFetched && !userRoleExists && user) {
-      setForcedLogoutInProgress(true);
-      supabase.auth.signOut({ scope: 'local' }).then(() => {
-        window.location.replace('/auth');
-      });
+    if (!user) {
+      noRoleCountRef.current = 0;
+      return;
+    }
+    if (userRoleFetched && !userRoleExists) {
+      noRoleCountRef.current += 1;
+      // Only force logout after 3 consecutive checks with no role (≈30s grace period)
+      if (noRoleCountRef.current >= 3) {
+        setForcedLogoutInProgress(true);
+        supabase.auth.signOut({ scope: 'local' }).then(() => {
+          window.location.replace('/auth');
+        });
+      }
+    } else {
+      noRoleCountRef.current = 0;
     }
   }, [userRoleFetched, userRoleExists, user]);
 
