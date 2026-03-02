@@ -178,6 +178,20 @@ export function useDeleteRevenue() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Issue 1.5: Revert linked student payment to unpaid before deleting revenue
+      const { data: revenue } = await supabase
+        .from("revenues")
+        .select("student_payment_id")
+        .eq("id", id)
+        .single();
+
+      if (revenue?.student_payment_id) {
+        await supabase
+          .from("student_payments")
+          .update({ status: "unpaid", amount: 0 } as any)
+          .eq("id", revenue.student_payment_id);
+      }
+
       const { error } = await supabase.from("revenues").delete().eq("id", id);
       if (error) throw error;
     },

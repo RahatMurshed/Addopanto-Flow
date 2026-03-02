@@ -136,6 +136,16 @@ export default function CompanyMembers() {
   // Update member mutation
   const updateMemberMutation = useMutation({
     mutationFn: async ({ memberId, updates }: { memberId: string; updates: Record<string, any> }) => {
+      // Issue 1.7: Block demoting last admin
+      if (updates.role && updates.role !== "admin") {
+        const member = members.find(m => m.id === memberId);
+        if (member?.role === "admin") {
+          const adminCount = members.filter(m => m.role === "admin").length;
+          if (adminCount <= 1) {
+            throw new Error("Cannot demote the last admin. Promote another member to admin first.");
+          }
+        }
+      }
       const { error } = await supabase
         .from("company_memberships")
         .update(updates)
@@ -152,6 +162,14 @@ export default function CompanyMembers() {
   // Remove member
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
+      // Issue 1.7: Block removing last admin
+      const member = members.find(m => m.id === memberId);
+      if (member?.role === "admin") {
+        const adminCount = members.filter(m => m.role === "admin").length;
+        if (adminCount <= 1) {
+          throw new Error("Cannot remove the last admin. Promote another member to admin first.");
+        }
+      }
       const { error } = await supabase
         .from("company_memberships")
         .delete()

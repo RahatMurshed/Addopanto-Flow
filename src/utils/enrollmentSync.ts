@@ -22,19 +22,29 @@ export async function syncBatchEnrollment(
   // No change
   if (oldId === newId) return;
 
-  // Delete old enrollment entirely
+  // Archive old enrollment as "transferred" instead of deleting (Issue 1.3)
   if (oldId) {
     await supabase
       .from("batch_enrollments")
-      .delete()
+      .update({ status: "transferred" } as any)
       .eq("student_id", studentId)
       .eq("batch_id", oldId)
       .eq("company_id", companyId)
       .eq("status", "active");
   }
 
-  // Create new active enrollment
+  // Create new active enrollment (check batch status first - Issue 2.2)
   if (newId) {
+    const { data: batchCheck } = await supabase
+      .from("batches")
+      .select("status")
+      .eq("id", newId)
+      .single();
+
+    if (batchCheck?.status === "completed") {
+      logger.warn("Cannot enroll into a completed batch:", newId);
+      return;
+    }
     const { data: enrollment, error: enrollError } = await supabase
       .from("batch_enrollments")
       .insert({
