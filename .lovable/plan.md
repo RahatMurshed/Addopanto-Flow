@@ -1,30 +1,27 @@
 
 
-# Generate "Addopanto Flow" Platform Logo
+# Regenerate "Addopanto Flow" Logo (Transparent Background, Larger)
 
 ## What I'll Do
 
-Create a professional logo for **"Addopanto Flow"** using AI image generation, matching your app's theme colors:
-
-- **Primary**: Deep orange (hsl 30, 100%, 35%) 
-- **Secondary**: Dark navy blue (hsl 217, 70%, 25%)
-- **Style**: Clean, modern, business/SaaS aesthetic
+Use AI image generation to create a new version of the "Addopanto Flow" logo with:
+- **Transparent background** (true PNG with alpha channel)
+- **Larger canvas size** (e.g. 1024x512 or similar) so it renders crisply at all sizes
+- Same theme colors: deep orange and dark navy blue
+- Clean, professional SaaS style
+- Text: "Addopanto Flow" (no "Demo")
 
 ## Steps
 
-1. **Generate the logo** using the AI image generation model (Nano banana pro for higher quality) with a prompt targeting:
-   - The text "Addopanto Flow" (no "Demo")
-   - Orange and navy blue color palette
-   - Clean, professional SaaS/fintech style
-   - Transparent or white background suitable for both light and dark themes
-
-2. **Save the generated logo** to both locations where it's currently used:
+1. **Generate the logo** using Nano banana pro (google/gemini-3-pro-image-preview) with explicit instructions for transparent/white background and high resolution
+2. **Save to both asset locations**:
    - `src/assets/GA-LOGO.png`
    - `public/GA-LOGO.png`
+3. **No code changes needed** -- all 8 files already reference these paths with `object-contain` and `w-auto` styling, so a larger image will display correctly everywhere
 
-3. **No code changes needed** -- all 8 files that reference the logo already import from `@/assets/GA-LOGO.png` or `/GA-LOGO.png`, so the new image will appear everywhere automatically (sidebar, auth pages, landing page, etc.)
+## Technical Notes
 
-## Files Affected
-- `src/assets/GA-LOGO.png` (overwrite with new logo)
-- `public/GA-LOGO.png` (overwrite with new logo)
+- AI image generation models may not produce true transparency reliably; if the result has a white background, I will instruct the prompt to use a clean white background that blends well with both light and dark themes
+- The logo appears in the sidebar (h-10), mobile header (h-8), auth pages (h-12 to h-16), landing page nav (h-9), and footer (h-7) -- all use `w-auto object-contain` so a larger source image will simply render sharper
+- Files affected: `src/assets/GA-LOGO.png`, `public/GA-LOGO.png`
 
