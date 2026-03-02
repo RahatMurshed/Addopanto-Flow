@@ -142,13 +142,8 @@ export function useUpdateBatch() {
       return data as unknown as Batch;
     },
     onSuccess: async (data: Batch, variables) => {
-      // Issue 1.4: When batch is manually completed, also complete active enrollments
       if (data.status === "completed") {
-        await supabase
-          .from("batch_enrollments")
-          .update({ status: "completed", updated_at: new Date().toISOString() } as any)
-          .eq("batch_id", data.id)
-          .eq("status", "active");
+        // Trigger sync_enrollments_on_batch_completion handles enrollment completion
         queryClient.invalidateQueries({ queryKey: ["batch_enrollments"] });
       }
 

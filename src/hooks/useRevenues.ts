@@ -188,7 +188,7 @@ export function useDeleteRevenue() {
       if (revenue?.student_payment_id) {
         await supabase
           .from("student_payments")
-          .update({ status: "unpaid", amount: 0 } as any)
+          .update({ status: "unpaid" } as any)
           .eq("id", revenue.student_payment_id);
       }
 
