@@ -83,6 +83,15 @@ export function useDeleteExpenseAccount() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Issue 2.12: Block deletion if linked expenses exist
+      const { count } = await supabase
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("expense_account_id", id);
+      if (count && count > 0) {
+        throw new Error(`Cannot delete this account — it has ${count} linked expense(s). Deactivate it instead.`);
+      }
+
       const { error } = await supabase.from("expense_accounts").delete().eq("id", id);
       if (error) throw error;
     },

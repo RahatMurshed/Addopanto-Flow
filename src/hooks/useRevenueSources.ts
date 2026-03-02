@@ -27,6 +27,31 @@ export function useRevenueSources() {
   });
 }
 
+export function useDeleteRevenueSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Issue 2.12: Block deletion if linked revenues exist
+      const { count } = await supabase
+        .from("revenues")
+        .select("id", { count: "exact", head: true })
+        .eq("source_id", id);
+      if (count && count > 0) {
+        throw new Error(`Cannot delete this source — it has ${count} linked revenue(s). Deactivate it instead.`);
+      }
+
+      const { error } = await supabase.from("revenue_sources").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["revenue_sources"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
+}
+
 export function useCreateRevenueSource() {
   const { user } = useAuth();
   const { activeCompanyId } = useCompany();

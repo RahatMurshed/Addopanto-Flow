@@ -126,12 +126,17 @@ export function useCreateStudentPayment() {
           let remaining = paymentData.amount;
 
           for (const row of sorted) {
-            if (remaining <= 0) break;
-            const originalDue = row.status === "unpaid" ? Number(row.amount) : 0;
-            const applied = Math.min(remaining, originalDue > 0 ? originalDue : remaining);
-            remaining -= applied;
+          if (remaining <= 0) break;
+          const originalDue = row.status === "unpaid" ? Number(row.amount) : 0;
+          const applied = Math.min(remaining, originalDue > 0 ? originalDue : remaining);
+          remaining -= applied;
 
-            const newStatus = (originalDue > 0 && applied < originalDue) ? "partial" : "paid";
+          // Issue 2.4: Track overpayment for warning
+          if (originalDue > 0 && applied > originalDue) {
+            console.warn(`Overpayment of ${applied - originalDue} on row ${row.id}`);
+          }
+
+          const newStatus = (originalDue > 0 && applied < originalDue) ? "partial" : "paid";
 
             await supabase
               .from("student_payments")

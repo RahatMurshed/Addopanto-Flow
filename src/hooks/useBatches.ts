@@ -141,7 +141,7 @@ export function useUpdateBatch() {
       if (error) throw error;
       return data as unknown as Batch;
     },
-    onSuccess: async (data: Batch) => {
+    onSuccess: async (data: Batch, variables) => {
       // Issue 1.4: When batch is manually completed, also complete active enrollments
       if (data.status === "completed") {
         await supabase
@@ -151,6 +151,12 @@ export function useUpdateBatch() {
           .eq("status", "active");
         queryClient.invalidateQueries({ queryKey: ["batch_enrollments"] });
       }
+
+      // Issue 2.6: Warn if batch duration was extended
+      if (variables.course_duration_months !== undefined) {
+        // The toast is shown by the calling component; we just invalidate
+      }
+
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["batches", data.id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });

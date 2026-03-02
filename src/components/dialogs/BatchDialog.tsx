@@ -222,6 +222,9 @@ export default function BatchDialog({ open, onOpenChange, batch, onSave, courseI
                   <Calendar mode="single" selected={selectedStartDate ? new Date(selectedStartDate) : undefined} onSelect={(date) => { if (date) { form.setValue("start_date", format(date, "yyyy-MM-dd")); setStartCalOpen(false); } }} initialFocus />
                 </PopoverContent>
               </Popover>
+              {selectedStartDate && selectedStartDate < format(new Date(), "yyyy-MM-dd") && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">⚠ Start date is in the past. Past months will appear as overdue for enrolled students.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>End Date</Label>

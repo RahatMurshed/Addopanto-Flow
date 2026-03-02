@@ -429,9 +429,9 @@ export function QuickActionsPanel({
             <AlertDialogTitle>Change Student Status</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to change <strong>{student.name}</strong>'s status to <strong>{pendingLabel}</strong>?
-              {["inactive", "dropout"].includes(pendingStatus ?? "") && " This will deactivate their current enrollments. Overdue alerts will stop and revenue projections will be excluded."}
+              {["inactive", "dropout"].includes(pendingStatus ?? "") && " This will deactivate their current enrollments, cancel future unpaid payments, and stop overdue alerts."}
               {pendingStatus === "active" && ["inactive", "dropout"].includes(student.status) && " This will restore any inactive enrollments whose batch is still active."}
-              {pendingStatus === "graduated" && " The student will be marked as an alumnus."}
+              {pendingStatus === "graduated" && " The student will be marked as an alumnus. Active enrollments will be completed."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
