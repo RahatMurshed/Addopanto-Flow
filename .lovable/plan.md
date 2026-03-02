@@ -1,29 +1,40 @@
 
-# Fix: Transfer History Not Using Company Currency
+# Fix: Audit Log Not Using Company Currency
 
 ## Problem
-The `TransferHistoryCard` component has the BDT currency symbol (`৳`) hardcoded in three places, so it ignores the company's chosen currency and exchange rate. This affects the Expense Sources (Khatas) page, Expenses page, and Reports page.
+The audit log displays raw database amounts (stored in BDT) without applying the company's currency conversion or symbol. For example, "Amount: 5000" appears instead of "$58.82" when the company currency is set to USD.
 
-## Fix
-Import and use the `useCompanyCurrency` hook inside `TransferHistoryCard.tsx` to format all monetary values with proper currency conversion.
+This affects:
+- Description text for payments, expenses, and transfers (e.g., `Amount: 5000`)
+- DiffView showing old/new amount values as raw numbers
+- DataView showing inserted/deleted record amounts as raw numbers
 
-## File Changed
-**`src/components/finance/TransferHistoryCard.tsx`**
+## Solution
+Since `auditHelpers.ts` contains pure functions (not React hooks), and `useCompanyCurrency` is a hook, the currency formatting must be applied at the component level in `AuditLog.tsx`.
 
-Three hardcoded currency references will be replaced:
+### Changes to `src/pages/AuditLog.tsx`
 
-1. **Line 194** (table amount column): `৳{Number(transfer.amount).toLocaleString()}` becomes `{fc(Number(transfer.amount))}`
-2. **Line 249** (footer total): `৳{totalAmount.toLocaleString()}` becomes `{fc(totalAmount)}`
-3. **Line 290** (detail dialog amount): `` `৳${Number(viewingTransfer.amount).toLocaleString()}` `` becomes `fc(Number(viewingTransfer.amount))`
+1. **Import and use `useCompanyCurrency` hook** in the main `AuditLog` component to get the `fc` (format currency) function.
 
-One new import is added at the top:
-```typescript
-import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
-```
+2. **Update `getDescription` function** (local copy in AuditLog.tsx) to accept an optional currency formatter parameter. When provided, format amount values:
+   - `student_payments`: `Amount: 5000` becomes `Amount: $58.82`
+   - `expenses`: `Amount: 5000` becomes `Amount: $58.82`
+   - `khata_transfers`: `Amount: 5000` becomes `Amount: $58.82`
 
-And inside the component, one line is added:
-```typescript
-const { fc } = useCompanyCurrency();
-```
+3. **Update `formatValue` and `formatFieldValue` functions** to accept an optional currency formatter and field key. When the key is `amount`, `monthly_fee`, `admission_fee`, or other monetary fields, format with `fc()`.
 
-This ensures all transfer amounts are converted using the company's exchange rate and displayed with the correct currency symbol, consistent with the rest of the application.
+4. **Pass the formatter down** to `DiffView` and `DataView` components as a prop, so monetary fields in detail dialogs also display converted values.
+
+### Monetary field detection
+Fields to format: `amount`, `monthly_fee`, `admission_fee`, `total_paid`, `balance`, `expected_monthly_expense`, `allocation_percentage` (not this one -- it's a percentage), `price`, `cost_price`, `sale_price`.
+
+A simple approach: maintain a `MONETARY_FIELDS` set and check if the field key is in it before applying `fc()`.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/pages/AuditLog.tsx` | Add `useCompanyCurrency`, create `MONETARY_FIELDS` set, update `getDescription`/`formatValue`/`formatFieldValue`/`DiffView`/`DataView` to format monetary values |
+
+### No changes needed to
+- `src/components/audit/auditHelpers.ts` -- the helpers there are used elsewhere too; we only fix the page-level rendering in AuditLog.tsx where the hook is available.
