@@ -1,42 +1,24 @@
 
 
-## Fix: Monthly Fee Breakdown Only Shows Current Month Instead of Full Duration
+## Fix: Payment Trigger Counts Unpaid Schedule Rows as "Already Paid"
+
+### Problem
+When you try to record a real payment for a student, the system says "Overpayment: admission fee exceeded. Maximum allowed: 0. Already paid: 2500." This happens because the validation trigger counts the auto-generated unpaid schedule rows as if they were actual payments.
 
 ### Root Cause
+The previous fix added an early return to skip validation when inserting `unpaid` rows. However, when inserting a real `paid` payment, the trigger's SUM queries use `status != 'cancelled'` -- which still includes `unpaid` rows in the "already paid" total.
 
-In `computeStudentSummary` (line 382 of `src/hooks/useStudentPayments.ts`):
-
-```javascript
-const endBound = courseEnd < currentMonth ? courseEnd : currentMonth;
-```
-
-This caps `allMonths` at the current month (2026-03), so future months (2026-04, 2026-05, 2026-06) are never added to the array. The student has a 4-month course, but only March is generated.
-
-The cap is unnecessary because the month classification loop (lines 422-436) already correctly categorizes future months as "pending" (`else` branch at line 434).
+For this student: the schedule has an unpaid admission row of 2,500. When you try to record an actual admission payment, the trigger sums that unpaid 2,500 and says "already paid: 2500", blocking the real payment.
 
 ### Fix
+**Database migration** -- Update the `validate_student_payment_amount` function to exclude `unpaid` rows from the "already paid" totals:
 
-**File: `src/hooks/useStudentPayments.ts`** -- Line 382
+1. **Admission check (line 39)**: Change `AND status != 'cancelled'` to `AND status NOT IN ('cancelled', 'unpaid')`
+2. **Monthly check (line 58)**: Change `AND sp.status != 'cancelled'` to `AND sp.status NOT IN ('cancelled', 'unpaid')`
 
-Change:
-```javascript
-const endBound = courseEnd < currentMonth ? courseEnd : currentMonth;
-```
-
-To:
-```javascript
-const endBound = courseEnd;
-```
-
-This allows all months from `billingStart` through `courseEnd` (or `currentMonth` if no end date) to be generated. The existing classification logic will correctly mark:
-- Past unpaid months as "overdue"
-- Current month as "pending" 
-- Future months as "pending"
+This ensures only actual payments (`paid`, `partial`) count toward the overpayment check, while schedule placeholders (`unpaid`) are ignored.
 
 ### Impact
-
-- Monthly Fee Breakdown grid will show all 4 months
-- Monthly Tuition card will show "Pending (4 mo)" instead of "Pending (1 mo)"
-- Overall Total will reflect the full pending amount
-- No database changes needed
-
+- Recording real payments will work correctly
+- Overpayment protection still applies (sums actual paid/partial payments)
+- No code changes needed -- database-only fix
