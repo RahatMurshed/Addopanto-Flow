@@ -1,13 +1,1 @@
-project_id = "zrmhhnepzbwbihdshwcm"
-
-[functions.admin-users]
-verify_jwt = false
-
-[functions.company-join]
-verify_jwt = false
-
-[functions.reset-company-data]
-verify_jwt = false
-
-[functions.bulk-import-students]
-verify_jwt = false
+project_id = "cuokhyyttjrcyhpqdqqc"
