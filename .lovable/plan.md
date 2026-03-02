@@ -1,43 +1,30 @@
 
 
-# Fix: Platform Users Page Empty (CORS Mismatch)
+# Generate "Addopanto Flow" Platform Logo
 
-## Problem
-The `admin-users` edge function has a hardcoded CORS allowlist pointing to the **original** project's domains. Your remixed project has a different project ID, so the browser blocks the response due to CORS policy.
+## What I'll Do
 
-**Original (broken):**
-- `addopantoflow.lovable.app`
-- `58aee540-d716-4564-805b-e26d9615ae54.lovableproject.com`
+Create a professional logo for **"Addopanto Flow"** using AI image generation, matching your app's theme colors:
 
-**Your project:**
-- `f820c644-655c-4917-96f4-832052a66364.lovableproject.com`
+- **Primary**: Deep orange (hsl 30, 100%, 35%) 
+- **Secondary**: Dark navy blue (hsl 217, 70%, 25%)
+- **Style**: Clean, modern, business/SaaS aesthetic
 
-## Fix
+## Steps
 
-Update `supabase/functions/admin-users/index.ts` lines 4-9 to use your new project ID:
+1. **Generate the logo** using the AI image generation model (Nano banana pro for higher quality) with a prompt targeting:
+   - The text "Addopanto Flow" (no "Demo")
+   - Orange and navy blue color palette
+   - Clean, professional SaaS/fintech style
+   - Transparent or white background suitable for both light and dark themes
 
-```text
-function isAllowedOrigin(origin: string): boolean {
-  // Allow the lovableproject.com dev domain
-  if (origin.includes("f820c644-655c-4917-96f4-832052a66364")) return true;
-  // Allow any preview subdomain
-  if (/^https:\/\/[a-z0-9-]+--f820c644-655c-4917-96f4-832052a66364\.lovable\.app$/.test(origin)) return true;
-  return false;
-}
-```
+2. **Save the generated logo** to both locations where it's currently used:
+   - `src/assets/GA-LOGO.png`
+   - `public/GA-LOGO.png`
 
-## Other Edge Functions to Check
-The same CORS pattern may exist in other edge functions. All 7 edge functions will be scanned and updated if needed:
-- `admin-users` (confirmed broken)
-- `auto-complete-batches`
-- `bulk-import-students`
-- `company-join`
-- `merge-students`
-- `reset-company-data`
-- `unmerge-students`
+3. **No code changes needed** -- all 8 files that reference the logo already import from `@/assets/GA-LOGO.png` or `/GA-LOGO.png`, so the new image will appear everywhere automatically (sidebar, auth pages, landing page, etc.)
 
-## Scope
-- Update CORS origin checks in all edge functions to match the new project ID
-- Deploy updated edge functions
-- No database or schema changes needed
+## Files Affected
+- `src/assets/GA-LOGO.png` (overwrite with new logo)
+- `public/GA-LOGO.png` (overwrite with new logo)
 
