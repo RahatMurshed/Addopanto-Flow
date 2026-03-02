@@ -144,11 +144,11 @@ export default function StudentDetail() {
 
     result.sort((a, b) => {
       switch (paymentSort) {
-        case "date-asc": return new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime();
-        case "date-desc": return new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
+        case "date-asc": return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case "date-desc": return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case "amount-desc": return Number(b.amount) - Number(a.amount);
         case "amount-asc": return Number(a.amount) - Number(b.amount);
-        default: return new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
+        default: return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
     });
 
@@ -653,7 +653,7 @@ export default function StudentDetail() {
                   <TableBody>
                     {paymentPagination.paginatedItems.map((p) => (
                       <TableRow key={p.id}>
-                        <TableCell>{format(new Date(p.payment_date), "MMM d, yyyy")}</TableCell>
+                        <TableCell>{format(new Date(p.created_at), "MMM d, yyyy")}</TableCell>
                         <TableCell className="font-semibold text-primary">{formatCurrency(Number(p.amount), currency)}</TableCell>
                         <TableCell>
                           <Badge
@@ -712,7 +712,7 @@ export default function StudentDetail() {
       {!isDataEntryModerator && (() => {
         const notedPayments = payments
           .filter((p) => p.description)
-          .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         if (notedPayments.length === 0) return null;
         const visibleCount = 5;
         const firstBatch = notedPayments.slice(0, visibleCount);
