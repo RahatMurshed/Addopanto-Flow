@@ -100,10 +100,10 @@ async function generatePaymentSchedule(
   const scheduleRows: any[] = [];
   const batchStartDate = new Date(batch.start_date);
 
-  // Check student's billing_start_month to respect it
+  // Check student's billing_start_month and custom fee (Issue 2.3)
   const { data: student } = await supabase
     .from("students")
-    .select("billing_start_month")
+    .select("billing_start_month, monthly_fee_amount")
     .eq("id", studentId)
     .single();
 
@@ -152,9 +152,10 @@ async function generatePaymentSchedule(
       });
     }
 
-    // Generate monthly fee rows
+    // Generate monthly fee rows — use student custom fee if set, else batch default (Issue 2.3)
     const durationMonths = batch.course_duration_months;
-    const monthlyFee = Number(batch.default_monthly_fee);
+    const studentCustomFee = student?.monthly_fee_amount ? Number(student.monthly_fee_amount) : 0;
+    const monthlyFee = studentCustomFee > 0 ? studentCustomFee : Number(batch.default_monthly_fee);
 
     if (durationMonths && durationMonths > 0 && monthlyFee > 0) {
       // Calculate offset based on billing_start_month

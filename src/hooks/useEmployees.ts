@@ -276,6 +276,24 @@ export function useCreateSalaryPayment() {
         throw new Error(`Salary for ${payment.month} has already been recorded for this employee.`);
       }
 
+      // Issue 2.10 & 2.11: Validate employee join date and status
+      const { data: emp } = await supabase
+        .from("employees" as any)
+        .select("join_date, employment_status")
+        .eq("id", payment.employee_id)
+        .single();
+
+      if (emp) {
+        const joinMonth = (emp as any).join_date?.slice(0, 7);
+        if (joinMonth && payment.month < joinMonth) {
+          throw new Error(`Cannot record salary for ${payment.month}. Employee joined in ${joinMonth}.`);
+        }
+        if ((emp as any).employment_status === "terminated") {
+          // Soft warning — we still allow it but the UI can show a toast
+          console.warn(`Recording salary for terminated employee: ${payment.employee_id}`);
+        }
+      }
+
       // 1. Create salary payment
       const { data: salaryRecord, error: salaryError } = await supabase
         .from("employee_salary_payments" as any)

@@ -75,7 +75,8 @@ export function ProductSaleDialog({ open, onOpenChange, preselectedProduct }: Pr
   const stockAvailable = selectedProduct?.stock_quantity ?? 0;
   const isOverStock = isPhysical && quantity > stockAvailable;
   const isFutureDate = saleDate > today;
-  const canSubmit = productId && quantity > 0 && unitPrice > 0 && !isOverStock && !isFutureDate && !createSale.isPending;
+  // Issue 3.3: Allow zero-price product sales (promotional/free samples)
+  const canSubmit = productId && quantity > 0 && unitPrice >= 0 && !isOverStock && !isFutureDate && !createSale.isPending;
 
   const doSubmit = async () => {
     try {
