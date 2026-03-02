@@ -176,9 +176,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SkipLink />
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-col bg-sidebar md:flex" role="navigation" aria-label="Main navigation">
-        <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-4 py-4">
+        <div className="flex flex-col items-center gap-2 border-b border-sidebar-border px-1 py-1">
           <Link to="/">
-            <img src={gaLogo} alt="Grammar Addopanto" className="h-[120px] w-auto max-w-[220px] object-contain" />
+            <img src={gaLogo} alt="Grammar Addopanto" className="h-[140px] w-full max-w-[250px] object-contain" />
           </Link>
           {companyLoading ? null : showCompanySwitcher ? (
             <DropdownMenu>
