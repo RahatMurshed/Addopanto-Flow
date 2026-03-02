@@ -1,4 +1,5 @@
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { useCompanyCurrency } from "@/hooks/useCompanyCurrency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export default function TransferHistoryCard({
   showDateFilter = false,
   limit,
 }: TransferHistoryCardProps) {
+  const { fc } = useCompanyCurrency();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterDateRange, setFilterDateRange] = useState<DateRange | null>(null);
   const [viewingTransfer, setViewingTransfer] = useState<KhataTransfer | null>(null);
@@ -191,7 +193,7 @@ export default function TransferHistoryCard({
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          ৳{Number(transfer.amount).toLocaleString()}
+                          {fc(Number(transfer.amount))}
                         </TableCell>
                         <TableCell className="hidden max-w-xs truncate md:table-cell">
                           {transfer.description || <span className="text-muted-foreground">—</span>}
@@ -246,7 +248,7 @@ export default function TransferHistoryCard({
                     {filteredTransfers.length} transfer{filteredTransfers.length !== 1 ? "s" : ""}
                   </span>
                   <span className="font-semibold">
-                    Total: ৳{totalAmount.toLocaleString()}
+                    Total: {fc(totalAmount)}
                   </span>
                 </div>
               )}
@@ -287,7 +289,7 @@ export default function TransferHistoryCard({
           { label: "Entry Date", value: format(new Date(viewingTransfer.created_at), "MMM d, yyyy h:mm a") },
           { label: "From", value: getAccountName(viewingTransfer.from_account_id) },
           { label: "To", value: getAccountName(viewingTransfer.to_account_id) },
-          { label: "Amount", value: `৳${Number(viewingTransfer.amount).toLocaleString()}` },
+          { label: "Amount", value: fc(Number(viewingTransfer.amount)) },
           { label: "Description", value: viewingTransfer.description || "—" },
           { label: "Recorded By", value: getRecorderName(viewingTransfer.user_id) },
         ] : []}
