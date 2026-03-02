@@ -751,7 +751,7 @@ export default function CompanyJoinRequests() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
             >
               {rejectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {rejectMutation.isPending ? "Rejecting..." : "Reject (1-day ban)"}
+              {rejectMutation.isPending ? "Rejecting..." : "Reject"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
