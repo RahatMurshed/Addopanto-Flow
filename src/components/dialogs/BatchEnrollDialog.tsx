@@ -259,12 +259,17 @@ export default function BatchEnrollDialog({
         return;
       }
 
-      // Check capacity before enrolling
+      // Check batch status and capacity before enrolling
       const { data: batchData } = await supabase
         .from("batches")
-        .select("max_capacity")
+        .select("max_capacity, status")
         .eq("id", batchId)
         .single();
+
+      if (batchData?.status === "completed") {
+        toast({ title: "Batch completed", description: `This batch has already been completed. You cannot enroll students into a completed batch.`, variant: "destructive" });
+        return;
+      }
 
       if (batchData?.max_capacity != null) {
         const { count } = await supabase

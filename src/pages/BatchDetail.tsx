@@ -67,8 +67,7 @@ export default function BatchDetail() {
       const { data, error } = await supabase
         .from("batch_enrollments")
         .select("id, student_id, status")
-        .eq("batch_id", id)
-        .eq("status", "active");
+        .eq("batch_id", id);
       if (error) throw error;
       return data;
     },
@@ -864,11 +863,15 @@ export default function BatchDetail() {
                                   </Button>
                                 );
                               })()}
-                              {canEdit && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setDeleteStudentId(s.id)} title="Remove from batch">
-                                  <UserMinus className="h-4 w-4" />
-                                </Button>
-                              )}
+                              {canEdit && (() => {
+                                const enrollment = batchEnrollments.find(e => e.student_id === s.id);
+                                const isCompleted = enrollment?.status === "completed";
+                                return !isCompleted ? (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setDeleteStudentId(s.id)} title="Remove from batch">
+                                    <UserMinus className="h-4 w-4" />
+                                  </Button>
+                                ) : null;
+                              })()}
                               {canEdit && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" onClick={() => setInactiveStudentId(s.id)} title="Set inactive">
                                   <PauseCircle className="h-4 w-4" />

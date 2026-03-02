@@ -42,6 +42,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Also complete all active enrollments in this batch
+        const { error: enrollError } = await supabase
+          .from("batch_enrollments")
+          .update({ status: "completed", updated_at: new Date().toISOString() })
+          .eq("batch_id", batch.id)
+          .eq("status", "active");
+
+        if (enrollError) {
+          console.error(`Failed to complete enrollments for batch ${batch.id}:`, enrollError);
+        }
+
         await supabase.from("audit_logs").insert({
           company_id: batch.company_id,
           user_id: "00000000-0000-0000-0000-000000000000",

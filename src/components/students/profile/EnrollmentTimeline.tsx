@@ -368,9 +368,15 @@ export function EnrollmentTimeline({ studentId, companyId, onViewPayments }: Enr
                                     Paid: {fc(paidAmount)}
                                   </span>
                                   {dueAmount > 0 && (
-                                    <span className="text-red-500 dark:text-red-400">
-                                      Due: {fc(Math.max(0, dueAmount))}
-                                    </span>
+                                    status === "completed" ? (
+                                      <span className="text-muted-foreground">
+                                        Historical Due: {fc(Math.max(0, dueAmount))}
+                                      </span>
+                                    ) : (
+                                      <span className="text-red-500 dark:text-red-400">
+                                        Due: {fc(Math.max(0, dueAmount))}
+                                      </span>
+                                    )
                                   )}
                                 </div>
                               </div>
