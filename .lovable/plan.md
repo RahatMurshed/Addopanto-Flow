@@ -1,24 +1,38 @@
 
 
-## Fix: Payment Trigger Counts Unpaid Schedule Rows as "Already Paid"
+# Fix: Payment History Date Column Should Show `created_at` Instead of `payment_date`
 
-### Problem
-When you try to record a real payment for a student, the system says "Overpayment: admission fee exceeded. Maximum allowed: 0. Already paid: 2500." This happens because the validation trigger counts the auto-generated unpaid schedule rows as if they were actual payments.
+## Problem
 
-### Root Cause
-The previous fix added an early return to skip validation when inserting `unpaid` rows. However, when inserting a real `paid` payment, the trigger's SUM queries use `status != 'cancelled'` -- which still includes `unpaid` rows in the "already paid" total.
+The Payment History table's Date column currently displays `payment_date` (which is the due date set during schedule generation). The user wants it to show `created_at` -- the actual timestamp when the payment record was created/recorded.
 
-For this student: the schedule has an unpaid admission row of 2,500. When you try to record an actual admission payment, the trigger sums that unpaid 2,500 and says "already paid: 2500", blocking the real payment.
+## Current State
 
-### Fix
-**Database migration** -- Update the `validate_student_payment_amount` function to exclude `unpaid` rows from the "already paid" totals:
+- `src/pages/StudentDetail.tsx` line 656: displays `p.payment_date`
+- Lines 145-152: sorting also uses `payment_date`
 
-1. **Admission check (line 39)**: Change `AND status != 'cancelled'` to `AND status NOT IN ('cancelled', 'unpaid')`
-2. **Monthly check (line 58)**: Change `AND sp.status != 'cancelled'` to `AND sp.status NOT IN ('cancelled', 'unpaid')`
+## Changes
 
-This ensures only actual payments (`paid`, `partial`) count toward the overpayment check, while schedule placeholders (`unpaid`) are ignored.
+### 1. `src/pages/StudentDetail.tsx` -- Display and sort by `created_at`
 
-### Impact
-- Recording real payments will work correctly
-- Overpayment protection still applies (sums actual paid/partial payments)
-- No code changes needed -- database-only fix
+- **Line 656**: Change `p.payment_date` to `p.created_at` for the Date column display
+- **Lines 147-151**: Update all sorting references from `payment_date` to `created_at`
+- **Line 715**: Update the payment notes timeline sorting from `payment_date` to `created_at`
+
+## Technical Details
+
+- The `student_payments` table has a `created_at` column (timestamp with time zone, default `now()`)
+- The `StudentPayment` interface in `useStudentPayments.ts` already includes `created_at: string`
+- No database changes needed
+
+## Testing Checklist
+
+| # | Test | Expected Result | Pass |
+|---|------|----------------|------|
+| 1 | View Payment History on a student detail page | Date column shows the record creation date, not the due date | -- |
+| 2 | Sort by Date Newest / Date Oldest | Payments sort by `created_at` | -- |
+
+## Files Modified
+
+- `src/pages/StudentDetail.tsx`
+
