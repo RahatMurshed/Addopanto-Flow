@@ -36,9 +36,12 @@ const CHART_COLORS = ["hsl(30,100%,45%)", "hsl(217,70%,45%)", "hsl(142,76%,36%)"
 
 export default function Employees() {
   const navigate = useNavigate();
-  const { isCompanyAdmin, isCipher, canManageEmployees } = useCompany();
+  const { isCompanyAdmin, isCipher, canManageEmployees, canAddEmployee, canEditEmployee, canDeleteEmployee, canManageSalary, canViewEmployees } = useCompany();
   const { fc: formatAmount } = useCompanyCurrency();
   const canManage = canManageEmployees;
+  const canAdd = canAddEmployee;
+  const canEditEmp = canEditEmployee;
+  const canDeleteEmp = canDeleteEmployee;
 
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("all");
@@ -124,7 +127,7 @@ export default function Employees() {
           <p className="text-sm text-muted-foreground">Manage your company staff</p>
         </div>
         <div className="flex items-center gap-2">
-          {canManage && !isCipher && (
+          {(canManage || canViewEmployees) && !isCipher && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -136,12 +139,12 @@ export default function Employees() {
               </Tooltip>
             </TooltipProvider>
           )}
-          {canManage && employees.length > 0 && (
+          {(canManage || canViewEmployees) && employees.length > 0 && (
             <Button variant="outline" onClick={handleExportCSV} className="gap-2">
               <Download className="h-4 w-4" /> Export CSV
             </Button>
           )}
-          {canManage && (
+          {canAdd && (
             <Button onClick={handleAdd} className="gap-2">
               <Plus className="h-4 w-4" /> Add Employee
             </Button>
@@ -323,9 +326,10 @@ export default function Employees() {
                       <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => navigate(`/employees/${emp.id}`)}><Eye className="h-4 w-4" /></Button>
-                          {canManage && (
-                            <>
-                              <Button variant="ghost" size="icon" onClick={() => handleEdit(emp)}><Pencil className="h-4 w-4" /></Button>
+                          {canEditEmp && (
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(emp)}><Pencil className="h-4 w-4" /></Button>
+                          )}
+                          {canDeleteEmp && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -341,7 +345,6 @@ export default function Employees() {
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
-                            </>
                           )}
                         </div>
                       </TableCell>

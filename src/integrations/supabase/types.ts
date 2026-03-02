@@ -479,6 +479,10 @@ export type Database = {
           mod_batches_add: boolean
           mod_batches_delete: boolean
           mod_batches_edit: boolean
+          mod_employees_add: boolean | null
+          mod_employees_delete: boolean | null
+          mod_employees_edit: boolean | null
+          mod_employees_salary: boolean | null
           mod_expenses_add: boolean
           mod_expenses_delete: boolean
           mod_expenses_edit: boolean
@@ -491,6 +495,11 @@ export type Database = {
           mod_students_add: boolean
           mod_students_delete: boolean
           mod_students_edit: boolean
+          mod_view_batches: boolean | null
+          mod_view_courses: boolean | null
+          mod_view_employees: boolean | null
+          mod_view_expenses: boolean | null
+          mod_view_revenue: boolean | null
           role: Database["public"]["Enums"]["company_role"]
           status: string
           user_id: string
@@ -515,6 +524,10 @@ export type Database = {
           mod_batches_add?: boolean
           mod_batches_delete?: boolean
           mod_batches_edit?: boolean
+          mod_employees_add?: boolean | null
+          mod_employees_delete?: boolean | null
+          mod_employees_edit?: boolean | null
+          mod_employees_salary?: boolean | null
           mod_expenses_add?: boolean
           mod_expenses_delete?: boolean
           mod_expenses_edit?: boolean
@@ -527,6 +540,11 @@ export type Database = {
           mod_students_add?: boolean
           mod_students_delete?: boolean
           mod_students_edit?: boolean
+          mod_view_batches?: boolean | null
+          mod_view_courses?: boolean | null
+          mod_view_employees?: boolean | null
+          mod_view_expenses?: boolean | null
+          mod_view_revenue?: boolean | null
           role?: Database["public"]["Enums"]["company_role"]
           status?: string
           user_id: string
@@ -551,6 +569,10 @@ export type Database = {
           mod_batches_add?: boolean
           mod_batches_delete?: boolean
           mod_batches_edit?: boolean
+          mod_employees_add?: boolean | null
+          mod_employees_delete?: boolean | null
+          mod_employees_edit?: boolean | null
+          mod_employees_salary?: boolean | null
           mod_expenses_add?: boolean
           mod_expenses_delete?: boolean
           mod_expenses_edit?: boolean
@@ -563,6 +585,11 @@ export type Database = {
           mod_students_add?: boolean
           mod_students_delete?: boolean
           mod_students_edit?: boolean
+          mod_view_batches?: boolean | null
+          mod_view_courses?: boolean | null
+          mod_view_employees?: boolean | null
+          mod_view_expenses?: boolean | null
+          mod_view_revenue?: boolean | null
           role?: Database["public"]["Enums"]["company_role"]
           status?: string
           user_id?: string
@@ -3340,6 +3367,10 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      company_can_add_employee: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       company_can_add_expense: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -3361,6 +3392,10 @@ export type Database = {
         Returns: boolean
       }
       company_can_delete_batch: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_delete_employee: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
@@ -3388,6 +3423,10 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      company_can_edit_employee: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       company_can_edit_expense: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -3405,6 +3444,10 @@ export type Database = {
         Returns: boolean
       }
       company_can_manage_employees: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      company_can_manage_salary: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
@@ -3463,6 +3506,10 @@ export type Database = {
           mod_batches_add: boolean
           mod_batches_delete: boolean
           mod_batches_edit: boolean
+          mod_employees_add: boolean | null
+          mod_employees_delete: boolean | null
+          mod_employees_edit: boolean | null
+          mod_employees_salary: boolean | null
           mod_expenses_add: boolean
           mod_expenses_delete: boolean
           mod_expenses_edit: boolean
@@ -3475,6 +3522,11 @@ export type Database = {
           mod_students_add: boolean
           mod_students_delete: boolean
           mod_students_edit: boolean
+          mod_view_batches: boolean | null
+          mod_view_courses: boolean | null
+          mod_view_employees: boolean | null
+          mod_view_expenses: boolean | null
+          mod_view_revenue: boolean | null
           role: Database["public"]["Enums"]["company_role"]
           status: string
           user_id: string

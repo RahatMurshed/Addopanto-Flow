@@ -189,14 +189,14 @@ const App = () => (
                   <Route path="/dashboard" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.moderatorDashboard]}><CriticalRouteErrorBoundary routeName="Dashboard"><Dashboard /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
                   <Route path="/khatas" element={<ProtectedRoute><CriticalRouteErrorBoundary routeName="Accounts"><Khatas /></CriticalRouteErrorBoundary></ProtectedRoute>} />
                   <Route path="/revenue" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoRevenuePages, ACCESS_RULES.deoRevenue]}><CriticalRouteErrorBoundary routeName="Revenue"><Revenue /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
-                  <Route path="/expenses" element={<ProtectedRoute><CriticalRouteErrorBoundary routeName="Expenses"><Expenses /></CriticalRouteErrorBoundary></ProtectedRoute>} />
+                  <Route path="/expenses" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoExpenses]}><CriticalRouteErrorBoundary routeName="Expenses"><Expenses /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
                   <Route path="/students" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><CriticalRouteErrorBoundary routeName="Students"><Students /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/new" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><AddStudent /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/duplicates" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.moderatorDuplicates]}><StudentDuplicates /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/:studentId/profile" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoStudents]}><StudentProfilePage /></AccessGuard></ProtectedRoute>} />
                   <Route path="/students/:id" element={<ProtectedRoute><StudentDetail /></ProtectedRoute>} />
-                  <Route path="/courses" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCoursePages, ACCESS_RULES.deoCourses]}><Courses /></AccessGuard></ProtectedRoute>} />
-                  <Route path="/courses/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCoursePages]}><CourseDetail /></AccessGuard></ProtectedRoute>} />
+                  <Route path="/courses" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCourses]}><Courses /></AccessGuard></ProtectedRoute>} />
+                  <Route path="/courses/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoCourses]}><CourseDetail /></AccessGuard></ProtectedRoute>} />
                   <Route path="/batches" element={<Navigate to="/courses" replace />} />
                   <Route path="/batches/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoBatchPages]}><BatchDetail /></AccessGuard></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.moderatorReports]}><CriticalRouteErrorBoundary routeName="Reports"><Reports /></CriticalRouteErrorBoundary></AccessGuard></ProtectedRoute>} />
