@@ -88,10 +88,12 @@ export default function Revenue() {
   
 
   const { data: rawRevenues = [], isLoading } = useRevenues();
+  // Moderators with canViewRevenue see ALL entries; otherwise only their own
   const revenues = useMemo(() => {
     if (!isModerator) return rawRevenues;
+    if (canViewRevenue) return rawRevenues; // Full visibility
     return rawRevenues.filter(r => r.user_id === user?.id);
-  }, [rawRevenues, isModerator, user?.id]);
+  }, [rawRevenues, isModerator, canViewRevenue, user?.id]);
   const { data: sources = [] } = useRevenueSources();
   const { data: accounts = [] } = useExpenseAccounts();
   const createMutation = useCreateRevenue();

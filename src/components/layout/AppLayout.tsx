@@ -42,6 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     canAddExpenseSource,
     canViewReports,
     canViewEmployees, canManageEmployees,
+    canViewCourses, canViewBatches, canViewRevenue, canViewExpense,
     isLoading: companyLoading,
   } = useCompany();
   const location = useLocation();
@@ -113,9 +114,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
     } else if (isTraditionalModerator) {
       // Traditional Moderator: granular permissions, no Dashboard/Reports
-      if (canAddCourse || canEditCourse || canDeleteCourse) {
+      if (canViewCourses) {
         items.push({ label: "Courses", href: "/courses", icon: BookOpen });
-        items.push({ label: "Products", href: "/products", icon: Package });
       }
       if (canAddStudent || canEditStudent || canDeleteStudent) {
         items.push({ label: "Students", href: "/students", icon: GraduationCap });
@@ -123,10 +123,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (canViewEmployees) {
         items.push({ label: "Employees", href: "/employees", icon: Briefcase });
       }
-      if (canAddRevenue || canEditRevenue || canDeleteRevenue) {
+      if (canViewRevenue || canAddRevenue) {
         items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
       }
-      if (canAddExpense || canEditExpense || canDeleteExpense) {
+      if (canViewExpense || canAddExpense) {
         items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
       }
     } else {

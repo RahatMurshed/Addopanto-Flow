@@ -112,10 +112,12 @@ export default function Expenses() {
   const showHistory = !isModerator || canViewExpense;
   
   const { data: rawExpenses = [], isLoading } = useExpenses();
+  // Moderators with canViewExpense see ALL entries; otherwise only their own
   const expenses = useMemo(() => {
     if (!isModerator) return rawExpenses;
+    if (canViewExpense) return rawExpenses; // Full visibility
     return rawExpenses.filter(e => e.user_id === user?.id);
-  }, [rawExpenses, isModerator, user?.id]);
+  }, [rawExpenses, isModerator, canViewExpense, user?.id]);
   const { data: accounts = [] } = useAccountBalances();
   const { data: transfers = [] } = useKhataTransfers();
   const createMutation = useCreateExpense();

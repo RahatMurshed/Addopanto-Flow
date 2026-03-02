@@ -22,9 +22,9 @@ export const ACCESS_RULES = {
     message: "Access Denied — Admin Only. Reports are restricted to admins.",
     autoRedirectSeconds: 5,
   },
-  /** Block moderators with no revenue permissions */
+  /** Block moderators without revenue view access */
   deoRevenue: {
-    isDenied: (ctx) => ctx.isModerator && !ctx.canAddRevenue && !ctx.canViewRevenue,
+    isDenied: (ctx) => ctx.isModerator && !ctx.canViewRevenue,
     message: "You don't have permission to access revenue data. Contact your company admin to request revenue access.",
   },
   /** Block moderators with no student permissions */
@@ -32,10 +32,10 @@ export const ACCESS_RULES = {
     isDenied: (ctx) => ctx.isModerator && !ctx.canAddStudent && !ctx.canEditStudent && !ctx.canDeleteStudent,
     message: "You don't have permission to access student data. Contact your company admin to request student access.",
   },
-  /** Block moderators with no batch/course permissions */
+  /** Block moderators without course view access */
   deoCourses: {
-    isDenied: (ctx) => ctx.isModerator && !ctx.canAddBatch && !ctx.canEditBatch && !ctx.canDeleteBatch,
-    message: "You don't have permission to access courses or batches. Contact your company admin to request access.",
+    isDenied: (ctx) => ctx.isModerator && !ctx.canViewCourses,
+    message: "You don't have permission to access courses. Contact your company admin to request access.",
   },
   /** Block DEO moderators from courses page */
   deoCoursePages: {
@@ -43,13 +43,13 @@ export const ACCESS_RULES = {
     message: "Access Denied. Courses are not available in Data Entry Mode.",
     autoRedirectSeconds: 5,
   },
-  /** Block DEO moderators from batches page */
+  /** Block moderators without batch view access */
   deoBatchPages: {
-    isDenied: (ctx) => ctx.isDataEntryModerator,
-    message: "Access Denied. Batches are not available in Data Entry Mode.",
+    isDenied: (ctx) => ctx.isModerator && !ctx.canViewBatches,
+    message: "You don't have permission to access batches. Contact your company admin to request access.",
     autoRedirectSeconds: 5,
   },
-  /** Block DEO moderators from revenue page */
+  /** Block moderators without revenue view */
   deoRevenuePages: {
     isDenied: (ctx) => ctx.isDataEntryModerator,
     message: "Access Denied. Revenue is not available in Data Entry Mode.",
@@ -77,6 +77,12 @@ export const ACCESS_RULES = {
   deoEmployees: {
     isDenied: (ctx) => ctx.isModerator && !ctx.canViewEmployees,
     message: "You don't have permission to access employee data. Contact your company admin to request employee access.",
+    autoRedirectSeconds: 5,
+  },
+  /** Block moderators without expense view access */
+  deoExpenses: {
+    isDenied: (ctx) => ctx.isModerator && !ctx.canViewExpense && !ctx.canAddExpense,
+    message: "You don't have permission to access expenses. Contact your company admin to request access.",
     autoRedirectSeconds: 5,
   },
   /** Block DEO moderators from Products */
