@@ -217,9 +217,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2 px-2 py-1.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sidebar-primary text-sidebar-primary-foreground">
-                <Building2 className="h-3 w-3" />
-              </div>
+              {activeCompany?.logo_url ? (
+                <img src={activeCompany.logo_url} alt="" className="h-5 w-5 rounded object-cover" />
+              ) : (
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Building2 className="h-3 w-3" />
+                </div>
+              )}
               <span className="truncate text-sm font-medium text-sidebar-foreground">{activeCompany?.name || "Business"}</span>
             </div>
           )}
