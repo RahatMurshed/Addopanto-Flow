@@ -26,6 +26,14 @@ function AccessDenied() {
   );
 }
 
+/** Allow cipher OR viewer roles */
+function CipherOrViewerGuard({ children }: { children: React.ReactNode }) {
+  const { isCipher, isViewer, isLoading } = useCompany();
+  if (isLoading) return null;
+  if (!isCipher && !isViewer) return <AccessDenied />;
+  return <>{children}</>;
+}
+
 const Auth = lazy(() => import("@/pages/Auth"));
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -211,10 +219,10 @@ const App = () => (
                   <Route path="/products/category/:slug" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><CategoryProducts /></AccessGuard></ProtectedRoute>} />
                   <Route path="/products/:id" element={<ProtectedRoute><AccessGuard rules={[ACCESS_RULES.deoProducts]}><ProductDetail /></AccessGuard></ProtectedRoute>} />
                   
-                  {/* Cipher-only: Investors & Loans */}
-                  <Route path="/stakeholders" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><Stakeholders /></RoleGuard></ProtectedRoute>} />
+                  {/* Cipher + Viewer: Investors & Loans */}
+                  <Route path="/stakeholders" element={<ProtectedRoute><CipherOrViewerGuard><Stakeholders /></CipherOrViewerGuard></ProtectedRoute>} />
                   <Route path="/stakeholders/new" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><AddStakeholder /></RoleGuard></ProtectedRoute>} />
-                  <Route path="/stakeholders/:id" element={<ProtectedRoute><RoleGuard roles={["cipher"]} fallback={<AccessDenied />}><StakeholderDetail /></RoleGuard></ProtectedRoute>} />
+                  <Route path="/stakeholders/:id" element={<ProtectedRoute><CipherOrViewerGuard><StakeholderDetail /></CipherOrViewerGuard></ProtectedRoute>} />
                   
                   
                   <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

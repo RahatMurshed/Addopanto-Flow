@@ -44,6 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     canViewEmployees, canManageEmployees,
     canViewCourses, canViewBatches, canViewRevenue, canViewExpense,
     isLoading: companyLoading,
+    isViewer,
   } = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
@@ -99,13 +100,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (companyLoading) return [];
     const items: Array<{ label: string; href: string; icon: any; badge?: number }> = [...baseNavItems];
 
+    // Viewer: full read-only navigation (same as admin/cipher)
+    if (isViewer) {
+      items.push({ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard });
+      items.push({ label: "Courses", href: "/courses", icon: BookOpen });
+      items.push({ label: "Products", href: "/products", icon: Package });
+      items.push({ label: "Students", href: "/students", icon: GraduationCap });
+      items.push({ label: "Employees", href: "/employees", icon: Briefcase });
+      items.push({ label: "Expense Sources", href: "/khatas", icon: Wallet });
+      items.push({ label: "Revenue", href: "/revenue", icon: TrendingUp });
+      items.push({ label: "Expenses", href: "/expenses", icon: Receipt });
+      items.push({ label: "Reports", href: "/reports", icon: FileText });
+      items.push({ label: "Investors & Loans", href: "/stakeholders", icon: Handshake });
+      items.push({ label: "Audit Log", href: "/audit-log", icon: ClipboardList });
+      return items;
+    }
+
     // Dashboard: admin/cipher only
     if (!isModerator) {
       items.push({ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard });
     }
 
     if (isDataEntryModerator) {
-      // Data Entry Moderator: only Students and Expenses
       if (canAddStudent || canEditStudent || canDeleteStudent) {
         items.push({ label: "Students", href: "/students", icon: GraduationCap });
       }
@@ -113,7 +129,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         items.push({ label: "My Expenses", href: "/expenses", icon: Receipt });
       }
     } else if (isTraditionalModerator) {
-      // Traditional Moderator: granular permissions, no Dashboard/Reports
       if (canViewCourses) {
         items.push({ label: "Courses", href: "/courses", icon: BookOpen });
       }
@@ -143,7 +158,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       items.push({ label: "Members", href: "/company/members", icon: Users, badge: (isCompanyAdmin || isCipher) ? pendingJoinCount : 0 });
       items.push({ label: "Audit Log", href: "/audit-log", icon: ClipboardList });
 
-      // Cipher-only platform pages
       if (isCipher) {
         items.push({ label: "Investors & Loans", href: "/stakeholders", icon: Handshake });
         items.push({ label: "Company Requests", href: "/company-requests", icon: Building2, badge: pendingCreationCount });

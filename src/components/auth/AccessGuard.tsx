@@ -110,6 +110,11 @@ export function AccessGuard({ children, rules }: AccessGuardProps) {
     );
   }
 
+  // Viewers bypass all access rules — full read-only access
+  if (ctx.isViewer) {
+    return <>{children}</>;
+  }
+
   for (const rule of rules) {
     if (rule.isDenied(ctx)) {
       return (
