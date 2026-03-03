@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, XCircle, AlertCircle, Clock } from "lucide-react";
+import { Building2, ArrowLeft, Loader2, Search, KeyRound, Ticket, Eye, EyeOff, ShieldCheck, XCircle, AlertCircle, Clock, LogOut } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import gaLogo from "@/assets/GA-LOGO.png";
 
 export default function JoinCompany() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isCipher } = useCompany();
@@ -327,14 +327,19 @@ export default function JoinCompany() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/companies")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Join a Business</h1>
-            <p className="text-sm text-muted-foreground">Browse businesses or use an invite code to join</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/companies")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Join a Business</h1>
+              <p className="text-sm text-muted-foreground">Browse businesses or use an invite code to join</p>
+            </div>
           </div>
+          <Button variant="outline" size="sm" onClick={() => signOut()} className="gap-2 text-destructive hover:text-destructive">
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
         </div>
 
         <Tabs defaultValue="browse">
