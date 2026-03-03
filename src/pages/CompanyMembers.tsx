@@ -29,6 +29,7 @@ import { UserProfileSheet } from "@/components/auth/UserProfileSheet";
 
 function getPermissionsSummary(member: CompanyMembership): string {
   if (member.role === "admin") return "Full access";
+  if (member.role === "viewer") return "Read-only (full visibility)";
   if (member.role === "moderator") {
     if (member.data_entry_mode) {
       const cats = [];
@@ -324,6 +325,7 @@ export default function CompanyMembers() {
                                   {isCipher && <SelectItem value="admin">Admin</SelectItem>}
                                   {!isCipher && isCompanyAdmin && <SelectItem value="admin">Admin</SelectItem>}
                                   <SelectItem value="moderator">Moderator</SelectItem>
+                                  <SelectItem value="viewer">Viewer</SelectItem>
                                 </SelectContent>
                               </Select>
                             )}

@@ -3591,6 +3591,10 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      is_company_viewer: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_data_entry_moderator: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean

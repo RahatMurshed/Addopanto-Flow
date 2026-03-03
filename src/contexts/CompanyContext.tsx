@@ -23,7 +23,7 @@ export interface CompanyMembership {
   id: string;
   user_id: string;
   company_id: string;
-  role: "admin" | "moderator";
+  role: "admin" | "moderator" | "viewer";
   data_entry_mode: boolean;
   // Legacy fields kept for backward compat
   can_add_revenue: boolean;
@@ -89,6 +89,7 @@ interface CompanyContextType {
   isModerator: boolean;
   isDataEntryModerator: boolean;
   isTraditionalModerator: boolean;
+  isViewer: boolean;
 
   // Granular permissions
   canAddRevenue: boolean;
@@ -265,6 +266,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const activeCompany = companies.find((c) => c.id === activeCompanyId) ?? null;
   const membership = memberships.find((m) => m.company_id === activeCompanyId) ?? null;
 
+  const isViewer = membership?.role === "viewer";
   const isCompanyAdmin = membership?.role === "admin" || isCipher;
   const isModerator = membership?.role === "moderator" && !isCompanyAdmin;
   const isDataEntryModerator = isModerator && (membership?.data_entry_mode ?? false);
@@ -276,64 +278,64 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const deoBatches = membership?.deo_batches ?? false;
   const deoFinance = membership?.deo_finance ?? false;
 
-  // Derived granular permissions
-  const canAddStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_add ?? false)) || (isDataEntryModerator && deoStudents);
-  const canEditStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_edit ?? false)) || (isDataEntryModerator && deoStudents);
-  const canDeleteStudent = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_delete ?? false)) || (isDataEntryModerator && deoStudents);
+  // Derived granular permissions (viewers get NO write permissions)
+  const canAddStudent = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_add ?? false)) || (isDataEntryModerator && deoStudents));
+  const canEditStudent = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_edit ?? false)) || (isDataEntryModerator && deoStudents));
+  const canDeleteStudent = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_students_delete ?? false)) || (isDataEntryModerator && deoStudents));
 
-  const canAddPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_add ?? false));
-  const canEditPayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_edit ?? false));
-  const canDeletePayment = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_delete ?? false));
+  const canAddPayment = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_add ?? false)));
+  const canEditPayment = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_edit ?? false)));
+  const canDeletePayment = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_payments_delete ?? false)));
 
-  const canAddBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_add ?? false)) || (isDataEntryModerator && deoBatches);
-  const canEditBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_edit ?? false)) || (isDataEntryModerator && deoBatches);
-  const canDeleteBatch = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_delete ?? false)) || (isDataEntryModerator && deoBatches);
+  const canAddBatch = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_add ?? false)) || (isDataEntryModerator && deoBatches));
+  const canEditBatch = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_edit ?? false)) || (isDataEntryModerator && deoBatches));
+  const canDeleteBatch = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_batches_delete ?? false)) || (isDataEntryModerator && deoBatches));
 
   // Courses are Admin/Cipher only
-  const canAddCourse = isCompanyAdmin;
-  const canEditCourse = isCompanyAdmin;
-  const canDeleteCourse = isCompanyAdmin;
+  const canAddCourse = !isViewer && isCompanyAdmin;
+  const canEditCourse = !isViewer && isCompanyAdmin;
+  const canDeleteCourse = !isViewer && isCompanyAdmin;
 
-  const canAddRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_add ?? false)) || (isDataEntryModerator && deoFinance);
-  const canEditRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_edit ?? false)) || (isDataEntryModerator && deoFinance);
-  const canDeleteRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_delete ?? false)) || (isDataEntryModerator && deoFinance);
+  const canAddRevenue = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_add ?? false)) || (isDataEntryModerator && deoFinance));
+  const canEditRevenue = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_edit ?? false)) || (isDataEntryModerator && deoFinance));
+  const canDeleteRevenue = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_revenue_delete ?? false)) || (isDataEntryModerator && deoFinance));
 
-  const canAddExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_add ?? false)) || (isDataEntryModerator && deoFinance);
-  const canEditExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_edit ?? false)) || (isDataEntryModerator && deoFinance);
-  const canDeleteExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_delete ?? false)) || (isDataEntryModerator && deoFinance);
+  const canAddExpense = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_add ?? false)) || (isDataEntryModerator && deoFinance));
+  const canEditExpense = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_edit ?? false)) || (isDataEntryModerator && deoFinance));
+  const canDeleteExpense = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_expenses_delete ?? false)) || (isDataEntryModerator && deoFinance));
 
-  const canAddExpenseSource = isCompanyAdmin;
-  const canTransfer = isCompanyAdmin || (isTraditionalModerator && (membership?.can_transfer ?? false));
-  const canViewReports = isCompanyAdmin;
-  const canManageStudents = isCompanyAdmin || canAddStudent || canEditStudent;
-  const canEdit = isCompanyAdmin;
-  const canDelete = isCompanyAdmin;
-  const canManageMembers = isCompanyAdmin;
-  const canViewMembers = isCompanyAdmin || isTraditionalModerator;
+  const canAddExpenseSource = !isViewer && isCompanyAdmin;
+  const canTransfer = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.can_transfer ?? false)));
+  const canViewReports = isCompanyAdmin || isViewer;
+  const canManageStudents = !isViewer && (isCompanyAdmin || canAddStudent || canEditStudent);
+  const canEdit = !isViewer && isCompanyAdmin;
+  const canDelete = !isViewer && isCompanyAdmin;
+  const canManageMembers = !isViewer && isCompanyAdmin;
+  const canViewMembers = isCompanyAdmin || isTraditionalModerator || isViewer;
 
-  // NEW: View permissions
-  const canViewRevenue = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_view_revenue ?? false)) || (isDataEntryModerator && deoFinance);
-  const canViewExpense = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_view_expenses ?? false)) || (isDataEntryModerator && deoFinance);
+  // NEW: View permissions — viewers get full read access
+  const canViewRevenue = isCompanyAdmin || isViewer || (isTraditionalModerator && (membership?.mod_view_revenue ?? false)) || (isDataEntryModerator && deoFinance);
+  const canViewExpense = isCompanyAdmin || isViewer || (isTraditionalModerator && (membership?.mod_view_expenses ?? false)) || (isDataEntryModerator && deoFinance);
 
   // Payment view auto-grants course/batch view
   const hasAnyPaymentPerm = isTraditionalModerator && ((membership?.mod_payments_add ?? false) || (membership?.mod_payments_edit ?? false) || (membership?.mod_payments_delete ?? false));
-  const canViewCourses = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_view_courses ?? false)) || hasAnyPaymentPerm;
-  const canViewBatches = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_view_batches ?? false)) || hasAnyPaymentPerm;
+  const canViewCourses = isCompanyAdmin || isViewer || (isTraditionalModerator && (membership?.mod_view_courses ?? false)) || hasAnyPaymentPerm;
+  const canViewBatches = isCompanyAdmin || isViewer || (isTraditionalModerator && (membership?.mod_view_batches ?? false)) || hasAnyPaymentPerm;
 
-  const canViewStudentPII = isCompanyAdmin;
-  const canManageEmployees = isCompanyAdmin;
-  const canViewEmployees = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_view_employees ?? false)) || (isModerator && (membership?.can_view_employees ?? false));
+  const canViewStudentPII = isCompanyAdmin || isViewer;
+  const canManageEmployees = !isViewer && isCompanyAdmin;
+  const canViewEmployees = isCompanyAdmin || isViewer || (isTraditionalModerator && (membership?.mod_view_employees ?? false)) || (isModerator && (membership?.can_view_employees ?? false));
 
   // NEW: Employee granular permissions
-  const canAddEmployee = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_add ?? false));
-  const canEditEmployee = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_edit ?? false));
-  const canDeleteEmployee = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_delete ?? false));
-  const canManageSalary = isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_salary ?? false));
+  const canAddEmployee = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_add ?? false)));
+  const canEditEmployee = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_edit ?? false)));
+  const canDeleteEmployee = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_delete ?? false)));
+  const canManageSalary = !isViewer && (isCompanyAdmin || (isTraditionalModerator && (membership?.mod_employees_salary ?? false)));
 
-  // Data entry mode specific visibility
-  const canViewDashboardMetrics = isCompanyAdmin;
-  const canViewPaymentHistory = !isDataEntryModerator;
-  const canViewFinancialData = !isDataEntryModerator;
+  // Data entry mode specific visibility — viewers see everything
+  const canViewDashboardMetrics = isCompanyAdmin || isViewer;
+  const canViewPaymentHistory = !isDataEntryModerator || isViewer;
+  const canViewFinancialData = !isDataEntryModerator || isViewer;
 
   const isLoading = cipherLoading || profileLoading || membershipsLoading || companiesLoading;
 
@@ -378,6 +380,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       isModerator,
       isDataEntryModerator,
       isTraditionalModerator,
+      isViewer,
 
       canAddRevenue,
       canAddExpense,
