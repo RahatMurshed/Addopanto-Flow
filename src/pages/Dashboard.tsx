@@ -43,7 +43,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const {
     activeCompanyId, activeCompany, isModerator, isCipher, isCompanyAdmin, membership,
-    isDataEntryModerator, isTraditionalModerator,
+    isDataEntryModerator, isTraditionalModerator, isViewer,
     canAddStudent, canAddPayment, canAddBatch, canAddRevenue, canAddExpense, canAddCourse,
     canViewDashboardMetrics,
   } = useCompany();
@@ -102,7 +102,7 @@ export default function Dashboard() {
         activeLoans: loans.length,
       };
     },
-    enabled: !!user && !!activeCompanyId && isCipher,
+    enabled: !!user && !!activeCompanyId && (isCipher || isViewer),
   });
 
   // All-time totals via RPC
