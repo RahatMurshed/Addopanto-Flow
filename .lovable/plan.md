@@ -1,27 +1,52 @@
 
 
-# Regenerate "Addopanto Flow" Logo (Transparent Background, Larger)
+## Fix: Auth Issues (Google redirect loop, invalid credentials, email verification)
 
-## What I'll Do
+### Root Causes Found
 
-Use AI image generation to create a new version of the "Addopanto Flow" logo with:
-- **Transparent background** (true PNG with alpha channel)
-- **Larger canvas size** (e.g. 1024x512 or similar) so it renders crisply at all sizes
-- Same theme colors: deep orange and dark navy blue
-- Clean, professional SaaS style
-- Text: "Addopanto Flow" (no "Demo")
+1. **Google login redirects back to auth**: The `handle_new_user` trigger is **missing** from `auth.users`. The function exists, but no trigger calls it. So when a new Google user signs up, no `user_profiles` or `user_roles` records are created. After ~30 seconds the app's safety check detects "no role" and forces a logout.
 
-## Steps
+2. **"Invalid credentials" on email login**: The auth logs confirm a `400: Invalid login credentials` response. Since the admin user's profile and role records now exist (from our earlier fix), the issue is likely that email confirmation is required and the password may need resetting, or the credentials are simply incorrect.
 
-1. **Generate the logo** using Nano banana pro (google/gemini-3-pro-image-preview) with explicit instructions for transparent/white background and high resolution
-2. **Save to both asset locations**:
-   - `src/assets/GA-LOGO.png`
-   - `public/GA-LOGO.png`
-3. **No code changes needed** -- all 8 files already reference these paths with `object-contain` and `w-auto` styling, so a larger image will display correctly everywhere
+3. **Email verification blocking signups**: New users must verify email before they can sign in. The user wants this disabled.
 
-## Technical Notes
+### Plan
 
-- AI image generation models may not produce true transparency reliably; if the result has a white background, I will instruct the prompt to use a clean white background that blends well with both light and dark themes
-- The logo appears in the sidebar (h-10), mobile header (h-8), auth pages (h-12 to h-16), landing page nav (h-9), and footer (h-7) -- all use `w-auto object-contain` so a larger source image will simply render sharper
-- Files affected: `src/assets/GA-LOGO.png`, `public/GA-LOGO.png`
+**Step 1: Re-create the missing database trigger**
+
+Run a migration to attach the `handle_new_user` function to `auth.users`:
+
+```sql
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+```
+
+This ensures every new user (Google, Apple, or email) automatically gets `user_profiles` and `user_roles` records.
+
+**Step 2: Fix the existing Google user**
+
+Insert missing records for `rahatmurshed01@gmail.com` (user ID `ac88fbed-1eb2-4e6a-82d2-f5d998b2a03f`):
+
+```sql
+INSERT INTO public.user_profiles (user_id, email, full_name)
+VALUES ('ac88fbed-1eb2-4e6a-82d2-f5d998b2a03f', 'rahatmurshed01@gmail.com', 'Rahat Murshed')
+ON CONFLICT (user_id) DO NOTHING;
+
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('ac88fbed-1eb2-4e6a-82d2-f5d998b2a03f', 'user')
+ON CONFLICT (user_id, role) DO NOTHING;
+```
+
+**Step 3: Enable auto-confirm for email signups**
+
+Use the configure-auth tool to disable email confirmation, so new users can sign in immediately after creating an account.
+
+### Technical Details
+
+- **Files modified**: None (database-only changes + auth config)
+- **Database changes**: Re-create trigger on `auth.users`, insert missing user data
+- **Auth config**: Enable auto-confirm for email signups
+- **No breaking changes**: All existing users are unaffected
 
