@@ -8,11 +8,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
 };
 
-function getCorsHeaders(_req: Request) {
-  return corsHeaders;
-}
-
-let corsHeaders: Record<string, string> = {};
 
 const uuidField = z.string().uuid("Invalid ID format");
 
@@ -39,7 +34,7 @@ const roleChangeSchema = z.object({
 });
 
 Deno.serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
