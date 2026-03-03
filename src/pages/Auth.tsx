@@ -220,6 +220,26 @@ export default function Auth() {
                     Forgot password?
                   </Button>
                 </form>
+
+                <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/50 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Demo Credentials</p>
+                  <div className="space-y-1 text-sm">
+                    <p><span className="text-muted-foreground">Email:</span> <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">admin@addopantoflowdemo.com</code></p>
+                    <p><span className="text-muted-foreground">Password:</span> <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">Admin.30@</code></p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      setLoginEmail("admin@addopantoflowdemo.com");
+                      setLoginPassword("Admin.30@");
+                    }}
+                  >
+                    Use Demo Credentials
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
