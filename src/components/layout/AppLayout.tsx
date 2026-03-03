@@ -113,6 +113,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       items.push({ label: "Reports", href: "/reports", icon: FileText });
       items.push({ label: "Investors & Loans", href: "/stakeholders", icon: Handshake });
       items.push({ label: "Audit Log", href: "/audit-log", icon: ClipboardList });
+      items.push({ label: "Members", href: "/company/members", icon: Users });
       return items;
     }
 

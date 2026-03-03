@@ -37,11 +37,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST,OPTIONS",
 };
 
-function getCorsHeaders(_req: Request) {
-  return corsHeaders;
-}
 
-let corsHeaders: Record<string, string> = {};
+
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -136,7 +133,6 @@ const actionSchema = z.object({
 }).passthrough();
 
 Deno.serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
