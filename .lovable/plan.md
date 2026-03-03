@@ -1,52 +1,27 @@
 
 
-## Fix: Auth Issues (Google redirect loop, invalid credentials, email verification)
+## Fix: Platform Users page showing no users
 
-### Root Causes Found
+### Root Cause
 
-1. **Google login redirects back to auth**: The `handle_new_user` trigger is **missing** from `auth.users`. The function exists, but no trigger calls it. So when a new Google user signs up, no `user_profiles` or `user_roles` records are created. After ~30 seconds the app's safety check detects "no role" and forces a logout.
-
-2. **"Invalid credentials" on email login**: The auth logs confirm a `400: Invalid login credentials` response. Since the admin user's profile and role records now exist (from our earlier fix), the issue is likely that email confirmation is required and the password may need resetting, or the credentials are simply incorrect.
-
-3. **Email verification blocking signups**: New users must verify email before they can sign in. The user wants this disabled.
-
-### Plan
-
-**Step 1: Re-create the missing database trigger**
-
-Run a migration to attach the `handle_new_user` function to `auth.users`:
-
-```sql
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user();
+The `admin-users` edge function crashes on startup with:
+```
+SyntaxError: Identifier 'corsHeaders' has already been declared
 ```
 
-This ensures every new user (Google, Apple, or email) automatically gets `user_profiles` and `user_roles` records.
+Line 4 declares `const corsHeaders = {...}` and line 15 declares `let corsHeaders: Record<string, string> = {};` — a duplicate variable name in the same scope. The function never loads, so the GET request to list users fails silently, returning an empty list.
 
-**Step 2: Fix the existing Google user**
+### Fix
 
-Insert missing records for `rahatmurshed01@gmail.com` (user ID `ac88fbed-1eb2-4e6a-82d2-f5d998b2a03f`):
+**File: `supabase/functions/admin-users/index.ts`**
 
-```sql
-INSERT INTO public.user_profiles (user_id, email, full_name)
-VALUES ('ac88fbed-1eb2-4e6a-82d2-f5d998b2a03f', 'rahatmurshed01@gmail.com', 'Rahat Murshed')
-ON CONFLICT (user_id) DO NOTHING;
+- Remove the duplicate `let corsHeaders` declaration on line 15
+- Remove the `getCorsHeaders` wrapper function (lines 11-13) since it just returns the same static object
+- Remove the reassignment on line 42 (`corsHeaders = getCorsHeaders(req)`)
 
-INSERT INTO public.user_roles (user_id, role)
-VALUES ('ac88fbed-1eb2-4e6a-82d2-f5d998b2a03f', 'user')
-ON CONFLICT (user_id, role) DO NOTHING;
-```
+The static `const corsHeaders` on line 4 is sufficient — the CORS headers don't change per-request.
 
-**Step 3: Enable auto-confirm for email signups**
+### Result
 
-Use the configure-auth tool to disable email confirmation, so new users can sign in immediately after creating an account.
-
-### Technical Details
-
-- **Files modified**: None (database-only changes + auth config)
-- **Database changes**: Re-create trigger on `auth.users`, insert missing user data
-- **Auth config**: Enable auto-confirm for email signups
-- **No breaking changes**: All existing users are unaffected
+After deploying, the Platform Users page will correctly list all registered users.
 
