@@ -10,6 +10,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Supabase](https://img.shields.io/badge/Supabase-Auth_·_Postgres_·_RLS-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com)
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-12.34-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion)
+[![Status](https://img.shields.io/badge/Status-Active-2ea44f)](#)
 [![License](https://img.shields.io/badge/License-Proprietary-333333)](#)
 
 [Live Demo](https://addopantoflowdemo.lovable.app) · [Report Issue](../../issues)
@@ -20,9 +21,11 @@
 
 ## What Is This?
 
-Addopanto Flow is a complete back-office platform purpose-built for schools, coaching centers, and academies that need to manage tuition fees, allocate revenue across expense accounts, track employee salaries, monitor investor obligations, and generate financial reports — all while operating multiple branches or organizations from a single login. If you run an educational business and currently juggle spreadsheets for fee collection, expense tracking, and payroll, this replaces all of them.
+Addopanto Flow is a complete back-office platform purpose-built for schools, coaching centers, and academies. If your institution currently manages fee collection, payroll, expense tracking, and investor obligations across separate spreadsheets or disconnected tools — this replaces all of them. Everything lives in one place, access is controlled by role, and every financial action leaves a traceable record.
 
-From an engineering perspective, this is a single-page application with a row-level-security-enforced multi-tenant architecture. Every database table is scoped to a `company_id` and protected by Postgres RLS policies. The access control layer implements a five-tier role hierarchy (Cipher › Admin › Moderator › Data Entry Operator › Viewer) with 30+ granular permission flags per membership. Routes are lazy-loaded, dashboard aggregations use server-side RPC functions, and all mutations are captured in an append-only audit log. Real-time synchronization is handled through Supabase Realtime channels.
+For those running multiple branches or organizations, the platform supports full data isolation per organization under a single login. Administrators define who sees what, operators enter data within their permitted scope, and nothing crosses organization boundaries.
+
+From an engineering perspective, this is a React 18 single-page application backed by Supabase with row-level security enforced at the database layer — not the application layer. Every table is scoped to a `company_id`. The access control model implements a five-tier role hierarchy with 30+ granular permission flags per membership. Dashboard aggregations run as server-side Postgres RPC functions, all mutations are captured in an append-only audit log, and real-time state is synchronized through Supabase Realtime channels.
 
 ---
 
@@ -91,10 +94,54 @@ From an engineering perspective, this is a single-page application with a row-le
 
 ---
 
+## Screenshots
+
+> Automatically adapts to your system's dark or light preference.
+
+**Dashboard** — Revenue metrics, expense allocation, profit tracking, and period-over-period comparison
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/dashboard-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/dashboard-light.png">
+  <img src=".github/screenshots/dashboard-light.png" alt="Dashboard" width="100%">
+</picture>
+
+<br/>
+
+**Student Management** — Enrollment stats, batch distribution, and a searchable student directory with bulk actions
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/students-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/students-light.png">
+  <img src=".github/screenshots/students-light.png" alt="Student Management" width="100%">
+</picture>
+
+<br/>
+
+**Student Payment Detail** — Admission fee, monthly tuition breakdown, payment progress, and full payment history
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/payment-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/payment-light.png">
+  <img src=".github/screenshots/payment-light.png" alt="Student Payment Detail" width="100%">
+</picture>
+
+<br/>
+
+**Reports** — Date-filtered financial summaries with revenue by source, expense distribution, and CSV export
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/reports-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/reports-light.png">
+  <img src=".github/screenshots/reports-light.png" alt="Reports" width="100%">
+</picture>
+
+---
+
 ## Tech Stack · Architecture
 
 | Layer | Technology | Role |
-|-------|-----------|------|
+|-------|------------|------|
 | UI Framework | React 18.3 | Component architecture with lazy-loaded route splitting |
 | Language | TypeScript 5.8 | End-to-end type safety across client and database types |
 | Build Tool | Vite 5.4 | Sub-second HMR, optimized production builds |
@@ -142,7 +189,14 @@ VITE_SENTRY_DSN=your-sentry-dsn          # optional
 ```
 
 ```bash
-# 4 ― Start the development server
+# 4 ― Apply database migrations
+npx supabase db push
+```
+
+> If using the connected Lovable Cloud instance, the database schema is already configured and this step can be skipped.
+
+```bash
+# 5 ― Start the development server
 npm run dev
 ```
 
@@ -164,18 +218,20 @@ npm run dev
 
 - **AI Payment Assistant** — An AI agent that flags overdue students, drafts reminder messages, and suggests optimal payment plans based on each student's payment history and enrollment duration
 
-- **Smart Attendance Integration** — Link attendance records to payment status so administrators can correlate class presence with fee compliance across batches
+- **AI Financial Insights** — Forecasts monthly collection rates, detects dropout risk from payment patterns, and summarizes batch-level financial health in plain language for non-technical administrators
 
 - **Parent Portal** — A read-only interface for parents to check their child's payment status, outstanding dues, and enrolled batches without contacting the admin office
 
-- **Automated WhatsApp · SMS Reminders** — Scheduled payment reminders sent directly to students or parents via WhatsApp API or SMS when dues are approaching or overdue
+- **Multi-branch Support** — Manage multiple coaching center locations under one account with branch-level reporting, cost allocation, and data isolation per location
 
-- **AI-Powered Financial Insights** — A dashboard layer that forecasts monthly collection rates, identifies dropout risk from payment patterns, and summarizes batch-level financial health in plain language
+- **Expense Tracking** — Log operational costs per branch (rent, salaries, utilities) and view net profit alongside revenue directly in the main financial dashboard
 
 ---
 
 <div align="center">
 
-Built by **Grammar Addopanto**
+Built and maintained by **Grammar Addopanto**
+
+[Live Demo](https://addopantoflowdemo.lovable.app) · [Report an Issue](../../issues)
 
 </div>
