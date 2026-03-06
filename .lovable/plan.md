@@ -1,41 +1,61 @@
 
 
-## Security & Data Leak Audit Results
+## Plan: Generate Professional README.md
 
-### Console Audit
-- **No PII leaked in console logs.** The only console output is a React warning about `forwardRef` in `DashboardCharts` (a non-security code quality issue). The `logger.ts` utility correctly suppresses all `console.log/warn/error` in production builds.
-- Only 4 files use raw `console.warn` — all for internal developer warnings (404 route, overpayment detection, terminated employee salary). None leak PII.
+### What the App Is
 
-### Network Audit
-- **No sensitive PII in API responses.** All network requests are authenticated with bearer tokens. Response data contains only business data (revenue summaries, expense accounts, tuition descriptions with student names — which is expected for authorized admin users).
-- **JWT tokens visible in network headers** — this is standard and expected for authenticated API calls. Tokens are short-lived (4-hour expiry).
-- **User profile response** includes email and full_name but no sensitive fields like phone/address (those are null for this account).
+**Addopanto Flow** is a multi-tenant financial management platform built for educational institutions (schools, academies, coaching centers). It handles revenue allocation, expense tracking, student fee management, employee payroll, course/batch management, investor/loan tracking, and financial reporting — all with granular role-based access control across multiple organizations.
 
-### Security Scan Findings (14 total)
+**App Name:** Addopanto Flow
+**Copyright:** Grammar Addopanto
+**Published URL:** https://addopantoflowdemo.lovable.app
 
-**No active data leaks detected.** However, the security scan flagged these architectural concerns:
+### README Structure
 
-| Severity | Finding | Risk Level |
-|----------|---------|------------|
-| ERROR | Student PII (addresses, national IDs, phone) accessible to all company members | Design concern — RLS restricts to company members only |
-| ERROR | Employee banking details accessible to users with view permission | Design concern — restricted by permission functions |
-| ERROR | User profile emails/phones viewable by company members | Design concern — members see fellow members |
-| ERROR | Company creation request contact info persists after rejection | Low risk — only visible to submitter + cipher |
-| WARN | Leaked password protection disabled | Recommended to enable |
-| WARN | Extension in public schema | Low risk |
-| WARN | Various financial data accessible to cipher/viewer roles | By design — viewer role has full read access |
-| INFO | Rate limits table has restrictive policy | By design |
-| INFO | students_safe view has no explicit RLS | Likely inherits from base table |
+**1. Hero Section**
+- Centered `<div align="center">` with app name, tagline: *"Multi-tenant financial management for educational institutions"*
+- shields.io badges with real versions: React 18.3, TypeScript 5.8, Vite 5.4, Tailwind CSS 3.4, Supabase, Framer Motion 12.34
+- Demo link to published URL
 
-### Demo Credentials Note
-The demo credentials (`admin@addopantoflowdemo.com` / `Admin.30@`) are intentionally hardcoded on the login page as requested. This is acceptable for a demo app but should be noted.
+**2. What Is This?**
+- Business paragraph: explains it manages tuition fees, revenue allocation, expenses, payroll, and reporting for schools/academies running multiple branches
+- Technical paragraph: SPA with RLS-secured multi-tenant architecture, granular RBAC (cipher/admin/moderator/viewer/data-entry), real-time sync, lazy-loaded routes, RPC-based dashboard aggregations
 
-### Verdict
-**No data is being leaked.** All data flows are behind authentication and RLS policies. The console is clean of PII. The flagged security findings are architectural design decisions (company members seeing fellow members' data) rather than actual data breaches.
+**3. Features** (grouped by area, benefit-focused)
+- Financial Management: revenue allocation to expense accounts, expense tracking, inter-account transfers, profit/loss dashboards
+- Student Management: enrollment wizard, fee tracking (admission + monthly), overdue detection, batch assignments, bulk import/export, duplicate detection, student profiles with lifetime value
+- Course & Batch System: course creation, batch scheduling with capacity, enrollment tracking, auto-complete
+- Employee & Payroll: employee records, salary payments with deductions, employment status tracking
+- Investor & Loan Tracking: investment recording, loan disbursement workflow, repayment tracking, fund allocation to expenses
+- Product Sales: product categories, inventory with stock adjustments, sales recording
+- Reports & Exports: date-filtered P&L, revenue/expense summaries, CSV/PDF export, period-over-period comparison
+- Multi-Organization: isolated company data, company creation requests, join via invite code, company switching
+- Access Control: 5-tier role system (Cipher > Admin > Moderator > Data Entry Operator > Viewer), 30+ granular permissions per membership
+- Audit & Security: audit log for all mutations, RLS on every table, PII restriction banners
 
-### Recommended Improvements (Optional)
-1. **Enable leaked password protection** in auth settings to prevent users from using known-compromised passwords
-2. **Fix the `forwardRef` warning** in `DashboardCharts.tsx` to clean up the console completely
+**4. Screenshots**
+- Placeholder section with captions: Dashboard, Student Management, Reports, Course & Batch View, Employee Management, Stakeholder/Investor View, Settings
 
-No code changes are required for this audit — the app is secure for client/recruiter use.
+**5. Tech Stack & Architecture**
+- Markdown table with: React 18, TypeScript 5.8, Vite 5, Tailwind CSS 3.4, shadcn/ui (Radix primitives), Supabase (Auth + Postgres + Edge Functions + RLS), TanStack React Query 5, React Router 6, Recharts 2, Framer Motion 12, Zod 3, React Hook Form 7, jsPDF + html2canvas, Sentry, date-fns 3
+
+**6. Installation & Local Setup**
+- Clone, `npm install`, env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, `VITE_SENTRY_DSN`), `npm run dev`, scripts: `npm run build`, `npm test`
+
+**7. Roadmap** (the 5 specified items)
+- AI Payment Assistant
+- Smart Attendance Integration
+- Parent Portal
+- Automated WhatsApp/SMS Reminders
+- AI-Powered Financial Insights
+
+### Design Rules Applied
+- No generic emojis — Unicode section markers (―, │, ·) and clean markdown only
+- All badges use real versions from package.json
+- No hardcoded colors in HTML — only standard markdown and `<div align="center">`
+- Senior, handcrafted tone — every sentence derived from actual codebase inspection
+- GitHub dark/light mode compatible
+
+### File Modified
+- `README.md` — complete rewrite
 
