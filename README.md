@@ -91,30 +91,6 @@ From an engineering perspective, this is a single-page application with a row-le
 
 ---
 
-## Screenshots
-
-### Dashboard
-Revenue metrics, expense allocation, profit tracking, and period-over-period comparison — all in one view.
-
-![Dashboard — Financial overview with revenue vs. expense charts, obligation summaries, and period comparison](public/screenshots/dashboard.png)
-
-### Student Management
-Enrollment stats, batch distribution, class breakdown, and a searchable student directory with bulk actions.
-
-![Students — Enrollment trends, gender distribution, and filterable student list with payment status](public/screenshots/students.png)
-
-### Reports
-Date-filtered financial summaries with year-over-year comparison, profit margin analysis, and bar/line chart breakdowns.
-
-![Reports — P&L overview, profit trend, and revenue vs. expense comparison with export controls](public/screenshots/reports.png)
-
-### Settings
-Organization profile, currency configuration, fiscal year preferences, and business logo management.
-
-![Settings — Business profile configuration with currency, fiscal year, and logo management](public/screenshots/settings.png)
-
----
-
 ## Tech Stack · Architecture
 
 | Layer | Technology | Role |
