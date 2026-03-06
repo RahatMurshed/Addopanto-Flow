@@ -93,18 +93,25 @@ From an engineering perspective, this is a single-page application with a row-le
 
 ## Screenshots
 
-> Replace the placeholders below with actual screenshots of your deployment.
+### Dashboard
+Revenue metrics, expense allocation, profit tracking, and period-over-period comparison — all in one view.
 
-| View | Description |
-|------|-------------|
-| **Dashboard** | Revenue vs. expense charts, obligation summaries, period-over-period stats |
-| **Student Management** | Searchable student list with filters by batch, status, and payment standing |
-| **Student Profile** | Lifetime value banner, enrollment timeline, payment breakdown, and quick actions |
-| **Reports** | Date-filtered P&L summaries with CSV/PDF export controls |
-| **Course · Batch View** | Course cards with linked batches, enrollment counts, and capacity indicators |
-| **Employee Management** | Employee directory with salary payment history and employment status |
-| **Stakeholder · Investor View** | Investment records, loan disbursement steps, and repayment tracking |
-| **Settings** | Organization configuration, member management, and permission matrix |
+![Dashboard — Financial overview with revenue vs. expense charts, obligation summaries, and period comparison](public/screenshots/dashboard.png)
+
+### Student Management
+Enrollment stats, batch distribution, class breakdown, and a searchable student directory with bulk actions.
+
+![Students — Enrollment trends, gender distribution, and filterable student list with payment status](public/screenshots/students.png)
+
+### Reports
+Date-filtered financial summaries with year-over-year comparison, profit margin analysis, and bar/line chart breakdowns.
+
+![Reports — P&L overview, profit trend, and revenue vs. expense comparison with export controls](public/screenshots/reports.png)
+
+### Settings
+Organization profile, currency configuration, fiscal year preferences, and business logo management.
+
+![Settings — Business profile configuration with currency, fiscal year, and logo management](public/screenshots/settings.png)
 
 ---
 
