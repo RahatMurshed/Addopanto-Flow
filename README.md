@@ -121,9 +121,9 @@ From an engineering perspective, this is a React 18 single-page application back
 **Student Payment Detail** — Admission fee, monthly tuition breakdown, payment progress, and full payment history
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_43_54.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_44_05.png">
-  <img src=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_44_05.png" alt="Student Payment Detail" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_44_05.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_43_54.png">
+  <img src=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_43_54.png" alt="Student Payment Detail" width="100%">
 </picture>
 
 <br/>
@@ -169,8 +169,8 @@ From an engineering perspective, this is a React 18 single-page application back
 
 ```bash
 # 1 ― Clone the repository
-git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_NAME>
+git clone https://github.com/RahatMurshed/Addopanto-Flow.git
+cd Addopanto-Flow
 
 # 2 ― Install dependencies
 npm install
@@ -185,7 +185,6 @@ Edit `.env` with your values:
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
 VITE_SUPABASE_PROJECT_ID=your-project-id
-VITE_SENTRY_DSN=your-sentry-dsn          # optional
 ```
 
 ```bash
