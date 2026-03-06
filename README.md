@@ -101,9 +101,9 @@ From an engineering perspective, this is a React 18 single-page application back
 **Dashboard** — Revenue metrics, expense allocation, profit tracking, and period-over-period comparison
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/dashboard-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/dashboard-light.png">
-  <img src=".github/screenshots/dashboard-light.png" alt="Dashboard" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-dashboard-2026-03-06-17_49_47.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-dashboard-2026-03-06-17_49_56.png">
+  <img src=".github/screenshots/screencapture-addopantoflow-lovable-app-dashboard-2026-03-06-17_49_56.png" alt="Dashboard" width="100%">
 </picture>
 
 <br/>
@@ -111,9 +111,9 @@ From an engineering perspective, this is a React 18 single-page application back
 **Student Management** — Enrollment stats, batch distribution, and a searchable student directory with bulk actions
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/students-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/students-light.png">
-  <img src=".github/screenshots/students-light.png" alt="Student Management" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-2026-03-06-17_35_15.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-2026-03-06-17_35_22.png">
+  <img src=".github/screenshots/screencapture-addopantoflow-lovable-app-students-2026-03-06-17_35_22.png" alt="Student Management" width="100%">
 </picture>
 
 <br/>
@@ -121,9 +121,9 @@ From an engineering perspective, this is a React 18 single-page application back
 **Student Payment Detail** — Admission fee, monthly tuition breakdown, payment progress, and full payment history
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/payment-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/payment-light.png">
-  <img src=".github/screenshots/payment-light.png" alt="Student Payment Detail" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_43_54.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_44_05.png">
+  <img src=".github/screenshots/screencapture-addopantoflow-lovable-app-students-bace19a4-e629-4be8-b2b7-aaa8fb8e0742-2026-03-06-17_44_05.png" alt="Student Payment Detail" width="100%">
 </picture>
 
 <br/>
@@ -131,9 +131,9 @@ From an engineering perspective, this is a React 18 single-page application back
 **Reports** — Date-filtered financial summaries with revenue by source, expense distribution, and CSV export
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/reports-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/reports-light.png">
-  <img src=".github/screenshots/reports-light.png" alt="Reports" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-reports-2026-03-06-17_50_44.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/screenshots/screencapture-addopantoflow-lovable-app-reports-2026-03-06-17_50_29.png">
+  <img src=".github/screenshots/screencapture-addopantoflow-lovable-app-reports-2026-03-06-17_50_29.png" alt="Reports" width="100%">
 </picture>
 
 ---
